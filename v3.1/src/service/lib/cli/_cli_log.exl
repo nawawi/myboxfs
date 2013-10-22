@@ -1,0 +1,414 @@
+<?php
+if(!defined('_CLI_CODE')||_CLI_CODE!="a098846421a09ab1cacd3b3a753cbe05") exit("\n\nERROR: _CLI_CODE not set\n\n");
+
+function ___CLI_LOG_PRINT_LIST($_fname="") {
+	$_objf=_OBJ_PATH."/iosh_log_print.obj";
+	@unlink($_objf);
+	$_buff=_GLOB(_LOG_PATH."/*.log*");
+	if(_ARRAY_NULL($_buff)) {
+		_CLI_ECHO(_GETTEXT("No log available"));
+		return FALSE;
+	}
+	$_cnt=1;
+	$_obj=array();$_DTL=array();
+	foreach($_buff as $_lnx) {
+		$_ln=basename($_lnx);
+		if(preg_match("/^(\S+)\-(\d+)\.(log$|log\.gz$)/",$_ln,$_mm)) {
+			if(!_NULL($_fname) && $_fname!="{$_mm[1]}") {
+				continue;
+			}
+			$_ldate=strtotime($_mm[2]);
+			$_date=date('d-M-Y',$_ldate);
+			$_com="  C";
+			if($_mm[3]=="log.gz") $_com=" A";
+			$_DTL[]=array($_cnt,"$_date",$_com,$_mm[1],_FILE_SIZE($_lnx,1));
+			$_obj[$_cnt]="$_lnx";
+			$_cnt++;
+		}
+	}
+	unset($_cnt,$_date,$_com,$_ln,$_lnx,$_buff);
+	if(!_ARRAY_NULL($_DTL)) {
+		$_DTH=array(_GETTEXT_U("ID"),_GETTEXT_U("DATE"),"  ",_GETTEXT_U("LOGNAME"),_GETTEXT_U("SIZE"));
+		$_output .=_CLI_DATA_BODY_LINE($_DTH,$_DTL,array("","-","","-",""));
+	}
+	if(_ARRAY_NULL($_obj) || !_FILE_ARRAY_SAVE($_objf,$_obj) || _NULL($_output)) {
+		_CLI_ECHO(_GETTEXT("No log available"));
+		return FALSE;
+	}
+	echo _GETTEXT("Flags:")." A = "._GETTEXT("Archived").", C = "._GETTEXT("Current")."\n";
+	echo "$_output";
+	return TRUE;
+}
+
+function ___CLI_LOG_PRINT_READ($_file,$_find="",$_sort=0) {
+	if(!file_exists($_file)) return FALSE;
+	$_ln=basename($_file);
+	if(preg_match("/^(\S+)\-(\d+)\.(log$|log\.gz$)/",$_ln,$_mm)) {
+		$_date=date('d-M-Y',strtotime($_mm[2]));
+		$_header="LOGNAME: {$_mm[1]} [$_date]";
+		$_cat="/bin/cat";
+		$_sop="";
+		if($_sort==1) $_sop="|/bin/sort -r";
+		if($_mm[3]=="log.gz") $_cat="/bin/zcat";
+		if(!_NULL($_find)) {
+			$_data=_EXEC_SHELL("$_cat $_file $_sop |/bin/grep -i \"$_find\" |/bin/sed -e 's|\[{$_date}\s|[|g'");
+		} else {
+			$_data=_EXEC_SHELL("$_cat $_file $_sop |/bin/sed -e 's|\[{$_date}\s|[|g'");
+		}
+		_TRIM($_data);
+		if(!_NULL($_data)) {
+			_CLI_ECHO_HEADER("LOGNAME: {$_mm[1]} [$_date]");
+			echo "$_data\n";
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+function ___CLI_LOG_PRINT_VIEW($_num,$_find="",$_sort=0) {
+	$_objf=_OBJ_PATH."/iosh_log_print.obj";
+	$_obj=_FILE_ARRAY_GET($_objf);
+	if(_ARRAY_NULL($_obj)) {
+		_CLI_ECHO(_GETTEXT("Resource Id not available."));
+		_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","print"));
+		@unlink($_objf);
+		return FALSE;
+	}
+	if($_num=='*') {
+		$_ok=0;
+		foreach($_obj as $_id => $_file) {
+			if(___CLI_LOG_PRINT_READ($_file,$_find,$_sort)) {
+				echo "\n";$_ok=1;
+			}
+		}
+		if($_ok==1) {
+			return TRUE;
+		}
+	} else {
+		$_num_array=array();
+		_CLI_MULTINUM($_num,$_num_array);
+		foreach($_num_array as $_no) {
+			$_file=$_obj[$_no];
+			if(___CLI_LOG_PRINT_READ($_file,$_find,$_sort)) {
+				$_ok=1;
+			}
+		}
+		if($_ok==1) {
+			return TRUE;
+		}
+	}
+	if(!_NULL($_find)) {
+		_CLI_ECHO(_GETTEXT("No results found"));
+	} else {
+		_CLI_ECHO(_GETTEXT("No log available"));
+	}
+	return FALSE;
+}
+
+function ___CLI_LOG_DELETE($_num) {
+	$_objf=_OBJ_PATH."/iosh_log_print.obj";
+	if($_num=='*') {
+		$_buff=_GLOB(_LOG_PATH."/*.log*");
+		if(_ARRAY_NULL($_buff)) {
+			_CLI_ECHO(_GETTEXT("No log available"));
+			return FALSE;
+		}
+		if(_CLI_YESNO(_GETTEXT("This action will delete all %s.\nContinue this action? %s","log files","[yes/no]: "))==TRUE) {
+			foreach($_buff as $_ln) {
+				if(@unlink($_ln)) {
+					echo "-> Deleting ".basename($_ln)."\n";
+				}
+			}
+			return TRUE;
+		}
+		_CLI_ECHO(_GETTEXT("Action aborted"));
+		clearstatcache();
+		@unlink($_objf);
+		return FALSE;
+	} else {
+		$_buff=_FILE_ARRAY_GET($_objf);
+		if(_ARRAY_NULL($_buff)) {
+			_CLI_ECHO(_GETTEXT("Resource Id not available."));
+			_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","print"));
+			@unlink($_objf);
+			return FALSE;
+		}
+		$_num_array=array();
+		_CLI_MULTINUM($_num,$_num_array);
+		foreach($_num_array as $_no) {
+			if(!_NULL($_buff[$_no])) {
+				$_f=$_buff[$_no];
+				if(file_exists("$_f")) {
+					@unlink($_f);
+					unset($_buff[$_no]);
+				}
+			}
+		}
+		clearstatcache();
+		if(_FILE_ARRAY_SAVE($_objf,$_buff)) {
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function ___CLI_LOG_CONFIG_PRINT($_opt="all") {
+	$_objf=_OBJ_PATH."/iosh_log_config_print.obj";
+	@unlink($_objf);
+	_INI_TOKEN_GET("reporting","syslog.cfg",$_NTOKEN);
+	if(_ARRAY_NULL($_NTOKEN)) {
+		_CLI_ECHO(_GETTEXT("Configuration file missing"));
+		return FALSE;
+	}
+	$_local=0;$_remote=0;$_server=0;
+	if($_opt=="local") {
+		$_local=1;
+	} elseif($_opt=="remote") {
+		$_remote=1;
+	} elseif($_opt=="server") {
+		$_server=1;
+	} else {
+		$_local=1;$_remote=1;$_server=1;
+	}
+	$_output="";
+	if(!_ARRAY_NULL($_NTOKEN['local'])&&$_local==1) {
+		$_num=1;$_obj=array();$_DTL=array();
+		foreach($_NTOKEN['local'] as $_name => $_value) {
+			if(strpos($_name,"STAT")===FALSE) continue;
+			if(_NULL($_value)) $_value=0;
+			_STR_ONOFF($_value_str,$_value);
+			if(preg_match("/^(.*?)_STAT$/",$_name,$_mm)) {
+				$_info=$_NTOKEN['info'][$_mm[1]];
+				$_nn=strtolower($_mm[1]);
+				if(!_NULL($_nn)) $_nn="($_nn)";
+				$_DTL[]=array($_num,"$_info {$_nn}:",$_value_str);
+				unset($_nn);
+			} else {
+				$_info=$_NTOKEN['info'][$_name];
+				$_DTL[]=array($_num,"{$_info}:",$_value_str);
+			}
+			$_obj['local'][$_num]=$_name;
+			unset($_value_str,$_name,$_value,$_info,$_mm);
+			$_num++;
+		}
+		if(!_ARRAY_NULL($_DTL)) {
+			$_output .=_CLI_HEADER(_GETTEXT("Local Logging configuration"));
+			$_DTH=array(_GETTEXT_U("ID"),_GETTEXT_U("DESCRIPTION (LOGNAME)"),_GETTEXT_U("ENABLE"));
+			$_output .=_CLI_DATA_BODY_LINE($_DTH,$_DTL,array("","","-"),"-");
+		}
+		unset($_DTL);
+	}
+	
+	if(!_ARRAY_NULL($_NTOKEN['remote'])&&$_remote==1) {
+		$_num=1;
+		foreach($_NTOKEN['remote'] as $_name => $_value) {
+			if(strpos($_name,"STAT")===FALSE) continue;
+			if(_NULL($_value)) $_value=0;
+			_STR_ONOFF($_value_str,$_value);
+			if(preg_match("/^(.*?)_STAT$/",$_name,$_mm)) {
+				$_info=$_NTOKEN['info'][$_mm[1]];
+				$_nn=strtolower($_mm[1]);
+				if(!_NULL($_nn)) $_nn="($_nn)";
+				$_DTL[]=array($_num,"$_info {$_nn}:",$_value_str);
+				unset($_nn);
+			} else {
+				$_info=$_NTOKEN['info'][$_name];
+				$_DTL[]=array($_num,"{$_info}:",$_value_str);
+			}
+			$_obj['remote'][$_num]=$_name;
+			unset($_value_str,$_name,$_value,$_info,$_mm);
+			$_num++;
+		}
+		if(!_ARRAY_NULL($_DTL)) {
+			if(!_NULL($_output)) $_output .="\n";
+			$_output .=_CLI_HEADER(_GETTEXT("Remote Logging configuration"));
+			$_DTH=array(_GETTEXT_U("ID"),_GETTEXT_U("DESCRIPTION (LOGNAME)"),_GETTEXT_U("ENABLE"));
+			$_output .=_CLI_DATA_BODY_LINE($_DTH,$_DTL,array("","","-"),"-");
+		}
+		unset($_DTL);
+	}
+
+	if(!_ARRAY_NULL($_NTOKEN['remote'])&&$_server==1) {
+		_DEFINITIONS_GET_BYNAME("networks",$_NTOKEN['remote']['SERVER'],$_STOKEN,"host");
+		$_remote_server=$_NTOKEN['remote']['SERVER'];
+		if(!_NULL($_STOKEN['ADDR'])) {
+			$_remote_server="{$_NTOKEN['remote']['SERVER']} [{$_STOKEN['ADDR']}]";
+		}
+		_DEFINITIONS_GET_BYNAME("services",$_NTOKEN['remote']['SERVICE'],$_STOKEN);
+		$_remote_service=$_NTOKEN['remote']['SERVICE'];
+		if(!_ARRAY_NULL($_STOKEN)) {
+			$_remote_service="{$_NTOKEN['remote']['SERVICE']} [{$_STOKEN['PROTO']} -> {$_STOKEN['SPORT']}:{$_STOKEN['DPORT']}]";
+		}
+		unset($_STOKEN);
+		$_output .="\n"._CLI_HEADER(_GETTEXT("Remote server configuration"));
+		$_output .=_CLI_DATA_BODY(
+			array(
+				_GETTEXT_U("HOST")=>$_remote_server,
+				_GETTEXT_U("SERVICE")=>$_remote_service
+			)
+		);
+		$_obj['server']['host']=$_remote_server;
+		$_obj['server']['service']=$_remote_service;
+	}
+	if(_ARRAY_NULL($_obj) || !_FILE_ARRAY_SAVE($_objf,$_obj) || _NULL($_output)) {
+		_CLI_ECHO(_GETTEXT("No data available"));
+		@unlink($_objf);
+                return FALSE;	
+	}
+	echo "$_output";
+	return TRUE;
+}
+
+function ___CLI_LOG_CONFIG_SET($_sec,$_sname,$_sval) {
+	_INI_TOKEN_GET("reporting","syslog.cfg",$_NTOKEN);
+	if($_sec=="local" || $_sec=="remote") {
+		$_objf=_OBJ_PATH."/iosh_log_config_print.obj";
+		_STR_ONOFF($_onoff,$_sval);
+		if($_sname=='*') {
+			if(!_ARRAY_NULL($_NTOKEN[$_sec])) {
+				$_DATA=array();
+				foreach($_NTOKEN[$_sec] as $_name => $_value) {
+					if($_name=="SERVER" || $_name=="SERVICE") continue;
+					$_DATA[$_name]="$_onoff";
+				}
+				if(!_ARRAY_NULL($_DATA)) {
+					if(_INI_TOKEN_UPDATE("reporting","syslog.cfg","$_sec",$_DATA)) {
+						_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+						_CLI_ACTIVATE("syslog_restart");
+						return TRUE;
+					}
+				}
+			}
+		} else {
+			$_obj=_FILE_ARRAY_GET($_objf);
+			if(_ARRAY_NULL($_obj[$_sec])) {
+				_CLI_ECHO(_GETTEXT("Resource Id '%s' for '%s' not available.","$_sname","$_sec"));
+				_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","config print $_sec"));
+				@unlink($_objf);
+				return FALSE;
+			}
+			$_num_array=array();$_DATA=array();
+			_CLI_MULTINUM($_sname,$_num_array);
+			foreach($_num_array as $_no) {
+				$_name=$_obj[$_sec][$_no];
+				if(!_NULL($_NTOKEN[$_sec][$_name])) {
+					$_DATA[$_name]="$_onoff";
+				}
+			}
+			if(!_ARRAY_NULL($_DATA)) {
+				if(_INI_TOKEN_UPDATE("reporting","syslog.cfg","$_sec",$_DATA)) {
+					_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+					_CLI_ACTIVATE("syslog_restart");
+					return TRUE;
+				}
+			}
+		}
+	} elseif($_sec=="server") {
+		if($_sname=="host") {
+			$_objf=_OBJ_PATH."/iosh_definitions_networks_print.obj";
+			$_obj=_FILE_ARRAY_GET($_objf);
+			if(_ARRAY_NULL($_obj)) {
+				_CLI_ECHO(_GETTEXT("Resource Id not available."));
+				_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions networks print host"));
+				@unlink($_objf);
+				return FALSE;
+			}
+			$_add=___CLI_DEFINITIONS_OBJGETNAME($_obj,"networks",$_sval,"host");
+			if(_NULL($_add)) {
+				_CLI_ECHO(_GETTEXT("Resource Id '%s' not available.","$_sval"));
+				_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions networks print host"));
+				@unlink($_objf);
+				return FALSE;
+			}
+			$_DATA['ID']="remote";
+			$_DATA['SERVER']="$_add";
+			if(_INI_TOKEN_UPDATE("reporting","syslog.cfg","remote",$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+				return TRUE;
+			}
+		} elseif($_sname=="service") {
+			$_objf=_OBJ_PATH."/iosh_definitions_services_print.obj";
+			$_obj=_FILE_ARRAY_GET($_objf);
+			if(_ARRAY_NULL($_obj)) {
+				_CLI_ECHO(_GETTEXT("Resource Id '%s' not available.","$_sval"));
+				_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions services print"));
+				@unlink($_objf);
+				return FALSE;
+			}
+			$_add=___CLI_DEFINITIONS_OBJGETNAME($_obj,"services",$_sval,"");
+			if(_NULL($_add)) {
+				_CLI_ECHO(_GETTEXT("Resource Id '%s' not available.","$_sval"));
+				_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions services print"));
+				@unlink($_objf);
+				return FALSE;
+			}
+			$_DATA['ID']="remote";
+			$_DATA['SERVICE']="$_add";
+			if(_INI_TOKEN_UPDATE("reporting","syslog.cfg","remote",$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+				return TRUE;
+			}
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function _cli_log() {
+	if($_SERVER["argc"] > 1 ) {
+		$_max=$_SERVER["argc"];
+		_CLI_TRIM_ARGS($_SERVER['argv']);
+		for($_x=1;$_x < $_max;$_x++) {
+			$_options=$_SERVER["argv"][$_x];
+			if($_options=="log") {
+				$_cmd=$_SERVER["argv"][$_x+1];
+                        	if($_cmd=="print") {
+					return ___CLI_LOG_PRINT_LIST();
+                        	} elseif($_cmd=="filter") {
+					$_lgnm=$_SERVER["argv"][$_x+2];
+					if(!_NULL($_lgnm)) {
+						return ___CLI_LOG_PRINT_LIST($_lgnm);
+					}
+                        	} elseif($_cmd=="view") {
+					$_num=$_SERVER["argv"][$_x+2];
+					$_sort="";
+					if(!_NULL($_SERVER["argv"][$_x+3])) _STR_ONOFF($_sort,$_SERVER["argv"][$_x+3]);
+					if(!_NULL($_num)) {
+						return ___CLI_LOG_PRINT_VIEW($_num,"",$_sort);
+					}
+                        	} elseif($_cmd=="find") {
+					$_num=$_SERVER["argv"][$_x+2];
+					$_str=$_SERVER["argv"][$_x+3];
+					$_sort="";
+					if(!_NULL($_SERVER["argv"][$_x+3])) _STR_ONOFF($_sort,$_SERVER["argv"][$_x+4]);
+					if(!_NULL($_str)) {
+						return ___CLI_LOG_PRINT_VIEW($_num,$_str,$_sort);
+					}
+				} elseif($_cmd=="delete") {
+					$_num=$_SERVER["argv"][$_x+2];
+					return ___CLI_LOG_DELETE($_num);
+				}
+			} elseif($_options=="config") {
+				$_cmd=$_SERVER["argv"][$_x+1];
+                        	if($_cmd=="print") {
+					$_opt=$_SERVER["argv"][$_x+2];
+					return ___CLI_LOG_CONFIG_PRINT($_opt);
+                        	} elseif($_cmd=="set") {
+					$_opt=$_SERVER["argv"][$_x+2];
+					if($_opt=="local" || $_opt=="remote" || $_opt=="server") {
+						$_snum=$_SERVER["argv"][$_x+3];
+						$_sval=$_SERVER["argv"][$_x+4];
+						return ___CLI_LOG_CONFIG_SET($_opt,$_snum,$_sval);
+					}
+				} elseif($_cmd=="apply") {
+					return _INIT_EXEC("syslog_restart");
+				}
+				continue;
+			} elseif($_options=="compress") {
+				return _LOG_COMPRESS();
+			}
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+?>

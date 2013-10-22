@@ -1,0 +1,266 @@
+﻿<?xml version="1.0"?>
+<CLISH_MODULE>
+<VIEW name="dhcp" prompt="${SYSTEM_NAME}/network/dhcp/&gt; ">
+        <COMMAND name="."
+                help="Return to main menu"
+                view="main"
+                viewid=""/>
+        <COMMAND name=".."
+                help="Return to previous menu"
+                view="network"
+                viewid=""/>
+<!-- start server -->
+        <COMMAND name="server"
+                help="Display or change DHCP Server configuration">
+                <ACTION>exec /service/tools/dhcp_config.exc server print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+        <COMMAND name="server print"
+                help="Display DHCP Server configuration">
+                <ACTION>exec /service/tools/dhcp_config.exc server print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+        <COMMAND name="server find"
+                help="Search DHCP Server">
+		<PARAM name="string"
+			help="String to find"
+			ptype="STRING_ANY" />
+                <ACTION>exec /service/tools/dhcp_config.exc server find "${string}" 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+        <COMMAND name="server apply"
+                help="Apply changes">
+                <ACTION>exec /service/tools/dhcp_config.exc server apply 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="server add"
+                help="Add new DHCP Server">
+ 		<PARAM name="interface_id"
+                        help="Resource Id for Interface"
+                        ptype="NUM"/>
+		<PARAM name="enable"
+			help="Set enable"
+			ptype="ONOFF" 
+			default="off"/>
+		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/dhcp_config.exc server add "${interface_id}" ${enable} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="server set"
+                help="Change DHCP Server configuration"/>
+        <COMMAND name="server set adddress-range"
+                help="Set DHCP Server address pool">
+		<PARAM name="id"
+                        help="Resource Id"
+                        ptype="NUM"/>
+		<PARAM name="range_start"
+                        help="Address range start"
+                        ptype="IPV4"/>
+		<PARAM name="range_end"
+                        help="Address range end"
+                        ptype="IPV4"/>
+                <ACTION>exec /service/tools/dhcp_config.exc server set range ${id} ${range_start} ${range_end} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="server set dns-server"
+                help="Set DHCP Server dns server">
+		<PARAM name="id"
+                        help="Resource Id"
+                        ptype="NUM"/>
+		<PARAM name="server1"
+                        help="DNS server 1"
+                        ptype="IPV4_NULL"
+			default="NULL"/>
+		<PARAM name="server2"
+                        help="DNS server 2"
+                        ptype="IPV4_NULL"
+			default="NULL"/>
+                <ACTION>exec /service/tools/dhcp_config.exc server set dns ${id} ${server1} ${server2} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="server set wins-server"
+                help="Set DHCP Server WINS server">
+		<PARAM name="id"
+                        help="Resource Id"
+                        ptype="NUM"/>
+		<PARAM name="node"
+                        help="WINS Node type"
+                        ptype="WINS_NODE"
+			default="none"/>
+		<PARAM name="server"
+                        help="WINS server"
+                        ptype="IPV4_NULL"
+			default="0.0.0.0"/>
+                <ACTION>exec /service/tools/dhcp_config.exc server set wins ${id} ${node} ${server} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="server set domain"
+                help="Set DHCP Server domain">
+		<PARAM name="id"
+                        help="Resource Id"
+                        ptype="NUM"/>
+ 		<PARAM name="domain"
+                        help="Domain name"
+                        ptype="HOST" />
+                <ACTION>exec /service/tools/dhcp_config.exc server set domain ${id} ${domain} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="server set default-gateway"
+                help="Set DHCP Server default-fateway">
+		<PARAM name="id"
+                        help="Resource Id"
+                        ptype="NUM"/>
+ 		<PARAM name="gateway"
+                        help="Gateway address"
+                        ptype="IPV4_NULL"
+			default="NULL"/>
+                <ACTION>exec /service/tools/dhcp_config.exc server set gateway ${id} ${gateway} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="server set enable"
+                help="Enable DNS Server">
+		<PARAM name="id"
+                        help="Resource Id"
+                        ptype="NUM"/>
+		<PARAM name="enable"
+			help="Set enable"
+			ptype="ONOFF" 
+			default="off"/>
+                <ACTION>exec /service/tools/dhcp_config.exc server set enable ${id} ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="server set description"
+                help="Set description">
+		<PARAM name="id"
+                        help="Resource Id"
+                        ptype="NUM"/>
+		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/dhcp_config.exc server set description ${id} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+       <COMMAND name="server delete"
+                help="Delete DHCP server list">
+                <PARAM name="id"
+                        help="Resource Id '*' will delete all list"
+                        ptype="MULTI_NUM_ALL" />
+                <ACTION>exec /service/tools/dhcp_config.exc server delete "${id}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!-- end server -->
+<!-- start static -->
+        <COMMAND name="static"
+                help="Display or change DHCP Static MAC/IP mappings">
+                <ACTION>exec /service/tools/dhcp_config.exc static print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+        <COMMAND name="static print"
+                help="Display DHCP Static MAC/IP mappings">
+                <ACTION>exec /service/tools/dhcp_config.exc static print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+        <COMMAND name="static find"
+                help="Search DHCP Static MAC/IP mappings">
+		<PARAM name="string"
+			help="String to find"
+			ptype="STRING_ANY" />
+                <ACTION>exec /service/tools/dhcp_config.exc static find "${string}" 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+        <COMMAND name="static apply"
+                help="Apply changes">
+                <ACTION>exec /service/tools/dhcp_config.exc static apply 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="static add"
+                help="Add new DHCP Static MAC/IP mappings">
+ 		<PARAM name="server_id"
+                        help="Resource Id for DHCP Server"
+                        ptype="NUM"/>
+		<PARAM name="mac_addr"
+                        help="MAC Address"
+                        ptype="MACADDR"/>
+		<PARAM name="ip_addr"
+                        help="IP Address"
+                        ptype="IPV4"/>
+		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/dhcp_config.exc static add "${server_id}" ${mac_addr} ${ip_addr} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="static set"
+                help="Change DHCP Static MAC/IP mappings"/>
+        <COMMAND name="static set ip-address"
+                help="Set DHCP Static MAC/IP mappings IP Address">
+		<PARAM name="id"
+                        help="Resource Id"
+                        ptype="NUM"/>
+		<PARAM name="ip_addr"
+                        help="IP Address"
+                        ptype="IPV4"/>
+                <ACTION>exec /service/tools/dhcp_config.exc static set ip ${id} ${ip_addr} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="static set mac-address"
+               	help="Set DHCP Static MAC/IP mappings MAC Address">
+		<PARAM name="id"
+                        help="Resource Id"
+                        ptype="NUM"/>
+		<PARAM name="mac_addr"
+                        help="MAC Address"
+                        ptype="IPV4"/>
+                <ACTION>exec /service/tools/dhcp_config.exc static set ip ${id} ${mac_addr} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="static set description"
+                help="Set description">
+		<PARAM name="id"
+                        help="Resource Id"
+                        ptype="NUM"/>
+		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/dhcp_config.exc static set description ${id} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!-- end static -->
+<!-- start relay -->
+        <COMMAND name="relay"
+                help="Display or change DHCP Relay">
+                <ACTION>exec /service/tools/dhcp_config.exc relay print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+        <COMMAND name="relay print"
+                help="Display DHCP Relay">
+                <ACTION>exec /service/tools/dhcp_config.exc relay print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+        <COMMAND name="relay apply"
+                help="Apply changes">
+                <ACTION>exec /service/tools/dhcp_config.exc relay apply 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="relay set"
+                help="Configure DHCP Relay" />
+        <COMMAND name="relay set server"
+                help="Configure DHCP Relay Server">
+ 		<PARAM name="server_id"
+                        help="Resource Id for definition network host"
+                        ptype="NUM_NULL"
+			default="NULL"/>
+                <ACTION>exec /service/tools/dhcp_config.exc relay set server "${server_id}" 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="relay set interface"
+                help="Configure DHCP Relay interface">
+		<PARAM name="interface_id"
+                        help="Resource Id for Interfaces"
+                        ptype="MULTI_NUM_NULL"
+			default="NULL"/>
+                <ACTION>exec /service/tools/dhcp_config.exc relay set interface "${interface_id}" 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="relay set enable"
+                help="Enable DHCP Relay">
+		<PARAM name="enable"
+			help="Set enable"
+			ptype="ONOFF" 
+			default="off"/>
+                <ACTION>exec /service/tools/dhcp_config.exc relay set enable ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+<!-- end relay -->
+</VIEW>
+</CLISH_MODULE>

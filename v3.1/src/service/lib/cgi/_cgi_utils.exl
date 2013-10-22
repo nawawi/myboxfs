@@ -1,0 +1,222 @@
+<?php
+if(!defined('_CGI_CODE')||_CGI_CODE!="90d45215e48dac81e802f17310ad0c1f") exit("\n\nERROR: _CGI_CODE not set\n\n");
+
+function _CGI_ATTR_KEY($_str='') {
+	$_rand=_RAND_TEXT(10);
+	return "key"._INI_TOKEN_CREATE_KEY("$_rand$_str");
+}
+
+function _CGI_JSON($_data_array) {
+	return json_encode($_data_array);
+}
+
+function _CGI_CHECKBOX_VAL($_num) {
+	if($_num==1) {
+		return "checked";
+	}
+}
+
+function _CGI_DROPDOWNBOX_VAL($_val1,$_val2) {
+	if($_val1==$_val2) {
+		return "selected";
+	}
+}
+
+function _CGI_IF_MSIE6() {
+ 	if(!_NULL($_SERVER["HTTP_USER_AGENT"]) && strpos($_SERVER["HTTP_USER_AGENT"],"MSIE 6")!==FALSE) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+function _CGI_IF_MSIE7() {
+ 	if(!_NULL($_SERVER["HTTP_USER_AGENT"]) && strpos($_SERVER["HTTP_USER_AGENT"],"MSIE 7")!==FALSE) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+function _CGI_IF_MSIE() {
+ 	if(!_NULL($_SERVER["HTTP_USER_AGENT"]) && strpos($_SERVER["HTTP_USER_AGENT"],"MSIE")!==FALSE) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+function _CGI_JS_DATA() {
+	_INI_TOKEN_GET("system","country.cfg",$_CTOKEN);
+	$_COUNTRY_VAR=array();
+	if(!_ARRAY_NULL($_CTOKEN)) {
+		$_COUNTRY=$_CTOKEN['country'];
+		unset($_COUNTRY['__DATA_ID']);
+		foreach($_COUNTRY as $_S => $_L) {
+			$_COUNTRY_VAR[$_S]=htmlspecialchars($_L);
+		}
+	}
+	_INI_TOKEN_GET("definitions","classip.cfg",$_ITOKEN);
+	$_IP_VAR=array();
+	if(!_ARRAY_NULL($_ITOKEN)) {
+		$_K=$_ITOKEN['classip'];
+		unset($_K['__DATA_ID']);
+		foreach($_K as $_S => $_L) {
+			$_IP_VAR[$_S]="$_L";
+		}
+	}
+	$_TIMEZONE_VAR="";
+	$_BUFF=_FILE(_ZONE_LIST_FILE);
+	if(!_ARRAY_NULL($_BUFF)) {
+		$_TIMEZONE_VAR .="[";
+		foreach($_BUFF as $_lst) {
+			_TRIM($_lst);
+			if(_NULL($_lst)) continue;
+			$_TIMEZONE_VAR .="'$_lst',";
+		}
+		_TRIM($_TIMEZONE_VAR,",");
+		$_TIMEZONE_VAR .="]";
+	}
+
+	$_ICMPTYPE_VAR=array();
+	_INI_TOKEN_GET("definitions","icmptype.cfg",$_ETOKEN);
+	if(!_ARRAY_NULL($_ETOKEN)) {
+		$_K=$_ETOKEN['icmptype'];
+		unset($_K['__DATA_ID']);
+		foreach($_K as $_S => $_L) {
+			$_ICMPTYPE_VAR[$_S]="$_L";
+		}
+	}
+
+	$_WEEKDAY_VAR=array();
+	_INI_TOKEN_GET("definitions","weekdays.cfg",$_ETOKEN);
+	if(!_ARRAY_NULL($_ETOKEN)) {
+		$_K=$_ETOKEN['weekdays'];
+		unset($_K['__DATA_ID']);
+		foreach($_K as $_S => $_L) {
+			$_WEEKDAY_VAR[$_S]="$_L";
+		}
+	}
+
+
+	$_var="";
+	$_var .="var _country_array="._CGI_JSON($_COUNTRY_VAR).";";
+	$_var .="var _classip_array="._CGI_JSON($_IP_VAR).";";
+	$_var .="var _icmptype_array="._CGI_JSON($_ICMPTYPE_VAR).";";
+	$_var .="var _weekday_array="._CGI_JSON($_WEEKDAY_VAR).";";
+	$_var .="var _timezone_array={$_TIMEZONE_VAR};";
+	return $_var;
+}
+
+function _CGI_JS_DATA_ICON() {
+	$_var .="var _ICON="._CGI_JSON($GLOBALS['_IMG']).";";
+	return $_var;
+}
+
+function _CGI_JS_SPECIALCHARS($_str) {
+	$_str = preg_replace("/\r*\n/","\\n",$_str);
+	$_str = preg_replace("/\//","\\\/",$_str);
+	$_str = preg_replace("/\"/","\\\"",$_str);
+	$_str = preg_replace("/'/","\\'",$_str);
+	return $_str;
+}
+
+function _CGI_TOOLTIPS($_title) {
+	$_title=_CGI_JS_SPECIALCHARS($_title);
+	return "onmouseover=\"return __tnutils.tooltips('$_title');\" onmouseout=\"return nd();\"";
+}
+
+function _CGI_RESOURCE_RESPONSE($_resource,$_DATA_GET) {
+	$_CONTENT_TYPE=array();
+	$_CONTENT_TYPE['png']="image/png";
+	$_CONTENT_TYPE['gif']="image/gif";
+	$_CONTENT_TYPE['js']="text/javascript";
+	$_CONTENT_TYPE['css']="text/css";
+	$_CONTENT_TYPE['html']="text/html";
+	$_CONTENT_TYPE['htm']="text/htm";
+	$_CONTENT_TYPE['txt']="text/ascii";
+
+	$_obj=_CGI_WEBGUI_RESOURCE."/$_resource";
+	$_ext="txt";
+	$_nofile=0;
+	$_nocache=$_DATA_GET['nocache'];
+	if(_NULL($_nocache)) $_nocache=0;
+	if(preg_match("/\.(js|png|gif|css|html|htm|txt)$/",$_resource,$_mm)) {
+		$_ext=$_mm[1];
+	}
+	if(_NULL($_CONTENT_TYPE[$_ext])) {
+		exit;
+	}
+
+	if(!file_exists($_obj)) {
+		$_nofile=1;$_nocache=0;
+		if($_ext=="png" || $_ext=="gif") {
+			$_obj=_CGI_WEBGUI_RESOURCE."/blank.gif";
+			$_nofile=0;
+		}
+	}
+
+	$_fp=fopen($_obj,'rb');
+	if($_nocache==1) {
+		header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
+                header("Last-Modified: " . gmdate("D, d M Y H:i:s") . " GMT");
+                header("Cache-Control: no-store, no-cache, must-revalidate");
+                header("Cache-Control: post-check=0, pre-check=0",false);
+		header("Pragma: no-cache");
+	}
+	header("Content-Type: {$_CONTENT_TYPE[$_ext]}");
+	@fpassthru($_fp);
+	exit;
+}
+
+function _CGI_UPLOAD_PROGRESS() {
+	if(!_NULL($_POST['_pid'])) {
+		$_pid=$_POST['_pid'];
+		$_bw=$_POST['_bw'] ? $_POST['_bw'] : 390;
+		$_info=uploadprogress_get_info($_pid);
+		if(!_ARRAY_NULL($_info)) {
+			$_upload_id=$_info['upload_id'];
+			$_fieldname=$_info['fieldname'];
+			$_filename=$_info['filename'];
+			$_time_start=$_info['time_start'];
+			$_time_last=$_info['time_last'];
+			$_speed_average=$_info['speed_average'];
+			$_speed_last=$_info['speed_last'];
+			$_bytes_uploaded=$_info['bytes_uploaded'];
+			$_bytes_total=$_info['bytes_total'];
+			$_files_uploaded=$_info['files_uploaded'];
+			$_est_sec=$_info['est_sec'];
+
+			if($_bytes_total > 1 && $_bytes_uploaded >= $_bytes_total && $_est_sec==0) {
+				return _GETTEXT("Upload completed");
+			}
+
+			$_speed=0;$_eta=0;
+			$_metter=sprintf("%.2f", $_bytes_uploaded / $_bytes_total * 100);
+			if($_speed_last < 10000) {
+				$_speed=sprintf("%.2f", $_speed_last / 1000);
+			} else {
+				$_speed=sprintf("%d", $_speed_last / 1000);
+			}
+			$_eta=sprintf("%02d:%02d", $_est_sec / 60, $_est_sec % 60 );
+
+			$_upload=_BYTE_FORMAT($_bytes_uploaded);
+        		$_total=_BYTE_FORMAT($_bytes_total);
+
+			$_bar="";
+			$_bar .="<table border=0 style='width: {$_bw}px; table-layout: fixed; padding: 0px; margin: 0px; border: 0px none; background: #ffffff;'>";
+			$_bar .="<tr>";
+			$_cn="#ff6600";
+			for($_i=0; $_i<100; $_i+=2) {
+				$_color=($_i< $_metter) ? "$_cn" : "#fae5b0";
+				$_bar .="<td style='background-color: {$_color}; font-size: 8pt; height: 15px; width: 2px;'>&nbsp;</td>";
+			}
+			$_bar .="</tr></table>";
+			$_bar .="<table width=100%>";
+			$_bar .="<tr><td align='center'>";
+			$_bar .="$_eta left (at {$_speed}KB/sec) {$_upload}/{$_total} ({$_metter}%)";
+			$_bar .="</td></tr></table>";
+
+			return $_bar;
+		}
+		return "Upload started";
+	}
+}
+?>

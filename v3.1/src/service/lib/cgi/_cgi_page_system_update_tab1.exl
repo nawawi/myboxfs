@@ -1,0 +1,241 @@
+<?php
+if(!defined('_CGI_CODE')||_CGI_CODE!="90d45215e48dac81e802f17310ad0c1f") exit("\n\nERROR: _CGI_CODE not set\n\n");
+
+function _CGI_PAGE_SYSTEM_UPDATE_TAB_1_LIST() {
+	extract($GLOBALS['_IMG']);
+	extract($GLOBALS['__CDATA']);
+	@_MKDIR("/tmp/uploadprogress");
+	$_buff=_GLOB(_UPDATE_PATH."/*.mpu");
+	$_cbuff=array();
+	if(!_ARRAY_NULL($_buff)) {
+		foreach($_buff as $_lnx) {
+			if(($_control=_UPDATE_READ_CONTROL($_lnx))==FALSE) {
+				continue;
+			}
+			$_ln=basename($_lnx,".mpu");
+			$_desc=_UPDATE_READ_NOTE($_lnx);
+			$_desc=nl2br(htmlspecialchars($_desc));
+			$_date=date('d-M-Y H:i',$_control['TIME']);
+			$_version=$_control['VERSION'];
+			$_release=$_control['BUILD'];
+			$_cbuff[$_control['TIME']]['date']="$_date";
+			$_cbuff[$_control['TIME']]['version']="$_version build-{$_release}";
+			$_cbuff[$_control['TIME']]['desc']=$_desc;
+			$_cbuff[$_control['TIME']]['file']=$_ln;
+			unset($_date,$_version,$_release,$_desc,$_control,$_ln);
+		}
+	}
+	$_page="";
+	$_css_td_c="padding: 4px;";
+	if(_ARRAY_NULL($_cbuff)) {
+		$_page .="<div style='border: 1px solid #4f6d81;padding: 10px; text-align: center;'>";
+		$_page .=_GETTEXT("No updates available for installation");
+		$_page .="</div>";
+	} else {
+		krsort($_cbuff);
+		$_page .="<div style='border: 1px solid #4f6d81;";
+		if(count($_cbuff) >= 9) {
+			$_page .="height: 300px; overflow-y: auto; overflow-x: hidden;";
+		}
+		$_page .="'>";
+		$_page .="<table id='blist' style='border-spacing: 0px; border-collapse: collapse;'>";
+		foreach($_cbuff as $_line_a) {
+			$_page .="
+			<tr id='upfile|{$_line_a['file']}'>
+			<td style='$_css_td_c; width: 150px; vertical-align: top; font-weight: bold;'>{$_line_a['version']}</td>
+			<td style='$_css_td_c; width: 20px; vertical-align: top; font-weight: bold;'><img src='$_ICON_INFO'></td>
+			<td style='$_css_td_c; width: 550px;'>
+				{$_line_a['desc']}
+				<hr style='margin: 3px 0px 3px 0px;' />
+				Released: {$_line_a['date']}
+			</td>
+			</tr>
+			";
+		}
+		$_page .="</table></div>";
+	}
+	return trim($_page);
+}
+
+function _CGI_PAGE_SYSTEM_UPDATE_TAB_1() {
+	extract($GLOBALS['__CDATA']);
+	_INI_TOKEN_GET("system","update.cfg",$_TOKEN);
+	$_bid=_CGI_ATTR_KEY();
+	$_css_table="width: 720px; border-spacing: 0px; border-collapse: collapse; margin: 0px; padding: 1px; background-color: #ffffff; border: 0px; color: #000000; text-align: left;";
+	$_css_td_t="font-weight: bold; background-color: #4f6d81; padding: 4px; color: #ffffff;";
+	$_css_td_c="padding: 4px;";
+	$_page .="
+		<div class='fbox_c'>
+		<table style='$_css_table'>
+		<tr>
+		<td style='$_css_td_t;'>"._GETTEXT("Available firmware updates")."</td>
+		</tr>
+		<tr>
+		<td id='update_list'>
+		"._CGI_PAGE_SYSTEM_UPDATE_TAB_1_LIST()."
+		</td>
+		</tr>
+		</table>
+		<fieldset style='margin-top: 20px;'>
+		<legend>"._GETTEXT("Options")."</legend>
+		<div style='margin: 5px;'>
+		<table class='tbox_t'>
+		<tr>
+		<td class='tbox_tdl' colspan='2'>"._CGI_BUTTON(array('id'=>"button_{$_bid}1",'text'=>_GETTEXT("Install updates"),'css'=>'width: 180px;'))."</td>
+		<td class='tbox_tdr' style='vertical-align: middle;'>"._GETTEXT("This will install all updates on list of available firmware updates above.")."</td>
+		</tr>
+		<tr>
+		<td colspan='3'>&nbsp;</td>
+		</tr>
+		<tr>
+		<td class='tbox_tdl' colspan='2'>"._CGI_BUTTON(array('id'=>"button_{$_bid}2",'text'=>_GETTEXT("Upload firmware"),'css'=>'width: 180px;'))."</td>
+		<td class='tbox_tdr' style='vertical-align: middle;'>"._GETTEXT("This will upload update file manually and add it to the list of available firmware updates above. Firmware file can be downloaded at %s","<a href='http://updates.tracenetworkcorporation.com/pub' target='_blank'>http://updates.tracenetworkcorporation.com/pub</a>")."</td>
+		</tr>
+	";
+	if(!_NULL($_TOKEN['update']['DOWNLOAD']) && $_TOKEN['update']['DOWNLOAD']==0) {
+		$_page .="
+		<tr>
+		<td colspan='3'>&nbsp;</td>
+		</tr>
+		<tr>
+		<td class='tbox_tdl' colspan='2'>"._CGI_BUTTON(array('id'=>"button_{$_bid}3",'text'=>_GETTEXT("Download firmware"),'css'=>'width: 180px;'))."</td>
+		<td class='tbox_tdr' style='vertical-align: middle;'>"._GETTEXT("This will download available update file and add it to the list of available firmware updates above.")."</td>
+		</tr>
+		";
+	}
+
+	$_page .="
+		</table>
+		</div>
+		</fieldset>
+		</div>
+
+		<script type='text/javascript'>
+			\$(document).ready(function() {
+				__tndefinitions.rowcolor('table#blist tr');
+				\$('div#button_{$_bid}1').click(function(evt) {
+					var e=evt || window.event;
+					e.preventDefault();
+					var _tmsg=\$.trim(\$('td#update_list').text());
+					if(!is_null(_tmsg) && _tmsg=='"._GETTEXT("No updates available for installation")."') {
+						__tndialog.ebox(_tmsg);
+						return false;
+					}	
+					__tndialog.confirm_box('"._GETTEXT("This action will reboot the system if an installed update requires it. Are you really want to proceed?")."',function() {
+						\$.ajaxSetup({async: false});
+						var _ex={'init_eo':'_eq','init_ex':'FUNC_UPDATE_INSTALL'};
+						\$.post('index.exh',_ex,function() {
+							__tndialog.ibox('"._GETTEXT("Firmware installation has been started. This may take a while. Please check update log for process information.")."');
+						});
+					});
+				});
+
+				\$('div#button_{$_bid}2').click(function(evt) {
+					var e=evt || window.event;
+					e.preventDefault();
+					var _top=e.pageY+'px';
+					var _left=e.pageX+'px';
+					var __pid='gbox_firmware_upload';
+					var __jpid='div#'+__pid;
+					var _html=\"<form id='upload_form_firmware' enctype='multipart/form-data'>\"+
+						  \"<input type='hidden' name='UPLOAD_IDENTIFIER' value='{$_bid}2'>\"+
+						  \"<input type='hidden' name='_update_data' value='firmware_upload'>\"+
+						  \"<input type='hidden' name='_opt' value='upload'>\"+
+						  \"<table style='width: 100%; border-spacing: 0px; border-collapse: collapse;'>\"+
+						  \"<tr><td style='text-align: center; padding: 2px;' id='upbox'><input type='file' name='file' id='file' style='background-color: #eeeeee; border: 1px solid #999999; padding: 2px;' size=35></td></tr>\"+
+						  \"<tr id='upbox1'><td style='padding: 0px;'><hr style='border: none; color: #4f6d81; background-color: #4f6d81; height: 1px; width: 100%; margin: 0px;'></td></tr>\"+
+						  \"<tr id='upbox2'><td style='padding: 3px;'><center><div class='button' id='bt_gbox_firmware_upload' style='width: 100px;'>"._GETTEXT("Start Upload")."</div></center></td></tr>\"+
+						 \"</table></form>\";
+					__tndialog.gbox(__pid,'"._GETTEXT("Upload file")."',_top,_left,'400px',_html);
+					__tnpage.button_hover();
+					var _check_file=function() {
+						var _file=\$.trim(\$(__jpid+' div#gbox_content input#file').val());
+						if(is_null(_file) || _file.match(/\\.mpu\$/)==null) {
+							__tndialog.ebox('"._GETTEXT("Invalid file")."');
+							return false;
+						}
+						return true;
+					};
+					var options = { 
+						url: 'index.exh',
+						type: 'POST',
+						method: 'POST',
+						async: false,
+						dataType: 'json',
+						clearForm: false,
+						resetForm: false,
+						cache: false,
+						beforeSubmit: function() {
+							__upload_update_stop();
+							return _check_file();
+						},
+						success: function(data) {
+							__upload_update_stop();
+							__tnpage.loading('hide');
+							if(is_object(data)) {
+								if(data.status=='OK') {
+									if(!is_null(data.msg)) {
+										__tndialog.sbox(data.msg);
+									}
+									\$(__jpid).hide();
+									__tnpage.loadpage('td#update_list','$_req_data&sub_data=3',false);									
+									return true;
+								}
+								if(!is_null(data.msg)) {
+									__tndialog.ebox(data.msg);
+								}
+								__tnpage.reload();
+								return false;
+							}
+							return false;
+						},
+						beforeSend: function() {
+							__upload_update_stop();
+							__tnpage.loading('show');
+						},
+						error: function() {
+							__upload_update_stop();
+							__tnpage.backend_error();
+							\$(__jpid).hide();
+						},
+						complete: function() {
+							__upload_update_stop();
+							__tnpage.loading('hide');
+							\$(__jpid).hide();
+							__tndialog.maskhide();
+						}
+					};
+					var _dosubmit=function() {
+						if(!__tnpage.is_admin()) {
+							return false;
+						}
+						if(!_check_file()) {
+							return false;
+						}
+						__tndialog.maskshow(198);
+						var _file=\$.trim(\$(__jpid+' div#gbox_content input#file').val());	
+						\$(__jpid+' div#gbox_content #upload_form_firmware').ajaxSubmit(options);
+						__upload_update_start(__jpid+' div#gbox_content td#upbox','$_req_data&sub_data=4&_pid={$_bid}2');					
+						\$(__jpid+' div#gbox_title_l').html(js_gettext('Uploading file')+' '+basename(_file));
+						\$(__jpid+' div#gbox_content tr#upbox1').hide();
+						\$(__jpid+' div#gbox_content tr#upbox2').hide();
+						return false;
+					};
+					\$('#bt_gbox_firmware_upload').click(function(evt) {
+						var e=evt || window.event;
+						e.preventDefault();
+						return _dosubmit();
+					});
+		
+					\$('#upload_form_firmware').submit(function() {
+						return _dosubmit();
+					});
+				});
+
+			});
+		</script>
+	";
+	return trim($_page);
+}
+
+?>

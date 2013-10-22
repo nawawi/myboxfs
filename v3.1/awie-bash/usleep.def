@@ -1,0 +1,35 @@
+This file is usleep.def, from which is created usleep.c.
+It implements the builtin "usleep" in Bash.
+usleep - sleep some number of microseconds
+
+$PRODUCES usleep.c
+#include <config.h>
+#include <unistd.h>
+#include <stdio.h>
+#include "../shell.h"
+#include "../builtins.h"
+
+$BUILTIN usleep
+$FUNCTION usleep_builtin
+$SHORT_DOC sleep [number]
+sleep some number of microseconds
+$END
+
+int usleep_builtin (WORD_LIST *list) {
+	unsigned long count;
+	if (list == 0) {
+		builtin_usage();
+		return(EX_USAGE);
+	}
+
+	if (*list->word->word == '-' || list->next) {
+		builtin_usage();
+		return(EX_USAGE);
+	}
+
+	count = strtoul(list->word->word, NULL, 0);
+    	if(usleep(count)) {
+		return(EXECUTION_FAILURE);
+    	}
+	return(EXECUTION_SUCCESS);
+}

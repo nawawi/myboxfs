@@ -1,0 +1,321 @@
+<?php
+/**
+* Registry function library
+*
+* Function berkaitan configuration file.<br />
+* NOTE: Setiap parameter (@param) yang mempunyai extra "-reference", function
+* tersebut adalah "Passing by Reference" type function.<br /><br />
+* <b>Penerangan</b><br />
+*
+* @author Mohd Nawawi Mohamad Jamili <nawawi@tracenetworkcorporation.com>
+* @copyright 2008 Nawawi, Tracenetwork Corporation Sdn. Bhd. 
+* @package library
+* @filesource
+* @link http://my.php.net/manual/en/language.references.whatdo.php -- Reference "Passing by Reference"
+*/
+/**
+* @ignore
+*/
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+// clean all token object file
+function _INI_OBJECT_CLEAN_ALL() {
+	@_CLEARDIR(_OBJ_PATH."/");
+}
+
+// clean token object file
+function _INI_OBJECT_CLEAN($_section,$_file) {
+	@_UNLINK(_OBJ_PATH."/{$_section}_{$_file}.obj");
+}
+
+// update token object file
+function _INI_OBJECT_UPDATE($_section,$_file) {
+	@_INI_TOKEN_GET($_section,$_file,$_TOKEN);
+	unset($_TOKEN);
+}
+
+function _INI_TOKEN_CREATE_KEY($_value) {
+	$_rand=rand(0,time());
+        return substr(md5("$_value$_rand".time()).time(),0,20);
+}
+// get token data
+// /strg/mybox/registry/$_section/$_file
+
+function _INI_TOKEN_GET($_section,$_file,&$_NTOKEN) {
+	if(!is_array($_NTOKEN)) $_NTOKEN=array();
+	$_OBJF=_OBJ_PATH."/{$_section}_{$_file}.obj";
+	$_OBJA=_FILE_ARRAY_GET($_OBJF);
+	if(!_ARRAY_NULL($_OBJA)) {
+		$_NTOKEN=$_OBJA;
+		return $_OBJA;
+	}
+	$_REG=_REG_PATH."/$_section/$_file";
+        if(!file_exists($_REG)) return array();
+	$_buff=_FILE($_REG);
+        if(!_ARRAY_NULL($_buff)) {
+		$_skip=0;
+                foreach($_buff as $_line) {
+			_TRIM($_line);
+                        if(_NULL($_line)) continue;
+			if($_line{0}=='#') continue;
+			if(preg_match("/^ID=(\S+)$/",$_line,$_mm)) {
+				$_tname=$_mm[1];
+				$_NTOKEN[$_tname]['__DATA_ID']="$_tname";
+				unset($_mm);
+				continue;
+			}
+			if(!_NULL($_tname)) {
+				list($_a,$_b)=preg_split("/=/",$_line);
+                        	_TRIM($_a);_TRIM($_b);
+				if(_NULL($_a)) continue;	
+				$_NTOKEN[$_tname][$_a]=$_b;
+			}
+		}
+	}
+	if(!_ARRAY_NULL($_NTOKEN)) {
+		_FILE_ARRAY_SAVE($_OBJF,$_NTOKEN);
+	}
+	return $_NTOKEN;
+}
+
+/*
+	get data by parameter and value
+	PARAM=value
+	return token array
+*/
+
+function _INI_TOKEN_GET_BYPARAM($_section,$_file,$_param,$_value,&$_ITOKEN) {
+	if(!is_array($_ITOKEN)) $_ITOKEN=array();
+	$_TOKEN=array();
+	_INI_TOKEN_GET($_section,$_file,$_TOKEN);
+	if($_param=="ID") {
+		if(!_ARRAY_NULL($_TOKEN[$_value])) {
+			$_ITOKEN=$_TOKEN[$_value];
+			return TRUE;
+		}
+	}
+	foreach($_TOKEN as $_id => $_data_array) {
+		if(!_NULL($_data_array[$_param])) {
+			if($_data_array[$_param]=="$_value") {
+				$_ITOKEN=$_TOKEN[$_id];
+				return TRUE;
+			}
+		}
+		unset($_id,$_data_array);
+	}
+	return FALSE;
+}
+
+// update existing token
+// /strg/mybox/registry/$_section/$_file --> ID --> array
+// TRUE=ok, FALSE=not ok, -1= name exist
+// NAME is a global variable, value cannot be same for diffrent ID
+function _INI_TOKEN_UPDATE($_section,$_file,$_ID,$_DATA) {
+	$_REG=_REG_PATH."/$_section/$_file";
+	$_NTOKEN=array();
+	_INI_TOKEN_GET($_section,$_file,$_NTOKEN);
+	_INI_OBJECT_CLEAN($_section,$_file);
+	if(_ARRAY_NULL($_NTOKEN)) return FALSE;
+	if(_NULL($_NTOKEN[$_ID])) return FALSE;
+
+	if(!_NULL($_NTOKEN[$_ID]['NAME']) && !_NULL($_DATA["NAME"])) {
+		if($_NTOKEN[$_ID]['NAME']!=$_DATA["NAME"]) {
+			if(!_INI_TOKEN_CHECK($_section,$_file,"NAME",$_DATA["NAME"])) {
+				return -1;
+			}
+		}
+	}
+	foreach($_NTOKEN[$_ID] as $_name => $_value) {
+		if(!_NULL($_DATA[$_name])) {
+			$_NTOKEN[$_ID][$_name]=$_DATA[$_name];
+			unset($_DATA[$_name]);
+		}
+	}
+	unset($_name,$_value);
+	if(!_ARRAY_NULL($_DATA)) {
+		foreach($_DATA as $_name => $_value) {
+			$_NTOKEN[$_ID][$_name]=$_DATA[$_name];
+		}
+	}
+	if(!_ARRAY_NULL($_NTOKEN)) {
+		foreach($_NTOKEN as $_SID => $_SDATA) {
+			if(_NULL($_SID)) continue;
+			$_line .="\nID=$_SID\n";
+			foreach($_SDATA as $_a => $_b) {
+				if(_NULL($_a)) continue;
+				if(preg_match("/^__/",$_a)) continue;
+				$_line .="$_a=$_b\n";
+			}
+		}
+	}
+	_TRIM($_line);
+	if(!_NULL($_line)) {
+		$_txt="# _INI_TOKEN_UPDATE: ".date('D M d H:i:s Y')."\n";
+		if(_FILE_SAVE($_REG,"$_txt$_line\n")) {
+			_INI_OBJECT_UPDATE($_section,$_file);
+			return TRUE;
+		}
+        }
+	return FALSE;
+}
+
+// add new token
+// /strg/mybox/registry/$_section/$_file --> array
+// return TRUE if success, FALSE if error
+// NAME is a global variable, value cannot be same
+
+function _INI_TOKEN_SAVE($_section,$_file,$_DATA) {
+	if(_ARRAY_NULL($_DATA)) return FALSE;
+	$_REG=_REG_PATH."/$_section/$_file";
+	$_NTOKEN=array();
+	_INI_TOKEN_GET($_section,$_file,$_NTOKEN);
+	_INI_OBJECT_CLEAN($_section,$_file);
+	if(_NULL($_DATA['ID'])) {
+		if(_ARRAY_NULL($_NTOKEN)) {
+			$_ID=_INI_TOKEN_CREATE_KEY($_section.$_file);
+		} else {
+			$_ID=_INI_TOKEN_CREATE_KEY($_section.$_file);
+			while(!_NULL($_NTOKEN[$_ID])) {
+				$_ID=_INI_TOKEN_CREATE_KEY(md5($_section.$_file));
+				if(_NULL($_NTOKEN[$_ID])) break;
+			}
+		}
+	} else {
+		$_ID=$_DATA['ID'];
+		if(!_ARRAY_NULL($_NTOKEN[$_ID])) {
+			return FALSE;
+		}
+		unset($_DATA['ID']);
+	}
+	if(!_NULL($_DATA["NAME"])) {
+		if(!_INI_TOKEN_CHECK($_section,$_file,"NAME",$_DATA["NAME"])) {
+			return FALSE;
+		}
+	}
+
+	$_line="";
+	foreach($_DATA as $_a => $_b) {
+		_TRIM($_a);_TRIM($_b);
+		if(preg_match("/^__/",$_a)) continue;
+		if(_NULL($_a)) continue;
+		if($_a=="ID" && _NULL($_b)) continue;
+		$_line .="$_a=$_b\n";
+	}
+	_TRIM($_line);
+	if(!_NULL($_line)) {
+		$_txt="# _INI_TOKEN_SAVE: ".date('D M d H:i:s Y')."\n";
+		$_txt .="ID=$_ID\n";
+		if(_FILE_APPEND($_REG,"$_txt$_line\n")) {
+			_INI_OBJECT_UPDATE($_section,$_file);
+			return TRUE;
+		}
+        }
+	return FALSE;
+}
+
+// delete token
+// /strg/mybox/registry/$_section/$_file --> ID
+function _INI_TOKEN_DELETE($_section,$_file,$_id) {
+	$_NTOKEN=array();
+	_INI_TOKEN_GET($_section,"$_file",$_NTOKEN);
+	if(_ARRAY_NULL($_NTOKEN[$_id])) {
+		_INI_OBJECT_CLEAN($_section,$_file);
+		return FALSE;
+	}
+
+	$_removename="";
+	if(!_NULL($_NTOKEN[$_id]['NAME'])) {
+		$_removename=$_NTOKEN[$_id]['NAME'];
+	}
+	unset($_NTOKEN[$_id]);
+
+	_INI_OBJECT_CLEAN($_section,$_file);
+	$_REG=_REG_PATH."/$_section/$_file";
+	$_line="";
+	foreach($_NTOKEN as $_SID => $_SDATA) {
+		if(_NULL($_SID)) continue;
+		$_line .="\nID=$_SID\n";
+		foreach($_SDATA as $_a => $_b) {
+			if(_NULL($_a)) continue;
+			if(preg_match("/^__/",$_a)) continue;
+			$_line .="$_a=$_b\n";
+		}
+	}
+	_TRIM($_line);
+	$_txt="";
+	if(!_NULL($_line)) {
+		$_txt="# _INI_TOKEN_DELETE: ".date('D M d H:i:s Y')."\n";
+	}
+	if(_FILE_SAVE($_REG,"$_txt$_line\n")) {
+		_INI_OBJECT_UPDATE($_section,$_file);
+		if(!_NULL($_removename)) {
+			_INI_TOKEN_REMOVE($_removename);
+		}
+		return TRUE;
+	}
+	return FALSE;
+}
+
+// token check
+// /strg/mybox/registry/$_section/$_file --> PARAM=VALUE
+// check if value already exist
+function _INI_TOKEN_CHECK($_section,$_file,$_name,$_value) {
+	$_NTOKEN=array();
+	_INI_TOKEN_GET($_section,"$_file",$_NTOKEN);
+	_INI_OBJECT_CLEAN($_section,$_file);
+	foreach($_NTOKEN as $_SID => $_SDATA) {
+		if(!_NULL($_SDATA[$_name]) && "{$_SDATA[$_name]}"=="$_value") {
+			return FALSE;
+		}
+	}
+	return TRUE;
+}
+
+// remove/update token reference
+function _INI_TOKEN_REMOVE($_name,$_newname="") {
+	$_BUFF=_GLOB(_REG_PATH."/*/*.cfg");
+	if(!_ARRAY_NULL($_BUFF)) {
+		foreach($_BUFF as $_file) {
+			$_data_a=_FILE($_file);
+			if(!_ARRAY_NULL($_data_a)) {
+				$_save="";
+				foreach($_data_a as $_line) {
+					_TRIM($_line);
+					if(preg_match("/^HOST=$_name$/",$_line) 
+						|| preg_match("/^ADDR=$_name$/",$_line)
+						|| preg_match("/^DNAME=$_name$/",$_line)
+						|| preg_match("/^TNAME=$_name$/",$_line)
+						|| preg_match("/^PNAME=$_name$/",$_line)
+						|| preg_match("/^NAME=$_name$/",$_line)
+						|| preg_match("/^SRCP=$_name$/",$_line)
+						|| preg_match("/^DSTP=$_name$/",$_line)
+						|| preg_match("/^SRC=$_name$/",$_line)
+						|| preg_match("/^DST=$_name$/",$_line)
+						|| preg_match("/^FWD=$_name$/",$_line)
+						|| preg_match("/^SERVER=$_name$/",$_line)
+						|| preg_match("/^SERVICE=$_name$/",$_line)
+						|| preg_match("/^EVENT=$_name$/",$_line)
+						|| preg_match("/^ROUTE_NETWORK=$_name$/",$_line)
+						|| preg_match("/^ROUTE_GATEWAY=$_name$/",$_line)
+						|| preg_match("/^PROXY_HOST=$_name$/",$_line)
+						) {
+							$_line=preg_replace("/$_name/",$_newname,$_line);
+							_TRIM($_line,",");
+					}
+					$_save .="$_line\n";
+				}
+				if(!_NULL($_save)) {
+					if(_FILE_SAVE($_file,$_save)) {
+						_BASENAME($_file);
+						@_UNLINK(_OBJ_PATH."/{$_file}.obj");
+					}
+				}
+				unset($_save);
+			}
+			unset($_data_a);
+		}
+		_INI_OBJECT_CLEAN_ALL();
+	}
+}
+
+?>

@@ -1,0 +1,378 @@
+<?php
+/**
+* File function library
+*
+* Mengandungi function-function untuk manipulasi
+* file dan directory.
+*
+* @author Mohd Nawawi Mohamad Jamili <nawawi@tracenetworkcorporation.com>
+* @copyright 2008 Nawawi, Tracenetwork Corporation Sdn. Bhd. 
+* @package library
+* @filesource
+* @link http://my.php.net/manual/en/function.serialize.php -- Reference (serialize) "storable representation of a value"
+*/
+/**
+* @ignore
+*/
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+/**
+* Dapatkan data dari file dalam bentuk array
+*
+* Dapatkan data dari file dalam bentuk array. Alternative kepada function file.
+* Boleh membaca file dalam format plain-text dan compress.
+*
+* @param string $_file nama file
+* @return array array
+*/
+function _FILE($_file) {
+	clearstatcache();
+	if(!file_exists($_file)) return array();
+	$_lines=array();
+	if(strpos($_file,".gz") !== FALSE) {
+		if($_fd=fopen("compress.zlib://$_file", "r")) {
+			while(!feof($_fd)) {
+  				$_buffer=fgets($_fd);
+				$_buffer=trim($_buffer);
+				if($_buffer!='') $_lines[]=$_buffer;
+			}
+			fclose($_fd);
+			return $_lines;
+		}
+	} else {
+		if($_fd=fopen($_file, "r")) {
+			while(!feof($_fd)) {
+  				$_buffer=fgets($_fd);
+				$_buffer=trim($_buffer);
+				if($_buffer!='') $_lines[]=$_buffer;
+			}
+			fclose($_fd);
+			return $_lines;
+		}
+	}
+	return array();
+}
+
+/**
+* Periksa file jika wujud.
+*
+* Periksa multiple file jika wujud. Alternative kepada function file_exists.
+*
+* @param string $_file_array array yang mengandungi nama file
+* @return bool TRUE or FALSE
+*/
+function _FILE_EXISTS($_file_array) {
+	if(_ARRAY_NULL($_file_array)) return FALSE;
+	$_num=count($_file_array);
+	$_fnum=0;
+	clearstatcache();
+	foreach($_file_array as $_file) {
+		if(file_exists($_file)) {
+			$_fnum++;
+		}
+	}
+	if($_fnum==$_num) return TRUE;
+	return FALSE;
+}
+
+/**
+* Simpan data dalam file.
+*
+* Simpan data dalam file dengan menggunakan Direct input/ouput extension jika ada.
+* Set permission by default 600 (rw-------).
+*
+* @param string $_filname nama file
+* @param string $_text data
+* @param integer $_chmod permission dalam type octal 
+* @return bool TRUE or FALSE
+*/
+function _FILE_SAVE($_filename,$_text,$_chmod=0600) {
+	$_dirname=dirname($_filename);
+	if(!_NULL($_dirname)&&!file_exists($_dirname)) _MKDIR($_dirname);
+	if(_EXT_LOADED('dio')) {
+		if($_fp=dio_open($_filename, O_RDWR | O_CREAT | O_TRUNC)) {
+ 			dio_write($_fp,$_text,strlen($_text));
+			dio_close($_fp);
+			@chmod($_filename,$_chmod);
+			return TRUE;
+		}
+	} else {
+		if($_fp=fopen($_filename,"w")) {
+ 			fwrite($_fp,$_text);
+			fclose($_fp);
+			@chmod($_filename,$_chmod);
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+/**
+* Append kan data dalam file.
+*
+* Append data dalam file dengan menggunakan Direct input/ouput extension jika ada.
+* Set permission by default 600 (rw-------).
+*
+* @see _FILE_SAVE()
+* @param string $_filname nama file
+* @param string $_text data
+* @param integer $_chmod permission dalam type octal 
+* @return bool TRUE or FALSE
+*/
+function _FILE_APPEND($_filename,$_text,$_chmod=0600) {
+	$_dirname=dirname($_filename);
+	if(!_NULL($_dirname)&&!file_exists($_dirname)) _MKDIR($_dirname);
+	if(_EXT_LOADED('dio')) {
+		if($_fp=dio_open($_filename, O_RDWR | O_CREAT | O_APPEND)) {
+ 			dio_write($_fp,$_text,strlen($_text));
+			dio_close($_fp);
+			@chmod($_filename,$_chmod);
+			return TRUE;
+		}
+	} else {
+		if($_fp=fopen($_filename,"a")) {
+ 			fwrite($_fp,$_text);
+			fclose($_fp);
+			@chmod($_filename,$_chmod);
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+/**
+* Dapatkan data dari file dalam bentuk string
+*
+* Dapatkan data dari file dalam bentuk string. Alternative kepada function file_get_contents.
+* Boleh membaca file dalam format plain-text dan compress.
+*
+* @see _FILE()
+* @param string $_file nama file
+* @return string trimmed file content
+*/
+function _FILE_GET($_file) {
+	clearstatcache();
+	if(file_exists($_file)) {
+		return trim(@file_get_contents("compress.zlib://$_file"));
+	}
+}
+
+/**
+* Dapatkan data array dari file yang disimpan dalam format serialize
+*
+* Dapatkan data array dari file yang disimpan dalam format serialize.
+*
+* @see _FILE_GET()
+* @param string $_file nama file
+* @return array array
+*/
+function _FILE_ARRAY_GET($_file) {
+	clearstatcache();
+	$_array=array();
+	if(file_exists($_file)) {
+		$_array=unserialize(_FILE_GET($_file));
+		if($_array==FALSE) $_array=array();
+	}
+	return $_array;
+}
+
+/**
+* Simpan data array dalam file dalam format serialize
+*
+* Simpan data array dalam file dalam format serialize.
+*
+* @see _FILE_SAVE()
+* @param string $_file nama file
+* @return bool TRUE or FALSE
+*/
+function _FILE_ARRAY_SAVE($_file,$_array) {
+	if(!is_array($_array)) return FALSE;
+	return _FILE_SAVE($_file,serialize($_array));
+}
+
+/**
+* File size.
+*
+* Dapatkan size file.
+*
+* @param string $_file nama file
+* @param int $_format format
+* @param int $_round round
+* @return string file size
+*/
+function _FILE_SIZE($_file,$_format=0,$_round=0) {
+	$_size=0;
+	if(file_exists($_file)) {
+		$_size=sprintf("%u",filesize($_file));
+		if($_format==1) {
+			$_size=_BYTE_FORMAT($_size,$_round);
+		}
+	}
+	return $_size;
+}
+
+/**
+* Delete file yang match dengan pattern.
+*
+* Delete file yang match dengan pattern. Alternative kepada function unlink
+*
+* @see _GLOB()
+* @param string $_file file pattern
+* @return bool TRUE or FALSE
+*/
+function _UNLINK($_file) {
+	clearstatcache();
+	if(is_file($_file)) {
+		return @unlink($_file);
+	}
+	$_FILE=_GLOB($_file);
+	if(!_ARRAY_NULL($_FILE)) {
+		foreach($_FILE as $_ln) {
+			if(is_dir($_ln)) {
+				_UNLINK("$_ln/*");
+			} else {
+				if(file_exists($_ln)) @unlink($_ln);
+			}
+		}
+		return TRUE;
+	}
+	return FALSE;
+}
+
+/**
+* Cari pathname berdasarkan pattern yang match
+*
+* Cari pathname berdasarkan pattern yang match. Alternative kepada function glob
+*
+* @param string $_dir pattern
+* @param integer $_opt option flag
+* @return array array
+*/
+function _GLOB($_dir,$_opt=GLOB_BRACE) {
+	if(glob($_dir,$_opt)!=FALSE) return glob($_dir,$_opt);
+	return array();
+}
+
+/**
+* Create directory dan sub directory.
+*
+* Create directory dan sub directory. Alternative kepada function mkdir
+*
+* @param string $_pathname pathname
+* @param integer $_mode permission dalam type octal
+* @return bool TRUE or FALSE
+*/
+function _MKDIR($_pathname, $_mode = 0700) {
+	clearstatcache();
+	if(_NULL($_pathname)) return FALSE;
+	if(is_dir($_pathname)) return TRUE;
+	if(is_file($_pathname)) return FALSE;
+	if($_pathname{0}!='/') $_pathname="./$_pathname";
+	$_next_pathname = substr($_pathname, 0, strrpos($_pathname, DIRECTORY_SEPARATOR));
+	if(_MKDIR($_next_pathname, $_mode)) {
+        	if(!file_exists($_pathname)) {
+			return mkdir($_pathname, $_mode);
+        	}
+    	}
+    	return FALSE;
+}
+
+/**
+* Copy file and directory.
+*
+* Copy file and directory. Alternative kepada function copy
+*
+* @param string $_src source
+* @param string $_new destination
+* @return bool TRUE or FALSE
+*/
+function _COPYDIR($_src,$_new) {
+	clearstatcache();
+	if($_src==$_new) return FALSE;
+	if(!is_dir($_new)) _MKDIR($_new);
+	$_d=dir($_src);
+        while(($_entry=$_d->read())) {
+                if(is_file("$_src/$_entry")) {
+			if(!@copy("$_src/$_entry", "$_new/$_entry")) {
+				return false;
+			}
+                }
+        }
+        $_d->close();
+	return TRUE;
+}
+
+/**
+* Delete keseluruhan directory.
+*
+* Delete keseluruhan directory. Alternative kepada function rmdir
+*
+* @param string $_dirname directory name
+* @param string $_dirr directory name, kegunaan internal
+* @return bool TRUE or FALSE
+*/
+function _DELDIR($_dirname,$_dirr='') {
+	clearstatcache();
+	if(!file_exists($_dirname)) return FALSE;
+    	if(is_file($_dirname)) return unlink($_dirname);
+	if(!is_dir($_dirname)) return FALSE;
+   	$_dir=dir($_dirname);
+	while(FALSE !== $_entry = $_dir->read()) {
+        	if($_entry == '.' || $_entry == '..') continue;
+		_DELDIR("$_dirname/$_entry",$_dirr);
+	}
+	$_dir->close();
+	if($_dirname!=$_dirr) return rmdir($_dirname);
+}
+
+/**
+* Delete directory content.
+*
+* Delete directory content.
+*
+* @param string $_dirname directory name
+* @return void
+*/
+function _CLEARDIR($_dirname) {
+        if(is_dir($_dirname)) {
+                if(@chdir($_dirname)) {
+                        $_dir=dir(".");
+                        while(FALSE !== $_entry = $_dir->read()) {
+                                if($_entry == '.' || $_entry == '..') continue;
+                                _DELDIR($_entry);
+                        }
+                        $_dir->close();
+                }
+        }
+}
+
+
+/**
+* Compress file.
+*
+* Compress file.
+*
+* @param string $_file nama file
+* @return bool TRUE or FALSE
+*/
+function _GZIP($_file) {
+	if(file_exists($_file)) {
+		if(copy($_file, "compress.zlib://$_file.gz")) {
+			@unlink($_file);
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+// TODO:
+function _MOVE($_src,$_dest) {
+	if(!is_dir($_dest)) {
+		$_ddir=dirname($_dest);
+		if($_ddir!='/' && $_ddir!=".") {
+			_MKDIR($_ddir);
+		}
+	}
+	return _EXEC_CMD("/bin/mv $_src $_dest");
+}
+?>

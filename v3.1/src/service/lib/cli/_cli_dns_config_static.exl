@@ -1,0 +1,174 @@
+<?php
+if(!defined('_CLI_CODE')||_CLI_CODE!="a098846421a09ab1cacd3b3a753cbe05") exit("\n\nERROR: _CLI_CODE not set\n\n");
+
+function ___CLI_DNS_STATIC_PRINT($_find='') {
+	$_objf=_OBJ_PATH."/iosh_dns_static_print.obj";
+	@unlink($_objf);
+	_INI_TOKEN_GET("network","named_static.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+              	_CLI_ECHO(_GETTEXT("No data available"));
+                return FALSE;
+	}
+	$_cnt=1;$_obj=array();
+	$_output="";
+	foreach($_TOKEN as $_ID => $_DATA) {
+		if(_NULL($_DATA['HOSTNAME']) ||
+			_NULL($_DATA['ADDR'])) continue;
+		if(_NULL($_DATA['STAT'])) $_DATA['STAT']=0;
+		_STR_ONOFF($_stat,$_DATA['STAT']);
+		$_DATA['STAT']=$_stat;
+		if(!_NULL($_find)) {
+			if(!_ARRAY_FIND($_find,$_DATA)) {
+				continue;
+			}
+		}
+		if($_cnt > 1) $_output .="\n";
+		$_output .=_CLI_DATA_BODY(
+			array(
+				_GETTEXT("ID")=>$_cnt,
+				_GETTEXT("HOSTNAME")=>$_DATA['HOSTNAME'],
+				_GETTEXT("ADDRESS")=>$_DATA['ADDR'],
+				_GETTEXT("ENABLE")=>$_DATA['STAT'],
+				_GETTEXT("DESCRIPTION")=>$_DATA['NOTE']
+			)
+		);
+		$_obj[$_cnt]=$_ID;
+		unset($_stat);
+		$_cnt++;
+	}
+	if(_ARRAY_NULL($_obj) || !_FILE_ARRAY_SAVE($_objf,$_obj) || _NULL($_output)) {
+		if(!_NULL($_find)) {
+			_CLI_ECHO(_GETTEXT("No results found"));
+		} else {
+			_CLI_ECHO(_GETTEXT("No data available"));
+		}
+		@unlink($_objf);
+                return FALSE;
+	}
+	_CLI_ECHO_HEADER(_GETTEXT("DNS static configuration"));
+	if(!_NULL($_find)) {
+		echo _GETTEXT("Search results match for '%s':","$_find")."\n\n";
+	}
+	echo "$_output";
+	return TRUE;
+}
+
+function ___CLI_DNS_STATIC_ADD($_args) {
+	if(!_ARRAY_NULL($_args)) {
+		$_hostname=$_args[0];
+		$_addr=$_args[1];
+		_STR_ONOFF($_onoff,$_args[2]);
+		$_note=$_args[3];
+		if(!_CHECK_DOMAIN_VAR($_hostname)) {
+			_CLI_ECHO(_GETTEXT("Invalid hostname %s","$_hostname"));
+			return FALSE;
+		}
+		if(!_INI_TOKEN_CHECK("network","named_static.cfg","HOSTNAME",$_hostname)) {
+			_CLI_ECHO(_GETTEXT("Static hostname '%s' already exist","$_hostname"));
+			return FALSE;
+		}
+		if(!_CHECK_IP($_addr)) {
+			_CLI_ECHO(_GETTEXT("Invalid IP Address '%s'","$_addr"));
+			return FALSE;
+		}
+
+		$_DATA['HOSTNAME']="$_hostname";
+		$_DATA['ADDR']="$_addr";
+		$_DATA['STAT']="$_onoff";
+		$_DATA['NOTE']="$_note";
+
+		if(_INI_TOKEN_SAVE("network","named_static.cfg",$_DATA)) {
+			_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function ___CLI_DNS_STATIC_SET($_args) {
+	if(!_ARRAY_NULL($_args)) {
+		$_objf=_OBJ_PATH."/iosh_dns_static_print.obj";
+		$_obj=_FILE_ARRAY_GET($_objf);
+		$_param=$_args[0];
+		$_id=$_args[1];
+		$_value=$_args[2];
+		if(_ARRAY_NULL($_obj) || _NULL($_obj[$_id])) {
+			_CLI_ECHO(_GETTEXT("No Resource Id available."));
+			_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","routing print"));
+			@unlink($_objf);
+			return FALSE;
+		}
+		$_DATA=array();
+		if($_param=="hostname") {
+			if(!_CHECK_DOMAIN_VAR($_value)) {
+				_CLI_ECHO(_GETTEXT("Invalid hostname %s","$_value"));
+				return FALSE;
+			}
+			$_DATA['HOSTNAME']="$_value";
+			if(_INI_TOKEN_UPDATE("network","named_static.cfg",$_id,$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+				return TRUE;
+			}
+		} elseif($_param=="address") {
+			if(!_CHECK_IP($_value)) {
+				_CLI_ECHO(_GETTEXT("Invalid IP Address '%s'","$_value"));
+				return FALSE;
+			}
+			$_DATA['ADDR']="$_value";
+			if(_INI_TOKEN_UPDATE("network","named_static.cfg",$_id,$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+				return TRUE;
+			}
+		} elseif($_param=="enable") {
+			_STR_ONOFF($_onoff,$_value);
+			$_DATA['STAT']="$_onoff";
+			if(_INI_TOKEN_UPDATE("network","named_static.cfg",$_id,$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+				return TRUE;
+			}
+		} elseif($_param=="description") {
+			$_DATA['NOTE']="$_value";
+			if(_INI_TOKEN_UPDATE("network","named_static.cfg",$_id,$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+				return TRUE;
+			}
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+function ___CLI_DNS_STATIC_DELETE($_nums) {
+	$_objf=_OBJ_PATH."/iosh_dns_static_print.obj";
+	$_obj=_FILE_ARRAY_GET($_objf);
+	if(_ARRAY_NULL($_obj)) {
+		_CLI_ECHO(_GETTEXT("No Resource Id available."));
+		_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","routing print"));
+		@unlink($_objf);
+		return FALSE;
+	}
+	if($_nums=='*' && _CLI_YESNO(_GETTEXT("This action will delete all %s.\nContinue this action? %s","DNS request routing","[yes/no]: "))==TRUE) {
+		foreach($_obj as $_cnt => $_id) {
+			if(_INI_TOKEN_DELETE("network","named_static.cfg",$_id)) {
+				unset($_obj[$_cnt]);
+			}
+		}
+		if(_FILE_ARRAY_SAVE($_objf,$_obj)) {
+			return TRUE;
+		}
+	} else {
+		$_num_array=array();
+		_CLI_MULTINUM($_nums,$_num_array);
+		foreach($_num_array as $_no) {
+			if(!_NULL($_obj[$_no])) {
+				if(_INI_TOKEN_DELETE("network","named_static.cfg",$_obj[$_no])) {
+					unset($_obj[$_no]);
+				}
+			}
+		}
+		if(_FILE_ARRAY_SAVE($_objf,$_obj)) {
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+?>

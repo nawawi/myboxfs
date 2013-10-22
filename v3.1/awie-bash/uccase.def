@@ -1,0 +1,97 @@
+This file is uccase.def, from which is created uccase.c.
+It implements the builtin "ucwords, ucfirst, strtoupper" in Bash.
+
+$PRODUCES uccase.c
+#include <config.h>
+#include <stdio.h>
+#include <ctype.h>
+#include "../builtins.h"
+#include "../shell.h"
+
+$BUILTIN strtoupper
+$FUNCTION strtoupper_builtin
+$SHORT_DOC strtoupper [string]
+strtoupper - convert letter to uppercase
+$END
+
+int strtoupper_builtin(WORD_LIST *list) {
+        int n = 0;
+        int ch;
+        char *string;
+
+        if(list == 0 || list->next) {
+                builtin_usage();
+                return(EX_USAGE);
+        }
+
+        string=list->word->word;
+
+        while(string[n]) {
+                string[n]=toupper(string[n]);
+                n++;
+        }
+
+        printf("%s\n", string);
+        return(EXECUTION_SUCCESS);
+}
+
+$BUILTIN ucwords
+$FUNCTION ucwords_builtin
+$SHORT_DOC ucwords [string]
+Uppercase the first character of each word in a string
+$END
+
+int ucwords_builtin(WORD_LIST *list) {
+	int n = 0, firstletter = 1;
+	char *string;
+
+	if(list== 0 || list->next) {
+		builtin_usage();
+		return(EX_USAGE);
+	}
+
+	string=list->word->word;
+	while(string[n]) {
+		if(isalpha(string[n]) && firstletter==1) {
+			firstletter=0;
+			string[n]=toupper(string[n]);
+		} else if(isupper(string[n])) {
+			string[n]=tolower(string[n]);
+		} else if(!isalpha(string[n])) {
+			firstletter=1;
+		}
+		n++;
+	}
+	printf("%s\n", string);
+	return(EXECUTION_SUCCESS);
+}
+
+$BUILTIN ucfirst
+$FUNCTION ucfirst_builtin
+$SHORT_DOC ucfirst [string]
+Make a string's first character uppercase
+$END
+
+int ucfirst_builtin(WORD_LIST *list) {
+	int n = 0, firstletter = 1;
+	char *string;
+
+	if(list== 0 || list->next) {
+		builtin_usage();
+		return(EX_USAGE);
+	}
+
+	string=list->word->word;
+	while(string[n]) {
+		if(isalpha(string[n]) && firstletter==1) {
+			firstletter=0;
+			string[n]=toupper(string[n]);
+		} else if(isupper(string[n])) {
+			string[n]=tolower(string[n]);
+		}
+		n++;
+	}
+	printf("%s\n", string);
+	return(EXECUTION_SUCCESS);
+}
+

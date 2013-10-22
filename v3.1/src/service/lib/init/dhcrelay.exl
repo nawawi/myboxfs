@@ -1,0 +1,105 @@
+<?php
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+function dhcrelay_check() {
+	if(!_INIT_CHECK_BINARY(array("/bin/dhcrelayd"))) {
+		_INIT_ECHO(1,_GETTEXT("Cannot execute %s. Internal error",_INIT_NAME()));
+		exit(1);
+	}
+}
+
+function dhcrelay_quiet() {
+	_INIT_QUIET('1');
+}
+
+function _dhcrelay_set_config(&$_config) {
+	_INI_TOKEN_GET("network","dhcp_relay.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+		_INIT_ECHO(0,_GETTEXT("%s daemon (%s) disabled","DHCP Relay","dhcrelayd"));
+		dhcrelay_quiet();
+		return FALSE;
+	}
+	$_DATA=$_TOKEN['dhcp_relay'];
+	if(_NULL($_DATA['STAT']) || $_DATA['STAT']==0) {
+		_INIT_ECHO(0,_GETTEXT("%s daemon (%s) disabled","DHCP Relay","dhcrelayd"));
+		dhcrelay_quiet();
+		return FALSE;
+	}
+	if(_NULL($_DATA['ADDR']) || _NULL($_DATA['DNAME'])) {
+		return FALSE;
+	}
+	_DEFINITIONS_GET_BYNAME("networks",$_DATA['ADDR'],$_DTOKEN,"host");
+	if(_NULL($_DTOKEN['ADDR'])) {
+		return FALSE;
+	}
+	$_device="";
+	$_dev_a=_STR_ARRAY($_DATA['DNAME'],",");
+	foreach($_dev_a as $_name) {
+		$_dev=_DEFINITIONS_GET_INTERFACE_DEVICE($_name);
+		if(!_NULL($_dev)) {
+			$_device .="-i $_dev ";
+		}
+		unset($_dev);
+	}
+	_TRIM($_device);
+	if(!_NULL($_device)) {
+		@_MKDIR("/var/lib/dhcpd");
+		@touch("/var/lib/dhcpd/dhcpd.leases");
+		$_config="-q $_device {$_DTOKEN['ADDR']}";
+		return TRUE;
+	}
+	return FALSE;
+}
+
+function dhcrelay_up() {
+	@unlink(_TASKQ_PATH."/dhcrelay_up");
+	$_prog="/bin/dhcrelayd";
+	if(_dhcrelay_set_config($_config)) {
+		if(_EXEC_CMD("$_prog $_config")==0) {
+			_INIT_CHKPROG_LOG("dhcrelay");
+			return TRUE;
+		}
+	}
+	return dhcrelay_restart();
+}
+
+
+function dhcrelay_start() {
+	_INIT_CHECK_DAEMON_STATUS("dhcrelayd");
+	if(_dhcp_server_isenable()) {
+		_INIT_ECHO(1,_GETTEXT("Cannot start %s while %s enabled.","DHCP Relay","DHCP Server"));
+		return FALSE;
+	}
+	$_prog="/bin/dhcrelayd";
+	if(!_dhcrelay_set_config($_config)) {
+		_INIT_ECHO(1,_GETTEXT("Starting %s failed","dhcrelay"));
+		return FALSE;
+	}
+	_INIT_START_DAEMON("$_prog $_config","dhcrelay_up");
+	if(_INIT_BOOTUP()==FALSE) {
+		_INIT_TASKQ("policy_sysinput");
+	}
+	return TRUE;
+}
+
+function dhcrelay_stop() {
+	_INIT_STOP_DAEMON("dhcrelayd","dhcrelay_up",1);
+	if(_INIT_BOOTUP()==FALSE) {
+		_INIT_TASKQ("policy_sysinput");
+	}
+	sleep(2);
+	return TRUE;
+}
+
+function dhcrelay_restart() {
+	_INIT_EXEC("dhcrelay_stop");
+	_INIT_EXEC("dhcrelay_start");
+	return TRUE;
+}
+
+function dhcrelay_reload() {
+	_INIT_EXEC("dhcrelay_restart");
+	return TRUE;
+}
+
+?>

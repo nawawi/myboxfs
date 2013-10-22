@@ -1,0 +1,209 @@
+<?php
+if(!defined('_CLI_CODE')||_CLI_CODE!="a098846421a09ab1cacd3b3a753cbe05") exit("\n\nERROR: _CLI_CODE not set\n\n");
+
+
+function ___CLI_DNS_CONFIG_PRINT() {
+	_INI_TOKEN_GET("network","named.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+		_CLI_ECHO(_GETTEXT("No data available"));
+		return FALSE;
+	}
+	$_DATA=$_TOKEN['named'];
+	if(_NULL($_DATA['STAT'])) $_DATA['STAT']=0;
+	if(_NULL($_DATA['ISP'])) $_DATA['ISP']=0;
+	_STR_ONOFF($_isp_stat,$_DATA['ISP']);
+	_STR_ONOFF($_stat,$_DATA['STAT']);
+	if(!_NULL($_DATA['FORWARDER'])) {
+		$_addr_a=array();
+		$_list_a=_STR_ARRAY($_DATA['FORWARDER'],",");
+		foreach($_list_a as $_host) {
+			_TRIM($_host);
+			if(_NULL($_host)) continue;
+			_DEFINITIONS_GET_BYNAME("networks",$_host,$_DTOKEN,"host");
+			$_addr=_GETTEXT("unresolved");
+			if(!_NULL($_DTOKEN['ADDR'])) $_addr=$_DTOKEN['ADDR'];
+			$_addr_a[]="$_host [$_addr]";
+			unset($_addr,$_DTOKEN);
+		}
+		if(!_ARRAY_NULL($_addr_a)) {
+			$_DATA['FORWARDER']=$_addr_a;
+		}
+		unset($_addr_a);
+	} else {
+		$_DATA['FORWARDER']=_GETTEXT("Disabled");
+	}
+	_CLI_ECHO_HEADER(_GETTEXT("DNS Server configuration"));
+	echo _CLI_DATA_BODY(
+		array(
+			_GETTEXT_U("ENABLE")=>$_stat,
+			_GETTEXT_U("FORWARDER")=>$_DATA['FORWARDER']
+		)
+	);
+	return TRUE;
+}
+
+function ___CLI_DNS_CONFIG_SET($_param,$_value) {
+	if($_param=="forwarder") {
+		$_DATA=array();
+		if(!_NULL($_value)) {
+			$_objf=_OBJ_PATH."/iosh_definitions_networks_print.obj";
+			$_obj=_FILE_ARRAY_GET($_objf);
+			if(_ARRAY_NULL($_obj)) {
+				_CLI_ECHO(_GETTEXT("Resource Id not available."));
+				_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions networks print host"));
+				@unlink($_objf);
+				return FALSE;
+			}
+			$_num_array=array();
+			$_list="";
+			_CLI_MULTINUM($_value,$_num_array);
+			foreach($_num_array as $_no) {
+				$_add=___CLI_DEFINITIONS_OBJGETNAME($_obj,"networks",$_no,"host");
+				if(!_NULL($_add)) {
+					$_list .="$_add,";
+				}
+				unset($_add);
+			}
+			_TRIM($_list,",");
+			if(_NULL($_list)) {
+				_CLI_ECHO(_GETTEXT("Resource Id not available."));
+				_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions networks print host"));
+				@unlink($_objf);
+				return FALSE;
+			}
+			$_DATA['FORWARDER']="$_list";
+		} else {
+			if(_CLI_YESNO(_GETTEXT("This action will remove %s.\nContinue this action? %s","dns forwarder setting","[yes/no]: "))==FALSE) {
+				_CLI_ECHO(_GETTEXT("Action aborted"));
+				return FALSE;
+			}
+			$_DATA['FORWARDER']="";
+		}
+		if(_INI_TOKEN_UPDATE("network","named.cfg","named",$_DATA)) {
+			_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+			return TRUE;
+		}
+	} elseif($_param=="enable") {
+		$_DATA=array();
+		if(!_NULL($_value)) {
+			_STR_ONOFF($_stat,$_value);
+			$_DATA=array();
+			$_DATA['STAT']="$_stat";
+			if(_INI_TOKEN_UPDATE("network","named.cfg","named",$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+				return TRUE;
+			}
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function _cli_dns_config() {
+	if($_SERVER["argc"] > 1 ) {
+		$_max=$_SERVER["argc"];
+		_CLI_TRIM_ARGS($_SERVER['argv']);
+		for($_x=1;$_x < $_max;$_x++) {
+			$_options=$_SERVER["argv"][$_x];
+			if($_options=="config") {
+				$_cmd=$_SERVER["argv"][$_x+1];
+				if($_cmd=="print") {
+					return ___CLI_DNS_CONFIG_PRINT();
+				} elseif($_cmd=="set") {
+					$_param=$_SERVER["argv"][$_x+2];
+					$_value=$_SERVER["argv"][$_x+3];
+					return ___CLI_DNS_CONFIG_SET($_param,$_value);
+				}
+			} elseif($_options=="acl") {
+				$_cmd=$_SERVER["argv"][$_x+1];
+				if($_cmd=="print") {
+					return ___CLI_DNS_ACL_PRINT();
+				} elseif($_cmd=="find") {
+					$_string=$_SERVER["argv"][$_x+2];
+					if(!_NULL($_string)) {
+						return ___CLI_DNS_ACL_PRINT($_string);
+					}
+				} elseif($_cmd=="add") {
+					$_nums=$_SERVER["argv"][$_x+2];
+					if(!_NULL($_nums)) {
+						return ___CLI_DNS_ACL_ADD($_nums);
+					}
+				} elseif($_cmd=="delete") {
+					$_nums=$_SERVER["argv"][$_x+2];
+					if(!_NULL($_nums)) {
+						return ___CLI_DNS_ACL_DELETE($_nums);
+					}
+				}
+			} elseif($_options=="routing") {
+				$_cmd=$_SERVER["argv"][$_x+1];
+				if($_cmd=="print") {
+					return ___CLI_DNS_ROUTING_PRINT();
+				} elseif($_cmd=="find") {
+					$_string=$_SERVER["argv"][$_x+2];
+					if(!_NULL($_string)) {
+						return ___CLI_DNS_ROUTING_PRINT($_string);
+					}
+				} elseif($_cmd=="add") {
+					_CLI_RESET_ARGS(2,$_SERVER["argv"]);
+					return ___CLI_DNS_ROUTING_ADD($_SERVER["argv"]);
+				} elseif($_cmd=="set") {
+					_CLI_RESET_ARGS(2,$_SERVER["argv"]);
+					return ___CLI_DNS_ROUTING_SET($_SERVER["argv"]);
+				} elseif($_cmd=="delete") {
+					$_nums=$_SERVER["argv"][$_x+2];
+					if(!_NULL($_nums)) {
+						return ___CLI_DNS_ROUTING_DELETE($_nums);
+					}
+				}
+			} elseif($_options=="static") {
+				$_cmd=$_SERVER["argv"][$_x+1];
+				if($_cmd=="print") {
+					return ___CLI_DNS_STATIC_PRINT();
+				} elseif($_cmd=="find") {
+					$_string=$_SERVER["argv"][$_x+2];
+					if(!_NULL($_string)) {
+						return ___CLI_DNS_STATIC_PRINT($_string);
+					}
+				} elseif($_cmd=="add") {
+					_CLI_RESET_ARGS(2,$_SERVER["argv"]);
+					return ___CLI_DNS_STATIC_ADD($_SERVER["argv"]);
+				} elseif($_cmd=="set") {
+					_CLI_RESET_ARGS(2,$_SERVER["argv"]);
+					return ___CLI_DNS_STATIC_SET($_SERVER["argv"]);
+				} elseif($_cmd=="delete") {
+					$_nums=$_SERVER["argv"][$_x+2];
+					if(!_NULL($_nums)) {
+						return ___CLI_DNS_STATIC_DELETE($_nums);
+					}
+				}
+			} elseif($_options=="dyndns") {
+				$_cmd=$_SERVER["argv"][$_x+1];
+				if($_cmd=="print") {
+					return ___CLI_DNS_DYNDNS_PRINT();
+				} elseif($_cmd=="find") {
+					$_string=$_SERVER["argv"][$_x+2];
+					if(!_NULL($_string)) {
+						return ___CLI_DNS_DYNDNS_PRINT($_string);
+					}
+				} elseif($_cmd=="add") {
+					_CLI_RESET_ARGS(2,$_SERVER["argv"]);
+					return ___CLI_DNS_DYNDNS_ADD($_SERVER["argv"]);
+				} elseif($_cmd=="set") {
+					_CLI_RESET_ARGS(2,$_SERVER["argv"]);
+					return ___CLI_DNS_DYNDNS_SET($_SERVER["argv"]);
+				} elseif($_cmd=="delete") {
+					$_nums=$_SERVER["argv"][$_x+2];
+					if(!_NULL($_nums)) {
+						return ___CLI_DNS_DYNDNS_DELETE($_nums);
+					}
+				} elseif($_cmd=="apply") {
+					return _INIT_EXEC("inadyn_restart");
+				}
+			} elseif($_options=="apply") {
+				return _INIT_EXEC("name_restart");
+			}
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+?>

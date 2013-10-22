@@ -1,0 +1,151 @@
+<?php
+/**
+* IP Calculator function library
+*
+* Class untuk IP Calculator.<br />
+* NOTE: Setiap parameter (@param) yang mempunyai extra "-reference", function
+* tersebut adalah "Passing by Reference" type function.
+*
+* @author Mohd Nawawi Mohamad Jamili <nawawi@tracenetworkcorporation.com>
+* @copyright 2008 Nawawi, Tracenetwork Corporation Sdn. Bhd. 
+* @package library
+* @filesource
+* @link http://my.php.net/manual/en/language.references.whatdo.php -- Reference "Passing by Reference"
+*/
+/**
+* @ignore
+*/
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n"); 
+
+class _IPCALC {
+	private function binnmtowm($_binin){
+		$_binin=rtrim($_binin, "0");
+		if(!ereg("0",$_binin) ){
+			return str_pad(str_replace("1","0",$_binin), 32, "1");
+		} else {
+			return "1010101010101010101010101010101010101010";
+		}
+	}
+
+
+	private function bintocdr($_binin){
+		return strlen(rtrim($_binin,"0"));
+	}
+
+
+	private function bintodq($_binin) {
+		if(_NULL($_binin)) {
+			return $_binin;
+		}
+		$_binin=explode(".", chunk_split($_binin,8,"."));
+		for($_i=0; $_i<4 ; $_i++) {
+			$_dq[$_i]=bindec($_binin[$_i]);
+		}
+		return implode(".",$_dq) ;
+	}
+
+
+	private function binwmtonm($_binin){
+		$_binin=rtrim($_binin, "1");
+		if(!ereg("1",$_binin)){
+			return str_pad(str_replace("0","1",$_binin), 32, "0");
+		}
+		return "1010101010101010101010101010101010101010";
+	}
+
+
+	private function cdrtobin($_cdrin){
+		return str_pad(str_pad("", $_cdrin, "1"), 32, "0");
+	}
+
+
+	private function dqtobin($_dqin) {
+		$_dq = explode(".",$_dqin);
+		for($_i=0; $_i<4 ; $_i++) {
+		   $_bin[$_i]=str_pad(decbin($_dq[$_i]), 8, "0", STR_PAD_LEFT);
+		}
+		return implode("",$_bin);
+	}
+
+	private function ipv4calc(&$_RESULT,$_IP,$_MASK='255.255.255.0') {
+		if(!is_array($_RESULT)) $_RESULT=array();
+		if(!_IS_IPV4($_IP)) return array();
+		$_dq_host=$_IP;
+		$_RESULT=array();
+		if(preg_match("/^[0-9]{1,2}$/",$_MASK)) {
+			if(!($_MASK >= 0 && $_MASK <= 32)) return $_RESULT;
+			$_bin_nmask=self::cdrtobin($_MASK);
+			$_bin_wmask=self::binnmtowm($_bin_nmask);
+			$_cdr_nmask=$_MASK;
+			$_prefix=$_MASK;
+		} elseif(preg_match('/^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$/',$_MASK)) {
+			$_bin_nmask=self::dqtobin($_MASK);
+			$_bin_wmask=self::binnmtowm($_bin_nmask);
+			if(ereg("0",rtrim($_bin_nmask, "0"))) {
+				$_bin_wmask=self::dqtobin($_MASK);
+				$_bin_nmask=self::binwmtonm($_bin_wmask);
+				if(ereg("0",rtrim($_bin_nmask, "0"))) {
+					return $_RESULT;
+				}
+			}
+			$_cdr_nmask=self::bintocdr($_bin_nmask);
+			$_prefix=$_cdr_nmask;
+		} else {
+			return $_RESULT;
+		}
+		$_bin_host=self::dqtobin($_dq_host);
+		$_bin_bcast=(str_pad(substr($_bin_host,0,$_cdr_nmask),32,1));
+		$_bin_net=(str_pad(substr($_bin_host,0,$_cdr_nmask),32,0));
+		$_bin_first=(str_pad(substr($_bin_net,0,31),32,1));
+		$_bin_last=(str_pad(substr($_bin_bcast,0,31),32,0));
+		$_host_total=(bindec(str_pad("",(32-$_cdr_nmask),1)) - 1);
+		if($_host_total <= 0) {
+			$_bin_first=""; $_bin_last=""; $_host_total="";
+			if($_bin_net === $_bin_bcast) $_bin_bcast="";
+		}
+		if(ereg('^(00001010)|(101011000001)|(1100000010101000)',$_bin_net)) {
+			$_type='Private';
+		} else {
+			$_type='Public';
+		}
+		$_ipaddr=$_dq_host;
+		$_netmask=self::bintodq($_bin_nmask);
+		$_wildcard=self::bintodq($_bin_wmask);
+		$_network=self::bintodq($_bin_net);
+		$_broadcast=self::bintodq($_bin_bcast);
+		$_hostmin=self::bintodq($_bin_first);
+		$_hostmax=self::bintodq($_bin_last);
+		$_hostnet=$_host_total;
+	
+		$_RESULT['ip']=$_ipaddr;
+		$_RESULT['netmask']=$_netmask;
+		$_RESULT['wildcard']=$_wildcard;
+		$_RESULT['network']=$_network;
+		$_RESULT['broadcast']=$_broadcast;
+		$_RESULT['hostmin']=$_hostmin;
+		$_RESULT['hostmax']=$_hostmax;
+		$_RESULT['total']=$_hostnet;
+		$_RESULT['prefix']=$_prefix;
+		$_RESULT['type']=$_type;
+		$_RESULT['inet']=4;
+		return $_RESULT;
+	}
+
+	private function ipv6calc(&$_RESULT,$_IP,$_MASK) {
+		if(!is_array($_RESULT)) $_RESULT=array();
+		$_RESULT['inet']=6;
+		return $_RESULT;
+	}
+
+	public static function IP(&$_RESULT,$_IP,$_MASK) {
+		if(!is_array($_RESULT)) $_RESULT=array();
+		if(_IS_IPV4($_IP)) {
+			self::ipv4calc($_RESULT,$_IP,$_MASK);
+		} elseif(_IS_IPV6($_IP)) {
+			self::ipv6calc($_RESULT,$_IP,$_MASK);
+		}
+		return $_RESULT;
+	}
+}
+
+?>

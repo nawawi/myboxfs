@@ -1,0 +1,59 @@
+======================================================================
+ BANTUAN KONTEKS SENSITIF
+======================================================================
+ [?]  Memaparkan bantuan konteks sensitif. Sama ada menyenaraikan
+      kemungkinan penyelesaian arahan dengan rumusannya, atau sintaks
+      penuh arahan tersebut. Pengulangan kekunci ini, selepas sesuatu
+      arahan telah dilaksanakan, akan memaparkan rujukan terperinci.
+
+
+======================================================================
+ PENYELESAIAN AUTO
+======================================================================
+
+ Kekunci berikut kedua-duanya menjalankan penyelesaian secara auto 
+ bagi sesuatu arahan pada baris arahan. Jika awalan bagi arahan 
+ tersebut tidak unik, maka loceng akan berbunyi.Pengulangan kekunci 
+ akan memaparkan kemungkinan penyelesaian arahan.
+
+ [enter] - Auto-siapan, sintaks-semak kemudian melaksanakan arahan.
+           Jika ada ralat pada sintaks kemudian bahagian yang silap
+           pada baris arahan akan ditanda dan diterangkan.
+
+ [space] - Auto-siapan, atau jika arahan sudah selesai masukkan 
+           ruang.
+
+
+======================================================================
+ KEKUNCI PERGERAKAN
+======================================================================
+
+ [CTRL-A] - Bergerak kepada permulaan baris. 
+ [CTRL-E] - Bergerak kepada pengakhiran baris.
+ [up]     - Bergerak kepada baris arahan sebelumnya yang disimpan 
+	    dalam history.
+ [down]   - Bergerak kepada arahan seterusnya yang disimpan dalam 
+            history.
+ [left]   - Menggerakkan titik kemasukan kiri satu aksara.
+ [right]  - Menggerakkan titik kemasukan kanan satu aksara.
+
+
+======================================================================
+ KEKUNCI PEMADAM
+======================================================================
+
+ [CTRL-C]    - Padam dan batalkan baris semasa.
+ [CTRL-D]    - Padam aksara ke kanan di titik kemasukan.
+ [CTRL-K]    - Padam semua aksara ke kanan titik kemasukan.
+ [CTRL-U]    - Padam seluruh baris.
+ [backspace] - Padam aksara ke kiri di titik kemasukan.
+
+
+======================================================================
+ TURUTAN PELEPASAN
+======================================================================
+
+ !!     - Mengganti baris akhir .
+ !N     - Mengganti baris arahan yang ke Nth (seperti arahan 'history')
+ !-N    - Mengganti baris arahan yang diberikan N baris sebelumnya 
+	  (berkaitan)

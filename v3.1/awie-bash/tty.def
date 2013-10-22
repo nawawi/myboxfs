@@ -1,0 +1,22 @@
+This file is tty.def, from which is created tty.c.
+It implements the builtin "tty" in Bash.
+
+$PRODUCES tty.c
+#include <config.h>
+#include <stdio.h>
+#include "../builtins.h"
+#include "../shell.h"
+
+$BUILTIN tty
+$FUNCTION tty_builtin
+$SHORT_DOC tty
+return terminal name
+$END
+
+extern char *ttyname();
+int tty_builtin(WORD_LIST *list) {
+	char *t=ttyname(0);
+	puts(t ? t : "not a tty");
+	return(t ? EXECUTION_SUCCESS : EXECUTION_FAILURE);
+}
+

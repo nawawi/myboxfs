@@ -1,0 +1,152 @@
+#!/bin/sh
+source /etc/init.boot/commons;
+
+_LCD_EXECQ() {
+	local cmd=$@;
+	$cmd &>/dev/null;
+	return $?;
+}
+
+_LCD_LOG_DOWN() {
+	local _msg=$"Service %s down";
+	local _pmsg="$(printf "$_msg" "$1")";
+	logger -t CHKPROG -p daemon.info "$_pmsg";
+}
+
+_LCD_LOG_SYSTEM() {
+	local _msg=$"Starting %s";
+	local _pmsg="$(printf "$_msg" "$1")";
+	logger -t SYSTEM -p local6.info "TYPE=INFO $_pmsg";
+}
+
+_LCD_LOG() {
+	_LCD_LOG_DOWN "$1";
+	_LCD_LOG_SYSTEM "$1";
+}
+
+_LCD_RESET() {
+	[ $# -eq 1 ] || return 1;
+	if [ "$1" = "0" ]; then
+		_LCD_EXECQ "pkill -f -9 lcdd";
+		_LCD_EXECQ "/bin/lcdd"; wait;
+	elif [ "$1" = "1" ]; then
+		_LCD_EXECQ "pkill -f -9 LCD";
+		_LCD_EXECQ "/bin/LCDd";
+		_LCD_EXECQ "/bin/LCDproc";
+		_LCD_EXECQ "/bin/LCDexec";
+	fi
+	return 0;
+}
+
+_LCD_CHECK() {
+	local _ps _fx;
+	[ $# -eq 1 ] || return 1;
+	if [ "$1" = "0" ]; then
+		if ! _LCD_EXECQ "pkill -f -0 lcdd"; then
+			_LCD_LOG "lcdd";
+			_LCD_EXECQ "/bin/lcdd";
+		fi
+	elif [ "$1" = "1" ]; then
+		for _fx in LCDd LCDproc LCDexec; do
+			if ! _LCD_EXECQ "pkill -f -0 $_fx"; then
+				_LCD_LOG "$_fx";
+				_LCD_EXECQ "/bin/$_fx";
+				wait;
+			fi
+		done
+	fi
+	return 0;
+}
+
+_LCD_CRON() {
+	[ $# -eq 1 ] || return 1;
+	[ "$1" != "0" ] && [ "$1" != "1" ] && return 1;
+	if [ -d "/etc/cron/1m" ]; then
+		echo -e "#!/bin/sh\n/bin/lcd-reset check $1;\nexit 0;" > /etc/cron/1m/lcdcheck;
+		_LCD_EXECQ "chmod 700 /etc/cron/1m/lcdcheck";
+	fi
+}
+
+_LCD_STOP() {
+	_LCD_EXECQ "pkill -f -9 LCD";
+	_LCD_EXECQ "pkill -f -9 lcdd";
+}
+
+_LCDPROC_CONFIG() {
+	if [ -f "/etc/lcdproc/lcdproc.conf.ori" ]; then
+		_LCD_EXECQ "cp /etc/lcdproc/lcdproc.conf.ori /etc/lcdproc/lcdproc.conf";
+	fi
+	if [ -w "/etc/lcdproc/lcdproc.conf" ]; then
+		_LCD_EXECQ "cp -f /etc/lcdproc/lcdproc.conf /etc/lcdproc/lcdproc.conf.ori";
+		if grep -q cpu1 /proc/stat 2>/dev/null; then 
+			echo "[SMP-CPU]" >> /etc/lcdproc/lcdproc.conf;
+			echo "Active=true" >> /etc/lcdproc/lcdproc.conf;		
+		fi
+		if ! empty_dir "/var/sys/eth-lcdproc"; then
+			local _cnt _p _v;
+			echo "[Iface]" >> /etc/lcdproc/lcdproc.conf;
+			echo "Active=true" >> /etc/lcdproc/lcdproc.conf;
+			echo "unit=bit" >> /etc/lcdproc/lcdproc.conf;
+			echo "transfer=TRUE" >> /etc/lcdproc/lcdproc.conf;
+			((_cnt=0));
+			for _p in /var/sys/eth-lcdproc/*; do
+				[ ! -f "$_p" ] && continue;
+				_v="$(cat $_p 2>/dev/null)";
+				[ -z "$_v" ] && _v="$_p";
+				echo "Interface${_cnt}=${_p}" >> /etc/lcdproc/lcdproc.conf;
+				echo "Alias${_cnt}=${_v}" >> /etc/lcdproc/lcdproc.conf;
+				((_cnt++));
+			done
+		fi
+	fi
+}
+
+_LCD_BOOT() {
+	[ $# -eq 2 ] || return 1;
+	local _opt="$1" _lcd="$2";
+
+	if [ "$_opt" = "up" ]; then
+		if [ "$_lcd" = "1" ]; then
+			_LCDPROC_CONFIG;
+			for _fx in LCDd LCDproc LCDexec; do
+				if ! _LCD_EXECQ "pkill -f -0 $_fx"; then
+					_LCD_EXECQ "/bin/$_fx";
+					wait;
+				fi
+			done
+		fi
+	fi
+	if [ "$_opt" = "down" ]; then
+		if [ "$_lcd" = "1" ]; then
+			_LCD_EXECQ "pkill -f -9 LCDproc";
+			_LCD_EXECQ "pkill -f -9 LCDexec";
+		fi
+	fi
+	return 0;
+}
+
+_LCDPROC_RELOAD() {
+	_LCDPROC_CONFIG;
+	_LCD_EXECQ "pkill -f -9 LCDproc";
+	if ! _LCD_EXECQ "pkill -f -0 $_fx"; then
+		_LCD_EXECQ "/bin/LCDproc";
+	fi
+}
+
+_LCD_MAIN() {
+	[ ! -f "/.lcdtype" ] && exit 1;
+	lang_init;
+	case $1 in
+		check) _LCD_CHECK "$2";;
+		reset) _LCD_RESET "$2";;
+		lcdproc-reload) _LCDPROC_RELOAD;;
+		cron) _LCD_CRON "$2";;
+		stop) _LCD_STOP;;
+		bootup) _LCD_BOOT "up" "$2";;
+		bootdown) _LCD_BOOT "down" "$2";;
+	esac
+	exit 0;
+}
+
+_LCD_MAIN $@;
+exit $?;

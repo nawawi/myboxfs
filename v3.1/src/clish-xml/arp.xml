@@ -1,0 +1,58 @@
+﻿<?xml version="1.0"?>
+<CLISH_MODULE>
+<VIEW name="arp" prompt="${SYSTEM_NAME}/network/arp/&gt; ">
+        <COMMAND name="."
+                help="Return to main menu"
+                view="main"
+                viewid=""/>
+        <COMMAND name=".."
+                help="Return to previous menu"
+                view="network"
+                viewid=""/>
+
+	<COMMAND name="print"
+                help="Display Static ARP list">
+                <ACTION>exec /service/tools/static_arp.exc print 2>/dev/null|more -dl</ACTION>
+        </COMMAND>
+
+	<COMMAND name="cache"
+                help="Display ARP cache">
+                <ACTION>exec /service/tools/static_arp.exc cache 2>/dev/null|more -dl</ACTION>
+        </COMMAND>
+	<COMMAND name="cache clear"
+                help="Clear ARP cache">
+                <ACTION>exec /service/tools/static_arp.exc cache clear 2>/dev/null</ACTION>
+        </COMMAND>
+
+	<COMMAND name="find"
+                help="Search Static ARP list">
+		<PARAM name="string"
+			help="String to find"
+			ptype="STRING_ANY" />
+                <ACTION>exec /service/tools/static_arp.exc find "${string}" 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+	<COMMAND name="add"
+                help="Add new Static ARP">
+ 		<PARAM name="ip_addr"
+                        help="Address"
+                        ptype="IPV4"/>
+ 		<PARAM name="mac_addr"
+                        help="MAC Address"
+                        ptype="MACADDR"/>
+ 		<PARAM name="interface_id"
+                        help="Resource Id for Interfaces"
+                        ptype="NUM_NULL"
+			default="NULL"/>
+                <ACTION>exec /service/tools/static_arp.exc add ${ip_addr} ${mac_addr} ${interface_id} 2>/dev/null</ACTION>
+        </COMMAND>
+	<COMMAND name="delete"
+                help="Delete Static ARP list">
+		<PARAM name="id"
+                        help="Resource Id '*' for all"
+                        ptype="MULTI_NUM_ALL"/>
+                <ACTION>exec /service/tools/static_arp.exc delete "${id}" 2>/dev/null</ACTION>
+        </COMMAND>
+
+</VIEW>
+</CLISH_MODULE>

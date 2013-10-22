@@ -1,0 +1,312 @@
+<?php
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+function http_check() {
+	if(!_INIT_CHECK_BINARY(array("/bin/httpd"))) {
+		_INIT_ECHO(1,_GETTEXT("Cannot execute %s. Internal error",_INIT_NAME()));
+		exit(1);
+	}
+	if(defined('_HTTP_SESSIONS_PATH') && !file_exists(_HTTP_SESSIONS_PATH)) {
+		@_MKDIR(_HTTP_SESSIONS_PATH);
+	}
+	if(defined('_HTTP_UPLOADPROGRESS_PATH') && !file_exists(_HTTP_UPLOADPROGRESS_PATH)) {
+		@_MKDIR(_HTTP_UPLOADPROGRESS_PATH);
+	}
+}
+
+function http_quiet() {
+	_INIT_QUIET('1');
+}
+
+function _http_create_ca($_hostname) {
+	$_cdir=_REG_PATH."/ssl_certs/web/{$_hostname}";
+	if(_EXEC_CMD("openssl req -config $_cdir/openssl.cnf -new -batch -nodes -x509 -days 3652 -sha1 -newkey rsa:1024 -keyout $_cdir/{$_hostname}_ca.key -out $_cdir/{$_hostname}_ca.crt -subj '/O=$_hostname/OU=$_hostname Root CA'")==0) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+function _http_create_cert($_hostname) {
+	$_cdir=_REG_PATH."/ssl_certs/web/{$_hostname}";
+	if(_EXEC_CMD("openssl req -config $_cdir/openssl.cnf -new -batch -sha1 -newkey rsa:1024 -nodes -keyout $_cdir/{$_hostname}_key.pem -out $_cdir/{$_hostname}_request.pem -subj '/O=$_hostname/OU=$_hostname/CN=$_hostname'")==0 &&
+		_EXEC_CMD("openssl ca -batch -config $_cdir/openssl.cnf -days 3652 -policy policy_default -extensions ssl_server -out $_cdir/{$_hostname}_cert.pem -infiles $_cdir/{$_hostname}_request.pem")==0) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+function _http_cert($_DATA,$_vhost="") {
+	$_country=$_DATA['COUNTRY'];
+	$_hostname=$_DATA['HOSTNAME'];
+	$_city=$_DATA['CITY'];
+	$_state=$_DATA['STATE'];
+	$_organization=$_DATA['ORGANIZATION'];
+	$_admin=$_DATA['ADMIN'];
+
+	if(!_NULL($_vhost)) {
+		$_hostname=$_vhost;
+	}	
+	if(_NULL($_hostname)) $_hostname="fw.tracenetwork.lo";
+
+	$_cdir=_REG_PATH."/ssl_certs/web/{$_hostname}";
+	$_FARRAY[]="$_cdir/{$_hostname}_cert.pem";
+	$_FARRAY[]="$_cdir/{$_hostname}_key.pem";
+	$_FARRAY[]="$_cdir/{$_hostname}_ca.crt";
+	if(_FILE_EXISTS($_FARRAY)) {
+		return TRUE;
+	}
+	if(!is_dir($_cdir)) {
+		_MKDIR($_cdir);
+	}
+
+	$_config ="# =================================================\n";
+	$_config .="# $_hostname : OpenSSL configuration file\n";
+	$_config .="# =================================================\n";
+	$_config .="RANDFILE         = $_cdir/.rnd\n";
+	$_config .="[ ca ]\n";
+	$_config .="default_ca       = CA_default\n";
+	$_config .="[ CA_default ]\n";
+	$_config .="dir              = $_cdir\n";
+	$_config .="certs            = $_cdir\n";
+	$_config .="new_certs_dir    = $_cdir\n";
+	$_config .="crl_dir          = $_cdir\n";
+	$_config .="database         = $_cdir/index.txt\n";
+	$_config .="private_key      = $_cdir/{$_hostname}_ca.key\n";
+	$_config .="certificate      = $_cdir/{$_hostname}_ca.crt\n";
+	$_config .="serial           = $_cdir/serial\n";
+	$_config .="crl              = $_cdir/{$_hostname}_crl.pem\n";
+	$_config .="RANDFILE         = $_cdir/.prand\n";
+	$_config .="default_days     = 3652\n";
+	$_config .="default_crl_days = 30\n";
+	$_config .="default_md       = sha1\n";
+	$_config .="preserve         = no\n";
+	$_config .="policy           = policy_default\n";
+	$_config .="name_opt         = ca_default\n";
+	$_config .="cert_opt         = ca_default\n";
+	$_config .="[ policy_default ]\n";
+	$_config .="countryName             = optional\n";
+	$_config .="stateOrProvinceName     = optional\n";
+	$_config .="localityName            = optional\n";
+	$_config .="organizationName        = optional\n";
+	$_config .="organizationalUnitName  = optional\n";
+	$_config .="commonName              = supplied\n";
+	$_config .="emailAddress            = optional\n";
+	$_config .="[ req ]\n";
+	$_config .="default_bits            = 1024\n";
+	$_config .="default_md              = sha1\n";
+	$_config .="default_keyfile         = {$_hostname}_key.pem\n";
+	$_config .="distinguished_name      = req_distinguished_name\n";
+	$_config .="x509_extensions         = v3_ca\n";
+	$_config .="string_mask             = nombstr\n";
+	$_config .="[ req_distinguished_name ]\n";
+	$_config .="countryName             = Country Name\n";
+	$_config .="countryName_min         = 2\n";
+	$_config .="countryName_max         = 2\n";
+	$_config .="stateOrProvinceName     = State or Province Name\n";
+	$_config .="localityName            = Locality Name\n";
+	$_config .="0.organizationName      = Organization Name\n";
+	$_config .="organizationalUnitName  = Organizational Unit Name\n";
+	$_config .="commonName              = $_hostname\n";
+	$_config .="commonName_max          = 64\n";
+	$_config .="emailAddress            = Email Address\n";
+	$_config .="emailAddress_max        = 64\n";
+	$_config .="[ usr_cert ]\n";
+	$_config .="basicConstraints        = CA:FALSE\n";
+	$_config .="# nsCaRevocationUrl       = https://url-to-exposed-clr-list/crl.pem\n";
+	$_config .="[ ssl_server ]\n";
+	$_config .="basicConstraints        = CA:FALSE\n";
+	$_config .="nsCertType              = server\n";
+	$_config .="keyUsage                = digitalSignature, keyEncipherment\n";
+	$_config .="extendedKeyUsage        = serverAuth, nsSGC, msSGC\n";
+	$_config .="nsComment               = \"TraceNetwork OpenSSL Certificate for SSL Web Server\"\n";
+	$_config .="[ ssl_client ]\n";
+	$_config .="basicConstraints        = CA:FALSE\n";
+	$_config .="nsCertType              = client\n";
+	$_config .="keyUsage                = digitalSignature, keyEncipherment\n";
+	$_config .="extendedKeyUsage        = clientAuth\n";
+	$_config .="nsComment               = \"TraceNetwork OpenSSL Certificate for SSL Client\"\n";
+	$_config .="[ v3_req ]\n";
+	$_config .="basicConstraints = CA:FALSE\n";
+	$_config .="keyUsage         = nonRepudiation, digitalSignature, keyEncipherment\n";
+	$_config .="[ v3_ca ]\n";
+	$_config .="basicConstraints        = critical, CA:true, pathlen:0\n";
+	$_config .="nsCertType              = sslCA\n";
+	$_config .="keyUsage                = cRLSign, keyCertSign\n";
+	$_config .="extendedKeyUsage        = serverAuth, clientAuth\n";
+	$_config .="nsComment               = \"TraceNetwork OpenSSL CA Certificate\"\n";
+	$_config .="[ crl_ext ]\n";
+	$_config .="basicConstraints        = CA:FALSE\n";
+	$_config .="keyUsage                = digitalSignature, keyEncipherment\n";
+	$_config .="nsComment               = \"TraceNetwork OpenSSL generated CRL\"\n";
+
+	_FILE_SAVE("$_cdir/openssl.cnf","$_config");
+	_FILE_SAVE("$_cdir/serial","01\n");
+	_FILE_SAVE("$_cdir/index.txt","");
+
+	if(_http_create_ca($_hostname) && _http_create_cert($_hostname)) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+function http_config($_scriptdata='') {
+	_INI_TOKEN_GET("system","system.cfg",$_NTOKEN);
+	$_DATA=$_NTOKEN['service_http'];
+	if(_NULL($_DATA['STAT']) || $_DATA['STAT']==0) {
+		_INIT_ECHO(0,_GETTEXT("%s daemon (%s) disabled","HTTP","httpd"));
+		http_quiet();
+		return FALSE;
+	}
+	if(_NULL($_DATA['CERT'])) $_DATA['CERT']=0;
+	if(_NULL($_DATA['PORT'])) $_DATA['PORT']=5051;
+
+
+	$_DATA_SYSTEM=$_NTOKEN['system'];
+	if(_NULL($_DATA_SYSTEM['HOSTNAME'])) {
+		$_DATA_SYSTEM['HOSTNAME']='mybox.traceos.local';
+	}
+
+	$_error=0;
+	$_config ="Listen {$_DATA['PORT']}\n";
+
+
+
+	_INI_TOKEN_GET("network","eth.cfg",$_PTOKEN);
+	if(!_ARRAY_NULL($_PTOKEN)) {
+		foreach($_PTOKEN as $_ID => $_DATA_IP) {
+			if(_NULL($_DATA_IP['ADDR'])) continue;
+			if(!_http_cert($_DATA_SYSTEM,$_DATA_IP['ADDR'])) {
+				_INIT_ECHO(1,_GETTEXT("%s daemon (%s) generating SSL certificate for host %s failed","HTTP","httpd","{$_DATA_IP['ADDR']}"));
+				http_quiet();
+				$_error++;
+			} else {
+				$_cdir=_REG_PATH."/ssl_certs/web/{$_DATA_IP['ADDR']}";
+				$_config .="NameVirtualHost {$_DATA_IP['ADDR']}:{$_DATA['PORT']}\n";
+				$_config .="<VirtualHost {$_DATA_IP['ADDR']}:{$_DATA['PORT']}>\n";
+				$_config .="ServerAdmin admin\n";
+				$_config .="ServerName localhost\n";
+				$_config .="DocumentRoot /service/web/core\n";
+				$_config .="Options +Includes -Indexes\n";
+				$_config .="SSLEngine On\n";
+				$_config .="SSLCertificateFile $_cdir/{$_DATA_IP['ADDR']}_cert.pem\n";
+				$_config .="SSLCertificateKeyFile $_cdir/{$_DATA_IP['ADDR']}_key.pem\n";
+				$_config .="</VirtualHost>\n";
+			}
+			unset($_cdir,$_DATA_IP);
+		}
+	}
+
+	unset($_PTOKEN);
+	_INI_TOKEN_GET("network","additional.cfg",$_PTOKEN);
+	if(!_ARRAY_NULL($_PTOKEN)) {
+		foreach($_PTOKEN as $_ID => $_DATA_IP) {
+			if(_NULL($_DATA_IP['ADDR'])) continue;
+			if(!_http_cert($_DATA_SYSTEM,$_DATA_IP['ADDR'])) {
+				_INIT_ECHO(1,_GETTEXT("%s daemon (%s) generating SSL certificate for host %s failed","HTTP","httpd","{$_DATA_IP['ADDR']}"));
+				http_quiet();
+				$_error++;
+			} else {
+				$_cdir=_REG_PATH."/ssl_certs/web/{$_DATA_IP['ADDR']}";
+				$_config .="NameVirtualHost {$_DATA_IP['ADDR']}:{$_DATA['PORT']}\n";
+				$_config .="<VirtualHost {$_DATA_IP['ADDR']}:{$_DATA['PORT']}>\n";
+				$_config .="ServerAdmin admin\n";
+				$_config .="ServerName localhost\n";
+				$_config .="DocumentRoot /service/web/core\n";
+				$_config .="Options +Includes -Indexes\n";
+				$_config .="SSLEngine On\n";
+				$_config .="SSLCertificateFile $_cdir/{$_DATA_IP['ADDR']}_cert.pem\n";
+				$_config .="SSLCertificateKeyFile $_cdir/{$_DATA_IP['ADDR']}_key.pem\n";
+				$_config .="</VirtualHost>\n";
+			}
+			unset($_cdir,$_DATA_IP);
+		}
+	}
+
+	// default
+	if(!_http_cert($_DATA_SYSTEM)) {
+		_INIT_ECHO(1,_GETTEXT("%s daemon (%s) generating SSL certificate for host %s failed","HTTP","httpd","{$_DATA_SYSTEM['HOSTNAME']}"));
+		http_quiet();
+		$_error++;
+	} else {
+		$_cdir=_REG_PATH."/ssl_certs/web/{$_DATA_SYSTEM['HOSTNAME']}";
+		$_config .="<VirtualHost _default_:{$_DATA['PORT']}>\n";
+		$_config .="ServerAdmin admin\n";
+		$_config .="DocumentRoot /service/web/core\n";
+		$_config .="Options +Includes -Indexes\n";
+		$_config .="SSLEngine On\n";
+		$_config .="SSLCertificateFile $_cdir/{$_DATA_SYSTEM['HOSTNAME']}_cert.pem\n";
+		$_config .="SSLCertificateKeyFile $_cdir/{$_DATA_SYSTEM['HOSTNAME']}_key.pem\n";
+		$_config .="</VirtualHost>\n";
+	}
+
+	if(!_NULL($_scriptdata)) {
+		return _FILE_SAVE("/etc/httpd/vhost/httpd-core.conf","$_scriptdata\n");
+	}
+
+	if($_error!=0) {
+		return FALSE;
+	}
+
+	if(file_exists("$_cdir/{$_DATA_SYSTEM['HOSTNAME']}_cert.pem") 
+		&& file_exists("$_cdir/{$_DATA_SYSTEM['HOSTNAME']}_key.pem")) {
+		@unlink("/etc/httpd/tracecert.pem");
+		@unlink("/etc/httpd/tracekey.pem");
+		@symlink("$_cdir/{$_DATA_SYSTEM['HOSTNAME']}_cert.pem","/etc/httpd/tracecert.pem");
+		@symlink("$_cdir/{$_DATA_SYSTEM['HOSTNAME']}_key.pem","/etc/httpd/tracekey.pem");
+	}
+	return _FILE_SAVE("/etc/httpd/vhost/httpd-core.conf","$_config");
+}
+
+
+function http_up() {
+	@unlink(_TASKQ_PATH."/http_up");
+	if(_EXEC_CMD("/bin/httpd")==0) {
+		_INIT_CHKPROG_LOG("httpd");
+		return TRUE;
+	}
+	return http_restart();
+}
+
+
+function http_start() {
+	_INIT_CHECK_DAEMON_STATUS("httpd");
+	if(!http_config()) {
+		_INIT_ECHO(1,_GETTEXT("Starting %s failed","httpd"));
+		return FALSE;
+	}
+	_INIT_START_DAEMON("/bin/httpd","http_up");
+	return TRUE;
+}
+
+function http_stop() {
+	_INIT_STOP_DAEMON("httpd","http_up",1);
+	return TRUE;
+}
+
+function http_restart() {
+	_INIT_EXEC("http_stop");
+	sleep(1);
+	_INIT_EXEC("http_start");
+	return TRUE;
+}
+
+function http_reload() {
+	if(http_config()) {
+		if(_SIGHUP("httpd")) {
+			_INIT_ECHO(0,_GETTEXT("Reloading %s daemon","httpd"));
+			return TRUE;
+		}
+	}
+	_INIT_ECHO(1,_GETTEXT("Reloading %s daemon failed","httpd"));
+	return FALSE;
+}
+
+function http_regenerated_cert() {
+	_INIT_EXEC("http_stop");
+	sleep(1);
+	@_DELDIR(_REG_PATH."/ssl_certs/web");
+	_INIT_EXEC("http_start");
+	return TRUE;
+}
+
+?>

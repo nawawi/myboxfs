@@ -1,0 +1,55 @@
+<?php
+if(!defined('_CGI_CODE')||_CGI_CODE!="90d45215e48dac81e802f17310ad0c1f") exit("\n\nERROR: _CGI_CODE not set\n\n");
+/* req_data = p_system_preference */
+
+function _CGI_PAGE_SYSTEM_PREFERENCE_TAB_0() {
+	extract($GLOBALS['_IMG']);
+	extract($GLOBALS['__CDATA']);
+	$_hkey=_RAND_TEXT(30);
+	$_page="";
+	$_page .="<div id='tabs{$_hkey}' class='tbox_c'>";
+	$_page .="<ul style='height: 20px;'>";
+	$_page .="<li><a href='#$_hkey' onclick=\"__tnpage.loadpage('#$_hkey','$_req_data&sub_data=1',true);return false;\"><span>General</span></a></li>"; 
+	$_page .="<li><a href='#$_hkey' onclick=\"__tnpage.loadpage('#$_hkey','$_req_data&sub_data=2',true);return false;\"><span>WebGui Settings</span></a></li>";
+	$_page .="<li><a href='#$_hkey' onclick=\"__tnpage.loadpage('#$_hkey','$_req_data&sub_data=3',true);return false;\"><span>Time and Date</span></a></li>"; 
+	$_page .="</ul>";
+	$_page .="<div id='$_hkey'></div>";
+	$_page .="</div>";
+	$_page .="
+		<script type='text/javascript'>
+			\$(document).ready(function() {
+				\$('#tabs{$_hkey} > ul').tabs();
+				\$('div#$_hkey').html(\"<img src='$_ICON_SPINNER'> "._GETTEXT("Reading data. Please wait..")."\");
+				__tnpage.loadpage('#$_hkey','$_req_data&sub_data=1',true);
+				\$('div#tabs{$_hkey} a').click(function() {
+					__tndialog.clear();
+					\$('div#$_hkey').html(\"<img src='$_ICON_SPINNER'> "._GETTEXT("Reading data. Please wait..")."\");
+				});
+			});
+		</script>
+	";
+	return trim($_page);
+}
+
+function _CGI_PAGE_SYSTEM_PREFERENCE_TABS($_opt='') {
+	$GLOBALS['__CDATA']['_req_data']="req_data=p_system_preference";
+	$_page="";
+	switch($_opt) {
+		case '1':
+			$_page=_CGI_PAGE_SYSTEM_PREFERENCE_TAB_1();
+		break;
+		case '2':
+			$_page=_CGI_PAGE_SYSTEM_PREFERENCE_TAB_2();
+		break;
+		case '3':
+			$_page=_CGI_PAGE_SYSTEM_PREFERENCE_TAB_3();
+		break;
+		default:
+			$_page=_CGI_PAGE_SYSTEM_PREFERENCE_TAB_0();
+		break;
+	}
+	$_page .="<script type='text/javascript'>__tnpage.button_hover();</script>";
+	return trim($_page);
+}
+
+?>

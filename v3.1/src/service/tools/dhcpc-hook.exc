@@ -1,0 +1,260 @@
+<?php
+class EXE {
+
+	/* dhcpcd - hook args
+
+	    [interface] => eth2
+	    [reason] => BOUND
+	    [pid] => 3406
+	    [metric] => 0
+	    [new_ip_address] => 192.168.2.87
+	    [new_subnet_cidr] => 24
+	    [new_broadcast_address] => 192.168.2.255
+	    [new_network_number] => 192.168.2.0
+	    [new_subnet_mask] => 255.255.255.0
+	    [new_routers] => 192.168.2.1
+	    [new_domain_name_servers] => 192.168.2.1 202.188.0.133 202.188.1.5
+	    [new_domain_name] => cromok
+	    [new_interface_mtu] => 1492
+	    [new_dhcp_lease_time] => 1800
+	    [new_dhcp_message_type] => 5
+	    [new_dhcp_server_identifier] => 192.168.2.1
+	*/
+
+	private function _INFO($_dev) {
+		$_VAR=array();
+		$_VAR[]="reason";
+		$_VAR[]="subnet_cidr";
+		$_VAR[]="network_number";
+		$_VAR[]="subnet_mask";
+		$_VAR[]="classless_static_routes";
+		$_VAR[]="ms_classless_static_routes";
+		$_VAR[]="static_routes";
+		$_VAR[]="routers";
+		$_VAR[]="time_offset";
+		$_VAR[]="time_servers";
+		$_VAR[]="ien116_name_servers";
+		$_VAR[]="domain_name_servers";
+		$_VAR[]="log_servers";
+		$_VAR[]="cookie_servers";
+		$_VAR[]="lpr_servers";
+		$_VAR[]="impress_servers";
+		$_VAR[]="resource_location_servers";
+		$_VAR[]="host_name";
+		$_VAR[]="boot_size";
+		$_VAR[]="merit_dump";
+		$_VAR[]="domain_name";
+		$_VAR[]="swap_server";
+		$_VAR[]="root_path";
+		$_VAR[]="extensions_path";
+		$_VAR[]="ip_forwarding";
+		$_VAR[]="non_local_source_routing";
+		$_VAR[]="policy_filter";
+		$_VAR[]="max_dgram_reassembly";
+		$_VAR[]="default_ip_ttl";
+		$_VAR[]="path_mtu_aging_timeout";
+		$_VAR[]="path_mtu_plateau_table";
+		$_VAR[]="interface_mtu";
+		$_VAR[]="all_subnets_local";
+		$_VAR[]="broadcast_address";
+		$_VAR[]="perform_mask_discovery";
+		$_VAR[]="mask_supplier";
+		$_VAR[]="router_discovery";
+		$_VAR[]="router_solicitation_address";
+		$_VAR[]="trailer_encapsulation";
+		$_VAR[]="arp_cache_timeout";
+		$_VAR[]="ieee802_3_encapsulation";
+		$_VAR[]="default_tcp_ttl";
+		$_VAR[]="tcp_keepalive_interval";
+		$_VAR[]="tcp_keepalive_garbage";
+		$_VAR[]="nis_domain";
+		$_VAR[]="nis_servers";
+		$_VAR[]="ntp_servers";
+		$_VAR[]="vendor_encapsulated_options";
+		$_VAR[]="netbios_name_servers";
+		$_VAR[]="netbios_dd_server";
+		$_VAR[]="netbios_node_type";
+		$_VAR[]="netbios_scope";
+		$_VAR[]="font_servers";
+		$_VAR[]="x_display_manager";
+		$_VAR[]="dhcp_requested_address";
+		$_VAR[]="dhcp_lease_time";
+		$_VAR[]="dhcp_option_overload";
+		$_VAR[]="dhcp_message_type";
+		$_VAR[]="dhcp_server_identifier";
+		$_VAR[]="dhcp_parameter_request_list";
+		$_VAR[]="dhcp_message";
+		$_VAR[]="dhcp_max_message_size";
+		$_VAR[]="dhcp_renewal_time";
+		$_VAR[]="dhcp_rebinding_time";
+		$_VAR[]="nisplus_domain";
+		$_VAR[]="nisplus_servers";
+		$_VAR[]="tftp_server_name";
+		$_VAR[]="bootfile_name";
+		$_VAR[]="mobile_ip_home_agent";
+		$_VAR[]="smtp_server";
+		$_VAR[]="pop_server";
+		$_VAR[]="nntp_server";
+		$_VAR[]="www_server";
+		$_VAR[]="finger_server";
+		$_VAR[]="irc_server";
+		$_VAR[]="streettalk_server";
+		$_VAR[]="streettalk_directory_assistance_server";
+		$_VAR[]="user_class";
+		$_VAR[]="fqdn_name";
+		$_VAR[]="nds_servers";
+		$_VAR[]="nds_tree_name";
+		$_VAR[]="nds_context";
+		$_VAR[]="bcms_controller_names";
+		$_VAR[]="bcms_controller_address";
+		$_VAR[]="client_last_transaction_time";
+		$_VAR[]="associated_ip";
+		$_VAR[]="uap_servers";
+		$_VAR[]="netinfo_server_address";
+		$_VAR[]="netinfo_server_tag";
+		$_VAR[]="default_url";
+		$_VAR[]="subnet_selection";
+		$_VAR[]="domain_search";
+		$_line="";
+		foreach($_VAR as $_varr) {
+			if(!_NULL($_SERVER[$_varr])) {
+				$_line .="$_varr={$_SERVER[$_varr]}\n";
+			}
+			$_new_var="new_{$_varr}";
+			if(!_NULL("{$_SERVER[$_new_var]}")) {
+				$_line .="$_new_var={$_SERVER[$_new_var]}\n";
+			}
+			$_old_var="old_{$_varr}";
+			if(!_NULL("{$_SERVER[$_old_var]}")) {
+				$_line .="$_old_var={$_SERVER[$_old_var]}\n";
+			}
+			unset($_new_var,$_old_var);
+		}
+		if(!_NULL($_line)) {
+			$_txt="# dhcpc-hook.exc (pid {$_SERVER['pid']}): ".date('D M d H:i:s Y',$_SERVER['REQUEST_TIME'])."\n";
+			$_txt .="$_line";
+			_FILE_SAVE("/etc/dhcpcd/${_dev}.info",$_txt);
+		}
+	}
+
+	private function  _UPDATE_NETWORK_CONFIG($_id,$_DATA) {
+		if(_NULL($_DATA['ADDR'])) return FALSE;
+		if(_NULL($_DATA['PREF']) && _NULL($_DATA['MASK'])) return FALSE;
+		_IPCALC::IP($_RESULT,$_DATA['ADDR'],$_DATA['PREF']);
+
+		if(!_NULL($_RESULT['total'])) {
+			$_DATA['HOST_TOTAL']=$_RESULT['total'];
+		}
+	
+		if(!_NULL($_RESULT['hostmin'])) {
+			$_DATA['HOST_MIN']=$_RESULT['hostmin'];
+		}
+	
+		if(!_NULL($_RESULT['hostmax'])) {
+			$_DATA['HOST_MAX']=$_RESULT['hostmax'];
+		}
+		if(!_NULL($_RESULT['type'])) {
+			$_DATA['HOST_TYPE']=$_RESULT['type'];
+		}
+		if(!_NULL($_RESULT['inet'])) {
+			$_DATA['INET']=$_RESULT['inet'];
+		}
+		return _INI_TOKEN_UPDATE("network","eth.cfg","$_id",$_DATA);
+	}
+
+	private function _UPDATE_CONFIG($_ARGS) {
+		if(!_NULL($_ARGS['interface'])) {
+			_INI_TOKEN_GET_BYPARAM("network","eth.cfg","DEVICE",$_ARGS['interface'],$_ITOKEN);
+			if(!_ARRAY_NULL($_ITOKEN)) {
+				if(!_NULL($_ITOKEN['__DATA_ID'])) {
+					$_DATA['ADDR']="{$_ARGS['new_ip_address']}";
+					$_DATA['NETWORK']="{$_ARGS['new_network_number']}";
+					$_DATA['PREF']="{$_ARGS['new_subnet_cidr']}";
+					$_DATA['MASK']="{$_ARGS['new_subnet_mask']}";
+					$_DATA['BCAST']="{$_ARGS['new_broadcast_address']}";
+					$_DATA['GATEWAY']="{$_ARGS['new_routers']}";
+					$_DATA['DHCP_MTU']="{$_ARGS['new_interface_mtu']}";
+					$_DATA['DHCP_SERVER']="{$_ARGS['new_dhcp_server_identifier']}";
+					$_DATA['DHCP_DNS_SERVERS']="{$_ARGS['new_domain_name_servers']}";
+					$_DATA['DHCP_DOMAIN_SEARCH']="{$_ARGS['new_domain_search']}";
+					self::_UPDATE_NETWORK_CONFIG($_ITOKEN['__DATA_ID'],$_DATA);
+				}
+				if(!_NULL($_ITOKEN['DEFAULT'])&&$_ITOKEN['DEFAULT']==1) {
+					if(!_NULL($_ARGS['new_routers']) && !file_exists("/var/sys/gw_ip")) {
+						if(_EXEC_CMD("/bin/ip route add default via {$_ARGS['new_routers']} dev {$_ARGS['interface']} metric {$_ARGS['metric']}")==0) {
+							_INIT_ECHO(0,_GETTEXT("Setting default gateway: %s via %s",$_ARGS['new_routers'],$_ARGS['interface']));
+							_FILE_SAVE("/var/sys/gw_ip","{$_ARGS['new_routers']}");
+							_network_router_set(1);
+						}
+					}
+				}
+				if(!_NULL($_ARGS['new_domain_name_servers'])) {
+					_INI_TOKEN_GET("network","named.cfg",$_NTOKEN);
+					$_TOKEN=$_NTOKEN['named'];
+					if(!_ARRAY_NULL($_TOKEN) && (!_NULL($_TOKEN['ISP']) && $_TOKEN['ISP']==1)) {
+						$_buff=_STR_ARRAY($_ARGS['new_domain_name_servers'],"\s+");
+						if(!_ARRAY_NULL($_buff)) {
+							$_dns='';
+							foreach($_buff as $_ln) {
+								$_dns .="{$_ln};";
+							}
+							if(!_NULL($_dns)) {
+								if(_FILE_SAVE("/etc/dhcpcd/resolv/{$_ARGS['interface']}.conf","$_dns")) {
+									_INIT_EXEC("name_reload");
+								}
+							}
+						}
+					}
+				}
+				// definitions maybe updated, just reload dont pening pening
+				$_fh="/etc/cron/3m/dhcpc_hook_post";
+				_SAVE_BASH_FILE("$_fh","/service/init/policy.init restart && rm -f $_fh");
+			}
+			self::_INFO($_ARGS['interface']);
+		}
+	}
+
+	private function _STOP($_ARGS) {
+		if(!_NULL($_ARGS['interface'])) {
+			self::_INFO($_ARGS['interface']);
+			@unlink("/etc/cron/3m/dhcpc_hook_post");
+			if(file_exists("/etc/dhcpcd/resolv/{$_ARGS['interface']}.conf")) {
+				@unlink("/etc/dhcpcd/resolv/{$_ARGS['interface']}.conf");
+				_INIT_EXEC("name_reload");
+			}
+		}
+	}
+
+	private function _DHCPC_HOOK_MAIN() {
+		define('_AWIE_CODE','ef3802a1fce98f3985e6a9a1f7c1a024');
+		include_once("lib.exl");
+		include_once("init.exl");
+		if(!_NULL($_SERVER['reason'])) {
+			switch($_SERVER['reason']) {
+				case 'BOUND':
+				case 'INFORM':
+				case 'REBIND':
+				case 'REBOOT':
+				case 'RENEW':
+				case 'TIMEOUT':
+					self::_UPDATE_CONFIG($_SERVER);
+				break;
+				case 'PREINIT':
+				case 'EXPIRE':
+				case 'FAIL':
+				case 'IPV4LL':
+				case 'RELEASE':
+				case 'STOP':
+					self::_STOP($_SERVER);
+				break;
+				default: break;
+			}
+		}
+		exit(0);
+	}
+
+	public static function MAIN() {
+		self::_DHCPC_HOOK_MAIN();
+	}
+}
+?>

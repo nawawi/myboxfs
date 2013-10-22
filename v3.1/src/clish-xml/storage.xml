@@ -1,0 +1,57 @@
+﻿<?xml version="1.0"?>
+<CLISH_MODULE>
+<VIEW name="storage" prompt="[storage/${dir}]# ">
+        <COMMAND name="quit"
+                help="Quit storage mode"
+                view="support"
+                viewid="">
+		<ACTION>echo -e "\nLeaving storage mode..\n"</ACTION>
+	</COMMAND>
+
+	<COMMAND name="dirs" 
+		help="Display storage data">
+		<PARAM name="dir"
+                        help="directory"
+                        ptype="STRING_ANY"
+			default=""/>
+		<ACTION>exec /service/tools/vstorage.exc dirs "${dir}" 2>/dev/null |more -dl</ACTION>
+	</COMMAND>
+
+	<COMMAND name="pwd"
+		help="Display current working directory">
+                <ACTION builtin="awie_vstorage_pwd" />
+        </COMMAND>
+
+	<COMMAND name="chdir"
+		help="Change storage directory"
+		viewid="dir=${dir}"
+		view="storage">
+		<PARAM name="dir"
+                        help="directory"
+                        ptype="STRING_ANY"
+			default="/"/>
+                <ACTION builtin="awie_vstorage_chdir">${dir}</ACTION>
+        </COMMAND>
+
+	<COMMAND name="ftp"
+		help="FTP client">
+		<PARAM name="operation"
+			help="Operation"
+			ptype="FTP_OPTION" />
+		<PARAM name="file"
+			help="File"
+			ptype="STRING_ANY" />
+		<PARAM name="user"
+			help="User"
+			ptype="STRING" />
+		<PARAM name="server"
+			help="Server Host"
+			ptype="HOST" />
+		<PARAM name="port"
+			help="service port to connect"
+			ptype="NUM"
+			default="21"/>
+		<ACTION>exec /bin/exec_cli ftp ${operation} ${file} ${user} ${server} ${port}</ACTION>
+	</COMMAND>
+</VIEW>
+</CLISH_MODULE>

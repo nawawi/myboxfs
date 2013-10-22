@@ -1,0 +1,202 @@
+<?php
+if(!defined('_CLI_CODE')||_CLI_CODE!="a098846421a09ab1cacd3b3a753cbe05") exit("\n\nERROR: _CLI_CODE not set\n\n");
+
+function ___CLI_STATIC_ARP_PRINT($_find='') {
+	$_objf=_OBJ_PATH."/iosh_static_arp_print.obj";
+	@unlink($_objf);
+	_INI_TOKEN_GET("network","static_arp.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+              	_CLI_ECHO(_GETTEXT("No data available"));
+                return FALSE;
+	}
+	$_cnt=1;$_obj=array();
+	$_output="";$_DTX=array();
+	foreach($_TOKEN as $_ID => $_DATA) {
+		if(_NULL($_DATA['IP'])||_NULL($_DATA['MAC'])) {
+			_INI_TOKEN_DELETE("network","static_arp.cfg",$_ID);
+			continue;
+		}
+		if(!_NULL($_find)) {
+			if(!_ARRAY_FIND($_find,$_DATA)) {
+				continue;
+			}
+		}
+		if($_cnt > 1) $_DTX[$_cnt][__CLI_DATA_NL]=1;
+		$_DTX[$_cnt][_GETTEXT_U("ID")]=$_cnt;
+		$_DTX[$_cnt][_GETTEXT_U("IP ADDRESS")]=$_DATA['IP'];
+		$_DTX[$_cnt][_GETTEXT_U("MAC ADDRESS")]=$_DATA['MAC'];
+		if(!_NULL($_DATA['DNAME'])) {
+			$_DTX[$_cnt][_GETTEXT_U("INTERFACE")]=$_DATA['DNAME'];
+		}
+		$_obj[$_cnt]=$_ID;
+		unset($_DTOKEN);
+		$_cnt++;
+	}
+	if(!_ARRAY_NULL($_DTX)) {
+		$_output .=_CLI_DATA_BODY_R($_DTX);
+		unset($_DTX);
+	}
+	if(_ARRAY_NULL($_obj) || !_FILE_ARRAY_SAVE($_objf,$_obj) || _NULL($_output)) {
+		if(!_NULL($_find)) {
+			_CLI_ECHO(_GETTEXT("No results found"));
+		} else {
+			_CLI_ECHO(_GETTEXT("No data available"));
+		}
+		@unlink($_objf);
+                return FALSE;
+	}
+	_CLI_ECHO_HEADER(_GETTEXT("Static ARP list"));
+	if(!_NULL($_find)) {
+		echo _GETTEXT("Search results match for '%s':","$_find")."\n\n";
+	}
+	echo "$_output";
+	return TRUE;
+}
+
+function ___CLI_STATIC_ARP_CACHE($_clear=0) {
+	$_BUFF=_FILE("/proc/net/arp");
+	unset($_BUFF[0]);
+	if(_ARRAY_NULL($_BUFF)) {
+              	_CLI_ECHO(_GETTEXT("No ARP cache available"));
+                return FALSE;
+	}
+	$_DTL=array();
+	foreach($_BUFF as $_line) {
+		_TRIM($_line);
+		if(_NULL($_line)) continue;
+		list($_ip,,$_type,$_mac,,$_intf)=_STR_ARRAY($_line,"\s+");
+		if($_type=="0x0") continue;
+		if($_type=="0x6") {
+			$_type="P";
+		} else {
+			$_type="D";
+		}
+		if(!_NULL($_intf)) {
+			_INI_TOKEN_GET_BYPARAM("network","eth.cfg","DEVICE","$_intf",$_ITOKEN);
+			if(!_NULL($_ITOKEN['NAME'])) $_intf="$_intf ({$_ITOKEN['NAME']})";
+			unset($_ITOKEN);
+		}
+		$_DTL[]=array($_type,$_ip,$_mac,$_intf);
+	}
+	if(!_ARRAY_NULL($_DTL)) {
+		echo _GETTEXT("Flags:")." P = "._GETTEXT("Permanent").", D = "._GETTEXT("Dynamic")."\n";
+		$_DTH=array("  ",_GETTEXT_U("IP ADDRESS"),_GETTEXT_U("MAC ADDRESS"),_GETTEXT_U("INTERFACE"));
+		echo _CLI_DATA_BODY_LINE($_DTH,$_DTL,array("","-","-","-"));
+		return TRUE;
+	}
+	return FALSE;
+}
+
+function ___CLI_STATIC_ARP_ADD($_args) {
+	if(!_ARRAY_NULL($_args)) {
+		$_ip=$_args[0];
+		$_mac=$_args[1];
+		$_intf=$_args[2];
+		if(!_CHECK_IP($_ip)) {
+			_CLI_ECHO(_GETTEXT("Invalid IP Address '%s'","$_ip"));
+			return FALSE;
+		}
+		if(!_CHECK_MACADDR($_mac)) {
+			_CLI_ECHO(_GETTEXT("Invalid MAC Address '%s'","$_mac"));
+			return FALSE;
+		}
+		$_DATA=array();
+		$_DATA['IP']="$_ip";
+		$_DATA['MAC']="$_mac";
+		if(!_NULL($_intf)) {
+			if(___CLI_DEFINITIONS_NETWORKS_ADD_INT($_intf,$_val)) {
+				$_DATA['DNAME']="$_val";
+			}
+		}
+		if(!_INI_TOKEN_CHECK("network","static_arp.cfg","IP","$_ip")) {
+			_CLI_ECHO(_GETTEXT("IP Address '%s' already exist","$_ip"));
+			return FALSE;
+		}
+		if(_INI_TOKEN_SAVE("network","static_arp.cfg",$_DATA)) {
+			_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+			_network_static_arp();
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function ___CLI_STATIC_ARP_DELETE($_nums) {
+	$_objf=_OBJ_PATH."/iosh_static_arp_print.obj";
+	$_obj=_FILE_ARRAY_GET($_objf);
+	if(_ARRAY_NULL($_obj)) {
+		_CLI_ECHO(_GETTEXT("No Resource Id available."));
+		_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","print"));
+		@unlink($_objf);
+		return FALSE;
+	}
+	_INI_TOKEN_GET("network","static_arp.cfg",$_TOKEN);
+	if($_nums=='*' && _CLI_YESNO(_GETTEXT("This action will delete all %s.\nContinue this action? %s","Static ARP list","[yes/no]: "))==TRUE) {
+		foreach($_obj as $_cnt => $_id) {
+			if(!_NULL($_TOKEN[$_id]['IP'])) {
+				$_cmd="/bin/arp -d {$_TOKEN[$_id]['IP']}"; 
+			}
+			if(_INI_TOKEN_DELETE("network","static_arp.cfg",$_id)) {
+				unset($_obj[$_cnt]);
+				if(!_NULL($_cmd)) _EXEC_CMD($_cmd);
+			}
+			unset($_cmd);
+		}
+		if(_FILE_ARRAY_SAVE($_objf,$_obj)) {
+			return TRUE;
+		}
+	} else {
+		$_num_array=array();
+		_CLI_MULTINUM($_nums,$_num_array);
+		foreach($_num_array as $_no) {
+			if(!_NULL($_obj[$_no])) {
+				if(!_NULL($_TOKEN[$_obj[$_no]]['IP'])) {
+					$_cmd="/bin/arp -d {$_TOKEN[$_obj[$_no]]['IP']}"; 
+				}
+				if(_INI_TOKEN_DELETE("network","static_arp.cfg",$_obj[$_no])) {
+					unset($_obj[$_no]);
+					if(!_NULL($_cmd)) _EXEC_CMD($_cmd);
+				}
+				unset($_cmd);
+			}
+		}
+		if(_FILE_ARRAY_SAVE($_objf,$_obj)) {
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function _cli_static_arp() {
+	if($_SERVER["argc"] > 1 ) {
+		$_max=$_SERVER["argc"];
+		_CLI_TRIM_ARGS($_SERVER['argv']);
+		for($_x=1;$_x < $_max;$_x++) {
+			$_options=$_SERVER["argv"][$_x];
+			if($_options=="print") {
+				return ___CLI_STATIC_ARP_PRINT();
+			} elseif($_options=="cache") {
+				$_clear=$_SERVER["argv"][$_x+1];
+				if(!_NULL($_clear) && $_clear=="clear") {
+					return _ARP_DELETE();
+				}
+				return ___CLI_STATIC_ARP_CACHE();
+			} elseif($_options=="find") {
+				$_string=$_SERVER["argv"][$_x+1];
+				if(!_NULL($_string)) {
+					return ___CLI_STATIC_ARP_PRINT($_string);
+				}
+			} elseif($_options=="add") {
+				_CLI_RESET_ARGS(1,$_SERVER["argv"]);
+				return ___CLI_STATIC_ARP_ADD($_SERVER["argv"]);
+			} elseif($_options=="delete") {
+				$_nums=$_SERVER["argv"][$_x+1];
+				if(!_NULL($_nums)) {
+					return ___CLI_STATIC_ARP_DELETE($_nums);
+				}
+			}
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+?>

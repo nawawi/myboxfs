@@ -1,0 +1,150 @@
+<?php
+if(!defined('_POLICY_CODE')||_POLICY_CODE!="214162c595ce24bf9285f0a98cb0fbca") exit("\n\nERROR: _POLICY_CODE not set\n\n");
+
+function _policy_admin_acl(&$_rules,$_rulesid,$_type,$_host,$_sport,$_dport,$_iface="") {
+	$_int="";
+	if(!_NULL($_iface)) {
+		$_iface1=_DEFINITIONS_GET_INTERFACE_DEVICE($_iface);
+		if(!_NULL($_iface1)) {
+			$_int="-i $_iface1";
+		}
+	}
+	if($_type=="host" || $_type=="dnshost") {
+		if($_type=="dnshost" && $_host==_GETTEXT("unresolved")) {
+			return TRUE;
+		}
+		if(_IS_IPV4($_host)) {
+			$_rules .="-A ADMIN $_rulesid $_int -p tcp -m tcp -s $_host --sport $_sport --dport $_dport -j CONFIRMED\n";
+			return TRUE;
+		}
+		_INIT_ECHO(1,_GETTEXT("ACL: invalid %s %s","IPv4 address","$_host"));
+		return FALSE;
+	} elseif($_type=="hostmac") {
+		if(_CHECK_MACADDR($_host)) {
+			$_rules .="-A ADMIN $_rulesid $_int -p tcp -m tcp -m mac --mac-source $_host --sport $_sport --dport $_dport -j CONFIRMED\n";
+			return TRUE;
+		}
+		_INIT_ECHO(1,_GETTEXT("ACL: invalid %s %s","hostmac","$_host"));
+		return FALSE;
+	} elseif($_type=="hostrange") {
+		$_list=_STR_ARRAY($_host,"-");
+		if(!_NULL($_list[0]) && !_NULL($_list[1])) {
+			if(_CHK_HOSTRANGE($_list[0],$_list[1])) {
+				$_rules .="-A ADMIN $_rulesid $_int -p tcp -m tcp -m iprange --src-range $_host --sport $_sport --dport $_dport -j CONFIRMED\n";
+				return TRUE;
+			}
+		}
+		_INIT_ECHO(1,_GETTEXT("ACL: invalid %s %s","hostrange","$_host"));
+		unset($_list);
+		return FALSE;
+	} else {
+		if(!_NULL($_host)) {
+			$_rules .="-A ADMIN $_rulesid $_int -p tcp -m tcp -s $_host --sport $_sport --dport $_dport -j CONFIRMED\n";
+			return TRUE;
+		}
+	}
+	_INIT_ECHO(1,_GETTEXT("ACL: function failed"));
+	return FALSE;
+}
+
+function _policy_admin_restore() {
+	$_objf=_OBJ_PATH."/_policy_admin_save.obj";
+	$_data=_FILE_GET($_objf);
+	if(!_NULL($_data)) {
+		if(!_policy_data($_data,1)) {
+			@unlink($_objf);
+			return FALSE;
+		}
+		_INIT_ECHO(0,_GETTEXT("Reloading previous saved policy"));
+		return TRUE;
+	}
+	@unlink($_objf);
+	return FALSE;
+}
+
+function _policy_admin_save($_data) {
+	$_objf=_OBJ_PATH."/_policy_admin_save.obj";
+	return _FILE_SAVE($_objf,$_data);
+}
+
+function policy_admin() {
+	_INI_TOKEN_GET("system","acl.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+                return FALSE;
+	}
+	_INI_TOKEN_GET("system","system.cfg",$_NTOKEN);
+	$_log_drop=$_NTOKEN['security']['LOG_DROP'] ? $_NTOKEN['security']['LOG_DROP'] : 0;
+	$_ftp_port=$_NTOKEN['service_ftp']['PORT'];
+	$_ssh_port=$_NTOKEN['service_ssh']['PORT'];
+	$_web_port=$_NTOKEN['service_http']['PORT'];
+	$_rules="";
+	$_rulesid="-m comment --comment \"admin access-list\"";
+	$_HOST_CHECK=array();
+	foreach($_TOKEN as $_ID => $_DATA) {
+		if(_NULL($_DATA['HOST']) || _NULL($_DATA['STAT']) || _NULL($_DATA['TYPE'])) {
+			_INI_TOKEN_DELETE("system","acl.cfg",$_ID);
+			continue;
+		}
+		if($_DATA['STAT']==0) continue;
+		_DEFINITIONS_GET_BYNAME_R("networks",$_DATA['HOST'],$_DTOKEN);
+		if(_ARRAY_NULL($_DTOKEN)) continue;
+		foreach($_DTOKEN as $_DID => $_DDTOKEN) {
+			if(_NULL($_DDTOKEN['ADDR']) 
+				|| _NULL($_DDTOKEN['__DATA_TYPE'])
+				|| _NULL($_DDTOKEN['NAME'])) continue;
+			if($_DDTOKEN['__DATA_TYPE']=="network") {
+				if(!_NULL($_DDTOKEN['PREF'])) {
+					$_DDTOKEN['ADDR']="{$_DDTOKEN['ADDR']}/{$_DDTOKEN['PREF']}";
+				}
+			}
+			$_addr_array=_STR_ARRAY($_DDTOKEN['ADDR'],",");
+			foreach($_addr_array as $_addr) {
+				if(_NULL($_addr)) continue;
+				if(!_NULL($_HOST_CHECK[$_addr])) continue;
+				$_HOST_CHECK[$_addr]=1;
+				if(!_NULL($_web_port) && strpos($_DATA['TYPE'],"web")!==FALSE) {
+					_policy_admin_acl($_rules,$_rulesid,$_DDTOKEN['__DATA_TYPE'],$_addr,"1:65535",$_web_port,$_DDTOKEN['DNAME']);
+				}
+				if(!_NULL($_ftp_port) && strpos($_DATA['TYPE'],"ftp")!==FALSE) {
+					_policy_admin_acl($_rules,$_rulesid,$_DDTOKEN['__DATA_TYPE'],$_addr,"1:65535",$_ftp_port,$_DDTOKEN['DNAME']);
+				}
+				if(!_NULL($_ssh_port) && strpos($_DATA['TYPE'],"ssh")!==FALSE) {
+					_policy_admin_acl($_rules,$_rulesid,$_DDTOKEN['__DATA_TYPE'],$_addr,"1:65535",$_ssh_port,$_DDTOKEN['DNAME']);
+				}
+			}
+			unset($_addr_array,$_addr);
+		}
+		unset($_DDTOKEN,$_DDID,$_DTOKEN,$_DATA);
+	}
+	unset($_HOST_CHECK);
+	$_mports="";
+	if(!_NULL($_web_port)) $_mports .="$_web_port,";
+	if(!_NULL($_ftp_port)) $_mports .="$_ftp_port,";
+	if(!_NULL($_ssh_port)) $_mports .="$_ssh_port,";
+	_TRIM($_mports,",");
+	$_DROP="DROP";
+	if($_log_drop==1) {
+		$_DROP="LOG_DROP";
+	}
+	if(!_NULL($_mports)) {
+		$_rules .="-A ADMIN $_rulesid -p tcp -m tcp -m multiport --dports $_mports -j $_DROP\n";
+	}
+	_TRIM($_rules);
+	if(!_NULL($_rules)) {
+		$_data="*filter\n";
+		$_data .="-F ADMIN\n";
+		$_data .="$_rules\n";
+		$_data .="COMMIT\n";
+		if(_policy_data($_data,0)) {
+			_DELDIR(_PROC_PATH."/login");
+			_policy_admin_save($_data);
+			return TRUE;
+		}
+		_INIT_ECHO(1,_GETTEXT("Loading %s failed","policy admin"));
+		_policy_admin_restore();
+		return FALSE;
+	}
+	return FALSE;
+}
+
+?>

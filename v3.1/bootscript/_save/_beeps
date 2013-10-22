@@ -1,0 +1,27 @@
+#!/bin/sh
+
+__beeps() {
+	if [ -f "/strg/mybox/registry/system/system.cfg" ]; then
+		source /strg/mybox/registry/system/system.cfg 2>/dev/null;
+	fi
+
+	if [ -n "$BEEP" -a "$BEEP" = "0" ]; then
+		exit 0;
+	fi
+
+	local _opt="$1";
+	[ -z "$_opt" ] && _opt="sysexec";
+	if [ -x "/bin/beep" ]; then
+		if [ "$_opt" = "start" ]; then
+			(for f in $(seq 1 3);do /bin/beep -f 900 && sleep 1;done && /bin/beep -f 700 -l 100 -n -f 800 -l 100 -n -f 900 -l 100 -n -f 1000 -l 100);
+		elif [ "$_opt" = "stop" ]; then
+			(/bin/beep -f 700 -l 1000);
+		else
+			(/bin/beep -f 700 -l 100 -n -f 800 -l 100 -n -f 900 -l 100 -n -f 1000 -l 100);
+		fi
+	fi
+}
+
+__beeps "$1";
+
+exit 0;

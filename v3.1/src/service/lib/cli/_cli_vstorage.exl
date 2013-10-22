@@ -1,0 +1,123 @@
+<?php
+if(!defined('_CLI_CODE')||_CLI_CODE!="a098846421a09ab1cacd3b3a753cbe05") exit("\n\nERROR: _CLI_CODE not set\n\n");
+
+function ___CLI_VSTORAGE_PATH_TRIM($_path) {
+        $_pat=array("/\/config/","/\/\.\./","/\.\./","/\/\//");
+        $_rep=array("","","","/");
+
+	return preg_replace($_pat,$_rep,$_path);
+}
+
+function ___CLI_VSTORAGE_GETSTAT($_file,&$_info) {
+	$_info=array();$_type="";
+	if(!file_exists($_file)) {
+		return FALSE;
+	}
+	if(!is_dir($_file)) {
+		$_info=stat($_file);
+		$_type="F";
+		if(preg_match("/\.gz$/",$_file)) $_type="C";
+		$_info['_ftype']=$_type;
+		return TRUE;
+	}
+	if(_EXEC_CMD_OUTPUT("/bin/du -bs --time --time-style=+%s $_file",$_STDOUT,$_STDERR)==0) {
+		if(!_NULL($_STDOUT[0])) {
+			$_data=$_STDOUT[0];
+			list($_size,$_time)=preg_split("/\s+/",$_data,2);
+			$_info['size']=$_size;
+			$_info['mtime']=$_time;
+			$_info['_ftype']="D";
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+function ___CLI_VSTORAGE_CHECKDIRS($_dirs) {
+	if(!is_dir($_dirs)) return FALSE;
+	if(@chdir($_dirs)) {
+		$_cwd=getcwd();
+		if(substr($_cwd,0,7)=="/config") {
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+function ___CLI_VSTORAGE_DIRS($_dirs="") {
+	$_DTL=array();$_output="";
+	if(!_NULL($_dirs)) {
+		if(substr($_dirs,0,7)!="/config") {
+			$_chk=0;
+			if(___CLI_VSTORAGE_CHECKDIRS($_dirs)) $_chk=1;
+			if($_chk==0) {
+				$_dirs="/config/$_dirs";
+				if(___CLI_VSTORAGE_CHECKDIRS($_dirs)) $_chk=1;
+			}
+			if($_chk==1) {
+				$_buff=_GLOB("*");
+			}
+		}
+	} else {
+		$_buff=_GLOB("*");
+	}
+	if(!_ARRAY_NULL($_buff)) {
+		foreach($_buff as $_file) {
+			if(___CLI_VSTORAGE_GETSTAT($_file,$_info)) {
+				$_size=_BYTE_FORMAT($_info['size'],0);
+				$_date=date('d-M-Y H:i:s',$_info['mtime']);
+				$_ftype=$_info['_ftype'];
+				clearstatcache();
+				$_file=___CLI_VSTORAGE_PATH_TRIM($_file);
+				$_DTL[]=array("$_date",$_size,$_ftype,$_file);
+				unset($_size,$_date,$_file);
+			}
+		}
+	}
+	if(!_ARRAY_NULL($_DTL)) {
+		$_DTH=array(_GETTEXT_U("DATE/TIME"),_GETTEXT_U("SIZE"),"  ",_GETTEXT_U("ITEMS"));
+		$_output .=_CLI_DATA_BODY_LINE($_DTH,$_DTL,array("-","","","-"));
+	}
+	if(!_NULL($_output)) {
+		echo _GETTEXT("Flags:")." F = "._GETTEXT("File").", D = "._GETTEXT("Directory").", C = "._GETTEXT("Compressed")."\n";
+		echo "$_output";
+		return TRUE;
+	}
+	_CLI_ECHO(_GETTEXT("No data available"));
+	return FALSE;
+}
+
+function ___CLI_VSTORAGE_CHROOT() {
+	$_cwd=getcwd();
+	if(substr($_cwd,0,7)!="/config") {
+		if(@chdir("/config")==FALSE) {
+			_CLI_ECHO(_GETTEXT("Invalid working directory"));
+			return FALSE;
+		}
+	}
+	return TRUE;
+}
+function _cli_vstorage() {
+	if(!___CLI_VSTORAGE_CHROOT()) exit(1);
+	if($_SERVER["argc"] > 1 ) {
+		$_max=$_SERVER["argc"];
+		_CLI_TRIM_ARGS($_SERVER['argv']);
+		for($_x=1;$_x < $_max;$_x++) {
+			$_cmd=$_SERVER["argv"][$_x];
+			if($_cmd=="dirs") {
+				$_dirs=$_SERVER["argv"][$_x+1];
+				return ___CLI_VSTORAGE_DIRS($_dirs);
+			} elseif($_cmd=="config") {
+				$_scmd=$_SERVER["argv"][$_x+1];
+                        	if($_scmd=="print") {
+					return ___CLI_VSTORAGE_CONFIG_PRINT();
+				}
+				$_sval=$_SERVER["argv"][$_x+2];
+				return ___CLI_VSTORAGE_CONFIG_SET($_scmd,$_sval);
+			}
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+?>

@@ -1,0 +1,63 @@
+#!/bin/bash -e
+trap "exit 1" 2;
+
+# checking
+if [ "x$_START" = "x" ]; then
+        echo "_START not set";
+	exit 1;
+fi
+if [ ! -f "$_START/MYBOX_VERSION" ]; then
+        echo "MYBOX_VERSION not set";
+	exit 1;
+fi
+if [ ! -f "$_FUNC/functions.sh" ]; then
+        echo "_FUNC not set";
+	exit 1;
+fi
+
+cd $_START;
+. $_FUNC/functions.sh
+
+_BUILD_MSG "zoneinfo";
+
+# setting
+_BDIR=/tmp/zoneinfo
+_KBASE=$_START/kernel_pkg
+_SOURCE=/usr/share/zoneinfo
+
+cd $_START;
+
+if [ -d "$_SOURCE" ]; then
+	mkdir -p $_BDIR/usr/share/zoneinfo
+	cd /usr/share/zoneinfo
+	LS=$(find . -type f -or -type l | grep '^./[A-Z]' | sort)
+	for x in $LS; do
+		_dir=$(dirname $x)
+		if [ "$_dir" != "." ]; then
+			mkdir -p $_BDIR/usr/share/zoneinfo/$_dir
+			cp -av $x $_BDIR/usr/share/zoneinfo/$_dir
+		else
+			cp -av $x $_BDIR/usr/share/zoneinfo
+		fi
+		_dir=
+	done
+	cd $_BDIR/usr/share
+	chmod -R 600 zoneinfo
+	echo "creating zoneinfo list"
+	cd $_BDIR/usr/share/zoneinfo
+	rm -f $_BDIR/usr/share/zoneinfo/ZONELIST.TXT /tmp/ZONELIST.TXT
+	for f in $(find . -type f -or -type l | grep '^./[A-Z]' | sort);do
+		echo $f |sed -e 's/\.\///g' >> /tmp/ZONELIST.TXT
+		_LZMA_COMPRESS $f $f.gz
+	done
+	mv -v /tmp/ZONELIST.TXT $_BDIR/usr/share/zoneinfo/ZONELIST.TXT
+	chmod 600 $_BDIR/usr/share/zoneinfo/ZONELIST.TXT
+	cd $_BDIR
+	tar -cvf corefs_zoneinfo.tar * |sort
+	_LZMA_COMPRESS corefs_zoneinfo.tar corefs_zoneinfo.mpk
+	wait
+	mv -v corefs_zoneinfo.mpk $_KBASE
+fi
+rm -rfv $_BDIR
+cd $_START;
+exit 0;

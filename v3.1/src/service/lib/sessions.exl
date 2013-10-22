@@ -1,0 +1,598 @@
+<?php
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+function _SESSION_RESET_AUTH_PASSWORD() {
+	_INI_TOKEN_GET("system","system.cfg",$_NTOKEN);
+	if(_ARRAY_NULL($_NTOKEN)) return FALSE;
+	if(!_NULL($_NTOKEN['system']['CONSOLE_PASSWD'])) {
+		$_console_pass=$_NTOKEN['system']['CONSOLE_PASSWD'];
+		$_console_user="console";
+	}
+	if(!_NULL($_NTOKEN['service_ssh']['PASSWD'])) {
+		$_ssh_pass=$_NTOKEN['service_ssh']['PASSWD'];
+	}
+	if(!_NULL($_NTOKEN['service_ssh']['USER'])) {
+		$_ssh_user=$_NTOKEN['service_ssh']['USER'];
+	}
+	if(!_NULL($_NTOKEN['service_ftp']['PASSWD'])) {
+		$_ftp_pass=$_NTOKEN['service_ftp']['PASSWD'];
+	}
+	if(!_NULL($_NTOKEN['service_ftp']['USER'])) {
+		$_ftp_user=$_NTOKEN['service_ftp']['USER'];
+	}
+	if(!_NULL($_NTOKEN['service_http']['ADMIN'])) {
+		$_sysadmin=$_NTOKEN['service_http']['ADMIN'];
+	}
+	if(!_NULL($_NTOKEN['service_http']['LOOK'])) {
+		$_syslook=$_NTOKEN['service_http']['LOOK'];
+	}
+	unset($_NTOKEN);
+	$_OBJ=array();
+	@unlink(_OBJ_PATH."/etc_passwd.obj");
+	$_BUFF=_FILE("/etc/passwd");
+	if(_ARRAY_NULL($_BUFF)) return 0;
+	$_save='';
+	foreach($_BUFF as $_line) {
+		_TRIM($_line);
+		if(_NULL($_line)) continue;
+		list($_user,$_pass,$_uid,$_gid,$_fname,$_home,$_shell)=preg_split("/:/",$_line);
+		if($_fname=="console" && !_NULL($_console_pass) && !_NULL($_console_user)) {
+			$_save .="$_console_user:$_console_pass:$_uid:$_gid:$_fname:/config:/bin/iosh\n";
+			$_salt=substr($_console_pass,0,11);
+			$_OBJ['console']['user']="$_console_user";
+			$_OBJ['console']['pass']="$_console_pass";
+			$_OBJ['console']['salt']="$_salt";
+			unset($_salt);
+			continue;
+		}
+		if($_fname=="ssh" && !_NULL($_ssh_pass) && !_NULL($_ssh_user)) {
+			$_save .="$_ssh_user:$_ssh_pass:$_uid:$_gid:$_fname:/config:/bin/iosh\n";
+			$_salt=substr($_ssh_pass,0,11);
+			$_OBJ['ssh']['user']="$_ssh_user";
+			$_OBJ['ssh']['pass']="$_ssh_pass";
+			$_OBJ['ssh']['salt']="$_salt";
+			unset($_salt);
+			continue;	
+		}
+		if($_fname=="ftp" && !_NULL($_ftp_pass) && !_NULL($_ftp_user)) {
+			$_save .="$_ftp_user:$_ftp_pass:$_uid:$_gid:$_fname:/config:/bin/iosh\n";
+			$_salt=substr($_ftp_pass,0,11);
+			$_OBJ['ftp']['user']="$_ftp_user";
+			$_OBJ['ftp']['pass']="$_ftp_pass";
+			$_OBJ['ftp']['salt']="$_salt";
+			unset($_salt);
+			continue;
+		}
+		if($_fname=="sysadmin" && !_NULL($_sysadmin)) {
+			$_save .="sysadmin:$_sysadmin:$_uid:$_gid:$_fname:/tmp:/bin/false\n";
+			$_salt=substr($_sysadmin,0,11);
+			$_OBJ['admin']['user']="sysadmin";
+			$_OBJ['admin']['pass']="$_sysadmin";
+			$_OBJ['admin']['salt']="$_salt";
+			unset($_salt);
+			continue;
+		}
+		if($_fname=="syslook" && !_NULL($_syslook)) {
+			$_save .="syslook:$_syslook:$_uid:$_gid:$_fname:/tmp:/bin/false\n";
+			$_salt=substr($_syslook,0,11);
+			$_OBJ['look']['user']="syslook";
+			$_OBJ['look']['pass']="$_syslook";
+			$_OBJ['look']['salt']="$_salt";
+			unset($_salt);
+			continue;
+		}
+		$_save .="$_user:$_pass:$_uid:$_gid:$_fname:$_home:$_shell\n";
+		unset($_user,$_pass,$_uid,$_gid,$_fname,$_home,$_shell);
+	}
+	unset($_BUFF);
+	if(!_NULL($_save)) {
+		if(!_ARRAY_NULL($_OBJ)) {
+			_FILE_ARRAY_SAVE(_OBJ_PATH."/etc_passwd.obj",$_OBJ);
+		}
+		return _FILE_SAVE("/etc/passwd",$_save);
+	}
+	return FALSE;
+}
+
+function _SESSION_SSH($_opt,$_pid,$_ldate,$_ip='') {
+        $_ID=_FILE_ARRAY_GET(_OBJ_PATH."/ssh_session.obj");
+        if($_opt==1) {
+                $_ID[$_pid]="$_ip";
+                _FILE_ARRAY_SAVE(_OBJ_PATH."/ssh_session.obj",$_ID);
+                $_console="ssh_{$_pid}_{$_ip}_{$_ldate}";
+                @touch(_CONSOLE_SESSIONS_PATH."/$_console");
+        }
+        if($_opt==2) {
+                if($_ID[$_pid]!='') {
+                        $_ip=$_ID[$_pid];
+                        $_console="ssh_{$_pid}_{$_ip}_";
+                        _UNLINK(_CONSOLE_SESSIONS_PATH."/$_console*");
+                        unset($_ID[$_pid]);
+                        _FILE_ARRAY_SAVE(_OBJ_PATH."/ssh_session.obj",$_ID);
+                        return $_ip;
+                }
+        }
+        return;
+}
+
+function _SESSION_FTP($_opt,$_pid='',$_pid2='',$_ldate='',$_ip='') {
+        $_ID=_FILE_ARRAY_GET(_OBJ_PATH."/ftp_session.obj");
+        if($_opt==1) {
+                $_ID[$_pid]="$_ip|$_pid2";
+                _FILE_ARRAY_SAVE(_OBJ_PATH."/ftp_session.obj",$_ID);
+                $_console="ftp_{$_pid}_{$_ip}_{$_ldate}_";
+                @touch(_CONSOLE_SESSIONS_PATH."/$_console");
+        }
+        if($_opt==2) {
+                if(!_ARRAY_NULL($_ID)) {
+			$_ftpuser=_FILE_GET("/etc/vsftpd/ftp_user");
+			if(_NULL($_ftpuser)) $_ftpuser="ftpuser";
+                        foreach($_ID as $_pid => $_lx) {
+                                if(_CHECK_PID($_pid)==FALSE) {
+                                        list($_ip,$_pid2)=preg_split("/\|/",$_lx);
+                                        unset($_ID[$_pid]);
+                                        $_console="ftp_{$_pid}_{$_ip}_";
+                                        _UNLINK(_CONSOLE_SESSIONS_PATH."/$_console*");
+                                        _SESSION_AUTH_OUT("ftp",$_ftpuser,$_ip);
+                                }
+                        }
+                }
+        }
+        if($_opt==3) {
+                if($_ID[$_pid]!='') {
+                        $_lx=$_ID[$_pid];
+                        list($_ip,$_pid2)=preg_split("/\|/",$_lx);
+                        $_console="ftp_{$_pid}_{$_ip}_";
+                        _UNLINK(_CONSOLE_SESSIONS_PATH."/$_console*");
+                        unset($_ID[$_pid]);
+                }
+        }
+        _FILE_ARRAY_SAVE(_OBJ_PATH."/ftp_session.obj",$_ID);
+}
+
+function _SESSION_AUTH_OUT($_type,$_auth,$_auth_addr) {
+	$_status=_GETTEXT("Session logout");
+	_LOG_AUTH("ECODE=01 TYPE=$_type USER=$_auth IP=$_auth_addr MSG=$_status");
+}
+
+function _SESSION_IDLE($_tm) {
+	$_ds=date('d',$_tm);
+	$_ms=date('m',$_tm);
+	$_ys=date('Y',$_tm);
+	$_hs=date('H',$_tm);
+	$_is=date('i',$_tm);
+
+	$_dn=date('d');
+	$_mn=date('m');
+	$_yn=date('Y');
+	$_hn=date('H');
+	$_in=date('i');
+
+	if($_yn >= $_ys) {
+		$_ret="";
+		if($_yn > $_ys) {
+			$_yc=$_yn - $_ys;
+			$_ret .="$_yc}y ";
+		} else {
+			$_mc=$_mn - $_ms;
+			if($_mc > 0) {
+				$_ret .="{$_mc}m ";
+			} else {
+				$_dc=$_dn - $_ds;
+				if($_dc > 0) $_ret .="{$_dc}d ";
+			}
+		}
+		$_hc=$_hn - $_hs;
+		if($_hc >= 0) {
+			if(strlen($_hc)==1) $_hc="0$_hc";
+			$_ret .="{$_hc}:";
+		} else {
+			$_ret .="00:";
+		}
+		$_ic=$_in - $_is;
+		if($_ic >= 0) {
+			if(strlen($_ic)==1) $_ic="0$_ic";
+			$_ret .="{$_ic}";
+		} else {
+			$_ret .="00";
+		}
+		_TRIM($_ret);
+		return rtrim($_ret,":");
+	}
+	return "00:00";
+}
+
+function _SESSION_HTTP_CLEAN() {
+	$_data=_GLOB(_HTTP_SESSIONS_PATH."/sess_*");
+	if(!_ARRAY_NULL($_data)) {
+		foreach($_data as $_ln) {
+			$_sess=_FILE_GET($_ln);
+			if(_NULL($_sess)) {
+				@unlink($_ln);
+			}
+		}
+		unset($_data);
+	}
+}
+
+function _SESSION_HTTP_UNSERIALIZE($_data) {
+	$_vars=preg_split('/([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff^|]*)\|/',$_data,-1,PREG_SPLIT_NO_EMPTY | PREG_SPLIT_DELIM_CAPTURE);
+	$_result=array();
+	for($_i=0; $_vars[$_i]; $_i++) {
+		$_result[$_vars[$_i++]]=unserialize($_vars[$_i]);
+	}
+	return $_result;
+}
+
+function _SESSION_HTTP_DELETE($_file) {
+	$_buff=_FILE_GET($_file);
+	unlink($_file);
+	if(!_NULL($_buff)) {
+		$_data_buff=_SESSION_HTTP_UNSERIALIZE($_buff);
+		$_data_array=$_data_buff['traceos_login'];
+		_SESSION_AUTH_OUT("web",$_data_array['id'],$_data_array['ip']);
+	}
+}
+
+function _SESSION_HTTP_PRINT(&$_OBJ,&$_cnt,&$_DTL) {
+	$_data=_GLOB(_HTTP_SESSIONS_PATH."/sess_*");
+	if(!_ARRAY_NULL($_data)) {
+		foreach($_data as $_ln) {
+			$_buff=_FILE_GET($_ln);
+			if(_NULL($_buff)) {
+				unlink($_ln);
+				continue;
+			}
+			$_data_buff=_SESSION_HTTP_UNSERIALIZE($_buff);
+			$_data_array=$_data_buff['traceos_login'];
+			$_date=date('d-M-Y',$_data_array['time_login']);
+			$_time=date('H:i:s',$_data_array['time_login']);
+			$_idle=_SESSION_IDLE($_data_array['time_login']);
+			$_DTL[]=array($_cnt,"web",$_data_array['ip'],$_date,$_time,$_idle);
+			$_OBJ[$_cnt]=$_ln;
+			$_cnt++;
+			unset($_data_array,$_data_buff,$_date1,$_date2,$_time,$_idle);
+		}
+	}
+}
+
+function _SESSION_PRINT($_noprint=0) {
+	$_data=_GLOB(_CONSOLE_SESSIONS_PATH."/*");
+	$_objf=_OBJ_PATH."/sessions_print.obj";
+	if(!_ARRAY_NULL($_data)) {
+		include_once(_SERVICE_LIB_PATH.'/cli.exl');
+		_SESSION_HTTP_CLEAN();
+		$_DTL=array();
+		if($_noprint==0) {
+			$_DTL=array();
+		}
+		$_OBJ=array();$_cnt=1;
+		foreach($_data as $_ln) {
+			$_lx=basename($_ln);
+			if(preg_match("/(\S+)\_(\S+)\_(\S+)\_(\S+)/",$_lx,$_mm)) {
+				$_tm=$_mm[4];
+				$_idle=_SESSION_IDLE($_tm);
+				if($_mm[1]=="console"
+					|| $_mm[1]=="sysexec"
+					|| $_mm[1]=="ssh"
+					|| $_mm[1]=="ftp") {
+					if(_CHECK_PID($_mm[2])) {
+						if($_noprint==0) {
+							$_ndate=date('d-M-Y',$_tm);
+							$_ntime=date('H:i:s',$_tm);
+							$_DTL[]=array($_cnt,$_mm[1],$_mm[3],$_ndate,$_ntime,$_idle);
+							$_OBJ[$_cnt]=$_mm[2];
+							$_cnt++;
+						}
+					} else {
+						@unlink($_ln);
+					}
+				}
+				unset($_tm,$_idle);
+			}
+			unset($_ln,$_mm,$_lx);
+		}
+		if($_noprint==0) {
+			_SESSION_HTTP_PRINT($_OBJ,$_cnt,$_DTL);
+			if(!_ARRAY_NULL($_DTL)) {
+				$_DTH=array(_GETTEXT_U("ID"),_GETTEXT_U("TYPE"),_GETTEXT_U("FROM"),_GETTEXT_U("DATE"),_GETTEXT_U("TIME"),_GETTEXT_U("IDLE"));
+				echo _CLI_DATA_BODY_LINE($_DTH,$_DTL,array("-","-","-","-","-","-"));
+			}
+			return _FILE_ARRAY_SAVE(_OBJ_PATH."/sessions_print.obj",$_OBJ);
+		}
+		return TRUE;
+	}
+	@unlink($_objf);
+	return FALSE;
+}
+
+function _SESSION_DELETE($_sess_id) {
+	if(stripos($_sess_id,"sess_")!==FALSE) {
+		_SESSION_HTTP_DELETE($_sess_id);
+		return TRUE;
+	}
+	$_data=_GLOB(_CONSOLE_SESSIONS_PATH."/*_{$_sess_id}_*");
+	if(!_ARRAY_NULL($_data)) {
+		foreach($_data as $_ln) {
+			$_lx=basename($_ln);
+			if(preg_match("/(\S+)\_($_sess_id)\_(\S+)\_(\S+)/",$_lx,$_mm)) {
+				if($_mm[1]=="console") {
+					@_KILL($_sess_id,9);
+					@unlink(_CONSOLE_SESSIONS_PATH."/$_lx");
+					_SESSION_AUTH_OUT("console","console",$_mm[3]);
+				}
+				if($_mm[1]=="sysexec") {
+					@_KILL($_sess_id,9);
+					@unlink(_CONSOLE_SESSIONS_PATH."/$_lx");
+					_SESSION_AUTH_OUT("sysexec","console",$_mm[3]);
+				}
+				if($_mm[1]=="ssh") {
+					$_sshuser=_FILE_GET("/etc/ssh/ssh_user");
+					if(_NULL($_sshuser)) $_sshuser="sshuser";
+					@_KILL($_sess_id,9);
+					_SESSION_SSH('2',$_sess_id,time());
+					_SESSION_AUTH_OUT("ssh",$_sshuser,$_mm[3]);
+				}
+				if($_mm[1]=="ftp") {
+					$_ftpuser=_FILE_GET("/etc/vsftpd/ftp_user");
+					if(_NULL($_ftpuser)) $_ftpuser="ftpuser";
+					$_ID=_FILE_ARRAY_GET(_OBJ_PATH."/ftp_session.obj");
+					if(!_ARRAY_NULL($_ID)) {
+						$_lx=$_ID[$_sess_id];
+						list($_ip,$_pid2)=preg_split("/\|/",$_lx);
+						@_KILL($_sess_id,9);
+						@_KILL($_pid2,9);
+					}
+					_SESSION_FTP('3',$_sess_id,time());
+					_SESSION_AUTH_OUT("ftp",$_ftpuser,$_mm[3]);
+				}
+				// delete others
+				@unlink($_ln);
+			}
+		}
+	}
+	return TRUE;
+}
+
+function _SESSION_CHECK_PASSWORD($_access,$_user,$_passwd) {
+	_SESSION_RESET_AUTH_PASSWORD();
+	$_OBJ=_FILE_ARRAY_GET(_OBJ_PATH."/etc_passwd.obj");
+	if(!_ARRAY_NULL($_OBJ)) {
+		if(!_ARRAY_NULL($_OBJ[$_access])) {
+			if(!_NULL($_OBJ[$_access]['pass']) && !_NULL($_OBJ[$_access]['user']) && !_NULL($_OBJ[$_access]['salt'])) {
+				if($_OBJ[$_access]['user']=="$_user") {
+					$_passme=crypt($_passwd,$_OBJ[$_access]['salt']);
+					if($_OBJ[$_access]['pass']=="$_passme") {
+						return TRUE;
+					}
+				}
+			}
+		}
+	}
+	return FALSE;
+}
+
+// 0=password exist, -2=Invalid username, -1=user exist, 1=OK
+function _SESSION_CHECK_ACCESS_PASSWORD($_access,$_passwd,$_user='') {
+	_SESSION_RESET_AUTH_PASSWORD();
+	if(!_NULL($_user)) {
+		if(!_SESSION_CHECK_UNIX_USERNAME($_user)) {
+			return -2;
+		}
+	}
+	$_OBJ=_FILE_ARRAY_GET(_OBJ_PATH."/etc_passwd.obj");
+	if(!_ARRAY_NULL($_OBJ)) {
+		foreach($_OBJ as $_key => $_arrayval) {
+			if($_key=="$_access") continue;
+			if(_NULL($_arrayval['pass']) || _NULL($_arrayval['salt'])) continue;
+			$_passme=crypt($_passwd,$_arrayval['salt']);
+			if("$_passme"==$_arrayval['pass']) {
+				return 0;
+			}
+			unset($_passme);
+			if(!_NULL($_user) && !_NULL($_arrayval['user'])) {
+				if($_access=="ssh") {
+					if($_user==$_OBJ['ftp']['user']) {
+						return -1;
+					}
+				} elseif($_access=="ftp") {
+					if($_user==$_OBJ['ssh']['user']) {
+						return -1;
+					}
+				}
+			}
+		}
+	}
+	return 1;
+}
+
+// used for ssh/ftp user
+function _SESSION_CHECK_UNIX_USERNAME($_name) {
+	$_len=strlen($_name);
+	if($_len > 8
+		|| !ctype_alnum($_name) 
+		|| $_name{0}=='-'
+		|| $_name{0}=='@') {
+		return FALSE;
+	}
+	for($x=0;$x < strlen($_name); $x++) {
+		if(ctype_alnum($_name{$x})
+			|| $_name{$x}=='_'
+			|| $_name{$x}=='-'
+			|| $_name{$x}=='.'
+			|| $_name{$x}=='@'
+			|| $_name{$_len}=='$') {
+			continue;
+		}
+		return FALSE;
+	}
+	return TRUE;
+}
+
+function _SESSION_CHECK_UNIX_USERGROUP($_group) {
+	$_len=strlen($_name);
+	if(strlen($_group) > 16) {
+		return FALSE;
+	}
+	return _SESSION_CHECK_UNIX_USERNAME($_group);
+}
+
+function _SESSION_SET_ACCESS_PASSWORD($_access,$_passwd,$_user='') {
+	if($_access=="admin" || $_access=="look") {
+		_UPPER($_access);
+		$_DATA[$_access]=crypt($_passwd);
+		if(_INI_TOKEN_UPDATE("system","system.cfg","service_http",$_DATA)) {
+			_SESSION_RESET_AUTH_PASSWORD();
+			return TRUE;
+		}
+		return FALSE;
+	}
+	if($_access=="ssh" || $_access=="ftp") {
+		$_DATA['PASSWD']=crypt($_passwd);
+		if(!_NULL($_user)) {
+			if(!_SESSION_CHECK_UNIX_USERNAME($_user)) {
+				return FALSE;
+			}
+			$_DATA['USER']="$_user";
+		}
+		if(_INI_TOKEN_UPDATE("system","system.cfg","service_{$_access}",$_DATA)) {
+			_SESSION_RESET_AUTH_PASSWORD();
+			return TRUE;
+		}
+		return FALSE;
+	}
+	if($_access=="console") {
+		$_DATA['CONSOLE_PASSWD']=crypt($_passwd);
+		if(_INI_TOKEN_UPDATE("system","system.cfg","system",$_DATA)) {
+			_SESSION_RESET_AUTH_PASSWORD();
+			return TRUE;
+		}
+		return FALSE;
+	}
+	return FALSE;
+}
+
+// 0 = clear, 1 = add
+function _SESSION_ATTEMPT_BLOCK($_ip,$_type,$_opt=0) {
+	_INI_TOKEN_GET("system","system.cfg",$_NTOKEN);
+	if(_ARRAY_NULL($_NTOKEN)) {
+		return FALSE;
+	}
+	if($_type=="ftp") {
+		$_port=$_NTOKEN['service_ftp']['PORT'];
+	} elseif($_type=="ssh") {
+		$_port=$_NTOKEN['service_ssh']['PORT'];
+	} elseif($_type=="web") {
+		$_port=$_NTOKEN['service_http']['PORT'];
+	}
+	if(_NULL($_port)) {
+		return FALSE;
+	}
+	$_data="*filter\n";
+	if($_opt==1) {
+		$_data .="-I ADMIN -s $_ip -m tcp -p tcp --dport $_port -j LOG_DROP\n";
+	} else {
+		$_data .="-D ADMIN -s $_ip -m tcp -p tcp --dport $_port -j LOG_DROP\n";
+	}
+	$_data .="COMMIT\n";
+	if(_policy_data($_data,0)) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+function _SESSION_ATTEMPT_EXCLUDE($_ip) {
+	_INI_TOKEN_GET("system","attempt_exclude.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+		return FALSE;
+	}
+	foreach($_TOKEN as $_ID => $_DATA) {
+		if(_NULL($_DATA['HOST'])) continue;
+		_DEFINITIONS_GET_BYNAME_R("networks",$_DATA['HOST'],$_ITOKEN);
+		if(!_ARRAY_NULL($_ITOKEN)) {
+			foreach($_ITOKEN as $_data_array) {
+				if($_data_array['NAME']=="any") {
+					// if any, just return true
+					return TRUE;
+				}
+				if($_data_array['__DATA_TYPE']=="hostrange") {
+					$_hip=_STR_ARRAY($_data_array['ADDR'],"-");
+					if(!_ARRAY_NULL($_hip) && _CHK_HOSTRANGE($_hip[0],$_ip) && _CHK_HOSTRANGE($_ip,$_hip[1])) {
+						return TRUE;
+					}
+				}
+				if($_data_array['ADDR']=="$_ip") {
+					return TRUE;
+				}
+			}
+		}
+		unset($_ITOKEN);
+	}
+	return FALSE;
+}
+
+function _SESSION_ATTEMPT_DELETE($_ip) {
+	$_datapath=_PROC_PATH."/login";
+	@unlink("$_datapath/$_ip");
+}
+
+function _SESSION_ATTEMPT($_ip,$_type) {
+	if($_ip=="unknown") {
+		return FALSE;
+	}
+	$_datapath=_PROC_PATH."/login";
+	_INI_TOKEN_GET("system","system.cfg",$_TOKEN);
+	$_attempt=$_TOKEN['security']['ATTEMPT'];
+	$_block=$_TOKEN['security']['BLOCK'];
+	if($_attempt==0 || $_block==0) {
+		_DELDIR($_datapath);
+		return FALSE;
+	}
+	if(_SESSION_ATTEMPT_EXCLUDE($_ip)) {
+		return FALSE;
+	}
+	$_DATA=array();
+	$_DATA=_FILE_ARRAY_GET("$_datapath/$_ip");
+	if($_DATA['block']==1) {
+		_SESSION_ATTEMPT_CHECK();
+		return FALSE;
+	}
+	if(!_ARRAY_NULL($_DATA)) {
+		if($_DATA['block']==0 && $_DATA['cnt'] >= $_attempt) {
+			$_DATA['block']=1;
+			$_DATA['time']=time() + $_block;
+			_SESSION_ATTEMPT_BLOCK($_ip,$_type,1); 
+			return _FILE_ARRAY_SAVE("$_datapath/$_ip",$_DATA);
+		}
+	}
+	$_DATA['cnt']++;
+	$_DATA['time']=time() + 60 * 5;
+	$_DATA['block']=0;
+	$_DATA['type']=$_type;
+	$_DATA['ip']=$_ip;
+	return _FILE_ARRAY_SAVE("$_datapath/$_ip",$_DATA);
+}
+
+function _SESSION_ATTEMPT_CHECK() {
+	$_datapath=_PROC_PATH."/login";
+	if(!is_dir($_datapath)) return FALSE;
+	$_BUFF=_GLOB("$_datapath/*");
+	if(!_ARRAY_NULL($_BUFF)) {
+		foreach($_BUFF as $_line) {
+			$_DATA=_FILE_ARRAY_GET("$_line");
+			if(_ARRAY_NULL($_DATA)) {
+				@unlink("$_line");
+				continue;
+			}
+			if(time() >= $_DATA['time']) {
+				if($_DATA['block']==1) {
+					_SESSION_ATTEMPT_BLOCK($_DATA['ip'],$_DATA['type'],0);
+				}
+				@unlink($_line);
+				continue;
+			}
+		}
+	}
+}
+
+?>

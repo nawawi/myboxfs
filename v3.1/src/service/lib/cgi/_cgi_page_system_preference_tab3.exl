@@ -1,0 +1,127 @@
+<?php
+if(!defined('_CGI_CODE')||_CGI_CODE!="90d45215e48dac81e802f17310ad0c1f") exit("\n\nERROR: _CGI_CODE not set\n\n");
+
+function _CGI_PAGE_SYSTEM_PREFERENCE_TAB_3() {
+	extract($GLOBALS['_IMG']);
+	_INI_TOKEN_GET("system","system.cfg",$_TOKEN);
+	$_DATA=$_TOKEN['system'];
+	_INI_TOKEN_GET("network","ntp.cfg",$_NTOKEN);
+	$_DATA_NTP=$_NTOKEN['ntpd'];
+	$_ALT=_CGI_PAGE_DEFINITIONS_GET_TITLE($_DATA_NTP['SERVER'],'networks');
+	$_bid=_CGI_ATTR_KEY();
+	$_ndate=date('d-M-Y');
+	$_nhour=date('H');
+	$_nmin=date('i');
+	$_page="
+		<div class='fbox_c'>
+
+		<fieldset>
+		<legend>"._GETTEXT("System clock")."</legend>
+		<div style='margin: 5px;'>
+		<table class='tbox_t'>
+		<tr>
+		<td class='tbox_tdl'>"._GETTEXT("Date:")."</td>
+		<td class='tbox_tdc'><input id='date' type='text' class='tbox_i' style='width: 200px;' value='$_ndate' /></td>
+		<th class='tbox_tdr' rowspan='3'>"._GETTEXT("This should be the date, time and time zone of the system's location, which may be different from your local time.")."</th>
+		</tr>
+		<tr>
+		<td class='tbox_tdl'>"._GETTEXT("Time:")."</td>
+		<td class='tbox_tdc'>
+	";
+	$_page .="<select id='hou' class='tbox_s' style='width: 55px;' size='1'>";
+		for($_x=0; $_x < 24; $_x++) {
+			if($_x < 10) $_x="0$_x";
+			$_page .="<option value='$_x' "._CGI_DROPDOWNBOX_VAL($_x,$_nhour).">$_x</option>";
+		}
+		$_page .="</select>";
+		$_page .="<select id='min' class='tbox_s' style='margin-left: 2px; width: 55px;' size='1'>";
+		for($_x=0; $_x < 59; $_x++) {
+			if($_x < 10) $_x="0$_x";
+			$_page .="<option value='$_x' "._CGI_DROPDOWNBOX_VAL($_x,$_nmin).">$_x</option>";
+		}
+		$_page .="</select>";
+
+	$_page .="
+		
+		</td>
+		</tr>
+
+		<tr>
+		<td class='tbox_tdl'>"._GETTEXT("Timezone:")."</td>
+		<td class='tbox_tdc'>
+			<select class='tbox_s' id='timezone' style='width: 200px;' size='1'></select>
+			<script type='text/javascript'>__tndefinitions.timezone('{$_DATA['TIMEZONE']}');</script>
+		</td>
+		</td>
+		</tr>
+		</table>
+		<hr />
+		"._CGI_BUTTON_APPLY("button_{$_bid}1")."
+		</div>
+		</fieldset>
+
+		<fieldset style='margin-top: 20px;'>
+		<legend>"._GETTEXT("Time synchronization")."</legend>
+		<div style='margin: 5px;'>
+		<table class='tbox_t'>
+		<tr>
+		<td class='tbox_tdl' style='width: 200px;'>
+		"._CGI_PAGE_DEFINITIONS_INPUT(array(
+				'input_css'=>'width: 200px;',
+				'fid'=>'ntp',
+				'default'=>$_DATA_NTP['SERVER'],
+				'section'=>'networks',
+				'accept'=>'#dnd_host,#dnd_dnshost',
+				'alt'=>"$_ALT"))."
+		</td>
+		<td class='tbox_tdr'>"._GETTEXT("Select an NTP (Network Time Protocol) Server to synchronize the time and date.")."</td>
+		</tr>
+		</table>
+		<hr />
+		"._CGI_BUTTON_APPLY("button_{$_bid}2")."
+		</div>
+		</fieldset>
+		
+		</div>
+
+		<script type='text/javascript'>
+			\$(document).ready(function() {
+				\$('#date').datepicker({
+					mandatory: true,
+			 		yearRange: '2008:2019',
+					dateFormat: 'dd-M-yy',
+					defaultDate: '$_ndate'
+				}).attr('readonly', 'readonly').css({
+					'cursor': 'pointer',
+					'background-image': 'url($_ICON_CALENDAR)',
+					'background-position': 'right',
+					'background-repeat': 'no-repeat'
+				});
+				\$('#button_{$_bid}1').click(function() {
+					if(!__tnpage.is_admin()) {
+						return false;
+					}
+					var _date=\$.trim(\$('#date').val());
+					var _hou=\$.trim(\$('#hou').attr('value'));
+					var _min=\$.trim(\$('#min').attr('value'));
+					var _timezone=\$.trim(\$('#timezone').attr('value'));
+					var _msg=base64_encode('"._GETTEXT("Date and time have been set successfully")."');
+					var _data='_update_data=2&_sec=system&_secf=system&_id=system&_msg='+_msg+'&_data[TIMEZONE]='+_timezone;
+					_data +='&_data[DATE_TIME]='+_date+' '+_hou+':'+_min;
+					__tnpage.data_update(_data);
+				});
+				\$('#button_{$_bid}2').click(function() {
+					if(!__tnpage.is_admin()) {
+						return false;
+					}
+					var _ntp=\$.trim(\$('#ntp').text());
+					var _msg=base64_encode('"._GETTEXT("NTP server configuration applied successfully")."');
+					var _data='_update_data=2&_sec=network&_secf=ntp&_id=ntpd&_eq=ntp_restart&_msg='+_msg+'&_data[SERVER]='+_ntp;
+					__tnpage.data_update(_data);
+				});
+			});
+		</script>
+	";
+	return trim($_page);
+}
+?>

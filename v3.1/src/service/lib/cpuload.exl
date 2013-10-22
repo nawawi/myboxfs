@@ -1,0 +1,121 @@
+<?php
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+// class_CPULoad.php - CPU Load Class
+// Version 1.0.1
+// Copyright 2001-2002, Steve Blinch
+// http://code.blitzaffe.com
+
+
+class CPULoad {
+	function check_load() {
+		if($_fd=fopen("/proc/stat","r")) {
+			$_statinfo=explode("\n",fgets($_fd, 1024));
+			fclose($_fd);
+			foreach($_statinfo as $_line) {
+				$_info=explode(" ",$_line);
+				if($_info[0]=="cpu") {
+					array_shift($_info); 
+					if(!$_info[0]) array_shift($_info);
+					$this->user=$_info[0];
+					$this->nice=$_info[1];
+					$this->system=$_info[2];
+					$this->idle=$_info[3];
+					return;
+				}
+			}
+		}
+	}
+	
+	function store_load() {
+		$this->last_user=$this->user;
+		$this->last_nice=$this->nice;
+		$this->last_system=$this->system;
+		$this->last_idle=$this->idle;
+	}
+	
+	function save_load() {
+		$this->store_load();
+		$_line="";
+		$_line .=time()."\n";
+		$_line .="{$this->last_user} {$this->last_nice} {$this->last_system} {$this->last_idle}\n";
+		$_line .="{$this->load["user"]} {$this->load['nice']} {$this->load['system']} {$this->load['idle']} {$this->load['cpu']}";
+		_FILE_SAVE("/tmp/cpuinfo.tmp","$_line");
+	}
+	
+	function load_load() {
+		if($_fp=@fopen("/tmp/cpuinfo.tmp","r")) {
+			$_lines=explode("\n",fread($_fp,1024));
+			$this->lasttime=$_lines[0];
+			list($this->last_user,$this->last_nice,$this->last_system,$this->last_idle)=explode(" ",$_lines[1]);
+			list($this->load["user"],$this->load["nice"],$this->load["system"],$this->load["idle"],$this->load["cpu"])=explode(" ",$_lines[2]);
+			fclose($_fp);
+		} else {
+			$this->lasttime=time() - 60;
+			$this->last_user=$this->last_nice=$this->last_system=$this->last_idle=0;
+			$this->user=$this->nice=$this->system=$this->idle=0;
+		}
+	}
+	
+	function calculate_load() {
+		$_d_user=$this->user - $this->last_user;
+		$_d_nice=$this->nice - $this->last_nice;
+		$_d_system=$this->system - $this->last_system;
+		$_d_idle=$this->idle - $this->last_idle;
+
+		$_total=$_d_user+$_d_nice+$_d_system+$_d_idle;
+		if ($_total<1) $_total=1;
+		$_scale=100.0/$_total;
+		
+		$_cpu_load=($_d_user+$_d_nice+$_d_system)*$_scale;
+		$this->load["user"]=$_d_user*$_scale;
+		$this->load["nice"]=$_d_nice*$_scale;
+		$this->load["system"]=$_d_system*$_scale;
+		$this->load["idle"]=$_d_idle*$_scale;
+		$this->load["cpu"]=($_d_user+$_d_nice+$_d_system)*$_scale;
+	}
+	
+	function print_current() {
+		printf("Current load tickers - User: %f  Nice: %f  System: %f  Idle: %f\n",
+			$this->user,
+			$this->nice,
+			$this->system,
+			$this->idle
+		);
+	}
+
+	function print_load() {
+		printf("User: %.1f%%  Nice: %.1f%%  System: %.1f%%  Idle: %.1f%%  Load: %.1f%%\n",
+			$this->load["user"],
+			$this->load["nice"],
+			$this->load["system"],
+			$this->load["idle"],
+			$this->load["cpu"]
+		);
+	}
+
+	function return_usage() {
+		return sprintf("%u",$this->load["cpu"]);
+	}
+
+	function sample_load($_interval=1) {
+		$this->check_load();
+		$this->store_load();
+		sleep($_interval);
+		$this->check_load();
+		$this->calculate_load();
+	}
+	
+	function get_load($_fastest_sample=4) {
+		$this->load_load();
+		$this->cached=(time()-$this->lasttime);
+		if ($this->cached>=$_fastest_sample) {
+			$this->check_load(); 
+			$this->calculate_load();
+			$this->save_load();
+		}
+	}
+
+}
+
+?>

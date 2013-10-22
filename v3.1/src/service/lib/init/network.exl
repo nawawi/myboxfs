@@ -1,0 +1,671 @@
+<?php
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+function network_check() {
+	_INIT_NETWORK_OK();
+	if(!_INIT_CHECK_BINARY(array("/bin/ip","/bin/ifconfig","/bin/vconfig","/bin/arping","/bin/arp"))) {
+		_INIT_ECHO(1,_GETTEXT("Cannot execute %s. Internal error",_INIT_NAME()));
+		exit(1);
+	}
+}
+
+function _network_check_ip($_dev,$_ip) {
+	if(_HW_PING($_dev,$_ip)) {
+		if(_GET_HWADDR($_dev,$_ip,$_mac)) {
+			_INIT_ECHO(3,_GETTEXT("Some other machine (%s) already uses address %s","$_mac","$_ip"));
+			return FALSE;
+		}
+	}
+	return TRUE;
+}
+
+function _network_static_arp() {
+	_INI_TOKEN_GET("network","static_arp.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) return FALSE;
+	foreach($_TOKEN as $_ID => $_DATA) {
+		if(_NULL($_DATA['IP'])||_NULL($_DATA['MAC'])) {
+			_INI_TOKEN_DELETE("network","static_arp.cfg",$_ID);
+			continue;
+		}
+		$_intf="";
+		if(!_NULL($_DATA['DNAME'])) {
+			$_iface=_DEFINITIONS_GET_INTERFACE_DEVICE($_DATA['DNAME']);
+			if(!_NULL($_iface)) $_intf="-i $_iface";
+		}
+		_EXEC_CMD("/bin/arp -s {$_DATA['IP']} {$_DATA['MAC']} $_intf");
+	}
+	return TRUE;
+}
+
+function _network_update_networkcfg($_id,&$_DATA) {
+	if(_NULL($_DATA['ADDR'])) return FALSE;
+	if(_NULL($_DATA['PREF']) && _NULL($_DATA['MASK'])) return FALSE;
+	if(_NULL($_DATA['PREF'])) {
+		$_prefix=$_DATA['MASK'];
+	} else {
+		$_prefix=$_DATA['PREF'];
+	}
+	_IPCALC::IP($_RESULT,$_DATA['ADDR'],$_prefix);
+	$_doupdate=0;
+	if(_NULL($_DATA['NETWORK']) && !_NULL($_RESULT['network'])) {
+		$_DATA['NETWORK']=$_RESULT['network'];
+		$_doupdate=1;
+	} 
+	if(_NULL($_DATA['MASK']) && !_NULL($_RESULT['netmask'])) {
+		$_DATA['MASK']=$_RESULT['netmask'];
+		$_doupdate=1;
+	} 
+	if(_NULL($_DATA['PREF']) && !_NULL($_RESULT['prefix'])) {
+		$_DATA['PREF']=$_RESULT['prefix'];
+		$_doupdate=1;
+	} 
+	if(_NULL($_DATA['BCAST']) && !_NULL($_RESULT['broadcast'])) {
+		$_DATA['BCAST']=$_RESULT['broadcast'];
+		$_doupdate=1;
+	}
+	if(_NULL($_DATA['HOST_TOTAL']) && !_NULL($_RESULT['total'])) {
+		$_DATA['HOST_TOTAL']=$_RESULT['total'];
+		$_doupdate=1;
+	}
+	if(_NULL($_DATA['HOST_MIN']) && !_NULL($_RESULT['hostmin'])) {
+		$_DATA['HOST_MIN']=$_RESULT['hostmin'];
+		$_doupdate=1;
+	}
+	if(_NULL($_DATA['HOST_MAX']) && !_NULL($_RESULT['hostmax'])) {
+		$_DATA['HOST_MAX']=$_RESULT['hostmax'];
+		$_doupdate=1;
+	}
+	if(_NULL($_DATA['HOST_TYPE']) && !_NULL($_RESULT['type'])) {
+		$_DATA['HOST_TYPE']=$_RESULT['type'];
+		$_doupdate=1;
+	}
+	if(_NULL($_DATA['INET']) && !_NULL($_RESULT['inet'])) {
+		$_DATA['INET']=$_RESULT['inet'];
+		$_doupdate=1;
+	}
+	if(!_ARRAY_NULL($_DATA) && $_doupdate==1) {
+		return _INI_TOKEN_UPDATE("network","eth.cfg","$_id",$_DATA);
+	}
+	return FALSE;
+}
+
+function network_quiet() {
+	_INIT_QUIET('1');
+}
+
+function _network_router_set($_opt) {
+	_FILE_SAVE("/proc/sys/net/ipv4/ip_forward","$_opt\n");
+}
+
+function _network_arp_proxy_set($_dev) {
+	_FILE_SAVE("/proc/sys/net/ipv4/conf/$_dev/proxy_arp","1\n");
+}
+
+function _network_start_additional($_PNAME,$_PDEV,$_PMTU) {
+	_INI_TOKEN_GET("network","additional.cfg",$_ATOKEN);
+	if(_ARRAY_NULL($_ATOKEN)) return FALSE;
+	foreach($_ATOKEN as $_ID => $_DATA) {
+		if(_NULL($_DATA['STAT'])||$_DATA['STAT']==0) continue;
+		if(_NULL($_DATA['PNAME']) ||
+			_NULL($_DATA['ADDR']) ||
+			_NULL($_DATA['PREF']) ||
+			_NULL($_DATA['MASK'])) continue;
+		if($_DATA['PNAME']==$_PNAME) {
+			_network_check_ip($_PDEV,$_DATA['ADDR']);
+			if(_EXEC_CMD("/bin/ifconfig $_PDEV:$_ID {$_DATA['ADDR']} netmask {$_DATA['MASK']} mtu $_PMTU")==0) {
+				_INIT_ECHO(0,_GETTEXT("Setting additional address on interface %s","$_PDEV {$_DATA['ADDR']}/{$_DATA['PREF']}"));
+				_LCD_ETH_CONFIG("$_PDEV:$_ID}","{$_DATA['NAME']}");
+			}
+		}
+	}
+	return TRUE;
+}
+
+function _network_start_static($_DATA) {
+	global $_DEV_UPDATE, $_HAVEGW;
+	if(_NULL($_DATA['DEVICE']) ||
+		_NULL($_DATA['ADDR']) ||
+		_NULL($_DATA['PREF']) ||
+		_NULL($_DATA['BCAST']) ||
+		_NULL($_DATA['NAME']) ||
+		_NULL($_DATA['MASK'])) return FALSE;
+	$_dev=$_DATA['DEVICE'];
+	$_mtu=$_DATA['MTU'];
+	$_ip=$_DATA['ADDR'];
+	$_prefix=$_DATA['PREF'];
+	$_mask=$_DATA['MASK'];
+	$_bcast=$_DATA['BCAST'];
+	$_name=$_DATA['NAME'];
+	if(_NULL($_mtu)) $_mtu=1500;
+	@_EXEC_CMD("/bin/ip link set dev $_dev down");
+	if(!_NULL($_DATA['HWADDR'])) {
+		if(_EXEC_CMD("/bin/ip link set dev $_dev address {$_DATA['HWADDR']}")==0) {
+			_INIT_ECHO(0,_GETTEXT("Setting MAC Address %s","{$_dev}: {$_DATA['HWADDR']}"));
+		}
+	}
+	if(_EXEC_CMD("/bin/ip link set $_dev up mtu $_mtu")==0) {
+		_network_check_ip($_dev,$_ip);
+		@_EXEC_CMD("/bin/ip addr flush dev $_dev");
+		if(_EXEC_CMD("/bin/ip addr add $_ip/$_prefix brd $_bcast dev $_dev scope global label $_dev")==0) {
+			_INIT_ECHO(0,_GETTEXT("Setting interface %s","$_dev $_ip/$_prefix"));
+			if(!_NULL($_DATA['PROXYARP'])) _network_arp_proxy_set($_dev);
+			if(!_NULL($_DATA['DEFAULT'])&&$_DATA['DEFAULT']==1&&_NULL($_HAVEGW)) {
+				if(!_NULL($_DATA['GATEWAY'])) {
+					if(_EXEC_CMD("/bin/ip route add default via {$_DATA['GATEWAY']} dev $_dev metric 0")==0) {
+						_INIT_ECHO(0,_GETTEXT("Setting default gateway: %s via %s","{$_DATA['GATEWAY']}","$_dev"));
+						_FILE_SAVE(_PROC_PATH."/gw_ip","{$_DATA['GATEWAY']}");
+						_network_router_set(1);
+						$_HAVEGW=1;
+					}
+				}
+			}
+			$_DEV_UPDATE[$_dev]['ip']=$_ip;
+			$_DEV_UPDATE[$_dev]['hw']=$_DATA['HWADDR'];
+			_LCD_ETH_CONFIG($_dev,$_name);
+			_network_start_additional($_name,$_dev,$_mtu);
+		} else {
+			_INIT_ECHO(1,_GETTEXT("Setting interface %s failed","$_dev $_ip/$_prefix"));
+		}
+		
+	}
+}
+
+function _network_start_vlan($_DATA) {
+	global $_DEV_UPDATE, $_HAVEGW;
+	if(_NULL($_DATA['DEVICE']) ||
+		_NULL($_DATA['ADDR']) ||
+		_NULL($_DATA['PREF']) ||
+		_NULL($_DATA['BCAST']) ||
+		_NULL($_DATA['MASK']) ||
+		_NULL($_DATA['NAME']) ||
+		_NULL($_DATA['TAG'])) return FALSE;
+	$_dev=$_DATA['DEVICE'];
+	$_mtu=$_DATA['MTU'];
+	$_ip=$_DATA['ADDR'];
+	$_prefix=$_DATA['PREF'];
+	$_mask=$_DATA['MASK'];
+	$_bcast=$_DATA['BCAST'];
+	$_tag=$_DATA['TAG'];
+	$_name=$_DATA['NAME'];
+	$_devvlan="{$_dev}.{$_tag}";
+	if(_NULL($_mtu)) $_mtu=1500;
+	@_EXEC_CMD("/bin/ip link set dev $_dev down");
+	if(!_NULL($_DATA['HWADDR'])) {
+		if(_EXEC_CMD("/bin/ip link set dev $_dev address {$_DATA['HWADDR']}")==0) {
+			_INIT_ECHO(0,_GETTEXT("Setting interface %s MAC Address %s","$_dev","{$_DATA['HWADDR']}"));
+		}
+	}
+	if(_EXEC_CMD("/bin/ip link set $_dev up mtu $_mtu")==0) {
+		_network_check_ip($_dev,$_ip);
+		@_EXEC_CMD("/bin/ip addr flush dev $_dev");
+		@_EXEC_CMD("/bin/vconfig set_name_type DEV_PLUS_VID_NO_PAD");
+		@_EXEC_CMD("/bin/vconfig rem $_devvlan");
+		if(_EXEC_CMD("/bin/vconfig add $_dev $_tag")==0) {
+			@_EXEC_CMD("/bin/vconfig set_flag $_devvlan 1 1");
+			if(_EXEC_CMD("/bin/ifconfig $_devvlan $_ip netmask $_mask mtu $_mtu")==0) {
+				_INIT_ECHO(0,_GETTEXT("Setting VLAN interface %s","$_devvlan $_ip/$_prefix"));
+				$_DEV_UPDATE["$_devvlan"]['ip']=$_ip;
+				$_DEV_UPDATE["$_devvlan"]['hw']=$_DATA['HWADDR'];
+
+				if(!_NULL($_DATA['DEFAULT'])&&$_DATA['DEFAULT']==1&&_NULL($_HAVEGW)) {
+					if(!_NULL($_DATA['GATEWAY'])) {
+						if(_EXEC_CMD("/bin/ip route add default via {$_DATA['GATEWAY']} dev $_dev metric 0")==0) {
+							_INIT_ECHO(0,_GETTEXT("Setting default gateway: %s via %s","{$_DATA['GATEWAY']}","$_dev"));
+							_FILE_SAVE(_PROC_PATH."/gw_ip","{$_DATA['GATEWAY']}");
+							_network_router_set(1);
+							$_HAVEGW=1;
+						}
+					}
+				}
+				_LCD_ETH_CONFIG("$_devvlan",$_name);
+				_network_start_additional($_name,"$_devvlan",$_mtu);
+			} else {
+				_INIT_ECHO(1,_GETTEXT("Setting VLAN interface %s failed","$_devvlan $_ip/$_prefix"));
+			}
+		}	
+	}
+}
+
+function network_cron_dhcp() {
+	$_eth=_GLOB("/etc/dhcpcd/device/eth*");
+	if(!_ARRAY_NULL($_eth) && !file_exists("/etc/cron/1m/dhcpc_check")) {
+		_SAVE_BASH_FILE("/etc/cron/1m/dhcpc_check","/bin/ionice -c2 -n7 /bin/run-parts /etc/dhcpcd/device");
+	}
+}
+function network_stop_dhcp() {
+	$_buff=_GLOB("/etc/dhcpcd/device/eth*");
+	if(!_ARRAY_NULL($_buff)) {
+		foreach($_buff as $_dev) {
+			$_intf=basename($_dev);
+			if(preg_match("/^eth\d+$/",$_intf)) {
+				_EXEC_CMD("/bin/dhcpcd -x -k $_intf");
+			}
+			@unlink($_dev);
+			@unlink("/etc/dhcpcd/{$_intf}.info");
+		}
+	}
+	_KILLMATCH("dhcpcd");
+	@_UNLINK("/etc/cron/1m/dhcpc_check");
+	@unlink(_PROC_PATH."/gw_ip");
+}
+
+// can call standalone
+function network_start_dhcp($_DATA=array()) {
+	if(_ARRAY_NULL($_DATA)) {
+		network_stop_dhcp();
+		_INI_TOKEN_GET("network","eth.cfg",$_NTOKEN);
+		foreach($_NTOKEN as $_ID => $_BUFF) {
+			if($_BUFF['TYPE']=="dhcp") {
+				$_DATA=$_BUFF;
+				break;
+			}
+		}
+		unset($_BUFF,$_NTOKEN);
+		if(_ARRAY_NULL($_DATA) || _NULL($_DATA['STAT']) || $_DATA['STAT']==0) {
+			return FALSE;
+		}
+	}
+	if(_NULL($_DATA['DEVICE']) 
+		|| !file_exists("/bin/dhcpcd")
+		|| !file_exists("/service/tools/dhcpc_check.exc")
+		|| (_NULL($_DATA['STAT']) || $_DATA['STAT']==0)
+	) return FALSE;
+	@_MKDIR("/var/lib/dhcpcd");
+	$_dev=$_DATA['DEVICE'];
+	$_mtu=$_DATA['MTU'];
+	if(_NULL($_mtu)) $_mtu=1500;
+	@_EXEC_CMD("/bin/ip link set dev $_dev down");
+	if(!_NULL($_DATA['HWADDR'])) {
+		if(_EXEC_CMD("/bin/ip link set dev $_dev address {$_DATA['HWADDR']}")==0) {
+			_INIT_ECHO(0,_GETTEXT("Setting MAC Address %s","{$_dev}: {$_DATA['HWADDR']}"));
+		}
+	}
+	if(_EXEC_CMD("/bin/ip link set $_dev up mtu $_mtu")==0) {
+		@_EXEC_CMD("/bin/ip addr flush dev $_dev");
+		if(_EXEC_CMD("/bin/dhcpcd $_dev")==0) {
+			_INIT_ECHO(0,_GETTEXT("Determining IP information for DHCP interface %s","$_dev"));
+			_SAVE_BASH_FILE("/etc/dhcpcd/device/$_dev","/service/tools/dhcpc_check.exc $_dev");
+			network_cron_dhcp();
+			_LCD_ETH_CONFIG($_dev,"{$_DATA['NAME']}");
+			return TRUE;
+		}
+		
+	}
+	_INIT_ECHO(1,_GETTEXT("Determining IP information for DHCP interface %s failed","$_dev"));
+	return FALSE;
+}
+
+function network_restart_dhcp() {
+	return network_start_dhcp();
+}
+
+function _network_clear_cache_config_pppoe($_pid) {
+	$_DATA=array();
+	$_DATA['HOST_TOTAL']="";
+	$_DATA['HOST_MIN']="";
+	$_DATA['HOST_MAX']="";
+	$_DATA['HOST_TYPE']="";
+	$_DATA['INET']="";
+	$_DATA['ADDR']="";
+	$_DATA['GATEWAY']="";
+	$_DATA['PDEV']="";
+	$_DATA['MASK']="";
+	$_DATA['PREF']="";
+	$_DATA['NETWORK']="";
+	$_DATA['BCAST']="";
+	return _INI_TOKEN_UPDATE("network","eth.cfg","$_pid",$_DATA);
+}
+
+function network_stop_pppoe() {
+	_KILLMATCH("pppd-pppoe");
+	_KILLMATCH("pppoe-connect");
+	_KILLMATCH("/bin/pppoe");
+	@_DELDIR("/var/run/ppp");
+	@unlink("/etc/ppp/pppoe/chap-secrets");
+	@unlink("/etc/ppp/pppoe/pap-secrets");
+	$_BUFF=_GLOB("/etc/ppp/pppoe/peers/*");
+	if(!_ARRAY_NULL($_BUFF)) {
+		foreach($_BUFF as $_peer) {
+			$_pid=basename($_peer);
+			_network_clear_cache_config_pppoe($_pid);
+			@unlink($_peer);
+		}
+	}
+	$_NSD=_GLOB("/etc/ppp/pppoe/resolv/*.conf");
+	if(!_ARRAY_NULL($_NSD)) {
+		@_DELDIR("/etc/ppp/pppoe/resolv");
+		_INIT_EXEC("name_reload");
+	}
+}
+
+function network_start_pppoe($_DATA=array()) {
+	if(_ARRAY_NULL($_DATA)) {
+		network_stop_pppoe();
+		_INI_TOKEN_GET("network","eth.cfg",$_NTOKEN);
+		foreach($_NTOKEN as $_ID => $_BUFF) {
+			if($_BUFF['TYPE']=="pppoe") {
+				$_DATA=$_BUFF;
+				break;
+			}
+		}
+		unset($_BUFF,$_NTOKEN);
+		if(_ARRAY_NULL($_DATA) || _NULL($_DATA['STAT']) || $_DATA['STAT']==0) {
+			return FALSE;
+		}
+	}
+	if(_NULL($_DATA['DEVICE']) 
+		|| !file_exists("/bin/pppoe-connect")
+		|| (_NULL($_DATA['STAT']) || $_DATA['STAT']==0)
+		|| _NULL($_DATA['USERNAME'])
+		|| _NULL($_DATA['PASSWORD'])
+		|| _NULL($_DATA['__DATA_ID'])
+	) return FALSE;
+	if(_NULL($_DATA['RETRY'])) $_DATA['RETRY']=5;
+	if(_NULL($_DATA['MTU'])) $_DATA['MTU']=1492;
+	if(_NULL($_DATA['NAT'])) $_DATA['NAT']=0;
+	if(_NULL($_DATA['DEFAULT'])) $_DATA['DEFAULT']=0;
+	$_rid=$_DATA['__DATA_ID'];
+	$_user=$_DATA['USERNAME'];
+	$_pass=_BASE64_DECRYPT($_DATA['PASSWORD']);
+	$_dev=$_DATA['DEVICE'];
+	$_mtu=$_DATA['MTU'];
+	$_retry=$_DATA['RETRY'];
+	$_nat=$_DATA['NAT'];
+	$_dgw=$_DATA['DEFAULT'];
+	$_config="";
+	$_config .="0.0.0.0:0.0.0.0\n";
+	$_config .="hide-password\n";
+	$_config .="noauth\n";
+	$_config .="ipcp-accept-local\n";
+	$_config .="ipcp-accept-remote\n";
+	$_config .="lcp-echo-failure 5\n";
+	$_config .="lcp-echo-interval 10\n";
+	$_config .="lock\n";
+	$_config .="noipdefault\n";
+	if($_dgw!=1) {
+		$_config .="defaultroute\n";
+	}
+	$_config .="mtu $_mtu\n";
+	$_config .="mru $_mtu\n";
+	$_config .="user \"{$_user}\"\n";
+	_FILE_SAVE("/etc/ppp/pppoe/peers/{$_rid}",$_config);
+
+	$_sect="\"{$_user}\" * \"{$_pass}\" *";
+	_FILE_APPEND("/etc/ppp/pppoe/chap-secrets","$_sect\n");
+	_FILE_APPEND("/etc/ppp/pppoe/pap-secrets","$_sect\n");
+	if(_EXEC_CMD("/bin/pppoe-connect $_dev $_rid $_mtu $_retry $_nat &")==0) {
+		@_FILE_SAVE("/var/run/ppp/resolv.conf","");
+		if($_dgw==1) _network_router_set(1);
+		return TRUE;
+	}
+	return FALSE;
+}
+
+function network_restart_pppoe() {
+	return network_start_pppoe();
+}
+
+// TODO
+function network_stop_static_route() {
+	if(file_exists(_PROC_PATH."/___static_route_remove")) {
+		_EXEC_CMD("/bin/ip -b /var/sys/___static_route_remove");
+		@unlink(_PROC_PATH."/___static_route_remove");
+	}
+}
+
+function network_start_static_route() {
+	network_stop_static_route();
+	_INI_TOKEN_GET("network","route_static.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) return FALSE;
+	$_dcmd=array();
+	foreach($_TOKEN as $_ID => $_DATA) {
+		if(_NULL($_DATA['ROUTE_NETWORK'])
+			|| _NULL($_DATA['ROUTE_TYPE'])) {
+			_INI_TOKEN_DELETE("network","route_static.cfg",$_ID);
+			continue;
+		}
+		if(_NULL($_DATA['STAT']) || $_DATA['STAT']==0) continue;
+		$_addr_a=array();
+		_DEFINITIONS_GET_BYNAME_R("networks",$_DATA['ROUTE_NETWORK'],$_DTOKEN);
+		if(_ARRAY_NULL($_DTOKEN)) continue;
+		foreach($_DTOKEN as $_DID => $_DDATA) {
+			if(!_NULL($_DDATA['ADDR'])) {
+				if(!_NULL($_DDATA['PREF'])) $_DDATA['ADDR']="{$_DDATA['ADDR']}/{$_DDATA['PREF']}";
+				$_addr_a["{$_DDATA['ADDR']}"]=$_DDATA['ADDR'];
+			}
+		}
+		unset($_DTOKEN,$_DID,$_DDATA);
+		
+		if($_DATA['ROUTE_TYPE']=="interface" && !_NULL($_DATA['DNAME'])) {
+			$_dev=_DEFINITIONS_GET_INTERFACE_DEVICE($_DATA['DNAME']);
+			if(!_NULL($_dev) && !_ARRAY_NULL($_addr_a)) {
+				foreach($_addr_a as $_addr) {
+					if(_EXEC_CMD("/bin/ip route add $_addr dev $_dev")==0) {
+						_INIT_ECHO(0,_GETTEXT("Setting static route (interface): %s via %s","$_addr","$_dev"));
+						_FILE_APPEND(_PROC_PATH."/___static_route_remove","route delete $_addr dev $_dev\n");
+					} else {
+						_INIT_ECHO(1,_GETTEXT("Setting static route (interface): %s via %s failed","$_addr","$_dev"));
+					}
+				}
+			}
+			continue;
+		}
+		if($_DATA['ROUTE_TYPE']=="gateway" && !_NULL($_DATA['ROUTE_GATEWAY'])) {
+			_DEFINITIONS_GET_BYNAME("networks",$_DATA['ROUTE_GATEWAY'],$_DTOKEN,"host");
+			if(!_NULL($_DTOKEN['ADDR']) && !_ARRAY_NULL($_addr_a)) {
+				foreach($_addr_a as $_addr) {
+					if(_EXEC_CMD("/bin/ip route add $_addr via {$_DTOKEN['ADDR']}")==0) {
+						_INIT_ECHO(0,_GETTEXT("Setting static route (gateway): %s via %s","$_addr",$_DTOKEN['ADDR']));
+						_FILE_APPEND(_PROC_PATH."/___static_route_remove","route delete $_addr via {$_DTOKEN['ADDR']}\n");
+					} else {
+						_INIT_ECHO(1,_GETTEXT("Setting static route (gateway): %s via %s failed","$_addr",$_DTOKEN['ADDR']));
+					}
+				}
+			}
+			unset($_DTOKEN);
+			continue;
+		}
+		if($_DATA['ROUTE_TYPE']=="blackhole" || $_DATA['ROUTE_TYPE']=="prohibit" || $_DATA['ROUTE_TYPE']=="unreachable") {
+			if(!_ARRAY_NULL($_addr_a)) {
+				foreach($_addr_a as $_addr) {
+					if(_EXEC_CMD("/bin/ip route add {$_DATA['ROUTE_TYPE']} $_addr")==0) {
+						_INIT_ECHO(0,_GETTEXT("Setting static route (%s): %s",$_DATA['ROUTE_TYPE'],"$_addr"));
+						_FILE_APPEND(_PROC_PATH."/___static_route_remove","route delete {$_DATA['ROUTE_TYPE']} $_addr\n");
+					} else {
+						_INIT_ECHO(1,_GETTEXT("Setting static route (%s): %s",$_DATA['ROUTE_TYPE'],"$_addr"));
+					}
+				}	
+			}
+		}
+	}
+}
+
+// TODO
+function network_stop_policy_route($_run=0) {
+	if(file_exists(_PROC_PATH."/policy_route/ip_rules_remove")) {
+		_EXEC_CMD("/bin/ip -b /var/sys/policy_route/ip_rules_remove");
+		@unlink(_PROC_PATH."/policy_route/ip_rules_remove");
+	}
+	if($_run==0 && _INIT_BOOTUP()==FALSE) {
+		_INIT_TASKQ("policy_routes_clear");
+	}
+}
+
+function network_start_policy_route($_run=0) {
+	network_stop_policy_route($_run);
+	@_CLEARDIR(_PROC_PATH."/policy_route/");
+	_INI_TOKEN_GET("network","route_policy.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) return FALSE;
+	$_dcmd=array();
+	$_mark=1;
+	foreach($_TOKEN as $_ID => $_DATA) {
+		if(_NULL($_DATA['ROUTE_TYPE'])
+			|| _NULL($_DATA['DNAME'])
+			|| _NULL($_DATA['SRC'])
+			|| _NULL($_DATA['DST'])
+			|| _NULL($_DATA['SERVICE'])) {
+			_INI_TOKEN_DELETE("network","route_policy.cfg",$_ID);
+			continue;
+		}
+		if(_NULL($_DATA['STAT']) || $_DATA['STAT']==0) continue;
+
+		$_src_dev="";
+		$_src_network=array();
+		$_dst_network=array();
+		$_service=array();
+		$_target="";
+		$_pfrules=array();
+
+		// reserve for lb
+		
+		if($_DATA['ROUTE_TYPE']=="gateway") {
+			if(_NULL($_DATA['ROUTE_GATEWAY'])) {
+				_INI_TOKEN_DELETE("network","route_policy.cfg",$_ID);
+				continue;
+			}
+			_DEFINITIONS_GET_BYNAME("networks",$_DATA['ROUTE_GATEWAY'],$_DTOKEN,"host");
+			if(!_NULL($_DTOKEN['ADDR'])) $_target="{$_DTOKEN['ADDR']}";
+		}
+		if($_DATA['ROUTE_TYPE']=="interface") {
+			if(_NULL($_DATA['TNAME'])) {
+				_INI_TOKEN_DELETE("network","route_policy.cfg",$_ID);
+				continue;
+			}
+			$_target=_DEFINITIONS_GET_INTERFACE_DEVICE($_DATA['TNAME']);
+		}
+		
+		$_pfrules=_policy_normal_rules_data($_DATA['SRC'],$_DATA['DST'],$_DATA['SERVICE']);
+
+		if(!_NULL($_target) && !_ARRAY_NULL($_pfrules)) {
+			if($_DATA['DNAME']!="any") {
+				$_src_dev=_DEFINITIONS_GET_INTERFACE_DEVICE($_DATA['DNAME']);
+				if(!_NULL($_src_dev)) $_src_dev="-i $_src_dev";
+			}
+			foreach($_pfrules as $_line) {
+				if($_mark=='253') $_mark+=3;
+				_FILE_APPEND(_PROC_PATH."/policy_route/pf_rules","-A POLICY_ROUTES_OUTPUT $_line $_src_dev -m mark --mark 0 -j MARK --set-mark $_mark\n");
+				_FILE_APPEND(_PROC_PATH."/policy_route/pf_rules","-A POLICY_ROUTES_PREROUTING $_line $_src_dev -m mark --mark 0 -j MARK --set-mark $_mark\n");
+				_FILE_APPEND(_PROC_PATH."/policy_route/ip_rules","rule add prio $_mark fwmark $_mark table $_mark\n");
+				_FILE_APPEND(_PROC_PATH."/policy_route/ip_rules_remove","rule delete prio $_mark fwmark $_mark table $_mark\n");				
+				if($_DATA['ROUTE_TYPE']=="interface") {
+					_FILE_APPEND(_PROC_PATH."/policy_route/ip_rules","route add dev $_target table $_mark\n");
+					_FILE_APPEND(_PROC_PATH."/policy_route/ip_rules_remove","route delete dev $_target table $_mark\n");
+				}
+				if($_DATA['ROUTE_TYPE']=="gateway") {
+					_FILE_APPEND(_PROC_PATH."/policy_route/ip_rules","route add default via $_target table $_mark\n");
+					_FILE_APPEND(_PROC_PATH."/policy_route/ip_rules_remove","route delete default via $_target table $_mark\n");
+				}
+				$_mark++;
+			}
+		}
+	}
+	if(file_exists(_PROC_PATH."/policy_route/pf_rules") && file_exists(_PROC_PATH."/policy_route/ip_rules")) {
+		if(_EXEC_CMD("/bin/ip -b /var/sys/policy_route/ip_rules")==0) {
+			_INIT_ECHO(0,_GETTEXT("Setting policy routing"));
+			if($_run==0 && _INIT_BOOTUP()==FALSE) {
+				_INIT_TASKQ("policy_reload");
+			}
+			return TRUE;
+		}
+		_INIT_ECHO(1,_GETTEXT("Setting policy routing"));
+	}
+	return FALSE;
+}
+
+
+function _network_update_arp() {
+	global $_DEV_UPDATE;
+	if(!_ARRAY_NULL($_DEV_UPDATE)) {
+		_INIT_ECHO(0,_GETTEXT("Updating ARP cache"));
+		foreach($_DEV_UPDATE as $_dev => $_data_array) {
+			if(_NULL($_dev)) continue;
+			if(!_NULL($_data_array['ip'])) {
+				$_ip=$_data_array['ip'];
+				@_EXEC_CMD("/bin/arping -q -A -c 1 -I $_dev $_ip");
+				@_EXEC_CMD("/bin/arping -q -U -c 1 -I $_dev $_ip");
+				if(!_NULL($_data_array['hw'])) {
+					$_mac=$_data_array['hw'];
+					@_EXEC_CMD("/bin/arp -s $_ip $_mac -i $_dev");
+					unset($_mac);
+				}
+				unset($_ip);
+			}
+		}
+	}
+	_network_static_arp();
+}
+
+function _network_interface_down() {
+	network_stop_dhcp();
+	network_stop_pppoe();
+	_EXEC_CMD_OUTPUT("/bin/ifconfig | awk /eth/'{print $1}'",$_output,$_err);
+	if(!_ARRAY_NULL($_output)) {
+		foreach($_output as $_eth) {
+			_TRIM($_eth);
+			if(_NULL($_eth)) continue;
+			@_EXEC_CMD("/bin/ip link set $_eth down");
+			@_EXEC_CMD("/bin/ip addr flush dev $_dev");
+		}
+	}
+}
+
+function _network_exec_quiet($_func) {
+	_INIT_QUIET('1');
+	_INIT_EXEC($_func);
+	_INIT_UNQUIET();
+}
+
+function network_start() {
+	if(_INIT_BOOTUP()==FALSE) {
+		_network_exec_quiet("ipwatch_stop");
+		_network_interface_down();
+	}
+	@_UNLINK(_OBJ_PATH."/iosh_*");
+	_INI_TOKEN_GET("network","eth.cfg",$_NTOKEN);
+	if(_ARRAY_NULL($_NTOKEN)) {
+		_INIT_ECHO(1,_GETTEXT("Starting %s failed","network interfaces"));
+		exit(1);
+	}
+	_INIT_ECHO(0,_GETTEXT("Starting %s","network interfaces"));
+	if(@_EXEC_CMD("/bin/ip link set lo up")==0) {
+		@_EXEC_CMD("/bin/ip addr add 127.0.0.1/8 brd 127.255.255.255 dev lo scope host label lo");
+	}
+	foreach($_NTOKEN as $_ID => $_DATA) {
+		if(_NULL($_DATA['TYPE'])) continue;
+		if(_NULL($_DATA['STAT'])||$_DATA['STAT']==0) continue;
+		if($_DATA['TYPE']=="static") {
+			_network_update_networkcfg($_ID,$_DATA);
+			_network_start_static($_DATA);
+		} elseif($_DATA['TYPE']=="vlan") {
+			_network_update_networkcfg($_ID,$_DATA);
+			_network_start_vlan($_DATA);
+		} elseif($_DATA['TYPE']=="dhcp") {
+			network_start_dhcp($_DATA);
+		} elseif($_DATA['TYPE']=="pppoe") {
+			network_start_pppoe($_DATA);
+		}
+	}
+	network_start_static_route();
+	network_start_policy_route(1);
+	_network_update_arp();
+	if(_INIT_BOOTUP()==FALSE) {
+		_network_exec_quiet("ipwatch_start");
+		_network_exec_quiet("hostname_start");
+		_INIT_TASKQ("dhcp_restart");
+		_INIT_TASKQ("policy_reload");
+	}
+	return TRUE;
+}
+
+function network_stop() {
+	_INIT_ECHO(0,_GETTEXT("Stopping %s","network interfaces"));
+	_network_interface_down();
+	return TRUE;
+}
+
+function network_restart() {
+	network_start();
+	return TRUE;
+}
+
+?>

@@ -1,0 +1,352 @@
+<?php
+/**
+* String function library
+*
+* Mengandungi function-function untuk manipulasi
+* string.<br />
+* NOTE: Setiap parameter (@param) yang mempunyai extra "-reference", function
+* tersebut adalah "Passing by Reference" type function.
+*
+* @author Mohd Nawawi Mohamad Jamili <nawawi@tracenetworkcorporation.com>
+* @copyright 2008 Nawawi, Tracenetwork Corporation Sdn. Bhd. 
+* @package library
+* @filesource
+* @link http://my.php.net/manual/en/language.references.whatdo.php -- Reference "Passing by Reference"
+* @link http://my.php.net/manual/en/function.empty.php -- Reference function php "empty"
+* @link http://www.answers.com/topic/unsigned-integer?cat=technology -- Reference "Unsigned Integer"
+*/
+/**
+* @ignore
+*/
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n"); 
+
+/**
+* Periksa variable string adalah NULL
+*
+* memeriksa string yang diberi
+* belum ada atau sudah ada tapi empty.<br />
+* Tidak sama dengan function php empty.
+*
+* @param string $_str
+* @return bool TRUE or FALSE
+*/
+function _NULL($_str) {
+	if(!isset($_str)|| "$_str"=="") return TRUE;
+	return FALSE;
+}
+
+/**
+* Periksa variable array
+*
+* memeriksa variable yang diberi
+* adalah dalam bentuk array.
+*
+* @param array $_array
+* @return bool TRUE or FALSE
+*/
+function _ARRAY($_array) {
+	if(is_array($_array)&&count($_array)!=0) return TRUE;
+	return FALSE;
+}
+
+/**
+* Periksa variable array adalah NULL
+*
+* memeriksa variable array yang diberi
+* belum ada atau sudah ada tapi empty.
+*
+* @param array $_array
+* @return bool TRUE or FALSE
+*/
+function _ARRAY_NULL($_array) {
+	// bukan array, assume sebagai NULL
+	if(!_ARRAY($_array)) return TRUE;
+	// jika array
+	if(isset($_array)&&count($_array)!=0) return FALSE;
+	return TRUE;
+}
+
+/**
+* Trim string
+*
+* Alternative kepada function trim
+*
+* @param string &$_str string-reference yang hendak ditrim
+* @param string $_char Optional: character list atau empty
+* @return string Trimmed string
+*/
+function _TRIM(&$_str,$_char='') {
+	if(_NULL($_char)) {
+        	$_str=trim($_str);
+	} else {
+        	$_str=trim($_str,$_char);
+	}
+        return $_str;
+}
+
+/**
+* Uppercase string
+*
+* Alternative kepada function strtoupper
+*
+* @param string &$_str string-reference yang hendak diubah
+* @return string Uppercase string
+*/
+function _UPPER(&$_str) {
+	$_str=strtoupper($_str);
+	return $_str;
+}
+
+/**
+* Lowercase string
+*
+* Alternative kepada function strtolower
+*
+* @param string &$_str string-reference yang hendak diubah
+* @return string Lowercase string
+*/
+function _LOWER(&$_str) {
+	$_str=strtolower($_str);
+	return $_str;
+}
+
+/**
+* Periksa variable unsigned integer
+*
+* Untuk memastikan variable yang diberi
+* dalam format "unsigned integer"
+*
+* @param int $_num unsigned-integer
+* @return bool TRUE or FALSE
+*/
+function _ISNUM($_num) {
+	if(_NULL($_num)) return FALSE;
+	if(preg_match("/^\d+$/",$_num)) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+/**
+* Dapatkan string path
+*
+* Alternative kepada function basename
+*
+* @param string &$_str string-reference path
+* @param string $_ext suffix yang hendak dibuang
+* @return string file base
+*/
+function _BASENAME(&$_str,$_ext='') {
+	if(_NULL($_ext)) {
+        	$_str=basename($_str);
+	} else {
+        	$_str=basename($_str,$_ext);
+	}
+        return $_str;
+}
+
+/**
+* UTC time ke Local time
+*
+* Convert variable UTC time ke Local time.
+* Digunakan untuk membaca DHCP leased table
+* yang menggunakan UTC time.
+*
+* @param string $_TIME string UTC time
+* @param string &$_ZONE string-reference
+* @return string Local time string
+*/
+function _UTC2LOCAL($_TIME,&$_ZONE) {
+	$_o=date('O');
+	$_z=date('Z');
+	$_o1=$_o{0};
+	switch($_o1) {
+		case "-": $_ZONE=$_TIME - $_z;
+		break;
+		case "+": $_ZONE=$_TIME + $_z;
+		break;
+	} 
+	return $_ZONE;
+}
+
+/**
+* Convert size unit byte ke unit lain
+*
+* Convert variable string dalam unit byte ke
+* unit yang sesuai.
+*
+* @param string $_size string size dalam byte
+* @param string $_unit string Optional: unit yang hendak digunakan.
+* @param string $_retstring format yang hendak dipaparkan
+* @return mixed formatted string
+*/
+function _SIZE_READABLE($_size, $_unit = null, $_retstring = null) {
+	$_sizes = array('B', 'KB', 'MB', 'GB', 'TB');
+	$_ii = count($_sizes) - 1;
+	$_unit = array_search((string) $_unit, $_sizes);
+	if($_unit === null || $_unit === false) {
+		$_unit = $_ii;
+	}
+    	if($_retstring === null) {
+		$_retstring = '%01.2f %s';
+	}
+	$_i = 0;
+	while ($_unit != $_i && $_size >= 1024 && $_i < $_ii) {
+		$_size /= 1024;
+		$_i++;
+	}
+	return sprintf($_retstring, $_size, $_sizes[$_i]);
+}
+
+/**
+* Convert variable string ke array
+*
+* Convert variable string ke array.
+*
+* @param string $_str string
+* @param string $_delim delimiter yang hendak digunakan
+* @return array Array
+*/
+function _STR_ARRAY($_str,$_delim) {
+	return preg_split("/$_delim/",$_str);
+}
+
+/**
+* Convert variable array ke string
+*
+* Convert variable array ke string dengan mengabaikan index, empty. hanya
+* ambil value yang terakhir.
+*
+* @param string $_str string
+* @return string string
+*/
+function _ARRAY_STR($_array,$_nl=1) {
+	$_str="";
+	if(_ARRAY($_array)) {
+		foreach($_array as $_ln) {
+			_TRIM($_ln);
+			if(_ARRAY($_ln)) {
+				if(_ARRAY_NULL($_ln)) continue;
+				$_ln=_ARRAY_STR($_ln);
+				continue;
+			}
+			if(_NULL($_ln)) continue;
+			if($_nl==1) {
+				$_str .="$_ln\n";
+			} else {
+				$_str .="$_ln";
+			}
+		}
+	}
+	return $_str;
+}
+
+/**
+* Convert variable string ke configuration variable
+*
+* Convert variable string ke configuration variable.
+*
+* @param string $_str string-reference
+* @param string $_option variable option
+* @return array Array
+*/
+function _STR_ONOFF(&$_str,$_opt) {
+	$_ca=strtolower($_opt);
+	switch($_ca) {
+		case '0':
+			$_str="OFF";
+		break;
+		case '1':
+			$_str="ON";
+		break;
+		case 'on':
+			$_str=1;
+		break;
+		case 'off':
+			$_str=0;
+		break;
+		case 'enable':
+			$_str=1;
+		break;
+		case 'disable':
+			$_str=0;
+		break;
+		default:
+			$_str=$_opt;
+		break;
+	}
+}
+
+/**
+* Create random letter
+*
+* Create random letter
+*
+* @param string $_len letter length, default 10
+* @return array String
+*/
+function _RAND_TEXT($_len=10) {
+	$_h=array('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'r', 's', 't', 'u', 'w','A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'R', 'S', 'T', 'U', 'W');
+	$_hlen=count($_h);
+	$_c="";
+	for($_x=0; $_x < $_len; $_x++) {
+		$_r=rand(0, $_hlen - 1);
+		$_c=$_c.$_h[$_r];
+	}
+	return $_c;
+}
+
+/* gettext */
+function _xgettext($_str) {
+	$_init=$_SERVER['_INIT_START'] ? $_SERVER['_INIT_START'] : 0;
+	if(_EXT_LOADED('gettext') && $_SERVER['_INIT_START']==0) {
+		return gettext($_str);
+	}
+	return $_str;
+}
+
+function _GETTEXT($_str) {
+	$_arg=array();
+	for($_i=1; $_i < func_num_args(); $_i++) {
+        	$_arg[] = func_get_arg($_i);
+	}
+	if(!_ARRAY_NULL($_arg)) {
+		if(($_xstr=vsprintf(_xgettext($_str), $_arg))) {
+			return "$_xstr";
+		}
+	}
+	return _xgettext($_str);
+}
+
+function _GETTEXT_U($_str) {
+	$_arg=array();
+	for($_i=1; $_i < func_num_args(); $_i++) {
+        	$_arg[] = func_get_arg($_i);
+	}
+	if(!_ARRAY_NULL($_arg)) {
+		if(($_xstr=vsprintf(_xgettext($_str), $_arg))) {
+			return _UPPER($_xstr);
+		}
+	}
+	return _UPPER(_xgettext($_str));
+}
+
+function _SET_LANG($_lg='') {
+	if(!_NULL($_lg)) {
+		return _FILE_SAVE("/etc/lang/default","$_lg");
+	}
+	_INI_TOKEN_GET("system","system.cfg",$_TOKEN);
+	$_LANG=$_TOKEN['system']['LANG'] ? $_TOKEN['system']['LANG'] : "en_US";
+	if(!_NULL($_LANG) && file_exists("/etc/lang/$_LANG/LC_MESSAGES/traceos.mo")) {
+		putenv("LANG=$_LANG");
+		setlocale(LC_ALL, "");
+		textdomain("traceos");
+		bindtextdomain("traceos","/etc/lang");
+		$GLOBALS['__LANG']=$_LANG;
+		return TRUE;
+	}
+	$GLOBALS['__LANG']=$_LANG;
+	return FALSE;
+}
+
+?>

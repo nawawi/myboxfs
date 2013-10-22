@@ -1,0 +1,35 @@
+This file is strcasestr.def, from which is created strcasestr.c.
+It implements the builtin "strcasestr, stristr" in Bash.
+
+$PRODUCES strcasestr.c
+#include <config.h>
+#include <stdio.h>
+#include <string.h>
+#include "../builtins.h"
+#include "../shell.h"
+#include "bashgetopt.h"
+
+$BUILTIN strcasestr
+$FUNCTION strcasestr_builtin
+$SHORT_DOC strcasestr string substring
+Shell version of strcasestr(3).  Returns success (0) or failure (1).
+$END
+
+$BUILTIN stristr
+$FUNCTION strcasestr_builtin
+$SHORT_DOC stristr string substring
+Alias for strcasestr
+$END
+
+int strcasestr_builtin(WORD_LIST *list) {
+	if(no_options(list)) return(EX_BADUSAGE);
+	list=loptend;
+	if(list_length(list)!=2) {
+		builtin_usage();
+		return(EX_BADUSAGE);
+	}
+	if(strcasestr(list->word->word, (list->next)->word->word)) {
+		return(EXECUTION_SUCCESS);
+	}
+	return(EXECUTION_FAILURE);
+}

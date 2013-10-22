@@ -1,0 +1,118 @@
+﻿<?xml version="1.0"?>
+<CLISH_MODULE>
+<VIEW name="log" prompt="${SYSTEM_NAME}/logging/&gt; ">
+
+        <COMMAND name="."
+                help="Return to previous menu"
+                view="main"
+                viewid=""/>
+
+	<COMMAND name="print"
+                help="Display log file or list">
+                <ACTION>exec /service/tools/log.exc log print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+	<COMMAND name="print list"
+                help="Log list">
+                <ACTION>exec /service/tools/log.exc log print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+	<COMMAND name="print filter"
+                help="Filter log list by logname">
+ 		<PARAM name="logname"
+                        help="The log name"
+                        ptype="STRING" />
+                <ACTION>exec /service/tools/log.exc log filter "${logname}" 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+	<COMMAND name="print log"
+                help="View log file">
+ 		<PARAM name="id"
+                        help="Resource Id '*' for all"
+                        ptype="MULTI_NUM_ALL"/>
+ 		<PARAM name="sort"
+                        help="Reverse order of log content"
+                        ptype="ONOFF"
+			default="off"/>
+		<ACTION>exec /service/tools/log.exc log view "${id}" ${sort} 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+	<COMMAND name="find"
+                help="Search string in log file">
+ 		<PARAM name="search"
+                        help="Match string"
+                        ptype="STRING_ANY"/>
+ 		<PARAM name="id"
+                        help="Resource Id '*' for all"
+                        ptype="MULTI_NUM_ALL"
+			default="*"/>
+ 		<PARAM name="sort"
+                        help="Reverse order of log content"
+                        ptype="ONOFF"
+			default="off"/>
+                <ACTION>exec /service/tools/log.exc log find "${id}" "${search}" ${sort} 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+        <COMMAND name="delete"
+                help="Delete log file">
+                <PARAM name="id"
+                        help="Resource Id '*' for all"
+                        ptype="MULTI_NUM_ALL" />
+                <ACTION>exec /service/tools/log.exc log delete "${id}" 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="config"
+                help="Logging configuration">
+		<ACTION>exec /service/tools/log.exc config print all 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+        <COMMAND name="config print"
+                help="Display current config">
+		<PARAM name="option"
+			help="Option"
+			ptype="LOG_PRINT_OPTION"
+			default="all"/>
+		<ACTION>exec /service/tools/log.exc config print ${option} 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+        <COMMAND name="config set"
+                help="Change logging setting"/>
+        <COMMAND name="config set local"
+                help="Change local logging setting">
+		<PARAM name="id"
+			help="Resource Id '*' for all"
+			ptype="MULTI_NUM_ALL" />
+		<PARAM name="enable"
+			help="Set enable"
+			ptype="ONOFF" />
+		<ACTION>exec /service/tools/log.exc config set local "${id}" ${enable} 2>/dev/null</ACTION>
+	</COMMAND>
+        <COMMAND name="config set remote"
+                help="Change remote logging setting">
+		<PARAM name="id"
+			help="Resource Id '*' for all"
+			ptype="MULTI_NUM_ALL" />
+		<PARAM name="enable"
+			help="Set enable"
+			ptype="ONOFF" />
+		<ACTION>exec /service/tools/log.exc config set remote "${id}" ${enable} 2>/dev/null</ACTION>
+	</COMMAND>
+        <COMMAND name="config set server"
+                help="Change remote server setting"/>
+        <COMMAND name="config set server host"
+                help="Set server host">
+		<PARAM name="host_id"
+			help="Resource Id for definition network host."
+			ptype="STRING" />
+		<ACTION>exec /service/tools/log.exc config set server host "${host_id}" 2>/dev/null</ACTION>
+	</COMMAND>
+        <COMMAND name="config set server service"
+                help="Set service">
+		<PARAM name="service_id"
+			help="Resource Id for definition service"
+			ptype="NUM"/>
+		<ACTION>exec /service/tools/log.exc config set server service "${service_id}" 2>/dev/null</ACTION>
+	</COMMAND>
+        <COMMAND name="config apply"
+                help="Apply changes">
+		<ACTION>exec /service/tools/log.exc config apply 2>/dev/null</ACTION>
+	</COMMAND>
+</VIEW>
+</CLISH_MODULE>

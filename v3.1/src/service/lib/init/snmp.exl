@@ -1,0 +1,49 @@
+<?php
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+// TODO
+function snmp_check() {
+	if(!_INIT_CHECK_BINARY(array("/bin/snmpd"))) {
+		_INIT_ECHO(1,_GETTEXT("Cannot execute %s. Internal error",_INIT_NAME()));
+		exit(1);
+	}
+}
+
+function snmp_quiet() {
+	_INIT_QUIET('1');
+}
+
+function snmp_config($_scriptdata='') {
+	/*if(!_NULL($_scriptdata)) {
+		return _FILE_SAVE("/etc/ipwatchd.conf","$_scriptdata\n");
+	}*/
+}
+
+
+function snmp_up() {
+	@unlink(_TASKQ_PATH."/snmp_up");
+	return _EXEC_CMD("/bin/snmpd");
+}
+
+
+function snmp_start() {
+	_INIT_CHECK_DAEMON_STATUS("snmpd");
+	if(!snmp_config()) {
+		_INIT_ECHO(1,_GETTEXT("Starting %s failed","snmpd"));
+		return FALSE;
+	}
+	_INIT_START_DAEMON("/bin","snmpd","","snmp_up");
+	return TRUE;
+}
+
+function snmp_stop() {
+	_INIT_STOP_DAEMON("snmpd","snmp_up");
+	return TRUE;
+}
+
+function snmp_restart() {
+	_INIT_EXEC("snmp_stop");
+	_INIT_EXEC("snmp_start");
+	return TRUE;
+}
+
+?>

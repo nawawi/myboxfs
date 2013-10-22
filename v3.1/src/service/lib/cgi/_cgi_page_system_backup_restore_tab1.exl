@@ -1,0 +1,286 @@
+<?php
+if(!defined('_CGI_CODE')||_CGI_CODE!="90d45215e48dac81e802f17310ad0c1f") exit("\n\nERROR: _CGI_CODE not set\n\n");
+
+function _CGI_PAGE_SYSTEM_BACKUP_TAB_1_LIST() {
+	extract($GLOBALS['_IMG']);
+	extract($GLOBALS['__CDATA']);
+	$_css_td_c="padding: 4px;";
+	$_page="";
+	$_buff=_GLOB(_BACKUP_PATH."/*.mbk");
+	if(_ARRAY_NULL($_buff)) {
+		$_page .="<div style='border: 1px solid #4f6d81;padding: 10px; text-align: center;'>";
+		$_page .="No backup available";
+		$_page .="</div>";
+	} else {
+		$_page .="<div style='border: 1px solid #4f6d81;";
+		if(count($_buff) >= 9) {
+			$_page .="height: 300px; overflow-y: auto; overflow-x: hidden;";
+		}
+		$_page .="'>";
+		$_page .="<table id='blist' style='border-spacing: 0px; border-collapse: collapse;'>";
+		$_cnt=0;
+		rsort($_buff);
+		foreach($_buff as $_lnx) {
+			$_ln=basename($_lnx,".mbk");
+			$_control=_BACKUP_READ_CONTROL($_lnx);
+			if(_ARRAY_NULL($_control)) continue;
+			if(!_NULL($_control['VERSION']) && !_NULL($_control['BUILD'])
+				&& !_NULL($_control['TIME'])) {
+				$_date=date('d-M-Y h:i A',$_control['TIME']);
+				$_version="{$_control['VERSION']} build-{$_control['BUILD']}";
+				$_note=_BACKUP_READ_NOTE($_lnx);
+				if(!_NULL($_note)) {
+					$_note=htmlspecialchars($_note);
+					$_note="<div style='float: left; margin: 0px;' "._CGI_TOOLTIPS($_note)."><img style='float: left; width: 10px; margin: 0px;' src='$_ICON_NOTE'>$_date</div>";
+				} else {
+					$_note="<div style='float: left; padding-left: 10px; margin: 0px;'>$_date</div>";
+				}
+				$_page .="
+					<tr id='r$_cnt'>
+					<td style='$_css_td_c; width: 300px;'><img src='{$_ICON_BACKUP['restore']}' id='restore|$_ln|r$_cnt'> <img src='{$_ICON_BACKUP['delete']}' id='delete|$_ln|r$_cnt'> <img src='{$_ICON_BACKUP['download']}' id='download|$_ln|r$_cnt'></td>
+					<td style='$_css_td_c; width: 270px;'>{$_note}</td>
+					<td style='$_css_td_c; width: 150px;'>$_version</td>
+					</tr>
+				";
+				unset($_note,$_date,$_version);
+				$_cnt++;
+			}
+		}
+		$_page .="</table>
+		<script type='text/javascript'>
+			\$(document).ready(function() {
+				\$('table#blist').find('img').each(function(i) {
+					var _tid=this.id;
+					if(_tid.match(/restore/) 
+						|| _tid.match(/delete/)
+						|| _tid.match(/download/)) {
+						\$(this).hover(
+							function() {
+								\$(this).css('cursor','pointer');
+							},
+							function() {
+								\$(this).css('cursor','default');
+							}
+						).click(function(evt) {
+							var e=evt || window.event;
+							e.preventDefault();
+							var _pval=\$(this).attr('id');
+							var _parray=_pval.split('|',3);
+							if(is_array(_parray)) {
+								var _opt=_parray[0];
+								var _file=_parray[1];
+								var _row=_parray[2];
+								if(is_same(_opt,'restore')) {
+									var _data='_update_data=backup_restore&_opt=restore&_file='+_file+'.mbk';
+									__tnpage.data_update(_data,function() {
+										__tnpage.loadpage('td#backup_list','$_req_data&sub_data=3',true);
+										return true;
+									});
+									return false;
+								}
+								if(is_same(_opt,'delete')) {
+									var _data='_update_data=backup_restore&_opt=delete&_file='+_file+'.mbk';
+									__tnpage.data_update(_data,function() {
+										\$('tr#'+_row).remove();
+										var _rlen=\$('tr[id*=r]').length;
+										if(_rlen==0) {
+											__tnpage.loadpage('td#backup_list','$_req_data&sub_data=3',true);
+										}
+										return true;
+									});
+									return false;
+								}
+								if(is_same(_opt,'download')) {
+									__tnpage.redirect('/backup/'+_file+'.mbk');
+									return false;
+								}
+							}
+						});
+					}
+				});
+			});
+		</script>
+		</div>";
+	}
+	return trim($_page);
+}
+
+function _CGI_PAGE_SYSTEM_BACKUP_TAB_1() {
+	extract($GLOBALS['_IMG']);
+	extract($GLOBALS['__CDATA']);
+	$_bid=_CGI_ATTR_KEY();
+	$_css_table="width: 720px; border-spacing: 0px; border-collapse: collapse; margin: 0px; padding: 1px; background-color: #ffffff; border: 0px; color: #000000; text-align: left;";
+	$_css_td_t="font-weight: bold; background-color: #4f6d81; padding: 4px; color: #ffffff;";
+	$_css_td_c="padding: 4px;";
+	$_page .="
+		<div class='fbox_c'>
+		<table style='$_css_table'>
+		<tr>
+		<td style='$_css_td_t; width: 300px;'>"._GETTEXT("Available backups")."</td>
+		<td style='$_css_td_t; width: 270px;padding-left: 22px;'>"._GETTEXT("Date/Time of creation")."</td>
+		<td style='$_css_td_t; width: 150px;'>Version</td>
+		</tr>
+		<tr>
+		<td id='backup_list' colspan='3'>
+		"._CGI_PAGE_SYSTEM_BACKUP_TAB_1_LIST()."
+		</td>
+		</tr>
+		</table>
+		<fieldset style='margin-top: 20px;'>
+		<legend>"._GETTEXT("Options")."</legend>
+		<div style='margin: 5px;'>
+		<table class='tbox_t'>
+		<tr>
+		<td class='tbox_tdl' colspan='2'>"._CGI_BUTTON(array('id'=>"button_{$_bid}1",'text'=>_GETTEXT("Create backup"),'css'=>'width: 180px;'))."</td>
+		<td class='tbox_tdr' style='vertical-align: middle;'>"._GETTEXT("This will backup current configuration and add it to the list of available backups above.")."</td>
+		</tr>
+		<tr>
+		<td colspan='3'>&nbsp;</td>
+		</tr>
+		<tr>
+		<td class='tbox_tdl' colspan='2'>"._CGI_BUTTON(array('id'=>"button_{$_bid}2",'text'=>_GETTEXT("Import backup"),'css'=>'width: 180px;'))."</td>
+		<td class='tbox_tdr' style='vertical-align: middle;'>"._GETTEXT("This will upload existing backup file and added to list above.")."</td>
+		</tr>
+		</table>
+		</div>
+		</fieldset>
+		</div>
+
+		<script type='text/javascript'>
+			\$(document).ready(function() {
+				__tndefinitions.rowcolor('table#blist tr');
+				\$('div#button_{$_bid}1').click(function(evt) {
+					var e=evt || window.event;
+					e.preventDefault();
+					var _top=e.pageY+'px';
+					var _left=e.pageX+'px';
+					var __pid='gbox_backup_note';
+					var __jpid='div#gbox_backup_note';
+					var _html=\"<table style='width: 100%; border-spacing: 0px; border-collapse: collapse;'>\"+
+						  \"<tr><td style='text-align: center; padding: 2px;'><input type='text' class='tbox_i' id='pnote' style='width: 180px;'></td></tr>\"+
+						  \"<tr><td style='padding: 0px;'><hr style='border: none; color: #4f6d81; background-color: #4f6d81; height: 1px; width: 100%; margin: 0px;'></td></tr>\"+
+						  \"<tr><td style='padding: 3px;'><center><div class='button' id='bt_gbox_backup_note' style='width: 100px;'>"._GETTEXT("Create backup")."</div></center></td></tr>\"+
+						  \"</table>\";
+					__tndialog.gbox(__pid,'"._GETTEXT("Description (optional)")."',_top,_left,'200px',_html);
+					__tnpage.button_hover();
+					\$('#bt_gbox_backup_note').click(function(evt) {
+						var e=evt || window.event;
+						e.preventDefault();
+						var _note=\$.trim(\$(__jpid+' div#gbox_content input#pnote').val());
+						var _data='_update_data=backup_restore&_opt=backup&_note='+_note;
+						__tnpage.data_update(_data,function() {
+							\$('#gbox_backup_note').hide();
+							__tnpage.loadpage('td#backup_list','$_req_data&sub_data=3',true);
+							return true;
+						});
+						\$(__jpid).hide();
+						return false;
+					});
+				});
+
+				\$('div#button_{$_bid}2').click(function(evt) {
+					var e=evt || window.event;
+					e.preventDefault();
+					var _top=e.pageY+'px';
+					var _left=e.pageX+'px';
+					var __pid='gbox_backup_upload';
+					var __jpid='div#gbox_backup_upload';
+					var _html=\"<form id='upload_form_backup' enctype='multipart/form-data'>\"+
+						  \"<input type='hidden' name='UPLOAD_IDENTIFIER' value='{$_bid}2'>\"+
+						  \"<input type='hidden' name='_update_data' value='backup_restore'>\"+
+						  \"<input type='hidden' name='_opt' value='import'>\"+
+						  \"<table style='width: 100%; border-spacing: 0px; border-collapse: collapse;'>\"+
+						  \"<tr><td style='text-align: center; padding: 2px;' id='upbox'><input type='file' name='file' id='file' style='background-color: #eeeeee; border: 1px solid #999999; padding: 2px;' size=35></td></tr>\"+
+						  \"<tr id='upbox1'><td style='padding: 0px;'><hr style='border: none; color: #4f6d81; background-color: #4f6d81; height: 1px; width: 100%; margin: 0px;'></td></tr>\"+
+						  \"<tr id='upbox2'><td style='padding: 3px;'><center><div class='button' id='bt_gbox_backup_upload' style='width: 100px;'>"._GETTEXT("Start Upload")."</div></center></td></tr>\"+
+						  \"</table></form>\";
+					__tndialog.gbox(__pid,'"._GETTEXT("Upload file")."',_top,_left,'400px',_html);
+					__tnpage.button_hover();
+					var _check_file=function() {
+						var _file=\$.trim(\$(__jpid+' div#gbox_content input#file').val());
+						if(is_null(_file) || _file.match(/\\.mbk\$/)==null) {
+							__tndialog.ebox('"._GETTEXT("Invalid file")."');
+							return false;
+						}
+						return true;
+					};
+					var options = { 
+						url: 'index.exh',
+						type: 'POST',
+						method: 'POST',
+						async: false,
+						dataType: 'json',
+						clearForm: false,
+						resetForm: false,
+						cache: false,
+						beforeSubmit: function() {
+							__upload_update_stop();
+							return _check_file();
+						},
+						success: function(data) {
+							__upload_update_stop();
+							__tnpage.loading('hide');
+							if(is_object(data)) {
+								if(data.status=='OK') {
+									if(!is_null(data.msg)) {
+										__tndialog.sbox(data.msg);
+									}
+									\$(__jpid).hide();
+									__tnpage.loadpage('td#backup_list','$_req_data&sub_data=3',true);
+									return true;
+								}
+								if(!is_null(data.msg)) {
+									__tndialog.ebox(data.msg);
+								}
+								return false;
+							}
+							return false;
+						},
+						beforeSend: function() {
+							__upload_update_stop();
+							__tnpage.loading('show');
+						},
+						error: function() {
+							__upload_update_stop();
+							__tnpage.backend_error();
+							\$(__jpid).hide();
+						},
+						complete: function() {
+							__upload_update_stop();
+							__tnpage.loading('hide');
+							\$(__jpid).hide();
+							__tndialog.maskhide();
+						}
+					};
+					var _dosubmit=function() {
+						if(!__tnpage.is_admin()) {
+							return false;
+						}
+						if(!_check_file()) {
+							return false;
+						}
+						__tndialog.maskshow(198);
+						var _file=\$.trim(\$(__jpid+' div#gbox_content input#file').val());	
+						\$(__jpid+' div#gbox_content #upload_form_backup').ajaxSubmit(options);
+						__upload_update_start(__jpid+' div#gbox_content td#upbox','$_req_data&sub_data=4&_pid={$_bid}2');					
+						\$(__jpid+' div#gbox_title_l').html(js_gettext('Uploading file')+' '+basename(_file));
+						\$(__jpid+' div#gbox_content tr#upbox1').hide();
+						\$(__jpid+' div#gbox_content tr#upbox2').hide();
+						return false;
+					};
+					\$('#bt_gbox_backup_upload').click(function(evt) {
+						var e=evt || window.event;
+						e.preventDefault();
+						return _dosubmit();
+					});
+					\$('#upload_form_backup').submit(function() {
+						return _dosubmit();
+					});
+				});
+			});
+		</script>
+	";
+	return trim($_page);
+}
+
+?>

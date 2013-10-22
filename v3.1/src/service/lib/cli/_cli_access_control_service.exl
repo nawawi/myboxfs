@@ -1,0 +1,57 @@
+<?php
+if(!defined('_CLI_CODE')||_CLI_CODE!="a098846421a09ab1cacd3b3a753cbe05") exit("\n\nERROR: _CLI_CODE not set\n\n");
+
+function ___CLI_ACCESS_CONTROL_SERVICE_PRINT() {
+	_INI_TOKEN_GET("system","system.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+              	_CLI_ECHO(_GETTEXT("No data available"));
+                return FALSE;
+	}
+	$_DTL=array();
+	foreach(array("http","ssh","ftp") as $_key) {
+		$_nkey="service_{$_key}";
+		if(!_NULL($_TOKEN[$_nkey]['TIMEOUT']) && !_NULL($_TOKEN[$_nkey]['PORT']) 
+			&& !_NULL($_TOKEN[$_nkey]['STAT'])) {
+			_STR_ONOFF($_stat,$_TOKEN[$_nkey]['STAT']);
+			if($_key=="http") $_key="web";
+			_UPPER($_key);
+			$_DTL[]=array($_key,$_TOKEN[$_nkey]['PORT'],$_TOKEN[$_nkey]['TIMEOUT'],$_stat);
+			unset($_stat);
+		}
+	}
+	if(!_ARRAY_NULL($_DTL)) {
+		$_DTH=array(_GETTEXT_U("TYPE"),_GETTEXT_U("PORT"),_GETTEXT_U("TIMEOUT"),_GETTEXT_U("ENABLE"));
+		echo _CLI_DATA_BODY_LINE($_DTH,$_DTL,array("-","-","-","-"));
+		return TRUE;
+	}
+	_CLI_ECHO(_GETTEXT("No data available"));
+	return FALSE;
+}
+
+function ___CLI_ACCESS_CONTROL_SERVICE_SET($_cmd,$_param,$_value) {
+	_UPPER($_param);
+	$_id="";$_func="";
+	if($_cmd=="web") {
+		$_id="service_http";
+		$_func="http_restart";
+	} elseif($_cmd=="ssh") {
+		$_id="service_ssh";
+		$_func="ssh_restart";
+	} elseif($_cmd=="ftp") {
+		$_id="service_ftp";
+		$_func="ftp_restart";
+	}
+	if(!_NULL($_id)) {
+		$_DATA[$_param]="$_value";
+		if(_INI_TOKEN_UPDATE("system","system.cfg","$_id",$_DATA)) {
+			_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+			if(!_NULL($_func)) {
+				_INIT_TASKQ("$_func");
+			}
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+?>

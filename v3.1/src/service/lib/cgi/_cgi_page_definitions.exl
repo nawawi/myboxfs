@@ -1,0 +1,1084 @@
+<?php
+if(!defined('_CGI_CODE')||_CGI_CODE!="90d45215e48dac81e802f17310ad0c1f") exit("\n\nERROR: _CGI_CODE not set\n\n");
+
+function _CGI_PAGE_DEFINITIONS_GET_ICON($_name,$_section) {
+	extract($GLOBALS['_IMG']);
+	_DEFINITIONS_GET_BYNAME($_section,$_name,$_ITOKEN);
+	if(!_ARRAY_NULL($_ITOKEN) && !_NULL($_ITOKEN['__DATA_TYPE'])) {
+		$_type=$_ITOKEN['__DATA_TYPE'];
+		if($_section=="networks") {
+			if(!_NULL($_ICON_DEFNETWORK[$_type])) {
+				return "{$_ICON_DEFNETWORK[$_type]}";
+			}
+		} elseif($_section=="services") {
+			if($_type!="group" && $_type!="builtin") {
+				return "{$_ICON_DEFNETWORK[$_ITOKEN['service']]}";
+			} else {
+				if(!_NULL($_ICON_DEFNETWORK[$_type])) {
+					return "{$_ICON_DEFNETWORK[$_type]}";
+				}
+			}
+		}
+	}
+	return;
+}
+
+function _CGI_PAGE_DEFINITIONS_GET_TITLE($_name,$_section) {
+	_DEFINITIONS_GET_BYNAME($_section,$_name,$_ITOKEN);
+	if(!_ARRAY_NULL($_ITOKEN) 
+			&& !_NULL($_ITOKEN['__DATA_TYPE']) 
+			&& !_NULL($_ITOKEN['NAME'])) {
+		$_type=$_ITOKEN['__DATA_TYPE'];
+		if($_name==$_ITOKEN['NAME']) { 
+			if($_section=="networks") {
+				if($_type=="builtin" || $_type=="host") {
+					return $_ITOKEN['ADDR'];
+				} elseif($_type=="dnshost") {
+					return "<b>{$_ITOKEN['HOSTNAME']}</b><br />[{$_ITOKEN['ADDR']}]";
+				} elseif($_type=="networks") {
+					return "{$_ITOKEN['ADDR']}/{$_ITOKEN['PREF']}";
+				}
+			} elseif($_section=="services") {
+				if($_type=="builtin") {
+					return $_ITOKEN['PROTO'];
+				} elseif($_type=="tcp" || $_type=="udp" || $_type=="tcpudp") {
+					return "{$_ITOKEN['SPORT']} &#8594; {$_ITOKEN['DPORT']}";
+				} elseif($_type=="icmp") {
+					_INI_TOKEN_GET("definitions","icmptype.cfg",$_ETOKEN);
+					if(!_ARRAY_NULL($_ETOKEN)) {
+						return "{$_ETOKEN['icmptype'][$_ITOKEN['CODE']]}";
+					}
+				} elseif($_type=="ip") {
+					return "IP Protocol {$_ITOKEN['NUM']}";
+				} elseif($_type=="esp" || $_type=="ah") {
+					return "{$_ITOKEN['SPI']}";
+				} elseif($_type=="group") {
+					return "{$_ITOKEN['SERVICE']}";
+				}
+			} elseif($_section=="timeevents") {
+				if($_type=="single") {
+					return "From {$_ITOKEN['SDATE']} {$_ITOKEN['STIME']} until {$_ITOKEN['EDATE']} {$_ITOKEN['ETIME']}";
+				} elseif($_type=="recurring") {
+					if(!_NULL($_ITOKEN['WDAYS'])) {
+						$_wdays=_STR_ARRAY($_ITOKEN['WDAYS'],",");
+						$_wdd="";
+						foreach($_wdays as $_wd) {
+							$_wdd .=_DEFINITIONS_TIMEEVENT_WEEKDAYS($_wd).",";
+						}
+						_TRIM($_wdd,",");
+						unset($_wd);
+						$_ITOKEN['WDAYS']="on $_wdd";
+					}
+					return "From {$_ITOKEN['SDATE']} {$_ITOKEN['STIME']} until {$_ITOKEN['EDATE']} {$_ITOKEN['ETIME']} {$_ITOKEN['WDAYS']}";
+				}
+			}
+		}
+	}
+	return "$_name";
+}
+
+function _CGI_PAGE_DEFINITIONS_INPUT($_data=array()) {
+	extract($GLOBALS['_IMG']);
+
+	$_save_opt=@str_replace("#dnd_","",$_data['accept']);
+
+	$_input_css="";
+	if(!_NULL($_data['input_css'])) $_input_css="style='{$_data['input_css']}'";
+	$_adjust=0;
+	if(!_NULL($_data['adjust'])) $_adjust=$_data['adjust'];
+	$_icon=_CGI_PAGE_DEFINITIONS_GET_ICON($_data['default'],$_data['section']);
+	$_style="style='margin-top: 2px; margin-right: 2px; float: left; height: 14px;'";
+	if(!_NULL($_icon)) {
+		$_icon="<img $_style src='$_icon'>";
+	}
+	$_page ="
+
+		<table><tr>
+		<td>
+			<div id='{$_data['fid']}' class='def_ibox1_i' $_input_css><span "._CGI_TOOLTIPS($_data['alt']).">
+				<img id='idel{$_data['fid']}' style='margin-top: 2px; margin-right: 2px; float: left; height: 14px;' src='$_ICON_DELETE'>$_icon
+				<div class='def_ibox1_ii'>".htmlspecialchars($_data['default'])."</div></span>
+			</div>
+		</td>
+		<td><div class='def_ibox1_f'></div></td>
+		<td><div class='def_ibox1_p'></div></td>
+		</tr></table>
+		<script type='text/javascript'>
+			\$(document).ready(function() {
+				var _dtremove=function() {
+					\$('div#{$_data['fid']}').empty();
+					if(function_exists('nd')) {
+						nd();
+					}
+				};
+
+				var _dtxt=\$('div#{$_data['fid']} .def_ibox1_ii').text();
+				if(\$.trim(_dtxt)==='') {
+					_dtremove();
+				}
+				var _click_action=function() {
+					\$('div#{$_data['fid']} img#idel{$_data['fid']}').hover(
+						function() {
+							\$(this).css({'cursor': 'pointer'});
+						},
+						function() {
+							\$(this).css({'cursor': 'default'});
+							if(function_exists('nd')) {
+								nd();
+							}
+						}
+					).click(function() {
+						_dtremove();
+					});
+				};
+				_click_action();
+				\$('div#{$_data['fid']}').droppable({
+					accept: '{$_data['accept']}',
+					hoverClass: 'def_ibox1_ihover',
+					drop: function(ev, ui) {
+						var _me=\$(this);
+						ui.draggable.clone().filter(
+							function() {
+								var _name=\$(this).html();
+								/*var _alt=\$(this).attr('title');*/
+								var _page=\"<img id='idel{$_data['fid']}' $_style src='$_ICON_DELETE'>\";
+								_page +=\"<div class='def_ibox1_ii'>\"+_name+\"</div>\";
+								_me.html(_page);
+								_click_action();
+							});
+					}
+				});
+
+				\$('div.def_ibox1_f').click(function(evt) {
+					var e=evt || window.event;
+					e.preventDefault();
+					__tndefinitions.navopen('{$_data['section']}');
+				});
+				\$('div.def_ibox1_p').click(function(evt) {
+					var e=evt || window.event;
+					e.preventDefault();
+					var _top=e.pageY;
+					var _left=e.pageX;
+					var _adjust=$_adjust;
+					if(_adjust!==0) {
+						var _wh=\$(window).height();
+						if(_top > _wh) {
+							_top=_top - _adjust;
+						}
+					}
+					var _accept='{$_data['accept']}';
+					var __oid='{$_data['fid']}';
+					var __pid='win_{$_data['fid']}';
+					var __psec='{$_data['section']}';
+					var __jid='div#win_{$_data['fid']}';
+					__tndefinitions.defopen(__pid,__psec,_top+'px',_left+'px',_accept);
+					\$(__jid+' div#button_save').click(function(evt) {
+						var e=evt || window.event;
+						e.preventDefault();
+						var _type=\$(__jid+' select[id=type] option:selected').attr('value');
+						var _data='_update_data=definitions_save&_oid='+__oid+'&_sec='+__psec+'&_type='+_type;
+						var _tid='';
+						var _tval='';
+						\$(__jid+' div#defi_box_content tr:visible td input').each(function() {
+							_tid=\$(this).attr('id');
+							if(!is_null(_tid) && !is_same(_tid,'type')) {
+								_tval=\$.trim(\$(this).attr('value'));	
+								_data +='&_DATA['+_tid+']='+_tval;
+							}
+						});
+						\$(__jid+' div#defi_box_content tr:visible td select').each(function() {
+							_tid=\$(this).attr('id');
+							if(!is_null(_tid) && !is_same(_tid,'type')) {
+								_tval=\$.trim(\$(this).attr('value'));	
+								_data +='&_DATA['+_tid+']='+_tval;
+							}
+						});
+						__tnpage.data_update(_data,function(_pdata) {
+							if(is_object(_pdata) && !is_null(_pdata.inst)) {
+								\$('div#'+__oid).html(_pdata.inst);
+								_click_action();
+								__tndefinitions.navrefresh(__psec);
+							}
+							\$(__jid).remove();
+						});
+					});
+				});
+			});
+		</script>
+	";
+	return trim($_page);
+}
+
+function _CGI_PAGE_DEFINITIONS_NAV($_section) {
+	if($_section=="interface_select") {
+		exit(_CGI_PAGE_DEFINITIONS_INTERFACES_SELECT());
+	} elseif($_section=="interfaces") {
+		exit(_CGI_PAGE_DEFINITIONS_NAV_NETWORKS_INTERFACE());
+	} elseif($_section=="networks") {
+		exit(_CGI_PAGE_DEFINITIONS_NAV_NETWORKS());
+	} elseif($_section=="services") {
+		exit(_CGI_PAGE_DEFINITIONS_NAV_SERVICES());
+	} elseif($_section=="timeevents") {
+		exit(_CGI_PAGE_DEFINITIONS_NAV_TIMEEVENTS());
+	}
+	exit(_GETTEXT("No data available"));
+}
+
+function _CGI_PAGE_DEFINITIONS_DATA($_section,$_id,$_type) {
+	_DEFINITIONS_GET_BYID($_section,$_id,$_ITOKEN,$_type);
+	if(!_ARRAY_NULL($_ITOKEN)) {
+		exit(_CGI_JSON($_ITOKEN));
+	}
+	exit(_CGI_JSON(array("__data_error"=>_GETTEXT("No data available"))));
+}
+
+function _CGI_PAGE_DEFINITIONS_PBOX($_DATA_POST) {
+
+	$_section=$_DATA_POST['section'];
+	$_stype=$_DATA_POST['stype'] ? $_DATA_POST['stype'] : 'all';
+	$_sfind=$_DATA_POST['sfind'] ? $_DATA_POST['sfind'] : '';
+	_TRIM($_sfind);
+
+	if($_section=="networks") {
+		exit(_CGI_PAGE_DEFINITIONS_PBOX_NETWORKS($_stype,$_sfind));
+	} elseif($_section=="services") {
+		exit(_CGI_PAGE_DEFINITIONS_PBOX_SERVICES($_stype,$_sfind));
+	} elseif($_section=="timeevents") {
+		exit(_CGI_PAGE_DEFINITIONS_PBOX_TIMEEVENTS($_stype,$_sfind));
+	}
+	exit(_GETTEXT("No data available"));
+}
+
+function _CGI_PAGE_DEFINITIONS_PBOX_TABLE($_req_data,$_section) {
+	extract($GLOBALS['_IMG']);
+	$_bid=_CGI_ATTR_KEY();
+	$_pid="box_page_definitions_{$_section}";
+	$_def_n="{}";$_defa_n="{}";
+	if($_section=="networks") {
+		$_def_n="__deft_n";
+		$_defa_n="__defa_n";
+	} elseif($_section=="services") {
+		$_def_n="__deft_s";
+		$_defa_n="__defa_s";
+	} elseif($_section=="timeevents") {
+		$_def_n="__deft_t";
+		$_defa_n="__defa_t";
+	}
+
+	$_page="
+		<div class='tbox_tee' style='overflow: hidden;'>
+		<div align='center'>
+			<table class='table_fixed'>
+			<tr>
+			<td style='width: 150px;' valign='top'>"._CGI_BUTTON(array('id'=>"button_{$_bid}1",'text'=>_GETTEXT("Add new definition.."),'css'=>'width: 150px;'))."</td>
+			<td style='width: 500px;' valign='top' align='center'>
+				<table class='table_fixed' style='width: 500px;'>
+					<tr>
+					<td style='width: 250px; padding-right: 2px;' align='right'><select class='tbox_s' id='tsel_{$_bid}' size='1'></select></td>
+					<td style='width: 150px;'><input type='text' id='tsearch_{$_bid}' class='tbox_is' value='' /></td>
+					<td style='width: 100px;'><div style='margin-left: 2px; float: left;'>"._CGI_BUTTON(array('id'=>"bfind_{$_id}",'class'=>'button_s','text'=>'Find','css'=>'width: 50px;'))."</div></td>
+					</tr>
+				</table>
+			</td>
+			<td style='width: 130px; padding-top: 4px;' valign='top' align='right'>
+				<table class='table_fixed'>
+					<tr>
+					<td valign='middle' align='right'><img id='iprev' src='{$_ICON_ARROW['previous']}'></td>
+					<td valign='middle' align='center'><span id='cnt_start'>0</span>-<span id='cnt_next'>0</span> of <span id='cnt_total'>0</span></span></td>
+					<td valign='middle' align='left'><img id='inext' src='{$_ICON_ARROW['next']}'></td>
+					</tr>
+				</table>
+			</td>
+			</tr>
+			</table>
+		</div>
+		<div id='defpbox_content' style='position: absolute; overflow: auto; margin-top: 10px; width: 780px; height: 510px; border: 1px solid #999999;'>
+			<img src='$_ICON_SPINNER'> "._GETTEXT("Reading data. Please wait..")."
+		</div>
+		</div>
+
+	";
+	$_page .="<script type='text/javascript'>
+			__tnpage.button_hover();
+			\$(document).ready(function() {
+
+				var _default_row_start=1;
+				var _default_row_max=10;
+				var __pid='$_pid';
+				var __psec='$_section';
+
+				var _dopagenext_row=function(_lt,_gt) {
+					_lt--;
+					_gt--;
+					\$('table#defpbox_table tr').show();
+					\$('table#defpbox_table tr:lt('+_lt+')').hide();
+					\$('table#defpbox_table tr:gt('+_gt+')').hide();
+				};
+
+				var _dopagenext_status=function(_a,_b,_c) {
+					if(_c < 1) {
+						_a=0;_b=0;
+						\$('div#defpbox_content').html('No data available');
+					}
+					\$('span#cnt_start').text(_a);
+					\$('span#cnt_next').text(_b);
+					\$('span#cnt_total').text(_c);
+				};
+				
+				var _dopagenext=function(_a,_b,_c) {
+					var _row_start=_a || _default_row_start;
+					var _row_max=_b || _default_row_max;
+					var _row_cnt=_c || 0;
+
+					if(_row_max > _row_cnt) {
+						_row_max=_row_cnt;
+					}
+
+					_dopagenext_row(_row_start,_row_max);
+					_dopagenext_status(_row_start,_row_max,_row_cnt);
+
+					\$('img#inext').hover(
+						function() {
+							if(parseInt(\$('span#cnt_next').text()) < parseInt(\$('span#cnt_total').text())) {
+								\$(this).css('cursor','pointer');
+							} else {
+								\$(this).css('cursor','default');
+							}
+						},
+						function() {
+							\$(this).css('cursor','default');
+						}
+					).click(function(evt) {
+						var e=evt || window.event;
+						e.preventDefault();
+
+						var _start=parseInt(\$('span#cnt_start').text());
+						var _next=parseInt(\$('span#cnt_next').text());
+						var _end=parseInt(\$('span#cnt_total').text());
+
+						if(_start < _end && _next < _end) {
+							_start +=_row_max;
+							_next +=_row_max;
+							_dopagenext_row(_start,_next);
+							if(_next >= _end) {
+								_next=_end;
+							}
+							_dopagenext_status(_start,_next,_end);
+						}
+					});
+
+					\$('img#iprev').hover(
+						function() {
+							if(parseInt(\$('span#cnt_start').text()) > _row_start) {
+								\$(this).css('cursor','pointer');
+							} else {
+								\$(this).css('cursor','default');
+							}
+						},
+						function() {
+							\$(this).css('cursor','default');
+						}
+					).click(function(evt) {
+						var e=evt || window.event;
+						e.preventDefault();
+
+						var _start=parseInt(\$('span#cnt_start').text());
+						var _next=parseInt(\$('span#cnt_next').text());
+						var _end=parseInt(\$('span#cnt_total').text());
+
+						if(_next===_end) {
+							var _test=\$('table#defpbox_table tr:visible').length;
+							if(_test < _row_max) {
+								_test=_row_max - _test;
+								_next +=_test;
+							}
+						}
+
+						if(_start > _row_start) {
+							_start -=_row_max;
+							_next -=_row_max;
+							_dopagenext_row(_start,_next);
+							_dopagenext_status(_start,_next,_end);
+						}
+					});
+
+				};
+
+				var _tnrcolor=function() {
+					__tndefinitions.rowcolor('table#defpbox_table tr','','',true);
+					\$('table#defpbox_table tr').each(function(i) {
+						var _color=\$(this).css('background-color');
+						\$(this).find('td').css('background-color',_color);
+					});
+				};
+
+				var _dodelete=function() {
+					\$('td.defpbox_opt div[id^=bdel_]').click(function() {
+						var _xtid=\$.trim(\$(this).attr('id'));
+						var _tid=_xtid.replace(/bdel_/g, '');
+						var _parray=_tid.split('|',2);
+						if(is_array(_parray)) {
+							var _data='_update_data=definitions_delete&__psec='+__psec+'&__pid='+_parray[0]+'&__ptype='+_parray[1];
+							__tnpage.data_update(_data,function(_pdata) {
+								__tnpage.reload();
+								__tndefinitions.navrefresh(__psec);
+							});
+						}
+					});
+				};
+
+				var _doedit=function() {
+					\$('td.defpbox_opt div[id^=bedit_]').click(function(evt) {
+						var e=evt || window.event;
+						e.preventDefault();
+						var _defa=$_defa_n;
+						var _top=e.pageY+'px';
+						var _xleft=parseInt(e.pageX) - 300;
+						var _left=_xleft+'px';
+						var __jid='div#{$_pid}';
+						var _xtid=\$.trim(\$(this).attr('id'));
+						var _tid=_xtid.replace(/bedit_/g, '');
+						var _parray=_tid.split('|',2);
+						if(is_array(_parray)) {
+							var _xpid=_parray[0];
+							var _xptype=_parray[1];
+							\$.ajaxSetup({cache:false,async:false});
+                                        		\$.post('index.exh',{'definitions_get_data':'1','__sec': __psec,'__id': _xpid,'__type': _xptype},function(data,status) {
+                                                		if(status==='success' && is_object(data)) {
+                                                        		if(data.__data_error) {
+										__tndialog.ebox(data.__data_error);
+										return false;
+									}
+									__tndefinitions.defopen(__pid,__psec,_top,_left,_defa[_xptype],data);
+                                               		 	}
+                                       			 },'json');
+						}
+					});
+				};
+
+				var _doloadtable=function(_opt,_str) {
+					var _stype=_opt || 'all';
+					var _find=_str || '';
+					var _data={'req_data':'$_req_data','sub_data':'pbox','section':'$_section','stype':_stype,'sfind':_find};
+					\$.ajaxSetup({cache:false});
+					\$('div#defpbox_content').load('index.exh',_data, function() {
+						_tnrcolor();
+						var _start_cnt=\$('table#defpbox_table tr').length;
+						_dopagenext(_default_row_start,_default_row_max,_start_cnt);
+						__tnpage.button_hover();
+					});
+					_dodelete();
+					_doedit();
+				};
+
+				var _doselect=function() {
+					var _page='';
+					var _sarray=$_def_n;
+					if(_sarray!=={}) {
+						for(var _x in _sarray) {
+							var _v=_x;
+							var _t=_sarray[_x];
+							if(_v==='all') {
+								_page +=\"<option value='\"+_v+\"' selected>\"+_t+\"</option>\";
+							} else {
+								_page +=\"<option value='\"+_v+\"'>\"+_t+\"</option>\";
+							}
+						}	
+					}
+					if(_page!=='') {
+						\$('select#tsel_{$_bid}').html(_page);
+						\$('select#tsel_{$_bid}').change(function() {
+							var _mid=\$(this).attr('value');
+							var _str=\$.trim(\$('input#tsearch_{$_bid}').attr('value'));
+							_doloadtable(_mid,_str);
+						});
+					}
+				};
+
+				var _dopagesearch_exec=function() {
+					var _str=\$('input#tsearch_{$_bid}').attr('value');
+					if(\$.trim(_str)!=='') {
+						var _opt=\$('select#tsel_{$_bid} option:selected').attr('value');
+						_doloadtable(_opt,_str);
+					} else {
+						_doloadtable();
+						_doselect();
+					}
+				};
+
+				var _dopagesearch=function() {
+					\$('input#tsearch_{$_bid}').click(function(evt) {
+						var e=evt || window.event;
+						e.preventDefault();
+						\$('input#tsearch_{$_bid}').attr('value','');
+					}).keyup(function(evt) {
+						var e=evt || window.event;
+						var knum = document.all ? window.event.keyCode : e.which;
+						if(knum===13) {
+							_dopagesearch_exec();
+						}
+					});
+					\$('div#bfind_{$_id}').click(function(evt) {
+						var e=evt || window.event;
+						e.preventDefault();
+						_dopagesearch_exec();
+					});
+				};
+
+				/* get data */
+				_doloadtable();
+				_doselect();
+				_dopagesearch();
+
+				/* after data loaded */
+				\$('div#button_{$_bid}1').click(function(evt) {
+					var e=evt || window.event;
+					e.preventDefault();
+					var _defa=$_defa_n;
+					var _top=e.pageY+'px';
+					var _left=e.pageX+'px';
+					var __jid='div#{$_pid}';
+					__tndefinitions.defopen(__pid,__psec,_top,_left,_defa['all']);
+					\$(__jid+' div#button_save').click(function(evt) {
+						var e=evt || window.event;
+						e.preventDefault();
+						var _type=\$(__jid+' select[id=type] option:selected').attr('value');
+						var _data='_update_data=definitions_save&_sec='+__psec+'&_type='+_type;
+						var _tid='';
+						var _tval='';
+						if(is_same(_type,'group')) {
+							var _nname='';
+							\$(__jid+' table.tbox_acl_tb td').each(function() {
+								_nname +=\$.trim(\$(this).text())+',';
+							});
+							var _xjid=__jid+' div#defi_box_content tr:visible td';
+							var _pnm=\$.trim(_nname,',');
+							var _nnm=\$.trim(\$(_xjid+' input#name').attr('value'));
+							var _nnote=\$.trim(\$(_xjid+' input#note').attr('value'));
+							_data +='&_DATA[name]='+_nnm+'&_DATA[address]='+_pnm+'&_DATA[note]='+_nnote;
+						} else {
+							\$(__jid+' div#defi_box_content tr:visible td input').each(function() {
+								_tid=\$(this).attr('id');
+								if(!is_null(_tid) && !is_same(_tid,'type')) {
+									_tval=\$.trim(\$(this).attr('value'));	
+									_data +='&_DATA['+_tid+']='+_tval;
+								}
+							});
+							\$(__jid+' div#defi_box_content tr:visible td select').each(function() {
+								_tid=\$(this).attr('id');
+								if(!is_null(_tid) && !is_same(_tid,'type')) {
+									_tval=\$.trim(\$(this).attr('value'));	
+									_data +='&_DATA['+_tid+']='+_tval;
+								}
+							});
+							if(is_same(__psec,'timeevents')) {
+								var _tval='';
+								\$(__jid+' div#defi_box_content tr:visible td :checkbox').each(function() {								
+									if(\$(this).length==1) {
+										_tval +=\$(this).attr('id')+',';
+									}
+								});
+								var _pnm=\$.trim(_tval,',');
+								_data +='&_DATA[wdays]='+_tval;
+							}
+						}
+						__tnpage.data_update(_data,function(_pdata) {
+							\$(__jid).remove();
+							__tnpage.reload();
+							__tndefinitions.navrefresh(__psec);
+						});
+					});
+
+				});
+
+			});
+
+	</script>";
+	return trim($_page);
+}
+
+function _CGI_PAGE_DEFINITIONS_OVERVIEW() {
+	extract($GLOBALS['_IMG']);
+
+	$_DATA=_DEFINITION_GET_COUNT('networks');
+	$_css_table="padding: 1px; width: 100%;";
+	$_css_tdleft="width: 10px; padding: 2px;";
+	$_css_tdleftc="width: 150px; padding: 2px; font-weight: bold;";
+	$_css_tdright="padding: 2px;";
+	$_ndef_data="<b>Total:</b> {$_DATA['total']}
+		<table class='gborder_t' style='$_css_table' cellpadding=1 cellspacing=0>
+		<tr>
+		<td style='$_css_tdleft'><img style='width: 14px; float: left;' src='{$_ICON_DEFNETWORK['host']}'></td>
+		<td style='$_css_tdleftc'>Hosts</td>
+		<td style='$_css_tdright'>{$_DATA['host']}</td>
+		</tr>
+		<tr>
+		<td style='$_css_tdleft'><img style='width: 14px; float: left;' src='{$_ICON_DEFNETWORK['network']}'></td>
+		<td style='$_css_tdleftc'>Networks</td>
+		<td style='$_css_tdright'>{$_DATA['networks']}</td>
+		</tr>
+		<tr>
+		<td style='$_css_tdleft'><img style='width: 14px; float: left;' src='{$_ICON_DEFNETWORK['dnshost']}'></td>
+		<td style='$_css_tdleftc'>DNS Hosts</td>
+		<td style='$_css_tdright'>{$_DATA['dnshost']}</td>
+		</tr>
+		<tr>
+		<td style='$_css_tdleft'><img style='width: 14px; float: left;' src='{$_ICON_DEFNETWORK['hostrange']}'></td>
+		<td style='$_css_tdleftc'>Hosts range</td>
+		<td style='$_css_tdright'>{$_DATA['hostrange']}</td>
+		</tr>
+		<tr>
+		<td style='$_css_tdleft'><img style='width: 14px; float: left;' src='{$_ICON_DEFNETWORK['hostmac']}'></td>
+		<td style='$_css_tdleftc'>MAC Addresses</td>
+		<td style='$_css_tdright'>{$_DATA['hostmac']}</td>
+		</tr>
+		<tr>
+		<td style='$_css_tdleft'><img style='width: 14px; float: left;' src='{$_ICON_DEFNETWORK['group']}'></td>
+		<td style='$_css_tdleftc'>Groups</td>
+		<td style='$_css_tdright'>{$_DATA['group']}</td>
+		</tr>
+		<tr>
+		<td style='$_css_tdleft'><img style='width: 14px; float: left;' src='{$_ICON_DEFNETWORK['other']}'></td>
+		<td style='$_css_tdleftc'>Other</td>
+		<td style='$_css_tdright'>{$_DATA['other']}</td>
+		</tr>
+		</table>
+	";
+
+	unset($_DATA);
+	$_DATA=_DEFINITION_GET_COUNT('services');
+	$_sdef_data="<b>Total:</b> {$_DATA['total']}
+		<table class='gborder_t' style='$_css_table' cellpadding=1 cellspacing=0>
+		<tr>
+		<td style='$_css_tdleft'><img style='width: 14px; float: left;' src='{$_ICON_DEFSERVICE['service']}'></td>
+		<td style='$_css_tdleftc'>TCP</td>
+		<td style='$_css_tdright'>{$_DATA['tcp']}</td>
+		</tr>
+		<tr>
+		<td style='$_css_tdleft'><img style='width: 14px; float: left;' src='{$_ICON_DEFSERVICE['service']}'></td>
+		<td style='$_css_tdleftc'>UDP</td>
+		<td style='$_css_tdright'>{$_DATA['udp']}</td>
+		</tr>
+		<tr>
+		<td style='$_css_tdleft'><img style='width: 14px; float: left;' src='{$_ICON_DEFSERVICE['service']}'></td>
+		<td style='$_css_tdleftc'>TCP/UDP</td>
+		<td style='$_css_tdright'>{$_DATA['tcpudp']}</td>
+		</tr>
+		<tr>
+		<td style='$_css_tdleft'><img style='width: 14px; float: left;' src='{$_ICON_DEFSERVICE['service']}'></td>
+		<td style='$_css_tdleftc'>ICMP</td>
+		<td style='$_css_tdright'>{$_DATA['icmp']}</td>
+		</tr>
+		<tr>
+		<td style='$_css_tdleft'><img style='width: 14px; float: left;' src='{$_ICON_DEFSERVICE['service']}'></td>
+		<td style='$_css_tdleftc'>Internet Protocol</td>
+		<td style='$_css_tdright'>{$_DATA['ip']}</td>
+		</tr>
+		<tr>
+		<td style='$_css_tdleft'><img style='width: 14px; float: left;' src='{$_ICON_DEFSERVICE['group']}'></td>
+		<td style='$_css_tdleftc'>Groups</td>
+		<td style='$_css_tdright'>{$_DATA['group']}</td>
+		</tr>
+		<tr>
+		<td style='$_css_tdleft'><img style='width: 12px; float: left;' src='{$_ICON_DEFSERVICE['other']}'></td>
+		<td style='$_css_tdleftc'>Other</td>
+		<td style='$_css_tdright'>{$_DATA['other']}</td>
+		</tr>
+		</table>
+	";
+
+	unset($_DATA);
+	$_DATA=_DEFINITION_GET_COUNT('timeevents');
+	$_tdef_data="<b>Total:</b> {$_DATA['total']}
+		<table class='gborder_t' style='$_css_table' cellpadding=1 cellspacing=0>
+		<tr>
+		<td style='$_css_tdleft'><img style='width: 14px; float: left;' src='{$_ICON_DEFTIMEEVENT['single']}'></td>
+		<td style='$_css_tdleftc'>Single event</td>
+		<td style='$_css_tdright'>{$_DATA['single']}</td>
+		</tr>
+		<tr>
+		<td style='$_css_tdleft'><img style='width: 14px; float: left;' src='{$_ICON_DEFTIMEEVENT['recurring']}'></td>
+		<td style='$_css_tdleftc'>Recurring event</td>
+		<td style='$_css_tdright'>{$_DATA['recurring']}</td>
+		</tr>
+		</table>
+	";
+
+	$_page="";
+	// left
+	$_page .="<div style='position: absolute; top: 10px; left: 10px;'>";
+	$_page .=_CGI_PAGE_CONTENT_BOX(array("title"=>"Network definitions",
+				"data"=>"$_ndef_data",
+				"width"=>"390",
+				"top"=>"0",
+				"left"=>"0")
+		);
+
+	$_page .=_CGI_PAGE_CONTENT_BOX(array("title"=>"Time event definitions",
+				"data"=>"$_tdef_data",
+				"width"=>"390",
+				"top"=>"190",
+				"left"=>"0")
+		);
+
+	// right
+	$_page .=_CGI_PAGE_CONTENT_BOX(array("title"=>"Service definitions",
+				"data"=>"$_sdef_data",
+				"width"=>"390",
+				"top"=>"0",
+				"left"=>"400")
+		);
+
+
+	$_page .="</div>";
+	return trim($_page);
+}
+
+function _CGI_PAGE_DEFINITIONS_SAVE($_DATA_POST) {
+	extract($GLOBALS['_IMG']);
+	if(!_ARRAY_NULL($_DATA_POST) 
+		&& !_NULL($_DATA_POST['_sec'])
+		&& !_ARRAY_NULL($_DATA_POST['_DATA'])) {
+		$_section=$_DATA_POST['_sec'];
+		$_type=$_DATA_POST['_type'];
+		$_oid=$_DATA_POST['_oid'];
+		$_DATA=array();
+		$_icon=_CGI_PAGE_DEFINITIONS_GET_ICON($_type,$_section);
+		$_style="style='margin-top: 2px; margin-right: 2px; float: left; height: 14px;'";
+		if($_section=="networks") {
+			$_icon=$_ICON_DEFNETWORK[$_type];
+			if(!_NULL($_icon)) {
+				$_icon="<img style='float: left;margin-right: 2px; height: 14px;' src='$_icon'>";
+			}
+			if($_type=="host") {
+				$_DATA['NAME']=$_DATA_POST['_DATA']['name'];
+				$_DATA['ADDR']=$_DATA_POST['_DATA']['address'];
+				$_DATA['DNAME']=$_DATA_POST['_DATA']['interface'];
+				$_DATA['NOTE']=$_DATA_POST['_DATA']['note'];
+
+				if(_NULL($_DATA['NAME'])) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Definition name not defined")));
+				}
+				if(!_CHECK_IP($_DATA['ADDR'])) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Invalid Address")));
+				}
+				if(_IS_IPV4($_DATA['ADDR'])) {
+					$_DATA['INET']="4";
+				} elseif(_IS_IPV6($_DATA['ADDR'])) {
+					$_DATA['INET']="6";
+				}
+				if(!_DEFINITIONS_SAVE("networks",$_type,$_DATA)) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}")));
+				}
+				if(!_NULL($_oid)) {
+					$_name=htmlspecialchars($_DATA['NAME']);
+					$_alt=$_DATA['ADDR'];
+					$_inst="<img id='idel{$_oid}' $_style src='$_ICON_DELETE'><div class='def_ibox1_ii'>";
+					$_inst .="<span "._CGI_TOOLTIPS($_alt).">{$_icon}{$_name}</span></div>";
+				}
+				return _CGI_JSON(array("status"=>"OK","msg","inst"=>$_inst));
+			} elseif($_type=="dnshost") {
+				$_DATA['NAME']=$_DATA_POST['_DATA']['name'];
+				$_DATA['HOSTNAME']=$_DATA_POST['_DATA']['hostname'];
+				$_DATA['ADDR']=_DEFINITIONS_DNSHOST_RESOLVE($_DATA_POST['_DATA']['hostname']);
+				$_DATA['DNAME']=$_DATA_POST['_DATA']['interface'];
+				$_DATA['NOTE']=$_DATA_POST['_DATA']['note'];
+
+				if(_NULL($_DATA['NAME'])) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Definition name not defined")));
+				}
+				if(!_DEFINITIONS_SAVE("networks",$_type,$_DATA)) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}")));
+				}
+				if(!_NULL($_oid)) {
+					$_name=htmlspecialchars($_DATA['NAME']);
+					$_alt="<b>{$_DATA['HOSTNAME']}</b><br />[{$_DATA['ADDR']}]";
+					$_inst="<img id='idel{$_oid}' $_style src='$_ICON_DELETE'><div class='def_ibox1_ii'>";
+					$_inst .="<span "._CGI_TOOLTIPS($_alt).">{$_icon}{$_name}</span></div>";
+				}
+				return _CGI_JSON(array("status"=>"OK","msg","inst"=>$_inst));
+			} elseif($_type=="hostrange") {
+				$_DATA['NAME']=$_DATA_POST['_DATA']['name'];
+				$_DATA['ADDR']="{$_DATA_POST['_DATA']['hrange1']}-{$_DATA_POST['_DATA']['hrange2']}";
+				$_DATA['DNAME']=$_DATA_POST['_DATA']['interface'];
+				$_DATA['NOTE']=$_DATA_POST['_DATA']['note'];
+
+				if(_NULL($_DATA['NAME'])) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Definition name not defined")));
+				}
+				if(!_CHK_HOSTRANGE($_DATA_POST['_DATA']['hrange1'],$_DATA_POST['_DATA']['hrange2'])) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Invalid range '%s'","{$_DATA_POST['_DATA']['hrange1']}-{$_DATA_POST['_DATA']['hrange2']}")));
+				}
+				if(!_DEFINITIONS_SAVE("networks",$_type,$_DATA)) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}")));
+				}
+				if(!_NULL($_oid)) {
+					$_name=htmlspecialchars($_DATA['NAME']);
+					$_alt=$_DATA['ADDR'];
+					$_inst="<img id='idel{$_oid}' $_style src='$_ICON_DELETE'><div class='def_ibox1_ii'>";
+					$_inst .="<span "._CGI_TOOLTIPS($_alt).">{$_icon}{$_name}</span></div>";
+				}
+				return _CGI_JSON(array("status"=>"OK","msg","inst"=>$_inst));
+			} elseif($_type=="network") {
+				$_DATA['NAME']=$_DATA_POST['_DATA']['name'];
+				$_DATA['ADDR']=$_DATA_POST['_DATA']['address'];
+				$_DATA['MASK']=$_DATA_POST['_DATA']['netmask'];
+				$_DATA['DNAME']=$_DATA_POST['_DATA']['interface'];
+				$_DATA['NOTE']=$_DATA_POST['_DATA']['note'];
+
+				if(_NULL($_DATA['NAME'])) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Definition name not defined")));
+				}
+				if(!_CHECK_IP($_DATA['ADDR'])) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Invalid Address")));
+				}
+				if(_IS_IPV4($_DATA['ADDR'])) {
+					$_DATA['INET']="4";
+				} elseif(_IS_IPV6($_DATA['ADDR'])) {
+					$_DATA['INET']="6";
+				}
+
+				_IPCALC::IP($_RESULT,$_DATA['ADDR'],$_DATA['MASK']);
+				$_DATA['MASK']=$_RESULT['netmask'];
+				$_DATA['PREF']=$_RESULT['prefix'];
+				$_DATA['INET']=$_RESULT['inet'];
+
+				if(!_DEFINITIONS_SAVE("networks",$_type,$_DATA)) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}")));
+				}
+				if(!_NULL($_oid)) {
+					$_name=htmlspecialchars($_DATA['NAME']);
+					$_alt="{$_DATA['ADDR']}/{$_DATA['PREF']}";
+					$_inst="<img id='idel{$_oid}' $_style src='$_ICON_DELETE'><div class='def_ibox1_ii'>";
+					$_inst .="<span "._CGI_TOOLTIPS($_alt).">{$_icon}{$_name}</span></div>";
+				}
+				return _CGI_JSON(array("status"=>"OK","msg","inst"=>$_inst));
+			} elseif($_type=="hostmac") {
+				$_DATA['NAME']=$_DATA_POST['_DATA']['name'];
+				$_DATA['ADDR']=$_DATA_POST['_DATA']['macaddr'];
+				$_DATA['DNAME']=$_DATA_POST['_DATA']['interface'];
+				$_DATA['NOTE']=$_DATA_POST['_DATA']['note'];
+
+				if(_NULL($_DATA['NAME'])) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Definition name not defined")));
+				}
+
+				if(!_CHECK_MACADDR($_DATA['ADDR'])) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Invalid MAC Address")));
+				}
+
+				if(!_DEFINITIONS_SAVE("networks",$_type,$_DATA)) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}")));
+				}
+				if(!_NULL($_oid)) {
+					$_name=htmlspecialchars($_DATA['NAME']);
+					$_alt=$_DATA['ADDR'];
+					$_inst="<img id='idel{$_oid}' $_style src='$_ICON_DELETE'><div class='def_ibox1_ii'>";
+					$_inst .="<span "._CGI_TOOLTIPS($_alt).">{$_icon}{$_name}</span></div>";
+				}
+				return _CGI_JSON(array("status"=>"OK","msg","inst"=>$_inst));
+			} elseif($_type=="group") {
+				$_DATA['NAME']=$_DATA_POST['_DATA']['name'];
+				$_DATA['ADDR']=$_DATA_POST['_DATA']['address'];
+				$_DATA['NOTE']=$_DATA_POST['_DATA']['note'];
+
+				if(_NULL($_DATA['NAME'])) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Definition name not defined")));
+				}
+
+				if(!_DEFINITIONS_SAVE("networks",$_type,$_DATA)) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}")));
+				}
+				if(!_NULL($_oid)) {
+					$_name=htmlspecialchars($_DATA['NAME']);
+					$_alt=$_DATA['ADDR'];
+					$_inst="<img id='idel{$_oid}' $_style src='$_ICON_DELETE'><div class='def_ibox1_ii'>";
+					$_inst .="<span "._CGI_TOOLTIPS($_alt).">{$_icon}{$_name}</span></div>";
+				}
+				return _CGI_JSON(array("status"=>"OK","msg","inst"=>$_inst));
+			}
+		} elseif($_section=="services") {
+			$_icon=$_ICON_DEFSERVICE[$_type];
+			if(!_NULL($_icon)) {
+				$_icon="<img style='float: left;margin-right: 2px;' src='$_icon'>";
+			}
+			if($_type=="tcp" || $_type=="udp" || $_type=="tcpudp") {
+				$_proto="$_type";
+				if($_type=="tcpudp") $_proto="tcp/udp";
+				$_DATA['NAME']=$_DATA_POST['_DATA']['name'];
+				$_DATA['PROTO']=strtoupper($_type);
+				$_DATA['DPORT']=$_DATA_POST['_DATA']['dport'];
+				$_DATA['SPORT']=$_DATA_POST['_DATA']['sport'];
+				$_DATA['NOTE']=$_DATA_POST['_DATA']['note'];
+
+				if(_NULL($_DATA['NAME'])) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Definition name not defined")));
+				}
+
+				if(!_DEFINITIONS_SAVE("services",$_type,$_DATA)) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}")));
+				}
+				if(!_NULL($_oid)) {
+					$_name=htmlspecialchars($_DATA['NAME']);
+					$_alt="{$_DATA['SPORT']} &#8594; {$_DATA['DPORT']}";
+					$_inst="<img id='idel{$_oid}' $_style src='$_ICON_DELETE'><div class='def_ibox1_ii'>";
+					$_inst .="<span "._CGI_TOOLTIPS($_alt).">{$_icon}{$_name}</span></div>";
+				}
+				return _CGI_JSON(array("status"=>"OK","msg","inst"=>$_inst));
+			} elseif($_type=="icmp") {
+				$_DATA['NAME']=$_DATA_POST['_DATA']['name'];
+				$_DATA['PROTO']=strtoupper($_type);
+				$_DATA['CODE']=$_DATA_POST['_DATA']['icmptype'];
+				$_DATA['NOTE']=$_DATA_POST['_DATA']['note'];
+
+				if(_NULL($_DATA['NAME'])) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Definition name not defined")));
+				}
+
+				if(!_DEFINITIONS_SAVE("services",$_type,$_DATA)) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}")));
+				}
+				if(!_NULL($_oid)) {
+					$_name=htmlspecialchars($_DATA['NAME']);
+					$_alt=$_DATA['CODE'];
+					$_inst="<img id='idel{$_oid}' $_style src='$_ICON_DELETE'><div class='def_ibox1_ii'>";
+					$_inst .="<span "._CGI_TOOLTIPS($_alt).">{$_icon}{$_name}</span></div>";
+				}
+				return _CGI_JSON(array("status"=>"OK","msg","inst"=>$_inst));
+			} elseif($_type=="ip") {
+				$_DATA['NAME']=$_DATA_POST['_DATA']['name'];
+				$_DATA['PROTO']=strtoupper($_type);
+				$_DATA['NUM']=$_DATA_POST['_DATA']['protocol'];
+				$_DATA['NOTE']=$_DATA_POST['_DATA']['note'];
+
+				if(_NULL($_DATA['NAME'])) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Definition name not defined")));
+				}
+
+				if(!_DEFINITIONS_SAVE("services",$_type,$_DATA)) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}")));
+				}
+				if(!_NULL($_oid)) {
+					$_name=htmlspecialchars($_DATA['NAME']);
+					$_alt="IP Protocol {$_DATA['NUM']}";
+					$_inst="<img id='idel{$_oid}' $_style src='$_ICON_DELETE'><div class='def_ibox1_ii'>";
+					$_inst .="<span "._CGI_TOOLTIPS($_alt).">{$_icon}{$_name}</span></div>";
+				}
+				return _CGI_JSON(array("status"=>"OK","msg","inst"=>$_inst));
+			} elseif($_type=="esp" || $_type=="ah") {
+				$_DATA['NAME']=$_DATA_POST['_DATA']['name'];
+				$_DATA['PROTO']=strtoupper($_type);
+				$_DATA['SPI']=$_DATA_POST['_DATA']['spi'];
+				$_DATA['NOTE']=$_DATA_POST['_DATA']['note'];
+
+				if(_NULL($_DATA['NAME'])) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Definition name not defined")));
+				}
+
+				if(!_DEFINITIONS_SAVE("services",$_type,$_DATA)) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}")));
+				}
+				if(!_NULL($_oid)) {
+					$_name=htmlspecialchars($_DATA['NAME']);
+					$_alt=$_DATA['SPI'];
+					$_inst="<img id='idel{$_oid}' $_style src='$_ICON_DELETE'><div class='def_ibox1_ii'>";
+					$_inst .="<span "._CGI_TOOLTIPS($_alt).">{$_icon}{$_name}</span></div>";
+				}
+				return _CGI_JSON(array("status"=>"OK","msg","inst"=>$_inst));
+			} elseif($_type=="group") {
+				$_DATA['NAME']=$_DATA_POST['_DATA']['name'];
+				$_DATA['SERVICE']=$_DATA_POST['_DATA']['address'];
+				$_DATA['NOTE']=$_DATA_POST['_DATA']['note'];
+
+				if(_NULL($_DATA['NAME'])) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Definition name not defined")));
+				}
+
+				if(!_DEFINITIONS_SAVE("services",$_type,$_DATA)) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}")));
+				}
+				if(!_NULL($_oid)) {
+					$_name=htmlspecialchars($_DATA['NAME']);
+					$_alt=$_DATA['SERVICE'];
+					$_inst="<img id='idel{$_oid}' $_style src='$_ICON_DELETE'><div class='def_ibox1_ii'>";
+					$_inst .="<span "._CGI_TOOLTIPS($_alt).">{$_icon}{$_name}</span></div>";
+				}
+				return _CGI_JSON(array("status"=>"OK","msg","inst"=>$_inst));
+			}
+		} elseif($_section=="timeevents") {
+			$_icon=$_ICON_DEFTIMEEVENT[$_type];
+			if(!_NULL($_icon)) {
+				$_icon="<img style='width: 14px; float: left;margin-right: 2px;' src='$_icon'>";
+			}
+			if($_type=="recurring") {
+				$_DATA['NAME']=$_DATA_POST['_DATA']['name'];
+				$_DATA['STIME']="{$_DATA_POST['_DATA']['stime_m']}:{$_DATA_POST['_DATA']['stime_s']}";
+				$_DATA['ETIME']="{$_DATA_POST['_DATA']['etime_m']}:{$_DATA_POST['_DATA']['etime_s']}";
+				$_DATA['WDAYS']=$_DATA_POST['_DATA']['wdays'];
+				$_DATA['NOTE']=$_DATA_POST['_DATA']['note'];
+
+				if(_NULL($_DATA['NAME'])) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Definition name not defined")));
+				}
+
+				if(!_DEFINITIONS_SAVE("timeevents",$_type,$_DATA)) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}")));
+				}
+				if(!_NULL($_oid)) {
+					if(!_NULL($_DATA['WDAYS'])) {
+						$_wdays=_STR_ARRAY($_DATA['WDAYS'],",");
+						$_wdd="";
+						foreach($_wdays as $_wd) {
+							$_wdd .=_DEFINITIONS_TIMEEVENT_WEEKDAYS($_wd).",";
+						}
+						_TRIM($_wdd,",");
+						unset($_wd);
+						$_DATA['WDAYS']="on $_wdd";
+					}
+					$_name=htmlspecialchars($_DATA['NAME']);
+					$_alt="From {$_DATA['SDATE']} {$_DATA['STIME']} until {$_DATA['EDATE']} {$_DATA['ETIME']} {$_DATA['WDAYS']}";
+					$_inst="<img id='idel{$_oid}' $_style src='$_ICON_DELETE'><div class='def_ibox1_ii'>";
+					$_inst .="<span "._CGI_TOOLTIPS($_alt).">{$_icon}{$_name}</span></div>";
+				}
+				return _CGI_JSON(array("status"=>"OK","msg","inst"=>$_inst));
+			} elseif($_type=="single") {
+				$_DATA['NAME']=$_DATA_POST['_DATA']['name'];
+				$_DATA['SDATE']=$_DATA_POST['_DATA']['sdate'];
+				$_DATA['EDATE']=$_DATA_POST['_DATA']['edate'];
+				$_DATA['STIME']="{$_DATA_POST['_DATA']['stime_m']}:{$_DATA_POST['_DATA']['stime_s']}";
+				$_DATA['ETIME']="{$_DATA_POST['_DATA']['etime_m']}:{$_DATA_POST['_DATA']['etime_s']}";
+				$_DATA['WDAYS']=$_DATA_POST['_DATA']['wdays'];
+				$_DATA['NOTE']=$_DATA_POST['_DATA']['note'];
+
+				if(_NULL($_DATA['NAME'])) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Definition name not defined")));
+				}
+
+				if(!_DEFINITIONS_SAVE("timeevents",$_type,$_DATA)) {
+					return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}")));
+				}
+				if(!_NULL($_oid)) {
+					$_name=htmlspecialchars($_DATA['NAME']);
+					$_alt="From {$_DATA['SDATE']} {$_DATA['STIME']} until {$_DATA['EDATE']} {$_DATA['ETIME']}";
+					$_inst="<img id='idel{$_oid}' $_style src='$_ICON_DELETE'><div class='def_ibox1_ii'>";
+					$_inst .="<span "._CGI_TOOLTIPS($_alt).">{$_icon}{$_name}</span></div>";
+				}
+				return _CGI_JSON(array("status"=>"OK","msg","inst"=>$_inst));
+			}
+		}
+	}
+	return FALSE;
+}
+
+function _CGI_PAGE_DEFINITIONS_DELETE($_DATA_POST) {
+	if(!_ARRAY_NULL($_DATA_POST) 
+		&& !_NULL($_DATA_POST['__psec'])
+		&& !_NULL($_DATA_POST['__pid'])
+		&& !_NULL($_DATA_POST['__ptype'])) {
+		if(_DEFINITIONS_DELETE($_DATA_POST['__psec'],$_DATA_POST['__ptype'],$_DATA_POST['__pid'])) {
+			return _CGI_JSON(array("status"=>"OK","msg"));
+		}
+	}
+	return FALSE;
+}
+?>

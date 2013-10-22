@@ -1,0 +1,57 @@
+#!/bin/bash -e
+trap "exit 1" 2;
+
+# checking
+if [ "x$_START" = "x" ]; then
+        echo "_START not set";
+	exit 1;
+fi
+if [ ! -f "$_START/MYBOX_VERSION" ]; then
+	echo "MYBOX_VERSION not set";
+	exit 1;
+fi
+if [ ! -f "$_FUNC/functions.sh" ]; then
+        echo "_FUNC not set";
+	exit 1;
+fi
+
+cd $_START;
+. $_FUNC/functions.sh
+
+_BUILD_MSG "Locale";
+
+# setting
+_LIB="/usr/lib/gconv/ISO8859-1.so";
+_CONF="/usr/lib/gconv/gconv-modules /usr/lib/locale/locale-archive";
+_BDIR=/tmp/locale
+_KBASE=$_START/kernel_pkg
+
+cd $_START;
+
+if [ -f "$_LIB" ]; then
+        rm -rf $_BDIR && mkdir -pv $_BDIR;
+	if cd $_BDIR 2>/dev/null; then
+		for f in $_LIB; do
+			_DD=$(dirname $f);
+			[ ! -d "$_BDIR/$_DD" ] && mkdir -pv $_BDIR/$_DD;
+			cp -v $f $_BDIR/$_DD;
+			unset _DD;
+		done
+		unset f;
+		for f in $_CONF; do
+			_DD=$(dirname $f);
+			[ ! -d "$_BDIR/$_DD" ] && mkdir -pv $_BDIR/$_DD;
+			cp -v $f $_BDIR/$_DD;
+			unset _DD;
+		done
+	fi
+	tar -C $_BDIR -cvf corefs_locale.tar usr
+	_LZMA_COMPRESS corefs_locale.tar corefs_locale.mpk
+        if [ -f "corefs_locale.mpk" ]; then
+                mv -v corefs_locale.mpk $_KBASE
+        fi
+        rm -rf $_BDIR;
+fi
+
+cd $_START;
+exit 0;

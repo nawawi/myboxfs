@@ -1,0 +1,72 @@
+<?php
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+function anyterm_check() {
+	if(!_INIT_CHECK_BINARY(array("/bin/anytermd"))) {
+		_INIT_ECHO(1,_GETTEXT("Cannot execute %s. Internal error",_INIT_NAME()));
+		exit(1);
+	}
+}
+
+function anyterm_quiet() {
+	_INIT_QUIET('1');
+}
+
+function anyterm_config() {
+	_INI_TOKEN_GET("system","system.cfg",$_NTOKEN);
+	$_DATA=$_NTOKEN['system'];
+	if(_NULL($_DATA['ANYTERM']) || $_DATA['ANYTERM']==0) {
+		_INIT_ECHO(0,_GETTEXT("%s daemon (%s) disabled","Anyterm","anytermd"));
+		anyterm_quiet();
+		return FALSE;
+	}
+	return TRUE;
+}
+
+function anyterm_up() {
+	@unlink(_TASKQ_PATH."/anyterm_up");
+	$_prog="/bin/anytermd --local-only";
+	if(_EXEC_CMD("$_prog")==0) {
+		_INIT_CHKPROG_LOG("anytermd");
+		return TRUE;
+	}
+	return anyterm_restart();
+}
+
+
+function anyterm_start() {
+	_INIT_CHECK_DAEMON_STATUS("anytermd");
+	$_prog="/bin/anytermd --local-only";
+	if(!anyterm_config()) {
+		_INIT_ECHO(1,_GETTEXT("Starting %s failed","anytermd"));
+		return FALSE;
+	}
+	putenv("ANYTERM_SHELL=1");
+	_INIT_START_DAEMON("$_prog","anyterm_up");
+	return TRUE;
+}
+
+function anyterm_stop() {
+	_INIT_STOP_DAEMON("anytermd","anyterm_up",1);
+	sleep(1);
+	return TRUE;
+}
+
+function anyterm_restart() {
+	_INIT_EXEC("anyterm_stop");
+	_INIT_EXEC("anyterm_start");
+	return TRUE;
+}
+
+function anyterm_reload() {
+	if(anyterm_config()) {
+		if(_SIGHUP("anytermd")) {
+			_INIT_ECHO(0,_GETTEXT("Reloading %s daemon","anytermd"));
+			return TRUE;
+		}
+	}
+	_INIT_ECHO(1,_GETTEXT("Reloading %s daemon failed","anytermd"));
+	return FALSE;
+}
+
+?>

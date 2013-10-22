@@ -1,0 +1,493 @@
+<?php
+if(!defined('_CGI_CODE')||_CGI_CODE!="90d45215e48dac81e802f17310ad0c1f") exit("\n\nERROR: _CGI_CODE not set\n\n");
+
+function _CGI_PAGE_SYSTEM_ACL_TAB_1() {
+	extract($GLOBALS['_IMG']);
+
+	_INI_TOKEN_GET("system","system.cfg",$_TOKEN);
+	$_DATA=$_TOKEN['system'];
+	$_DATA_SSH=$_TOKEN['service_ssh'];
+	$_DATA_FTP=$_TOKEN['service_ftp'];
+	$_DATA_WEB=$_TOKEN['service_http'];
+	$_web_bid=_CGI_ATTR_KEY();
+	$_page="";
+	$_page .="
+		<div class='fbox_c'>
+		<table style='border-spacing: 0px; border-collapse: collapse;'><tbody><tr>
+		<td>Access type: <select class='tbox_s' size=1>
+			<option value='web' selected>Web Access</option>
+			<option value='ssh'>SSH Access</option>
+			<option value='ftp'>FTP Access</option>
+	";
+	if(_CGI_IS_ADMIN()) {
+		$_page .="
+			<option value='console'>Console Access</option>
+		";
+	}
+	$_page .="
+		</select></td>
+		<td id='daemon_stat' style='padding-top: 2px;display: none;'>
+			"._CGI_BUTTON_ENABLE(array('img_id'=>'daemon_stat','mleft'=>'10px'))."
+		</td>
+		</tr></tbody></table>
+
+		<fieldset id='web' style='margin-top: 20px;'>
+		<legend>"._GETTEXT("%s Access Password","Web")."</legend>
+		<div style='margin: 5px;'>
+		<table class='tbox_t'>
+		<tr>
+		<td class='tbox_tdl' style='width: 180px;'>"._GETTEXT("Password for %s access:","Admin")."</td>
+		<td class='tbox_tdc'><input type='password' id='pass_a1' class='tbox_i' value='' /></td>
+		<th rowspan='3' class='tbox_tdr'>"._GETTEXT("This is an access password for login to %s. Leaving a password's fields empty will preserve the existing password.","WebGui")."</th>
+		</tr>
+		<tr>
+		<td class='tbox_tdl' style='width: 180px;'>"._GETTEXT("Repeat:")."</td>
+		<td class='tbox_tdc'><input type='password' id='pass_a2' class='tbox_i' value='' /></td>
+		</tr>
+		<tr><td colspan='3'><br /></td></tr>
+		<tr>
+		<td class='tbox_tdl' style='width: 180px;'>"._GETTEXT("Password for %s access:","Look")."</td>
+		<td class='tbox_tdc'><input type='password' id='pass_l1' class='tbox_i' value='' /></td>
+		</tr>
+		<tr>
+		<td class='tbox_tdl' style='width: 180px;'>"._GETTEXT("Repeat:")."</td>
+		<td class='tbox_tdc'><input type='password' id='pass_l2' class='tbox_i' value='' /></td>
+		</tr>
+
+		</table>
+		<hr />
+		"._CGI_BUTTON(array('id'=>"button_{$_web_bid}",'text'=>'Set specified passwords','css'=>'width: 180px;'))."
+
+		</div>
+		</fieldset>
+		<script type='text/javascript'>
+			\$(document).ready(function() {
+				\$('#pass_a1').click(function() {
+					\$('#pass_a1').attr('value','');
+				});
+				\$('#pass_a2').click(function() {
+					\$('#pass_a2').attr('value','');
+				});
+				\$('#pass_l1').click(function() {
+					\$('#pass_l1').attr('value','');
+				});
+				\$('#pass_l2').click(function() {
+					\$('#pass_l2').attr('value','');
+				});
+				\$('#button_{$_web_bid}').click(function() {
+					if(!__tnpage.is_admin()) {
+						return false;
+					}
+					var _pass_a1=\$.trim(\$('#pass_a1').val());
+					var _pass_a2=\$.trim(\$('#pass_a2').val());
+					var _pass_l1=\$.trim(\$('#pass_l1').val());
+					var _pass_l2=\$.trim(\$('#pass_l2').val());
+					if(!is_same(_pass_a1,_pass_a2)) {
+						__tndialog.ebox('"._GETTEXT("Password for %s access not match","Admin")."');
+						return false;
+					}
+					if(!is_same(_pass_l1,_pass_l2)) {
+						__tndialog.ebox('"._GETTEXT("Password for %s access not match","Look")."');
+						return false;
+					}
+					var _isok=0;
+					var _msg=base64_encode('"._GETTEXT("Password set successfully")."');
+					alert(_msg);
+					if((!is_null(_pass_a1) && !is_null(_pass_a2)) && is_same(_pass_a1,_pass_a2)) {
+						var _data='_update_data=acl_passwd&_pass='+_pass_a2+'&_access=admin&_cmd=web&_msg='+_msg;
+						__tnpage.data_update(_data,function() { _isok=1;});
+					}
+					if((!is_null(_pass_l1) && !is_null(_pass_l2)) && is_same(_pass_l1,_pass_l2)) {
+						var _data='_update_data=acl_passwd&_pass='+_pass_l2+'&_access=look&_cmd=web&_msg='+_msg;
+						__tnpage.data_update(_data,function() { _isok=1;});
+					}
+					if(_isok==0) {
+						__tndialog.ebox('"._GETTEXT("Entered values is syntactically or logically incorrect")."');
+					}
+				});
+			});
+		</script>
+	";
+	$_ssh_bid=_CGI_ATTR_KEY();
+	$_page .="
+		<fieldset id='ssh' style='margin-top: 20px; display: none;'>
+		<legend>"._GETTEXT("%s Access Setting","SSH")."</legend>
+		<div style='margin: 5px;'>
+		<table class='tbox_t'>
+		<tr>
+		<td class='tbox_tdl'>"._GETTEXT("Access User:")."</td>
+		<td class='tbox_tdc'><input type='text' id='ssh_user' class='tbox_i' value='{$_DATA_SSH['USER']}' /></td>
+		<th rowspan='3' class='tbox_tdr'>"._GETTEXT("This is an access setting for %s. Default username set to '%s', you can change it to your own with conditions: <ul><li>Maximum <b>8</b> characters</li><li>Only accept <b>a-z A-Z 0-9 .-_@$</b> combination characters</li><li>Only accept <b>$</b> as a last character</li><li>Not accept <b>-</b> or <b>@</b> as a first character</li></ul>","remote shell access","sshuser")."
+		</th>
+		</tr>
+		<tr>
+		<td class='tbox_tdl'>"._GETTEXT("Access Password:")."</td>
+		<td class='tbox_tdc'><input type='password' id='ssh_pass1' class='tbox_i' value='' /></td>
+		</tr>
+		<tr>
+		<td class='tbox_tdl'>"._GETTEXT("Repeat:")."</td>
+		<td class='tbox_tdc'><input type='password' id='ssh_pass2' class='tbox_i' value='' /></td>
+		</tr>
+
+		</table>
+		<hr />
+		"._CGI_BUTTON_APPLY("button_{$_ssh_bid}1")."
+		</div>
+		</fieldset>
+	";
+	$_page .="
+		<fieldset id='ssh' style='margin-top: 20px;display: none;'>
+		<legend>"._GETTEXT("%s Daemon Setting","SSH")."</legend>
+		<div style='margin: 5px;'>
+		<table class='tbox_t'>
+		<tr>
+		<td class='tbox_tdl'>"._GETTEXT("TCP Port:")."</td>
+		<td class='tbox_tdc'><input id='ssh_port' type='text' class='tbox_i' value='{$_DATA_SSH['PORT']}' /></td>
+		<td class='tbox_tdr'>"._GETTEXT("This is the TCP port number used to access %s service. It defaults to TCP port %d. You can change it to %d or any value between %d and %d","SSH",5052,22,1024,65535)."</td>
+		</tr>
+		<tr><td colspan='3'><br /></td></tr>
+		<tr>
+		<td class='tbox_tdl'>"._GETTEXT("Session Idle Timeout:")."</td>
+		<td class='tbox_tdc'><input id='ssh_timeout' type='text' class='tbox_i' value='{$_DATA_SSH['TIMEOUT']}' /></td>
+		<td class='tbox_tdr'>"._GETTEXT("This specifies the number of seconds after which an idle will timeout.")."</td>
+		</tr>
+		</table>
+		<hr />
+		"._CGI_BUTTON_APPLY("button_{$_ssh_bid}2")."
+		</div>
+		</fieldset>
+
+		<script type='text/javascript'>
+			\$(document).ready(function() {
+				\$('#ssh_pass1').click(function() {
+					\$('#ssh_pass1').attr('value','');
+				});
+				\$('#ssh_pass2').click(function() {
+					\$('#ssh_pass2').attr('value','');
+				});
+				var _ssh_user0=\$.trim(\$('#ssh_user').val());
+				if(is_null(_ssh_user0)) {
+					_ssh_user0='sshuser';
+					\$('#ssh_user').val(_ssh_user0);
+				}
+				\$('#button_{$_ssh_bid}1').click(function() {
+					if(!__tnpage.is_admin()) {
+						return false;
+					}
+					var _ssh_user=\$.trim(\$('#ssh_user').val()) || 'sshuser';
+					var _ssh_pass1=\$.trim(\$('#ssh_pass1').val());
+					var _ssh_pass2=\$.trim(\$('#ssh_pass2').val());
+					if(is_null(_ssh_user) && !is_null(_ssh_user0)) {
+						_ssh_user=_ssh_user0;
+					}
+					if((!is_null(_ssh_pass1) && !is_null(_ssh_pass2)) && is_same(_ssh_pass1,_ssh_pass2)) {
+						_data='_update_data=acl_passwd&_pass='+_ssh_pass2+'&_access='+_ssh_user+'&_cmd=ssh';
+						__tnpage.data_update(_data);
+						return true;
+					} else {
+						if(!is_same(_ssh_pass1,_ssh_pass2)) {
+							__tndialog.ebox('"._GETTEXT("Password for %s access not match","SSH")."');
+							return false;
+						}
+					}
+					__tndialog.ebox('"._GETTEXT("Entered values is syntactically or logically incorrect")."');
+					return false;
+				});
+
+				\$('#ssh_port').click(function() {
+					\$('#ssh_port').attr('value','');
+				});
+				\$('#ssh_timeout').click(function() {
+					\$('#ssh_timeout').attr('value','');
+				});
+				\$('#button_{$_ssh_bid}2').click(function() {
+					if(!__tnpage.is_admin()) {
+						return false;
+					}
+					var _ssh_port=\$.trim(\$('#ssh_port').val()) || 5052;
+					var _ssh_timeout=\$.trim(\$('#ssh_timeout').val()) || 60;
+					if(!is_num(_ssh_port) || (_ssh_port!=22 && _ssh_port < 1024) || _ssh_port > 65535) {
+						__tndialog.sbox('"._GETTEXT("Invalid TCP Port")." '+_ssh_port);
+						return false;
+					}
+					if(!is_num(_ssh_timeout)) {
+						__tndialog.sbox('"._GETTEXT("Invalid timeout")." '+_ssh_timeout);
+						return false;
+					}
+					_data='_update_data=2&_sec=system&_secf=system&_id=service_ssh&_eq=ssh_restart,policy_admin&_data[TIMEOUT]='+_ssh_timeout+'&_data[PORT]='+_ssh_port;
+					__tnpage.data_update(_data);
+					return true;
+				});
+			});
+		</script>
+	";
+
+	$_ftp_bid=_CGI_ATTR_KEY();
+	$_page .="
+		<fieldset id='ftp' style='margin-top: 20px;display: none;'>
+		<legend>"._GETTEXT("%s Access Setting","FTP")."</legend>
+		<div style='margin: 5px;'>
+		<table class='tbox_t'>
+		<tr>
+		<td class='tbox_tdl'>"._GETTEXT("Access User:")."</td>
+		<td class='tbox_tdc'><input type='text' id='ftp_user' class='tbox_i' value='{$_DATA_FTP['USER']}' /></td>
+		<th rowspan='3' class='tbox_tdr'>"._GETTEXT("This is an access setting for %s. Default username set to '%s', you can change it to your own with conditions: <ul><li>Maximum <b>8</b> characters</li><li>Only accept <b>a-z A-Z 0-9 .-_@$</b> combination characters</li><li>Only accept <b>$</b> as a last character</li><li>Not accept <b>-</b> or <b>@</b> as a first character</li></ul>","FTP access","ftpuser")."
+		</th>
+		</tr>
+		<tr>
+		<td class='tbox_tdl'>"._GETTEXT("Access Password:")."</td>
+		<td class='tbox_tdc'><input type='password' id='ftp_pass1' class='tbox_i' value='' /></td>
+		</tr>
+		<tr>
+		<td class='tbox_tdl'>"._GETTEXT("Repeat:")."</td>
+		<td class='tbox_tdc'><input type='password' id='ftp_pass2' class='tbox_i' value='' /></td>
+		</tr>
+
+		</table>
+		<hr />
+		"._CGI_BUTTON_APPLY("button_{$_ftp_bid}1")."
+		</div>
+		</fieldset>
+
+	";
+
+	$_page .="
+		<fieldset id='ftp' style='margin-top: 20px;display: none;'>
+		<legend>"._GETTEXT("%s Daemon Setting","FTP")."</legend>
+		<div style='margin: 5px;'>
+		<table class='tbox_t'>
+		<tr>
+		<td class='tbox_tdl'>TCP Port:</td>
+		<td class='tbox_tdc'><input id='ftp_port' type='text' class='tbox_i' value='{$_DATA_FTP['PORT']}' /></td>
+		<td class='tbox_tdr'>"._GETTEXT("This is the TCP port number used to access %s service. It defaults to TCP port %d. You can change it to %d or any value between %d and %d","FTP",5053,21,1024,65535)."</td>
+		</tr>
+		<tr>
+		<tr><td colspan='3'><br /></td></tr>
+		</tr>
+		<tr>
+		<td class='tbox_tdl'>"._GETTEXT("Session Idle Timeout:")."</td>
+		<td class='tbox_tdc'><input id='ftp_timeout' type='text' class='tbox_i' value='{$_DATA_FTP['TIMEOUT']}' /></td>
+		<td class='tbox_tdr'>"._GETTEXT("This specifies the number of seconds after which an idle will timeout.")."</td>
+		</tr>
+		<tr><td colspan='3'><br /></td></tr>
+		<tr>
+		<td class='tbox_tdl'><input id='ftp_ssl' type='checkbox' "._CGI_CHECKBOX_VAL($_DATA_FTP['SSL'])."</td>
+		<td class='tbox_tdc' style='padding: 5px 0px 0px 2px;'>Enable secure connection</td>
+		<td class='tbox_tdr'>"._GETTEXT("When this option enabled. You can connect to FTP daemon using explicit TLS/SSL connection.")."</td>
+		</tr>
+		</table>
+		<hr />
+		"._CGI_BUTTON_APPLY("button_{$_ftp_bid}2")."
+		</div>
+		</fieldset>
+
+		<script type='text/javascript'>
+			\$(document).ready(function() {
+				\$('#ftp_pass1').click(function() {
+					\$('#ftp_pass1').attr('value','');
+				});
+				\$('#ftp_pass2').click(function() {
+					\$('#ftp_pass2').attr('value','');
+				});
+				var _ftp_user0=\$.trim(\$('#ftp_user').val());
+				if(is_null(_ftp_user0)) {
+					_ftp_user0='ftpuser';
+					\$('#ftp_user').val(_ftp_user0);
+				}
+				\$('#button_{$_ftp_bid}1').click(function() {
+					if(!__tnpage.is_admin()) {
+						return false;
+					}
+					var _ftp_user=\$.trim(\$('#ftp_user').val()) || 'ftpuser';
+					var _ftp_pass1=\$.trim(\$('#ftp_pass1').val());
+					var _ftp_pass2=\$.trim(\$('#ftp_pass2').val());
+					if(is_null(_ftp_user) && !is_null(_ftp_user0)) {
+						_ftp_user=_ftp_user0;
+					}
+					if((!is_null(_ftp_pass1) && !is_null(_ftp_pass2)) && is_same(_ftp_pass1,_ftp_pass2)) {
+						_data='_update_data=acl_passwd&_pass='+_ftp_pass2+'&_access='+_ftp_user+'&_cmd=ftp';
+						__tnpage.data_update(_data);
+						return true;
+					} else {
+						if(!is_same(_ftp_pass1,_ftp_pass2)) {
+							__tndialog.ebox('"._GETTEXT("Password for %s access not match","ftp")."');
+							return false;
+						}
+					}
+					__tndialog.ebox('"._GETTEXT("Entered values is syntactically or logically incorrect")."');
+					return false;
+				});
+
+				\$('#ftp_port').click(function() {
+					\$('#ftp_port').attr('value','');
+				});
+				\$('#ftp_timeout').click(function() {
+					\$('#ftp_timeout').attr('value','');
+				});
+				\$('#button_{$_ftp_bid}2').click(function() {
+					if(!__tnpage.is_admin()) {
+						return false;
+					}
+					var _ftp_port=\$.trim(\$('#ftp_port').val()) || 5053;
+					var _ftp_timeout=\$.trim(\$('#ftp_timeout').val()) || 300;
+					var _ftp_ssl=\$('#ftp_ssl:checked').length;
+					if(!is_num(_ftp_port) || (_ftp_port!=21 && _ftp_port < 1024) || _ftp_port > 65535) {
+						__tndialog.sbox('"._GETTEXT("Invalid TCP Port")." '+_ftp_port);
+						return false;
+					}
+					if(!is_num(_ftp_timeout)) {
+						__tndialog.sbox('"._GETTEXT("Invalid timeout")." '+_ftp_timeout);
+						return false;
+					}
+					_data='_update_data=2&_sec=system&_secf=system&_id=service_ftp&_eq=ftp_restart,policy_admin&_data[TIMEOUT]='+_ftp_timeout+'&_data[PORT]='+_ftp_port+'&_data[SSL]='+_ftp_ssl;
+					__tnpage.data_update(_data);
+					return true;
+				});
+			});
+		</script>
+	";
+	
+	$_console_bid=_CGI_ATTR_KEY();
+	/*$_page .="
+		<fieldset id='console' style='margin-top: 20px; display: none;'>
+		<legend>"._GETTEXT("Console Access Password")."</legend>
+		<div style='margin: 5px;'>
+		<table class='tbox_t'>
+		<tr>
+		<td class='tbox_tdl'>"._GETTEXT("Console Password:")."</td>
+		<td class='tbox_tdc'><input type='password' id='console_pass1' class='tbox_i' value='' /></td>
+		<th rowspan=3 class='tbox_tdr'>"._GETTEXT("This is an access setting for console access. Leaving a fields empty will preserve the existing setting.")."</th>
+		</tr>
+		<tr>
+		<td class='tbox_tdl'>"._GETTEXT("Repeat:")."</td>
+		<td class='tbox_tdc'><input type='password' id='console_pass2' class='tbox_i' value='' /></td>
+		</tr>
+
+		</table>
+		<hr />
+		"._CGI_BUTTON(array('id'=>"button_{$_console_bid}1",'text'=>'Set specified passwords','css'=>'width: 180px;'))."
+
+		</div>
+		</fieldset>
+	";*/
+	if(_CGI_IS_ADMIN()) {
+		$_page .="
+			<fieldset id='console' style='margin-top: 20px; display: none;'>
+			<legend>"._GETTEXT("Web Terminal Setting")."</legend>
+			<div style='margin: 5px;'>
+			<table class='tbox_t'>
+			<tr>
+			<td class='tbox_tdl'><input id='console_terminal' type='checkbox' "._CGI_CHECKBOX_VAL($_DATA['ANYTERM'])."</td>
+			<td class='tbox_tdc' style='padding: 5px 0px 0px 2px; width: 150px;''>"._GETTEXT("Enable Web Terminal")."</td>
+			<td class='tbox_tdr'>"._GETTEXT("When this option enabled. You can connect to console thru %s.","WebGui")."</td>
+			</tr>
+
+			</table>
+			<hr />
+			"._CGI_BUTTON_APPLY("button_{$_console_bid}2")."
+
+			</div>
+			</fieldset>
+		";
+	}
+	$_page .="
+		</div>
+
+		<script type='text/javascript'>
+			\$(document).ready(function() {
+				/*\$('#console_pass1').click(function() {
+					\$('#console_pass1').attr('value','');
+				});
+				\$('#console_pass2').click(function() {
+					\$('#console_pass2').attr('value','');
+				});
+				\$('#button_{$_console_bid}1').click(function() {
+					if(!__tnpage.is_admin()) {
+						return false;
+					}
+					var _console_pass1=\$.trim(\$('#console_pass1').val());
+					var _console_pass2=\$.trim(\$('#console_pass2').val());
+					if((!is_null(_console_pass1) && !is_null(_console_pass2)) && is_same(_console_pass1,_console_pass2)) {
+						var _data='_update_data=acl_passwd&_pass='+_console_pass2+'&_cmd=console&_access=console';
+						__tnpage.data_update(_data);
+						return true;
+					} else {
+						if(!is_same(_console_pass1,_console_pass2)) {
+							__tndialog.ebox('"._GETTEXT("Password for %s access not match","Console")."');
+							return false;
+						}
+					}
+					__tndialog.ebox('"._GETTEXT("Entered values is syntactically or logically incorrect")."');
+					return false;
+				});*/
+	";
+	if(_CGI_IS_ADMIN()) {
+		$_page .="
+				\$('#button_{$_console_bid}2').click(function() {
+					var _console_terminal=\$('#console_terminal:checked').length;
+					_data='_update_data=2&_sec=system&_secf=system&_id=system&_eq=anyterm_restart&_data[ANYTERM]='+_console_terminal;
+					__tnpage.data_update(_data, function() {
+						__service_depend_status['anyterm']=_console_terminal;
+						__tnpage.anyterm();
+					});
+					return true;
+				});
+		";
+	}
+	$_page .="
+			});
+
+			\$(document).ready(function() {
+				var _ssh_button1='{$_ssh_bid}1';
+				var _ssh_button2='{$_ssh_bid}2';
+				var _ftp_button1='{$_ftp_bid}1';
+				var _ftp_button2='{$_ftp_bid}2';
+				var _imgoff='{$_ICON_ONOFF[0]}';
+				var _imgon='{$_ICON_ONOFF[1]}';
+				var _stat_array={'ssh': {$_DATA_SSH['STAT']}, 'ftp': {$_DATA_FTP['STAT']}};
+				var _stat_onoff=function(stat) {
+					if(stat==1) {
+						\$('div.fbox_c td#daemon_stat img').attr({'src': _imgon});
+						\$('div.fbox_c div#button_stat').text('Disable').attr('title','"._GETTEXT("Disable this daemon")."');
+					} else {
+						\$('div.fbox_c td#daemon_stat img').attr({'src': _imgoff});
+						\$('div.fbox_c div#button_stat').text('Enable').attr('title','"._GETTEXT("Enable this daemon")."');
+					}
+				};
+				\$('div.fbox_c select').change(function() {
+					var _pid=$(this).attr('value');
+					\$('div.fbox_c fieldset').hide().filter(function() {
+						\$('fieldset[id='+_pid+']').show();
+					});
+					if(_pid==='ssh' || _pid==='ftp') {
+						\$('div.fbox_c td#daemon_stat').show().filter(function() {
+							_stat_onoff(_stat_array[_pid]);
+						});
+					} else {
+						\$('div.fbox_c td#daemon_stat').hide();
+					}
+				});
+				\$('div.fbox_c div#button_stat').click(function() {
+					var _cstat=\$.trim(\$(this).text());
+					var _ename=\$('div.fbox_c select').attr('value');
+					var _data='_update_data=2&_sec=system&_secf=system&_id=service_'+_ename+'&_eq='+_ename+'_restart';
+					if(_cstat==='Enable') {
+						_stat_onoff(1);
+						_data +='&_data[STAT]=1&_msg='+base64_encode('"._GETTEXT("Enabling daemon, please wait")."');
+						__tnpage.data_update(_data,function() {
+							_stat_array[_ename]=1;
+						});
+					} else {
+						_stat_onoff(0);
+						_data +='&_data[STAT]=0&_msg='+base64_encode('"._GETTEXT("Disabling daemon, please wait")."');
+						__tnpage.data_update(_data,function() {
+							_stat_array[_ename]=0;
+						});
+					}
+				});
+			});
+		</script>
+	";
+	return trim($_page);
+}
+?>

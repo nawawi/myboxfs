@@ -1,0 +1,268 @@
+#!/bin/bash -e
+trap "exit 1" 2;
+
+# checking
+if [ "x$_START" = "x" ]; then
+        echo "_START not set";
+	exit 1;
+fi
+if [ "x$_MK" = "x" ]; then
+        echo "_MK not set";
+	exit 1;
+fi
+if [ "x$_MYV" = "x" ]; then
+	echo "_MYV not set";
+	exit 1;
+fi
+if [ ! -f "$_FUNC/functions.sh" ]; then
+	echo "_FUNC not set";
+	exit 1;
+fi
+
+cd $_START;
+
+. $_FUNC/functions.sh
+
+_BUILD_MSG "Kernel";
+
+# setting
+_KERNEL_ONLY=0;
+
+_CONFIG="$_START/src/kernel/configs/config.kernel"
+_RELV=$(date +"%y.%m")
+_SOURCE=$_START/src/kernel/kernel
+_TMP_DIR=$_START/kernel_tmp
+_REL_DIR=$_START/kernel_pkg
+
+if [ ! -d "$_SOURCE" ]; then
+	_ERROR "$_SOURCE not found";
+fi
+
+if [ ! -f "$_CONFIG" ]; then
+	_ERROR "$_CONFIG not found";
+fi
+
+if [ -n "$2" -a "$2" = "test" ]; then
+	echo "--> KERNEL ONLY <--";
+	_KERNEL_ONLY=1;
+fi
+
+cd $_START;
+
+_MYBOX_UTS="
+#undef UTS_SYSNAME
+#define UTS_SYSNAME \"MyboxOS\"
+#undef UTS_VERSION
+#define UTS_VERSION \"v$_MYV\"
+#undef LINUX_COMPILE_BY
+#define LINUX_COMPILE_BY \"nawawi\"
+#undef LINUX_COMPILE_HOST 
+#define LINUX_COMPILE_HOST \"devel.mybox.net.my\"
+#undef LINUX_COMPILE_DOMAIN
+#define LINUX_COMPILE_DOMAIN \"mybox.net.my\"
+#undef UTS_MACHINE
+#define UTS_MACHINE \"i386\"
+#undef LINUX_COMPILER
+#define LINUX_COMPILER \"gcc version 4.3.0\"
+"
+
+rm -rf $_TMP_DIR
+rm -rfv $_REL_DIR/*
+mkdir -p $_TMP_DIR
+mkdir -p $_REL_DIR
+
+cd $_SOURCE
+make distclean
+make clean
+make mrproper
+sync
+cat $_CONFIG > $_SOURCE/.config
+echo "$_MYBOX_UTS" > $_SOURCE/include/linux/mybox.h
+sync
+make oldconfig
+
+export CFLAGS="-mregparm=3"
+
+#make -j2 CC="distcc gcc" INSTALL_MOD_PATH=$_TMP_DIR
+#make -j2 CC="distcc gcc" INSTALL_MOD_PATH=$_TMP_DIR modules_install
+make V=1 INSTALL_MOD_PATH=$_TMP_DIR
+make V=1 INSTALL_MOD_PATH=$_TMP_DIR modules_install
+make V=1 INSTALL_FW_PATH=$_TMP_DIR/lib/firmware firmware_install
+cd $_START
+
+K_VER=$(ls $_TMP_DIR/lib/modules)
+if [ -f "$_SOURCE/arch/i386/boot/bzImage" ]; then
+	cp -v $_SOURCE/arch/i386/boot/bzImage $_REL_DIR/mybox-kernel.bin
+	du -hc $_REL_DIR/$KVER
+fi
+
+if [ ! -d "$_TMP_DIR/lib/modules/$K_VER/kernel" ]; then
+	echo "Compiling kernel failed"
+	exit
+fi
+
+
+cd $_START
+
+rm -fv $_TMP_DIR/lib/modules/$K_VER/build 
+rm -fv $_TMP_DIR/lib/modules/$K_VER/source
+rm -fv $_TMP_DIR/lib/modules/$K_VER/modules.ccwmap
+rm -fv $_TMP_DIR/lib/modules/$K_VER/modules.ieee1394map
+rm -fv $_TMP_DIR/lib/modules/$K_VER/modules.inputmap
+rm -fv $_TMP_DIR/lib/modules/$K_VER/modules.isapnpmap
+
+cd $_TMP_DIR
+
+# ppp/pptp modules
+find lib/modules/*/kernel/drivers/net/ppp* -name '*.ko' >> lib/modules/ppp.txt
+find lib/modules/*/kernel/drivers/net/* -name 'slhc.ko' >> lib/modules/ppp.txt
+find lib/modules/*/kernel/drivers/net/* -name 'slip.ko' >> lib/modules/ppp.txt
+tar -cvf $_REL_DIR/kmods_ppp.tar \
+lib/modules/ppp.txt \
+lib/modules/$K_VER/kernel/drivers/net/slhc.ko \
+lib/modules/$K_VER/kernel/drivers/net/slip.ko \
+lib/modules/$K_VER/kernel/drivers/net/ppp* |sort
+_LZMA_COMPRESS $_REL_DIR/kmods_ppp.tar $_REL_DIR/kmods_ppp.mpk
+rm -rfv lib/modules/$K_VER/kernel/drivers/net/ppp*
+rm -rfv lib/modules/$K_VER/kernel/drivers/net/slhc.ko
+rm -rfv lib/modules/$K_VER/kernel/drivers/net/slip.ko
+rm -fv lib/modules/ppp.txt
+
+# ipv4/iptables
+tar -cvf $_REL_DIR/kmods_ipv4.tar lib/modules/$K_VER/kernel/net/ipv4 lib/modules/$K_VER/kernel/net/netfilter |sort
+_LZMA_COMPRESS $_REL_DIR/kmods_ipv4.tar $_REL_DIR/kmods_ipv4.mpk
+rm -rfv lib/modules/$K_VER/kernel/net/ipv4 lib/modules/$K_VER/kernel/net/netfilter
+
+# ipvs
+tar -cvf $_REL_DIR/kmods_ipvs.tar lib/modules/$K_VER/kernel/net/ipv4/ipvs |sort
+_LZMA_COMPRESS $_REL_DIR/kmods_ipvs.tar $_REL_DIR/kmods_ipvs.mpk
+rm -rfv lib/modules/$K_VER/kernel/net/ipv4/ipvs
+
+# ipv6/iptables
+tar -cvf $_REL_DIR/kmods_ipv6.tar lib/modules/$K_VER/kernel/net/ipv6 |sort
+_LZMA_COMPRESS $_REL_DIR/kmods_ipv6.tar $_REL_DIR/kmods_ipv6.mpk
+rm -rfv lib/modules/$K_VER/kernel/net/ipv6
+
+# bridge
+tar -cvf $_REL_DIR/kmods_bridge.tar lib/modules/$K_VER/kernel/net/bridge |sort
+_LZMA_COMPRESS $_REL_DIR/kmods_bridge.tar $_REL_DIR/kmods_bridge.mpk
+rm -rfv lib/modules/$K_VER/kernel/net/bridge
+
+# crypto
+tar -cvf $_REL_DIR/kmods_crypto.tar lib/modules/$K_VER/kernel/crypto lib/modules/$K_VER/kernel/arch/x86/crypto |sort
+_LZMA_COMPRESS $_REL_DIR/kmods_crypto.tar $_REL_DIR/kmods_crypto.mpk
+rm -rfv lib/modules/$K_VER/kernel/crypto lib/modules/$K_VER/kernel/arch/x86/crypto
+
+# hw_random
+tar -cvf $_REL_DIR/kmods_hwrandom.tar lib/modules/$K_VER/kernel/drivers/char/hw_random |sort
+_LZMA_COMPRESS $_REL_DIR/kmods_hwrandom.tar $_REL_DIR/kmods_hwrandom.mpk
+rm -rfv lib/modules/$K_VER/kernel/drivers/char/hw_random
+
+# fs ntfs+vfat+fat+msdos
+tar -cvf $_REL_DIR/kmods_fsnt.tar \
+lib/modules/$K_VER/kernel/fs/fat \
+lib/modules/$K_VER/kernel/fs/vfat \
+lib/modules/$K_VER/kernel/fs/msdos \
+lib/modules/$K_VER/kernel/fs/ntfs |sort
+_LZMA_COMPRESS $_REL_DIR/kmods_fsnt.tar $_REL_DIR/kmods_fsnt.mpk
+rm -rfv lib/modules/$K_VER/kernel/fs/fat
+rm -rfv lib/modules/$K_VER/kernel/fs/vfat
+rm -rfv lib/modules/$K_VER/kernel/fs/msdos
+rm -rfv lib/modules/$K_VER/kernel/fs/ntfs
+
+# fs
+tar -cvf $_REL_DIR/kmods_fs.tar lib/modules/$K_VER/kernel/fs |sort
+_LZMA_COMPRESS $_REL_DIR/kmods_fs.tar $_REL_DIR/kmods_fs.mpk
+rm -rfv lib/modules/$K_VER/kernel/fs
+
+# Qos
+tar -cvf $_REL_DIR/kmods_qos.tar lib/modules/$K_VER/kernel/net/sched |sort
+_LZMA_COMPRESS $_REL_DIR/kmods_qos.tar $_REL_DIR/kmods_qos.mpk
+rm -rfv lib/modules/$K_VER/kernel/net/sched
+
+# scsi modules
+find lib/modules/*/kernel/drivers/scsi -name '*.ko' >> lib/modules/scsi.txt
+find lib/modules/*/kernel/drivers/message/fusion/mpt* -name '*.ko' >> lib/modules/scsi.txt
+tar -cvf $_REL_DIR/kmods_scsi.tar \
+lib/modules/scsi.txt \
+lib/modules/$K_VER/kernel/drivers/scsi \
+lib/modules/$K_VER/kernel/drivers//message/fusion/mpt* |sort
+_LZMA_COMPRESS $_REL_DIR/kmods_scsi.tar $_REL_DIR/kmods_scsi.mpk
+rm -rfv lib/modules/$K_VER/kernel/drivers/scsi
+rm -rfv lib/modules/$K_VER/kernel/drivers/message/fusion/mpt*
+rm -fv  lib/modules/scsi.txt
+
+# usb modules
+find lib/modules/*/kernel/drivers/usb/* -name '*.ko' >> lib/modules/usb.txt
+tar -cvf $_REL_DIR/kmods_usb.tar lib/modules/usb.txt lib/modules/$K_VER/kernel/drivers/usb |sort
+_LZMA_COMPRESS $_REL_DIR/kmods_usb.tar $_REL_DIR/kmods_usb.mpk
+rm -rfv lib/modules/$K_VER/kernel/drivers/usb
+rm -fv lib/modules/usb.txt
+
+# lcd modules
+find lib/modules/*/kernel/drivers/net/* -name 'mii.ko' >> lib/modules/lcd.txt
+find lib/modules/*/kernel/drivers/net/* -name 'hamachi.ko' >> lib/modules/lcd.txt
+find lib/modules/*/kernel/drivers/parport/* -name '*.ko' >> lib/modules/lcd.txt
+tar -cvf $_REL_DIR/kmods_lcd.tar \
+lib/modules/lcd.txt \
+lib/modules/$K_VER/kernel/drivers/net/mii.ko \
+lib/modules/$K_VER/kernel/drivers/net/hamachi.ko \
+lib/modules/$K_VER/kernel/drivers/parport/* |sort
+_LZMA_COMPRESS $_REL_DIR/kmods_lcd.tar $_REL_DIR/kmods_lcd.mpk
+rm -rfv lib/modules/$K_VER/kernel/drivers/parport/*
+rm -rfv lib/modules/$K_VER/kernel/drivers/net/mii.ko
+rm -rfv lib/modules/$K_VER/kernel/drivers/net/hamachi.ko
+rm -fv lib/modules/lcd.txt
+
+# nic modules
+find lib/modules/*/kernel/drivers/net/* -name '*.ko' >> lib/modules/nic.txt
+tar -cvf $_REL_DIR/kmods_nic.tar \
+lib/modules/nic.txt \
+lib/modules/$K_VER/kernel/drivers/net |sort
+_LZMA_COMPRESS $_REL_DIR/kmods_nic.tar $_REL_DIR/kmods_nic.mpk
+rm -rfv lib/modules/$K_VER/kernel/drivers/net
+rm -fv lib/modules/nic.txt
+
+# base
+tar -cvf $_REL_DIR/kmods_firmware.tar lib/firmware |sort
+_LZMA_COMPRESS $_REL_DIR/kmods_firmware.tar $_REL_DIR/kmods_firmware.mpk
+rm -fv $_REL_DIR/kmods_firmware.tar
+rm -rfv lib/firmware
+
+# base
+tar -cvf $_REL_DIR/kmods_base.tar lib |sort
+_LZMA_COMPRESS $_REL_DIR/kmods_base.tar $_REL_DIR/kmods_base.mpk
+rm -fv $_REL_DIR/kmods_base.tar
+rm -rfv lib
+
+cd $_START;
+echo "_VER=$_MYV" >MYBOX_VERSION
+echo "_FIRM=$_RELV" >>MYBOX_VERSION
+
+[ -n "$_KERNEL_ONLY" -a "$_KERNEL_ONLY" = "1" ] && exit;
+
+if [ -f "$_MK/mk_iptables" ]; then
+	sh $_MK/mk_iptables;
+fi
+
+cd $_START;
+if [ -f "$_MK/mk_keymaps" ]; then
+	sh $_MK/mk_keymaps;
+fi
+
+cd $_START;
+if [ -f "$_MK/mk_zoneinfo" ]; then
+	sh $_MK/mk_zoneinfo;
+fi
+
+cd $_START;
+if [ -f "$_MK/mk_locale" ]; then
+	sh $_MK/mk_locale;
+fi
+
+cd $_START;
+cp -v $_SOURCE/System.map $_REL_DIR;
+
+cd $_START;
+rm -rf $_TMP_DIR
+exit 0;

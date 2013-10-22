@@ -1,0 +1,1004 @@
+#!/bin/sh
+# +-------------------------------------------------------------------------------------+
+# | Copyright (c) 2002-2009 Tracenetwork Corporation Sdn. Bhd.           		|
+# +-------------------------------------------------------------------------------------+
+# | This source file is belongs to nawawi, the author.                    		|
+# | Any changes/use of the source, please email to the author.           		|
+# +-------------------------------------------------------------------------------------+
+# | Authors: nawawi, Mohd nawawi Mohamad Jamili <nawawi@tracenetworkcorporation.com	|
+# +-------------------------------------------------------------------------------------+
+#
+# $Id: rc.init.sh,v 7.0 2008/01/21 03:29:00 nawawi Exp $
+# $Id: rc.init.sh,v 7.1 2009/02/27 16:00:00 nawawi Exp $
+
+trap : 1 2 3 15;
+PATH="/bin";
+[ "x$TERM" = "x" ] && TERM=linux;
+export PATH TERM;
+umask 006;
+cd /;
+__SPACE="                                       ";
+_LOG="/dev/tty2";
+
+_BASENAME() {
+        local name="${1##*/}";
+        local opt="$2";
+        [ -n "$opt" ] && name="${name%.$opt}";
+        echo "${name%$2}";
+}
+
+_DIRNAME() {
+        local dir="${1%${1##*/}}";
+        [ "${dir:=./}" != "/" ] && dir="${dir%?}";
+        echo "$dir";
+}
+
+_STRSTR() {
+        [ "$1" = "$2" ] && return 0;
+        local slice="${1#*$2*}";
+        [ "$slice" = "$1" ] && return 1;
+        return 0;
+}
+
+
+_ERROR() {
+        local msg=$@;
+	echo "[ERROR] $msg";
+	sleep 1;
+}
+
+
+_EXECQ() {
+	local cmd=$@;
+	if [ -w "$_LOG" ]; then
+		echo "[EXEC] $cmd" >> $_LOG;
+		$cmd &>$_LOG;
+		return $?;
+	fi
+	$cmd &>/dev/null;
+}
+
+_MKDIR() {
+	local _dir="$@";
+	_EXECQ "mkdir -p $_dir";
+	return $?;
+}
+
+_YESNO() {
+	local _prompt="$1";
+	local _ANS="";
+        read -p "${_prompt} [yes/no]: " _ANS;
+        while [ "$_ANS" != "yes" ] && [ "$_ANS" != "no" ]; do
+                read -p "Please enter 'yes' or 'no': " _ANS;
+        done
+        [ "$_ANS" = "yes" ] && return 0;
+        return 1;
+}
+
+_UMOUNT() {
+	local _m;
+	for _m in CDROM cachefs logfs strg boot; do
+		_EXECQ "umount $_m";
+	done
+}
+
+_ABORT() {
+	echo "";
+	echo "[ABORT] Installation aborted";
+	_UMOUNT;
+	[ -w "/dev/cdrom" ] && _EXECQ "eject /dev/cdrom";
+	_EXECQ "/bin/reboot -d 5";
+	exit 0;
+}
+
+
+####################################################################
+# RC.BOOTUP START
+####################################################################
+# ramdisk
+_RAMSIZE=0;
+_DEFAULTSIZE=65536;
+_MINLEFT=16000;
+# 200M for filesystem
+#_MINMEM=204800;
+# 100M for filesystem
+_MINMEM=102400;
+
+_CALCULATE_MEM() {
+	local _TOTALMEM _PM _FOUNDMEM;
+	if [ -r "/proc/meminfo" ]; then
+		_FOUNDMEM="$(awk '/MemTotal/{print $2}' /proc/meminfo)";
+		_TOTALMEM="$(awk 'BEGIN{m=0};/MemFree|Cached/{m+=$2};END{print m}' /proc/meminfo)";
+	fi
+	if [ -z "$_FOUNDMEM" -o "$_FOUNDMEM" = 0 ]; then
+		_ERROR "MEMORY COUNTING FAILED";
+		exit 1;
+	fi
+	
+	if [ "$_FOUNDMEM" -lt "$_MINMEM" ]; then
+		_ERROR "NOT ENOUGH MEMORY $_FOUNDMEM kB ($(( $_FOUNDMEM / 1024 )) MB), YOU NEED AT LEAST $(( $_MINMEM / 1024 ))MB";
+		exit 1;
+	fi
+
+        echo "Total memory found: $_FOUNDMEM kB ($(( $_FOUNDMEM / 1024 )) MB)";
+	
+	_RAMSIZE="$(( $_TOTALMEM / 5))";
+
+	if [ -n "$_TOTALMEM" -a "$_TOTALMEM" -gt "$_MINLEFT" ]; then
+		[ -z "$_RAMSIZE" -o "$_RAMSIZE" -lt "0" ] && _RAMSIZE=$_DEFAULTSIZE;
+		_RAMSIZE="$(( $_RAMSIZE * 4 ))";
+	fi
+}
+
+
+_STAGE1() {
+	_EXECQ "mount -t proc -o ro virtual /proc";
+	_EXECQ "mount -t sysfs -o ro virtual /sys";
+	_CALCULATE_MEM;
+	echo "Creating filesystem ($_RAMSIZE kB) on virtual memory.";
+	_EXECQ "mount -t tmpfs -o "rw,size=${_RAMSIZE}k" virtual /ramd";
+	_EXECQ "chmod 700 /ramd";
+	cd /ramd;
+	local _DIR;
+	for _DIR in /*; do
+		case $_DIR in 
+			/lost+found|/ramd|/proc|/dev|/sys) continue;; 
+			*) cp -dpR $_DIR /ramd/ ;; 
+		esac 
+	done
+	_MKDIR "dev/pts dev/shm initrd";
+	_EXECQ "umount /proc";
+	_EXECQ "umount /sys";
+}
+
+_STAGE2() {
+	cd /ramd;
+	pivot_root . initrd;
+	cd /;
+	_MKDIR "proc sys";
+	_EXECQ "mount -t proc -o rw,noexec,nosuid,nodev virtual /proc";
+	_EXECQ "mount -t sysfs -o rw,noexec,nosuid,nodev virtual /sys";
+	[ -w "/proc/sys/kernel/printk" ] && echo "0 0 0 0" > /proc/sys/kernel/printk;
+	[ -w "/proc/sys/kernel/hotplug" ] && echo "/bin/mdev" > /proc/sys/kernel/hotplug;
+	[ -w "/proc/sys/kernel/modprobe" ] && echo "/bin/modprobe" > /proc/sys/kernel/modprobe;
+	local _PKG;
+	echo -n ">> Extracting base tools: ";
+	for _PKG in /tmp/*.mpk;do
+		tar -C / -axf $_PKG;
+		echo -n "#"; usleep 0; wait;
+	done
+	echo -n -e "\rExtracting base tools. Done.${__SPACE}\n";
+	_EXECQ "depmod -a";wait;
+	_EXECQ "mdev -s";wait;
+	_EXECQ "mount -t tmpfs -o rw,noexec,nosuid,nodev virtual /dev/shm";
+	_EXECQ "mount -t devpts -o \"rw,gid=0,mode=620\" virtual /dev/pts";
+}
+
+_STAGE3() {
+	cd /;
+	echo "::sysinit:/bin/rcinit" >/etc/inittab;
+	echo "tty1::once:/bin/iowrap /dev/tty1 /bin/rcinstall" >>/etc/inittab;
+	echo "tty2::respawn:/bin/iowrap $_LOG /bin/nolog" >>/etc/inittab;
+	echo "tty3::askfirst:/bin/iowrap /dev/tty3 /bin/sh" >>/etc/inittab;
+	echo "::restart:/bin/init" >>/etc/inittab;
+	echo "::ctrlaltdel:/bin/bootdown" >>/etc/inittab;
+	echo "::ctrlaltdel:/bin/reset" >>/etc/inittab;
+	echo "::ctrlaltdel:/bin/reboot" >>/etc/inittab;
+	exec chroot . /bin/init < /dev/console > /dev/console 2>&1;
+	_ERROR "Failed to boot file system.\nPress Ctrl+Alt+Del or switch off/on for reboot.";
+	read _PRESS;
+	exit 1;
+}
+
+_MAIN_BOOTUP() {
+	_STAGE1;
+	_STAGE2;
+	_STAGE3;
+}
+
+####################################################################
+# RC.BOOTUP END
+# RC.INIT START
+####################################################################
+_HDSIZE_MIN="10";
+_HDSIZE_UNIT="GB TB";
+_BOOT_SIZE="130M";
+_SWAP_SIZE="1024M";
+_STRG_SIZE="5G";
+_CACHE_SIZE="2G";
+
+_RC_INIT() {
+	echo "0 0 0 0" > /proc/sys/kernel/printk;
+	echo "MYBOXOS" > /proc/sys/kernel/hostname;
+	_EXECQ "blockdev --flushbufs /dev/ram0";
+	_EXECQ "umount /initrd/sys";wait;
+	_EXECQ "umount /initrd";wait;
+	_EXECQ "rm -rf /initrd /bootup";
+	echo -e '#!/bin/sh\necho "sys"\nexit 0;' > /bin/groups;
+	_EXECQ "chmod 700 /bin/groups";
+}
+
+
+_RC_HWDETECT() {
+	local _b;
+	echo -n ">> Checking hardware drivers.";
+	/etc/installer/rc.hwdetect;
+	# earlier probe
+	if [ -f "/var/spool/modules/moduleslist" ]; then
+		_b="$(cat /var/spool/modules/moduleslist)";
+		for f in $_b; do
+			_EXECQ "modprobe -q $f";
+			echo -n ".";
+			usleep 0; wait;
+		done
+		echo -e -n "\rChecking hardware drivers. Done.${__SPACE}\n";
+	fi
+	echo -n ">> Loading hardware drivers.";
+	/etc/installer/rc.hwdetect;
+	if [ -f "/var/spool/modules/moduleslist" ]; then
+		_b="$(cat /var/spool/modules/moduleslist)";
+		for f in $_b; do
+			_EXECQ "modprobe -q $f";
+			echo -n ".";
+			usleep 0; wait;
+		done
+		echo -e -n "\rLoading hardware drivers. Done.${__SPACE}\n";
+	fi
+	# create device incase hotplug failed
+	_EXECQ "mdev";
+	return 0;
+}
+
+_RC_CHECK_NETWORK() {
+        local NET_DEVICE=$(awk -F: '/eth.:/{print $1}' /proc/net/dev);
+        if [ -n "$NET_DEVICE" ]; then
+		_MKDIR "/var/sys";
+                echo -n "Checking network interfaces: ";
+                for x in $NET_DEVICE; do
+                        _EXECQ "ip link set $x up";
+                        if [ $? = 0 ]; then
+                                echo -n "$x ";
+				[ ! -f "/var/sys/nic" ] && echo "$x" > /var/sys/nic;
+                                _EXECQ "ip link set $x down";
+                        fi
+                done
+                _EXECQ "ip route flush cache";
+                _EXECQ "ip route flush table main";
+                echo "";
+        else
+                _ERROR "No network device found";
+                exit 1;
+        fi
+}
+
+_MAIN_INIT() {
+	_RC_INIT;
+	_RC_HWDETECT;
+	_RC_CHECK_NETWORK;
+}
+
+####################################################################
+# RC.INIT END
+# RC.INSTALL START
+####################################################################
+
+
+_RC_GETDISK_SIZE() {
+        local _dev _f _s _u;
+        _dev="$1";
+        _f=$(fdisk -l 2>/dev/null |grep ^Disk |grep $_dev);
+        if [ -n "$_f" ]; then
+                _s=$(printf "%.0f" $(echo "$_f" |awk '/:/{print $3}'));
+                _u=$(echo "$_f" |awk '/:/{print $4}' |tr -d ',');
+        fi
+        [ -n "$_s" -a -n "$_u" ] && echo "$_s $_u";
+}
+
+_RC_FINDCDROM() {
+	local _dev;
+	cd /sys/block;
+        for _dev in $(ls | egrep '^hd'); do
+		if [ "$(cat $_dev/device/media)" = "cdrom" ]; then
+			echo "/dev/$_dev";
+			ln -sf /dev/$_dev /dev/cdrom 2>/dev/null;
+			_MKDIR "/CDROM";
+			return 0;
+		fi
+	done
+	unset _dev;
+        for _dev in $(ls | egrep '^sd|^sr|^scd|^sg'); do
+		if [ "$(cat $_dev/device/type)" = "5" ]; then
+			echo "/dev/$_dev";
+			_MKDIR "/CDROM";
+			ln -sf /dev/$_dev /dev/cdrom 2>/dev/null;
+			return 0;
+		fi
+	done
+	cd /;
+	return 1;
+}
+
+_RC_CHECKCDROM() {
+	echo -n ">> Checking CDROM: ";
+	_CDROM=$(_RC_FINDCDROM);
+	if [ -n "$_CDROM" ]; then
+		echo -n -e "\rChecking cdrom device: found $_CDROM.${__SPACE}\n";
+	else
+		echo -n -e "\r[ERROR] cdrom device: no device found.${__SPACE}\n";
+		exit 1;
+	fi
+	if ! _EXECQ "mount $_CDROM /CDROM";then
+		_ERROR "Mounting cdrom device failed";
+		exit 1;
+	fi
+}
+
+_RC_FINDDISK() {
+	local _dev;
+	cd /sys/block;
+
+	for _dev in $(ls | egrep '^hd'); do
+		if [ "$(cat $_dev/device/media 2>/dev/null)" = "disk" ]; then
+			if [ "$(dmesg | grep sectors | grep $_dev)" ]; then
+                                echo "/dev/$_dev";
+				return 0;
+			fi
+		fi
+        done
+	unset _dev;
+	for _dev in $(ls | egrep '^sd'); do
+		if ! [ "$(cat $_dev/device/type 2>/dev/null)" = "5" ]; then
+			if [ "$(dmesg | grep sectors | grep $_dev)" ]; then
+				echo "/dev/$_dev";
+				return 0;
+			fi
+		fi
+	done
+	cd /;
+	return 1;
+}
+
+_RC_HDCHKSIZE() {
+	local _S _U _X _E;
+	_S="$1";_U="$2";
+	_E=1;
+	for _X in $_HDSIZE_UNIT; do
+		[ "$_U" = "$_X" ] && _E=0;
+	done
+	[ "$_S" -lt $_HDSIZE_MIN ] && _E=1;
+	if [ "$_E" = "1" ]; then
+		_ERROR "Not enough disk size ($_S$_U). Minimum requirred $_HDSIZE_MIN$_HDSIZE_UNIT";
+		exit 1;
+	fi
+}
+
+
+_RC_CHECKDISK() {
+	local _GS _S _U;
+
+	echo -n ">> Checking storage device: ";
+	_HDISK=$(_RC_FINDDISK);
+	if [ -n "$_HDISK" ]; then
+		_GS=$(_RC_GETDISK_SIZE "$_HDISK");
+		if [ -n "$_GS" ]; then
+        		_S=$(echo "$_GS" |cut -d ' ' -f 1);
+        		_U=$(echo "$_GS" |cut -d ' ' -f 2);
+			echo -n -e "\rChecking storage device: found $_HDISK ($_S$_U).${__SPACE}\n";
+			_RC_HDCHKSIZE "$_S" "$_U";
+		else
+			echo -n -e "\r[ERROR] Checking storage device: found $_HDISK (failed to get size).${__SPACE}\n";
+			exit 1;
+		fi
+	else
+		echo -n -e "\r[ERROR] Checking storage device: no device found.${__SPACE}\n";
+		exit 1;
+	fi
+}
+
+
+_RC_HDDEL() {
+	local _num;
+	local _dev="$1";
+	local _fd="$(fdisk -l 2>/dev/null |grep ^$_dev |awk '{print $1}' |sed -e 's/[A-Za-z\/]//g')";
+	if [ "x$_fd" != "x" ]; then
+		:>/tmp/fdisk;
+		for _num in $_fd;do
+			echo -e "d\n$_num" >>/tmp/fdisk;
+		done
+		echo "w" >>/tmp/fdisk;
+		fdisk $_dev < /tmp/fdisk &>$_LOG;
+		return $?;
+	fi
+	return 0;
+}
+
+_RC_INSTALL_SYSTEM() {
+	if _MKDIR "/strg/mybox/loopfs"; then
+		echo -n ">> Installing system: ";
+		for f in /CDROM/OS/*.mce; do
+			_EXECQ "cp -f $f /strg/mybox/loopfs";
+			echo -n "#";
+		done
+		for f in /CDROM/OS/*.bin; do
+			_EXECQ "cp -f $f /boot/";
+			echo -n "#";
+		done
+		echo -e -n "\rInstalling system. Done.${__SPACE}\n";
+		_MKDIR "/strg/mybox/tmp";
+	fi
+}
+
+_RC_INSTALL_END() {
+	_UMOUNT;
+	[ -w "/dev/cdrom" ] && _EXECQ "eject /dev/cdrom";
+	_EXECQ "/bin/reboot";
+}
+
+_IPTEST() {
+        case "$*" in
+                ""|*[!0-9.]*) return 1;;
+        esac;
+        local IFS=".";
+        set -- $*;
+        [ $# -eq 4 ] && [ ${1:-555} -le 255 ] && [ ${2:-555} -le 255 ] && [ ${3:-555} -le 255 ] && [ ${4:-555} -le 255 ];
+}
+
+_IP="192.168.100.1";
+_MASK="255.255.255.0";
+_GW="";
+_DGW=0;
+_CONSOLE_PASS="console123";
+_WEB_ADMIN="admin123";
+_WEB_LOOK="look123";
+_ACL_HOST="192.168.100.2";
+
+_RC_BASIC_SETUP_NETWORK() {
+	local ip mask gw;
+	read -p "Enter IP Address: " ip;
+	while ! _IPTEST $ip; do
+		echo "* Invalid IPv4 Address '$ip'!!";
+		read -p "Enter Ipv4 Address: " ip;
+	done
+	_IP="$ip";
+	read -p "Enter Netmask Address: " mask;
+	while ! _IPTEST $mask; do
+		echo "* Invalid netmask '$mask'!!";
+		read -p "Enter netmask: " mask;
+	done
+	_MASK="$mask";
+	read -p "Enter Gateway Address or none: " gw;
+	while [ "$gw" != "none" ] && ! _IPTEST $gw; do
+		echo "* Invalid Gateway Address '$gw'!!";
+		read -p "Enter netmask: " mask;
+	done
+	if [ "$gw" != "none" ]; then
+		_GW="$gw";
+		_DGW="1";
+	fi
+	echo "";
+}
+
+_RC_BASIC_SETUP_PASS() {
+	local pass1 pass2 pass3;
+	read -s -p "Enter Console password: " pass1;
+	while [ "x$pass1" = "x" ] || [ ${#pass1} -lt 6 ]; do
+		if [ ${#pass1} -lt 6 ]; then
+			echo -e "* You need at least 6 character!!\n";
+		else
+			echo -e "* Invalid Console password!!\n";
+		fi
+		read -p "Enter Console password: " pass1;
+	done
+	_CONSOLE_PASS="$pass1";
+	echo "";
+
+	read -s -p "Enter Web Admin password: " pass2;
+	while [ "x$pass2" = "x" ] || [ "$pass2" = "$pass1" ] || [ ${#pass2} -lt 6 ]; do
+		if [ ${#pass2} -lt 6 ]; then
+			echo -e "* You need at least 6 character!!\n";
+		elif [ "$pass2" = "$pass1" ]; then
+			echo -e "* Password already exist!!\n";
+		else
+			echo -e "* Invalid Web Admin password!!\n";
+		fi
+		read -p "Enter Web Admin password: " pass2;
+	done
+	_WEB_ADMIN="$pass2";
+	echo "";
+
+	read -p "Enter ACL Host IP Address: " pass3;
+	while ! _IPTEST $pass3; do
+		echo "* Invalid ACL Host IP Address '$pass3'!!";
+		read -p "Enter ACL Host IP Address: " pass3;
+	done
+	_ACL_HOST="$pass3";
+}
+
+_RC_BASIC_SETUP() {
+	local _NIC0 _ANS;
+	echo "";
+	echo "(*) Performing basic setting:";
+	_MKDIR "/strg/mybox";
+	_EXECQ "cp -a /etc/factory/registry /strg/mybox";
+	if [ -r "/var/sys/nic" ]; then
+		_NIC0="$(cat /var/sys/nic)";
+		if [ -n "$_NIC0" ]; then
+			if _YESNO "[*] Configure $_NIC0 IP Address?"; then
+				_RC_BASIC_SETUP_NETWORK;
+			fi
+			if [ ! -d "/strg/mybox/registry/network" ]; then
+				_MKDIR "/strg/mybox/registry/network";
+			fi
+			echo "ID=1" > /strg/mybox/registry/network/eth.cfg;
+			echo "NAME=default" >> /strg/mybox/registry/network/eth.cfg;
+			echo "DEVICE=$_NIC0" >> /strg/mybox/registry/network/eth.cfg;
+			echo "TYPE=static" >> /strg/mybox/registry/network/eth.cfg;
+			echo "ADDR=$_IP" >> /strg/mybox/registry/network/eth.cfg;
+			echo "MASK=$_MASK" >> /strg/mybox/registry/network/eth.cfg;
+			echo "MTU=1500" >> /strg/mybox/registry/network/eth.cfg;
+			echo "PROXYARP=0" >> /strg/mybox/registry/network/eth.cfg;
+			echo "DEFAULT=$_DGW" >> /strg/mybox/registry/network/eth.cfg;
+			echo "GATEWAY=$_GW" >> /strg/mybox/registry/network/eth.cfg;
+			echo "STAT=1" >> /strg/mybox/registry/network/eth.cfg;
+			echo "NOTE=Auto-created on installation" >> /strg/mybox/registry/network/eth.cfg;
+
+			echo "(*) Network interface";
+			echo "     DEVICE  : $_NIC0";
+			echo "     ADDRESS : $_IP";
+			echo "     NETMASK : $_MASK";
+			if [ "$_GW" != "" ]; then
+				echo "     GATEWAY : $_GW";
+			fi
+			echo "";
+		fi
+	fi
+	unset _ANS;
+	if [ -f "/strg/mybox/registry/system/system.cfg" ]; then
+		if _YESNO "[*] Configure system access password?"; then
+			_RC_BASIC_SETUP_PASS;
+		fi
+
+		echo "(*) Access password";
+		echo "     Console          : $_CONSOLE_PASS";
+		echo "     Web Access Admin : $_WEB_ADMIN";
+		echo "     ACL Host         : $_ACL_HOST";
+		echo "";
+		local _CPASS1 _CPASS2 _CPASS3;
+		_CPASS1="$(/bin/cryptpw $_CONSOLE_PASS)";
+		_CPASS2="$(/bin/cryptpw $_WEB_ADMIN)";
+		_CPASS3="$(/bin/cryptpw $_WEB_LOOK)";
+		sed -i -e "s|CONSOLE_PASSWD=.*|CONSOLE_PASSWD=$_CPASS1|g" /strg/mybox/registry/system/system.cfg;
+		sed -i -e "s|ADMIN=.*|ADMIN=$_CPASS2|g" /strg/mybox/registry/system/system.cfg;
+		sed -i -e "s|LOOK=.*|LOOK=$_CPASS3|g" /strg/mybox/registry/system/system.cfg;
+
+		if [ "x$_ACL_HOST" != "x" ]; then
+			[ ! -d "/strg/mybox/registry/definitions" ] && _MKDIR "/strg/mybox/registry/definitions";
+			echo -e "ID=1\nNAME=setup-host\nADDR=$_ACL_HOST" > /strg/mybox/registry/definitions/network_host.cfg;
+		fi
+	fi
+	echo "";
+	read -p "Installation is completed. Press any key to continue." _any;
+}
+
+_RC_DISK_FORMAT() {
+	local _dev="$1";
+	local _label="$2";
+	local _mount="$3";
+	local _fs="$4";
+
+	[ "x$_fs" = "x" ] && _fs="ext3";
+
+	if [ "$_fs" = "ext3" ]; then
+		echo -n ">> Formating device '${_dev}'..";
+		_EXECQ "mkfs.ext3 -L /${_label} -j ${_dev}";
+		if [ $? != 0 ]; then	
+			echo -e -n "\rFormating device '${_dev}'..failed.${__SPACE}\n";
+			exit 1;
+		fi
+		_EXECQ "tune2fs -c 0 -i 0 ${_dev}";
+		echo -e -n "\rFormating device '${_dev}'. Done.${__SPACE}\n";
+		_MKDIR "/${_mount}";
+		_EXECQ "mount LABEL=/${_label} /${_mount}";
+		if [ $? != 0 ]; then
+			_ERROR "Mounting ${_dev} failed";
+			exit 1;
+		fi
+		sleep 2;
+	elif [ "$_fs" = "reiserfs" ]; then
+		echo -n ">> Formating device '${_dev}'..";
+		yes | mkfs.reiserfs -l /${_label} "${_dev}" &>$_LOG;
+		if [ $? != 0 ]; then
+			echo -e -n "\rFormating device '${_dev}'..failed.${__SPACE}\n";
+			exit 1;
+		fi
+		echo -e -n "\rFormating device '${_dev}'. Done.${__SPACE}\n";
+		_MKDIR "/${_mount}";
+		_EXECQ "mount -t reiserfs LABEL=/${_label} /${_mount}";
+		if [ $? != 0 ]; then
+			_ERROR "Mounting ${_dev} failed";
+			exit 1;
+		fi
+		sleep 2;
+	elif [ "$_fs" = "swap" ]; then
+		echo -n ">> Creating swap disk on device '${_dev}'..";
+		_EXECQ "mkswap -L /${_label} ${_dev}";
+		if [ $? != 0 ]; then
+			echo -e -n "\rCreating swap disk on device '${_dev}'. Failed.\n";
+			exit 1;
+		fi
+		_EXECQ "swapon LABEL=/${_label}";
+		echo -e -n "\rCreating swap disk on device '${_dev}'. Done.\n";
+		sleep 2;
+	fi
+}
+
+
+
+_RC_FRESH_INSTALL() {
+	trap "_ABORT" 1 2;
+	echo "";
+	echo "######################################################################";
+	echo "# WARNING: DEVICE '$_HDISK' WILL BE COMPLETELY ERASED.              #";
+	echo "######################################################################";
+	echo "";
+	if ! _YESNO "Continue the installation?"; then
+		_ABORT;
+		exit 1;
+	fi
+
+	if [ -z "$_HDISK" ]; then
+		echo "_HDISK not set";
+		exit 1;
+	fi
+	local _dev="$_HDISK";
+	echo -n ">> Creating partition on device '$_dev'..";
+	_RC_HDDEL "$_dev";
+	if [ $? != 0 ]; then
+		echo -e -n "\rCreating partition on device '$_dev'. Failed.\n";
+		exit 1;
+	fi
+	sleep 2;
+	
+	echo "d" > /tmp/fdisk;
+	echo "n" >> /tmp/fdisk;
+	echo "p" >> /tmp/fdisk;
+	echo "1" >> /tmp/fdisk;
+	echo "" >> /tmp/fdisk;
+	echo "+$_BOOT_SIZE" >> /tmp/fdisk;
+	echo "a" >> /tmp/fdisk;
+	echo "1" >> /tmp/fdisk;
+	echo "n" >> /tmp/fdisk;
+	echo "p" >> /tmp/fdisk;
+	echo "2" >> /tmp/fdisk;
+	echo "" >> /tmp/fdisk;
+	echo "+$_SWAP_SIZE" >> /tmp/fdisk;
+	echo "t" >> /tmp/fdisk;
+	echo "2" >> /tmp/fdisk;
+	echo "82" >> /tmp/fdisk;
+	echo "n" >> /tmp/fdisk;
+	echo "p" >> /tmp/fdisk;
+	echo "3" >> /tmp/fdisk;
+	echo "" >> /tmp/fdisk;
+	echo "+$_STRG_SIZE" >> /tmp/fdisk;
+	echo "n" >> /tmp/fdisk;
+	echo "e" >> /tmp/fdisk;
+	echo "" >> /tmp/fdisk;
+	echo "" >> /tmp/fdisk;
+	echo "n" >> /tmp/fdisk;
+	echo "" >> /tmp/fdisk;
+	echo "+$_CACHE_SIZE" >> /tmp/fdisk;
+	echo "n" >> /tmp/fdisk;
+	echo "" >> /tmp/fdisk;
+	echo "" >> /tmp/fdisk;
+	echo "w" >> /tmp/fdisk;
+	
+	fdisk $_dev < /tmp/fdisk &>$_LOG;
+	if [ $? != 0 ]; then
+		echo -e -n "\rCreating partition on device '$_dev'. Failed.\n";
+		exit 1;
+	fi
+	echo -e -n "\rCreating partition on device '$_dev'. Done.\n";
+	sleep 2;
+	_EXECQ "mdev -s";wait;
+
+	_RC_DISK_FORMAT "${_dev}1" "BOOT" "boot" "reiserfs";
+	_RC_DISK_FORMAT "${_dev}2" "SWAP" "swap" "swap";
+	_RC_DISK_FORMAT "${_dev}3" "MAIN" "strg" "reiserfs";
+	_RC_DISK_FORMAT "${_dev}5" "CACHE" "cachefs" "reiserfs";
+	_RC_DISK_FORMAT "${_dev}6" "LOG" "logfs" "reiserfs";
+
+	_RC_INSTALL_SYSTEM;
+	_RC_GRUB "${_dev}";
+	_RC_BASIC_SETUP;
+	
+}
+
+#_GRUB_CDEV() {
+#	# assume a /dev/hdX or /dev/hdXY name
+#	local letter=$(echo $1 | cut -b8);
+#	local pnum;
+#	case $letter in
+#		"a") dnum=0 ;;
+#		"b") dnum=1 ;;
+#		"c") dnum=2 ;;
+#		"d") dnum=3 ;;
+#		"e") dnum=4 ;;
+#		"f") dnum=5 ;;
+#		"g") dnum=6 ;;
+#		"h") dnum=7 ;;
+#		*) return;
+#	esac
+#
+#	if [ "$(echo $1 | egrep '[0-9]$')" ]; then
+#		# /dev/hdXY
+#		pnum=$(echo $1 | cut -b9-);
+#		pnum=$(($pnum-1));
+#		echo "(hd${dnum},${pnum})";
+#	else
+#		# /dev/hdX
+#		echo "(hd${dnum})";
+#	fi
+#}
+
+_RC_GRUB() {
+	local _dev="$1";
+	local mods;
+	echo -n ">> Installing boot loader..";
+	if [ -f "/var/spool/modules/moduleslist" ]; then
+		mods="$(cat /var/spool/modules/moduleslist | tr '\n' ',' |sed -e 's/,$//g')";
+		[ -n "$mods" ] && mods="mods=\"$mods\"";
+	fi
+
+	if ! _MKDIR "/boot/grub"; then
+		echo -n -e "\rInstalling boot loader. failed.${__SPACE}\n";
+		exit 1;
+	fi
+	if ! _EXECQ "cp -a /grub/* /boot/grub"; then
+		echo -n -e "\rInstalling boot loader. failed.${__SPACE}\n";
+		exit 1;
+	fi
+	#local _groot="$(_GRUB_CDEV ${_dev}1)";
+	#local _gsetup="$(_GRUB_CDEV $_dev)";
+
+	local _groot="(hd0,0)";
+	local _gsetup="(hd0)";
+
+	local _serialset="";
+	echo "# MYBOXOS GRUB CONFIG" > /boot/grub/grub.conf;
+	if [ "x$_HWAPP" != "x" ] && [ "$_HWAPP" != "vmware" ]; then
+		echo "# terminal order, console -> serial" >> /boot/grub/grub.conf;
+		echo "serial --unit=0 --speed=115200 --word=8 --parity=no --stop=1" >> /boot/grub/grub.conf;
+		echo "terminal --silent --timeout=2 serial console" >> /boot/grub/grub.conf;
+	else
+		echo "# terminal order, console -> serial" >> /boot/grub/grub.conf;
+		echo "#serial --unit=0 --speed=115200 --word=8 --parity=no --stop=1" >> /boot/grub/grub.conf;
+		echo "#terminal --silent --timeout=2 serial console" >> /boot/grub/grub.conf;
+	fi
+	echo "default=0" >> /boot/grub/grub.conf;
+	echo "timeout=5" >> /boot/grub/grub.conf;
+	echo "title MYBOXOS" >> /boot/grub/grub.conf;
+	if [ "x$_HWAPP" != "x" ]; then
+		local _xset="";
+		[ "$_HWAPP" = "3140" ] && _xset=" acpi=acpi_pm_good";
+		echo "kernel /mybox-kernel.bin diam root=/dev/ram0 console=tty1 console=ttyS0,115200n8 hwapp=$_HWAPP badram=0x00f00000,0xfff00000${_xset}" >> /boot/grub/grub.conf;
+	else
+		echo "#kernel /mybox-kernel.bin diam root=/dev/ram0 console=tty1 console=ttyS0,115200n8 $mods badram=0x00f00000,0xfff00000" >> /boot/grub/grub.conf;
+		echo "kernel /mybox-kernel.bin diam root=/dev/ram0 $mods badram=0x00f00000,0xfff00000" >> /boot/grub/grub.conf;
+	fi
+	echo "initrd /mybox-boot.bin" >> /boot/grub/grub.conf;
+	
+#/bin/grub --no-floppy --batch >/tmp/grub.log 2>&1 <<EOF
+#root $_groot
+#setup $_gsetup
+#quit
+#EOF
+	(echo -e "root $_groot\nsetup $_gsetup\nquit\n" | /bin/grub --no-floppy --batch >/tmp/grub.log 2>&1);
+	cat /tmp/grub.log >$_LOG;
+	if grep "Error [0-9]*: " /tmp/grub.log >/dev/null; then
+		echo -n -e "\rInstalling boot loader. failed.${__SPACE}\n";
+		exit 1;
+	fi
+
+	echo -n -e "\rInstalling boot loader. Done.${__SPACE}\n";
+}
+
+_RC_UPGRADE() {
+	trap "_ABORT" 1 2;
+	if [ -z "$_HDISK" ]; then
+		_ERROR "_HDISK not set";
+		exit 1;
+	fi
+	local _bootfs _strgfs;
+	_bootfs="$(findfs LABEL=/BOOT)";
+	_strgfs="$(findfs LABEL=/MAIN)";
+
+	if [ -z "$_bootfs" -o ! -r "$_bootfs" ]; then
+		_ERROR "boot partition not found";
+		exit 1;
+	fi
+
+	if [ -z "$_strgfs" -o ! -r "$_strgfs" ]; then
+		_ERROR "main partition not found";
+		exit 1;
+	fi
+
+	_MKDIR "/boot";
+	_EXECQ "mount -t reiserfs LABEL=/BOOT /boot";
+	if [ $? != 0 ]; then
+		_ERROR "Mounting $_bootfs failed";
+		exit 1;
+	fi
+
+	_MKDIR "/strg";
+	_EXECQ "mount -t reiserfs LABEL=/MAIN /strg";
+	if [ $? != 0 ]; then
+		_ERROR "Mounting ${_dev}3 failed";
+		exit 1;
+	fi
+
+	if [ -d "/strg/mybox/loopfs" ]; then
+		[ -d "/strg/mybox/loopfs.update.backup" ] && _EXECQ "rm -rf /strg/mybox/loopfs.update.backup";
+		_EXECQ "mv /strg/mybox/loopfs /strg/mybox/loopfs.update.backup";
+	fi
+
+	local _f;
+	for _f in /boot/*.bin; do
+		_EXECQ "mv $_f ${_f}.update.backup";
+	done
+	_RC_INSTALL_SYSTEM;
+	if [ -d "/boot/grub" ]; then
+		[ -d "/boot/grub.update.backup" ] && _EXECQ "rm -rf boot/grub.update.backup";
+		if [ -r "/boot/grub/grub.conf" ]; then
+			_HWAPP="$(grep hwapp /boot/grub/grub.conf |sed -e 's/.*hwapp=//g' -e 's/\s.*//g')";
+		fi
+		_EXECQ "mv /boot/grub /boot/grub.update.backup";
+	fi
+
+	local _cf _cg;
+	echo -n ">> Updating configuration file: ";
+	for _cf in $(find /etc/factory/registry/* -type f); do
+		_cg=$(echo "$_cf" | sed -e 's|/etc/factory|/strg/mybox|g');
+		if [ -n "$_cg" -a ! -f "$_cg" ]; then
+			_EXECQ "cp $_cf $_cg";
+		fi
+	done
+	echo -e -n "\rUpdating configuration file. Done.${__SPACE}\n";
+	_RC_GRUB "$_HDISK";
+}
+
+_RC_GRUB_UPGRADE() {
+	trap "_ABORT" 1 2;
+	if [ -z "$_HDISK" ]; then
+		_ERROR "_HDISK not set";
+		exit 1;
+	fi
+	local _bootfs;
+	_bootfs="$(findfs LABEL=/BOOT)";
+
+	if [ -z "$_bootfs" -o ! -r "$_bootfs" ]; then
+		_ERROR "boot partition not found";
+		exit 1;
+	fi
+
+	_MKDIR "/boot";
+	_EXECQ "mount -t reiserfs LABEL=/BOOT /boot";
+	if [ $? != 0 ]; then
+		_ERROR "Mounting $_bootfs failed";
+		exit 1;
+	fi
+	if [ -d "/boot/grub" ]; then
+		[ -d "/boot/grub.update.backup" ] && _EXECQ "rm -rf boot/grub.update.backup";
+		if [ -r "/boot/grub/grub.conf" ]; then
+			_HWAPP="$(grep hwapp /boot/grub/grub.conf |sed -e 's/.*hwapp=//g' -e 's/\s.*//g')";
+		fi
+		_EXECQ "mv /boot/grub /boot/grub.update.backup";
+	fi
+	_RC_GRUB "$_HDISK";
+}
+
+_INSTALL_OPTION() {
+	trap "_ABORT" 2;
+	local _TEST _ANS;
+	echo "";
+	echo "######################################################################";
+	echo "# WELCOME TO THE MYBOXOS INSTALLATION PROGRAM.                       #";
+	echo "# THE INSTALL PROCESS IS FAIRLY STRAIGHTFORWARD.                     #";
+	echo "# YOU CAN VIEW ALL OUTPUT FROM COMMANDS BY VIEWING YOUR              #"; 
+	echo "# VC2 CONSOLE (ALT-F2). ALT-F1 WILL BRING YOU BACK HERE.             #";
+	echo "#                                                                    #";
+	echo "# PRESSING CTRL+C WILL ABORT THE INSTALLATION.                       #";
+	echo "######################################################################";
+	echo "";
+
+        echo -e ">> Please select installation options:\n";
+        echo "[1] Install fresh system";
+        echo "[2] Upgrade an existing system";
+        echo "[3] Install or Update Boot loader";
+        echo "[4] Mybox appliances";
+        echo "";
+        read -p "Please select [1,2,3,4]: " _ANS;
+        _TEST="$(echo $_ANS |tr -d [0-9])";
+        [ -n "$_TEST" ] && _ANS=0;
+        while [ "$_ANS" -lt 1 -o "$_ANS" -gt 4 ]; do
+                read -p "Please select [1,2,3,4]: " _ANS;
+                _TEST="$(echo $_ANS |tr -d [0-9])";
+                [ -n "$_TEST" ] && _ANS=0;
+        done
+	return $_ANS;
+}
+
+_MAIN_INSTALL() {
+	trap "_ABORT" 1 2;
+	local _CDROM _HDISK _HWAPP;
+	local _OPT;
+
+	_EXECQ "rm -f /tmp/*";
+	_RC_CHECKCDROM;
+	_RC_CHECKDISK;
+
+	_INSTALL_OPTION;
+	_OPT=$?;
+	if [ "$_OPT" = "1" ]; then
+		echo "";
+		_RC_FRESH_INSTALL;
+	elif [ "$_OPT" = "2" ]; then
+		echo "";
+		_RC_UPGRADE;
+	elif [ "$_OPT" = "3" ]; then
+		_RC_GRUB_UPGRADE;
+	elif [ "$_OPT" = "4" ]; then
+		echo "";
+		local ANS;
+		echo -e ">> Please select Mybox appliances:\n";
+		echo "[1] Advantech 3140";
+		echo "[2] Advantech 6280A";
+		echo "[3] VMware";
+		echo "";
+		read -p "Please select [1,2,3]: " _ANS;
+		_TEST="$(echo $_ANS |tr -d [0-9])";
+		[ -n "$_TEST" ] && _ANS=0;
+		while [ "$_ANS" -lt 1 -o "$_ANS" -gt 3 ]; do
+		        read -p "Please select [1,2,3]: " _ANS;
+		        _TEST="$(echo $_ANS |tr -d [0-9])";
+		        [ -n "$_TEST" ] && _ANS=0;
+		done
+		if [ "$_ANS" = "1" ]; then
+			_HWAPP="3140";
+		elif [ "$_ANS" = "2" ]; then
+			_HWAPP="6280A";
+		elif [ "$_ANS" = "3" ]; then
+			_HWAPP="vmware";
+		else
+			_HWAPP="";
+		fi
+		_RC_FRESH_INSTALL;
+	else
+		exit 1;
+	fi
+
+	echo "";
+	getkey -i -c 10 -m "System will rebooting in %2d second, or press 'R' for reboot " R;
+	echo "";
+	_RC_INSTALL_END;
+}
+
+
+
+####################################################################
+# RC.INSTALL END
+####################################################################
+
+
+_PROGRAM="$(_BASENAME $0)";
+if [ "$_PROGRAM" = "bootup" ]; then
+	_MAIN_BOOTUP;
+	exit 0;
+elif [ "$_PROGRAM" = "rcinit" ]; then
+	_MAIN_INIT;
+	exit 0;
+elif [ "$_PROGRAM" = "rcinstall" ]; then
+	_MAIN_INSTALL;
+	exit 0;
+fi
+
+exit 0;

@@ -1,0 +1,210 @@
+<?php
+if(!defined('_CLI_CODE')||_CLI_CODE!="a098846421a09ab1cacd3b3a753cbe05") exit("\n\nERROR: _CLI_CODE not set\n\n");
+
+function ___CLI_DHCP_CONFIG_STATIC_PRINT($_find='') {
+	$_objf=_OBJ_PATH."/iosh_dhcp_static_print.obj";
+	@unlink($_objf);
+	_INI_TOKEN_GET("network","dhcp_static.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+              	_CLI_ECHO(_GETTEXT("No data available"));
+                return FALSE;
+	}
+	$_cnt=1;$_obj=array();
+	$_output="";
+	foreach($_TOKEN as $_ID => $_DATA) {
+		if(_NULL($_DATA['DNAME'])
+			|| _NULL($_DATA['IP'])
+			|| _NULL($_DATA['MAC'])) {
+			_INI_TOKEN_DELETE("network","dhcp_static.cfg",$_ID);
+			continue;
+		}
+		
+		if(!_NULL($_find)) {
+			if(!_ARRAY_FIND($_find,$_DATA)) {
+				continue;
+			}
+		}
+		if($_cnt > 1) $_output .="\n";
+		$_output .=_CLI_DATA_BODY(
+			array(
+				_GETTEXT_U("ID")=>$_cnt,
+				_GETTEXT_U("DHCP SERVER")=>$_DATA['DNAME'],
+				_GETTEXT_U("IP ADDRESS")=>$_DATA['IP'],
+				_GETTEXT_U("MAC ADDRESS")=>$_DATA['MAC'],
+				_GETTEXT_U("DESCRIPTION")=>$_DATA['NOTE']
+			)
+		);
+		$_obj[$_cnt]=$_ID;
+		unset($_DTOKEN);
+		$_cnt++;
+	}
+	if(_ARRAY_NULL($_obj) || !_FILE_ARRAY_SAVE($_objf,$_obj) || _NULL($_output)) {
+		if(!_NULL($_find)) {
+			_CLI_ECHO(_GETTEXT("No results found"));
+		} else {
+			_CLI_ECHO(_GETTEXT("No data available"));
+		}
+		@unlink($_objf);
+                return FALSE;
+	}
+	_CLI_ECHO_HEADER(_GETTEXT("DHCP Static MAC/IP mappings list"));
+	if(!_NULL($_find)) {
+		echo _GETTEXT("Search results match for '%s':","$_find")."\n\n";
+	}
+	echo "$_output";
+	return TRUE;
+}
+
+function ___CLI_DHCP_CONFIG_STATIC_ADD($_args) {
+	if(!_ARRAY_NULL($_args)) {
+		$_objf=_OBJ_PATH."/iosh_dhcp_server_print.obj";
+		$_obj=_FILE_ARRAY_GET($_objf);
+		if(_ARRAY_NULL($_obj) || _NULL($_obj[$_args[0]])) {
+			_CLI_ECHO(_GETTEXT("No Resource Id available."));
+			_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","server print"));
+			@unlink($_objf);
+			return FALSE;
+		}
+
+		$_DATA=array();
+		$_sid=$_obj[$_args[0]];
+		$_mac=$_args[1];
+		$_ip=$_args[2];
+
+		if(!_CHECK_IP($_ip)) {
+			_CLI_ECHO(_GETTEXT("Invalid IP Address '%s'","$_ip"));
+			return FALSE;
+		}
+		if(!_CHECK_MACADDR($_mac)) {
+			_CLI_ECHO(_GETTEXT("Invalid MAC Address '%s'","$_mac"));
+			return FALSE;
+		}
+		_INI_TOKEN_GET_BYPARAM("network","dhcp_server.cfg","ID",$_sid,$_ITOKEN);
+		if(_ARRAY_NULL($_ITOKEN) 
+			|| _NULL($_ITOKEN['DNAME'])
+			|| _NULL($_ITOKEN['RANGE_START'])
+			|| _NULL($_ITOKEN['RANGE_END'])) {
+			_CLI_ECHO(_GETTEXT("No data available for DHCP Server Id '%s'","$_sid"));
+			return FALSE;
+		}
+		if(!_CHK_HOSTRANGE($_ITOKEN['RANGE_START'],$_ip) &&
+			!_CHK_HOSTRANGE($_ip,$_ITOKEN['RANGE_END'])) {
+			_CLI_ECHO(_GETTEXT("IP Address not in range %s","{$_ITOKEN['RANGE_START']}-{$_ITOKEN['RANGE_END']}"));
+			return FALSE;
+		}
+		if(!_INI_TOKEN_CHECK("network","dhcp_static.cfg","IP","$_ip")) {
+			_CLI_ECHO(_GETTEXT("IP Address '%s' already exist","$_ip"));
+			return FALSE;
+		}
+		$_DATA['DNAME']=$_ITOKEN['DNAME'];
+		$_DATA['IP']="$_ip";
+		$_DATA['MAC']="$_mac";
+		$_DATA['STAT']=1;
+		$_DATA['NOTE']="{$_args[3]}";
+		if(_INI_TOKEN_SAVE("network","dhcp_static.cfg",$_DATA)) {
+			_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function ___CLI_DHCP_CONFIG_STATIC_SET($_args) {
+	if(!_ARRAY_NULL($_args)) {
+		$_objf=_OBJ_PATH."/iosh_dhcp_static_print.obj";
+		$_obj=_FILE_ARRAY_GET($_objf);
+		if(_ARRAY_NULL($_obj) || _NULL($_obj[$_args[1]])) {
+			_CLI_ECHO(_GETTEXT("No Resource Id available."));
+			_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","static print"));
+			@unlink($_objf);
+			return FALSE;
+		}
+		$_DATA=array();
+		$_param=$_args[0];
+		$_sid=$_obj[$_args[1]];
+
+		_INI_TOKEN_GET_BYPARAM("network","dhcp_static.cfg","ID",$_sid,$_NTOKEN);
+		if(_ARRAY_NULL($_NTOKEN) 
+			|| _NULL($_NTOKEN['DNAME'])
+			|| _NULL($_NTOKEN['IP'])
+			|| _NULL($_NTOKEN['MAC'])) {
+			_CLI_ECHO(_GETTEXT("No data available for Static mapping Id '%s'","$_sid"));
+			return FALSE;
+		}
+
+		_INI_TOKEN_GET_BYPARAM("network","dhcp_server.cfg","DNAME",$_NTOKEN['DNAME'],$_ITOKEN);
+		if(_ARRAY_NULL($_ITOKEN) 
+			|| _NULL($_ITOKEN['DNAME'])
+			|| _NULL($_ITOKEN['RANGE_START'])
+			|| _NULL($_ITOKEN['RANGE_END'])) {
+			_CLI_ECHO(_GETTEXT("No data available for DHCP Server '%s'","{$_NTOKEN['DNAME']}"));
+			return FALSE;
+		}
+
+		if($_param=="ip") {
+			$_ip=$_args[2];
+			if(!_CHECK_IP($_ip)) {
+				_CLI_ECHO(_GETTEXT("Invalid IP Address '%s'","$_ip"));
+				return FALSE;
+			}
+			if(!_CHK_HOSTRANGE($_ITOKEN['RANGE_START'],$_ip) ||
+				!_CHK_HOSTRANGE($_ip,$_ITOKEN['RANGE_END'])) {
+				_CLI_ECHO(_GETTEXT("IP Address not in range %s","{$_ITOKEN['RANGE_START']}-{$_ITOKEN['RANGE_END']}"));
+				return FALSE;
+			}
+			$_DATA['IP']="$_ip";
+		} elseif($_param=="mac") {
+			$_mac=$_args[2];
+			if(!_CHECK_MACADDR($_mac)) {
+				_CLI_ECHO(_GETTEXT("Invalid MAC Address '%s'","$_mac"));
+				return FALSE;
+			}
+			$_DATA['MAC']="$_mac";
+		} elseif($_param=="description") {
+			$_DATA['NOTE']=$_args[2];
+		}
+		if(!_ARRAY_NULL($_DATA) && _INI_TOKEN_UPDATE("network","dhcp_static.cfg",$_sid,$_DATA)) {
+			_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+			return TRUE;
+		}
+
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function ___CLI_DHCP_CONFIG_STATIC_DELETE($_nums) {
+	$_objf=_OBJ_PATH."/iosh_dhcp_static_print.obj";
+	$_obj=_FILE_ARRAY_GET($_objf);
+	if(_ARRAY_NULL($_obj)) {
+		_CLI_ECHO(_GETTEXT("No Resource Id available."));
+		_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id","server print"));
+		@unlink($_objf);
+		return FALSE;
+	}
+	if($_nums=='*' && _CLI_YESNO(_GETTEXT("This action will delete all %s.\nContinue this action? %s","DHCP Static MAC/IP mappings","[yes/no]: "))==TRUE) {
+		foreach($_obj as $_cnt => $_id) {
+			if(_INI_TOKEN_DELETE("network","dhcp_static.cfg",$_id)) {
+				unset($_obj[$_cnt]);
+			}
+		}
+		if(_FILE_ARRAY_SAVE($_objf,$_obj)) {
+			return TRUE;
+		}
+	} else {
+		$_num_array=array();
+		_CLI_MULTINUM($_nums,$_num_array);
+		foreach($_num_array as $_no) {
+			if(!_NULL($_obj[$_no])) {
+				if(_INI_TOKEN_DELETE("network","dhcp_static.cfg",$_obj[$_no])) {
+					unset($_obj[$_no]);
+				}
+			}
+		}
+		if(_FILE_ARRAY_SAVE($_objf,$_obj)) {
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+?>

@@ -1,0 +1,8 @@
+#!/bin/sh
+_FI=$1;
+_FO=$2;
+
+if [ "x$_FI" = "x" -a "x$_FO" = "x" ]; then
+	exit 1;
+fi
+msgfmt -v -c $_FI -o $_FO --statistics

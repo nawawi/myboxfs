@@ -1,0 +1,155 @@
+<?php
+if(!defined('_CLI_CODE')||_CLI_CODE!="a098846421a09ab1cacd3b3a753cbe05") exit("\n\nERROR: _CLI_CODE not set\n\n");
+
+function ___CLI_ACCESS_CONTROL_SECURITY_PRINT() {
+	_INI_TOKEN_GET("system","system.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+              	_CLI_ECHO(_GETTEXT("No data available"));
+                return FALSE;
+	}
+	_CLI_ECHO_HEADER(_GETTEXT("Block password guessing"));
+	echo " "._GETTEXT("After %s attempts.","{$_TOKEN['security']['ATTEMPT']}")."\n";
+	echo " "._GETTEXT("Block access for %s seconds","{$_TOKEN['security']['BLOCK']}")."\n";
+	return TRUE;
+}
+
+function ___CLI_ACCESS_CONTROL_SECURITY_SET($_param,$_value) {
+	_UPPER($_param);
+	$_DATA[$_param]="$_value";
+	if(_INI_TOKEN_UPDATE("system","system.cfg","security",$_DATA)) {
+		_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+		return TRUE;
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function ___CLI_ACCESS_CONTROL_SECURITY_EXCLUDE_PRINT() {
+	$_objf=_OBJ_PATH."/iosh_access_control_security_exclude_print.obj";
+	@unlink($_objf);
+	_INI_TOKEN_GET("system","attempt_exclude.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+              	_CLI_ECHO(_GETTEXT("No data available"));
+                return FALSE;
+	}
+	$_cnt=1;$_obj=array();
+	$_output="";$_DTL=array();
+	foreach($_TOKEN as $_ID => $_DATA) {
+		if(_NULL($_DATA['HOST'])) {
+			_INI_TOKEN_DELETE("system","attempt_exclude.cfg",$_ID);
+			continue;
+		}
+		_DEFINITIONS_GET_BYNAME("networks",$_DATA['HOST'],$_DTOKEN);
+		_CLI_TRIM_STR($_DTOKEN['ADDR'],"",30);
+		if(_NULL($_DTOKEN['ADDR'])) $_DTOKEN['ADDR']=_GETTEXT("unresolved");
+		$_DTL[]=array($_cnt,"{$_DATA['HOST']} [{$_DTOKEN['ADDR']}]");
+		$_obj[$_cnt]=$_ID;
+		$_cnt++;
+	}
+	if(!_ARRAY_NULL($_DTL)) {
+		$_DTH=array(_GETTEXT_U("ID"),_GETTEXT_U("HOST"));
+		$_output .=_CLI_DATA_BODY_LINE($_DTH,$_DTL,array("","-"));
+		unset($_DTL);
+	}
+	if(_ARRAY_NULL($_obj) || !_FILE_ARRAY_SAVE($_objf,$_obj) || _NULL($_output)) {
+		_CLI_ECHO(_GETTEXT("No data available"));
+		@unlink($_objf);
+                return FALSE;
+	}
+	echo "$_output";
+	return TRUE;
+}
+
+function ___CLI_ACCESS_CONTROL_SECURITY_EXCLUDE_ADD($_num) {
+	$_objf=_OBJ_PATH."/iosh_definitions_networks_print.obj";
+	$_obj=_FILE_ARRAY_GET($_objf);
+	if(_ARRAY_NULL($_obj)) {
+		_CLI_ECHO(_GETTEXT("Resource Id not available."));
+		_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions networks print"));
+		@unlink($_objf);
+		return FALSE;
+	}
+	$_num_array=array();
+	$_list=array();
+	_CLI_MULTINUM($_num,$_num_array);
+	foreach($_num_array as $_no) {
+		$_list[]=___CLI_DEFINITIONS_OBJGETNAME($_obj,"networks",$_no,"");
+	}
+	if(_ARRAY_NULL($_list)) {
+		_CLI_ECHO(_GETTEXT("Resource Id '$_num' not available."));
+		_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions networks print"));
+		@unlink($_objf);
+		return FALSE;
+	}
+	$_save=0;$_ok=0;
+	foreach($_list as $_n) {
+		_TRIM($_n);
+		if(_NULL($_n)) continue;
+		if(!_INI_TOKEN_CHECK("system","attempt_exclude.cfg","HOST","$_n")) {
+			_CLI_ECHO(_GETTEXT("Host '%s' already exist","$_n"));
+			return FALSE;
+		}
+		$_DATA['HOST']="$_n";
+		if(_INI_TOKEN_SAVE("system","attempt_exclude.cfg",$_DATA)) $_save++;
+		$_ok++;
+	}
+	if($_save!=0 && $_ok==$_save) {
+		_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+		_INIT_TASKQ("policy_admin");
+		return TRUE;
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function ___CLI_ACCESS_CONTROL_SECURITY_EXCLUDE_DELETE($_num) {
+	$_objf=_OBJ_PATH."/iosh_access_control_security_exclude_print.obj";
+	$_obj=_FILE_ARRAY_GET($_objf);
+	if(_ARRAY_NULL($_obj)) {
+		_CLI_ECHO(_GETTEXT("No Resource Id available."));
+		_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","config security exclude print"));
+		@unlink($_objf);
+		return FALSE;
+	}
+	if($_num=='*' && _CLI_YESNO("This action will delete all exclude list.\nContinue this action? [yes/no]: ")==TRUE) {
+		foreach($_obj as $_cnt => $_id) {
+			if(_INI_TOKEN_DELETE("system","attempt_exclude.cfg",$_id)) {
+				unset($_obj[$_cnt]);
+			}
+		}
+		if(_FILE_ARRAY_SAVE($_objf,$_obj)) {
+			_INIT_TASKQ("policy_admin");
+			return TRUE;
+		}
+	} else {
+		$_num_array=array();
+		_CLI_MULTINUM($_num,$_num_array);
+		foreach($_num_array as $_no) {
+			if(!_NULL($_obj[$_no])) {
+				if(_INI_TOKEN_DELETE("system","attempt_exclude.cfg",$_obj[$_no])) {
+					unset($_obj[$_no]);
+				}
+			}
+		}
+		if(_FILE_ARRAY_SAVE($_objf,$_obj)) {
+			_INIT_TASKQ("policy_admin");
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function ___CLI_ACCESS_CONTROL_SECURITY_EXCLUDE($_args) {
+	if(!_ARRAY_NULL($_args)) {
+		$_cmd=$_args[0];
+		if($_cmd=="print") {
+			return ___CLI_ACCESS_CONTROL_SECURITY_EXCLUDE_PRINT();
+		}
+		if($_cmd=="add") {
+			return ___CLI_ACCESS_CONTROL_SECURITY_EXCLUDE_ADD($_args[1]);
+		}
+		if($_cmd=="delete") {
+			return ___CLI_ACCESS_CONTROL_SECURITY_EXCLUDE_DELETE($_args[1]);
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+?>

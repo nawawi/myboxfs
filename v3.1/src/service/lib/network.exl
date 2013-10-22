@@ -1,0 +1,298 @@
+<?php
+/**
+* Network function library
+*
+* Function berkaitan networking.<br />
+* NOTE: Setiap parameter (@param) yang mempunyai extra "-reference", function
+* tersebut adalah "Passing by Reference" type function.
+*
+* @author Mohd Nawawi Mohamad Jamili <nawawi@tracenetworkcorporation.com>
+* @copyright 2008 Nawawi, Tracenetwork Corporation Sdn. Bhd. 
+* @package library
+* @filesource
+* @link http://my.php.net/manual/en/language.references.whatdo.php -- Reference "Passing by Reference"
+*/
+/**
+* @ignore
+*/
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n"); 
+
+/**
+* Periksa MAC Address format
+*
+* Untuk pastikan string yang diberi adalah MAC address
+*
+* @param string $_mac string
+* @return bool TRUE or FALSE
+*/
+function _CHECK_MACADDR($_mac) {
+	if(preg_match('/^[0-9a-fA-F]{1,2}:[0-9a-fA-F]{1,2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{1,2}:[0-9a-fA-F]{1,2}:[0-9a-fA-F]{1,2}$/',$_mac)) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+/**
+* Periksa jika IPv4 host sudah digunakan dengan menggunakan
+* protocol arp
+*
+* Untuk pastikan ip address sudah digunakan
+* dengan menggunakan protocol arp
+*
+* @param string $_dev network interface
+* @param string $_ip host address
+* @return bool TRUE or FALSE
+*/
+function _HW_PING($_dev,$_ip) {
+	_EXEC_CMD_OUTPUT("/bin/arping -c 2 -w 3 -D -I $_dev $_ip",$_output,$_err);
+	if(!_ARRAY_NULL($_output)) {
+		foreach($_output as $_list) {
+			if(preg_match("/Received\s(\d+)/",$_list,$_mm)) {
+				if($_mm[1] > 0) return TRUE;
+			}
+		}
+	}
+        return FALSE;
+}
+
+/**
+* Periksa jika IPv4 host sudah digunakan dengan menggunakan
+* protocol icmp
+*
+* Untuk pastikan ip address sudah digunakan
+* dengan menggunakan protocol icmp
+*
+* @param string $_ip host address
+* @return bool TRUE or FALSE
+*/
+function _HOST_PING($_ip) {
+	if(_EXEC_CMD("/bin/ping -c 2 -w 3 $_ip")==0) {
+		return TRUE;
+	}
+        return FALSE;
+}
+
+/**
+* Periksa jika network interface link detect
+*
+* Untuk pastikan network interface link detect
+*
+* @param string $_dev network interface
+* @return bool TRUE or FALSE
+*/
+function _LINK_ISUP($_dev) {
+	if(_EXEC_CMD_OUTPUT("/bin/ethtool $_dev",$_output,$_err)==0) {
+		if(!_ARRAY_NULL($_output)) {
+			foreach($_output as $_str) {
+				_TRIM($_str);
+				if(_NULL($_str)) continue;
+				if(preg_match("/^Link detected:\s+(\S+)$/",$_str,$_mm)) {
+					if($_mm[1]=="yes") {
+						return TRUE;
+					}
+				}
+			}
+		}
+	}
+        return FALSE;
+}
+
+/**
+* Dapatkan MAC Address dari host
+*
+* Untuk dapatkan MAC Address dari host.
+*
+* @param string $_dev network interface
+* @param string $_ip host address
+* @param string $_mac string-reference
+* @return bool TRUE or FALSE
+*/
+function _GET_HWADDR($_dev,$_ip,&$_mac) {
+	$_mac="";
+	if(_EXEC_CMD_OUTPUT("/bin/arping -f -c 2 -w 3 -I $_dev $_ip",$_output,$_err)==0) {
+        	if(!_ARRAY_NULL($_output)) {
+			foreach($_output as $_lx) {
+				_TRIM($_lx);
+				if(preg_match("/\s+$_ip\s+\[(\S+\:\S+\:\S+\:\S+\:\S+\:\S+)\]/",$_lx,$_mm)) {
+					if(_CHECK_MACADDR($_mm[1])) {
+						$_mac=$_mm[1];
+						return TRUE;
+					}
+				}
+			}
+		}
+	}
+        return FALSE;
+}
+
+/**
+* Periksa IPv4 Address format
+*
+* Untuk pastikan host yang diberi adalah IPv4
+*
+* @param string $_ip host
+* @return bool TRUE or FALSE
+*/
+function _IS_IPV4($_ip) {
+        if(filter_var($_ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                return TRUE;
+        }
+        return FALSE;
+}
+
+/**
+* Periksa IPv6 Address format
+*
+* Untuk pastikan host yang diberi adalah IPv6
+*
+* @param string $_ip host
+* @return bool TRUE or FALSE
+*/
+function _IS_IPV6($_ip) {
+        if(filter_var($_ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+                return TRUE;
+        }
+        return FALSE;
+}
+
+/**
+* Periksa IP Address format
+*
+* Untuk pastikan host yang diberi adalah IP address
+*
+* @param string $_ip host
+* @return bool TRUE or FALSE
+*/
+function _CHECK_IP($_ip) {
+	if(_IS_IPV4($_ip) || _IS_IPV6($_ip)) {
+		return TRUE;
+	}
+        return FALSE;
+}
+
+
+/**
+* Dapatkan Network Interface Traffic
+*
+* Dapatkan Network Interface Traffic
+*
+* @param array $_RESULTS array-reference
+* @return array
+*/
+function _DEVICE_TRAFFIC(&$_RESULTS) {
+	$_RESULTS=array();
+	if($_fd=fopen('/proc/net/dev', 'r')) do {
+		if(preg_match('/:/', $_buf)) {
+			list($_dev_name, $_stats_list)=preg_split('/:/', $_buf, 2);
+			$_stats=preg_split('/\s+/',trim($_stats_list));
+			_TRIM($_dev_name);
+			$_RESULTS[$_dev_name]=array();
+
+			$_RESULTS[$_dev_name]['rx_bytes'] = $_stats[0];
+			$_RESULTS[$_dev_name]['rx_packets'] = $_stats[1];
+			$_RESULTS[$_dev_name]['rx_errs'] = $_stats[2];
+			$_RESULTS[$_dev_name]['rx_drop'] = $_stats[3];
+
+			$_RESULTS[$_dev_name]['tx_bytes'] = $_stats[8];
+			$_RESULTS[$_dev_name]['tx_packets'] = $_stats[9];
+			$_RESULTS[$_dev_name]['tx_errs'] = $_stats[10];
+			$_RESULTS[$_dev_name]['tx_drop'] = $_stats[11];
+
+			$_RESULTS[$_dev_name]['errs'] = $_stats[2] + $_stats[10];
+			$_RESULTS[$_dev_name]['drop'] = $_stats[3] + $_stats[11];
+		}
+	} while($_buf = fgets($_fd, 4096));
+	return $_RESULTS;
+}
+
+/**
+* Dapatkan ip address dari host
+*
+* Dapatkan ip address dari host
+*
+* @param string $_host host
+* @return array result
+*/
+function _GETHOSTBYNAMEL($_host) {
+	$_result=array();
+	$_result=gethostbynamel($_host);
+	if(!_ARRAY_NULL($_result)) {
+		return $_result;
+	}
+	return array();
+}
+
+/**
+* Periksa host range
+*
+* Periksa host range
+*
+* @param string $_start host start
+* @param string $_end host end
+* @return bool TRUE or FALSE
+*/
+function _CHK_HOSTRANGE($_start,$_end) {
+	if(@ip2long($_start) > @ip2long($_end)) {
+		return FALSE;
+	}
+	return TRUE;
+}
+
+/**
+* Periksa ip jika berada dalam range interface
+*
+* Periksa ip jika berada dalam range interfac
+*
+* @param string $_name interface name
+* @param string $_ip ip yang hendak di check
+* @return bool TRUE or FALSE
+*/
+function _CHK_INRANGE($_name,$_ip) {
+	_INI_TOKEN_GET_BYPARAM("network","eth.cfg","NAME",$_name,$_NTOKEN);
+	_INI_TOKEN_GET_BYPARAM("network","additional.cfg","NAME",$_name,$_NTOKEN);
+	if(!_ARRAY_NULL($_NTOKEN) 
+		&& !_NULL($_NTOKEN['ADDR'])
+		&& !_NULL($_NTOKEN['PREF'])) {
+		_IPCALC::IP($_RESULT,$_NTOKEN['ADDR'],$_NTOKEN['PREF']);
+		if(!_ARRAY_NULL($_RESULT)
+			&& !_NULL($_RESULT['hostmin'])
+			&& !_NULL($_RESULT['hostmax'])) {
+			if(_CHK_HOSTRANGE($_RESULT['hostmin'],$_ip) && _CHK_HOSTRANGE($_ip,$_RESULT['hostmax'])) {
+				return TRUE;
+			}
+		}
+	}
+	return FALSE;
+}
+
+// TODO:
+function _ARP_DELETE() {
+	$_BUFF=_FILE("/proc/net/arp");
+	unset($_BUFF[0]);
+	if(!_ARRAY_NULL($_BUFF)) {
+		foreach($_BUFF as $_line) {
+			_TRIM($_line);
+			if(_NULL($_line)) continue;
+			list($_ip,,$_type,,,)=_STR_ARRAY($_line,"\s+");
+			if(!_NULL($_ip) && $_type!="0x6") {
+				_EXEC_CMD("/bin/arp -d $_ip");
+			}
+		}
+	}
+}
+
+// TODO:
+function _CHCK_DEFAULTGW() {
+	_INI_TOKEN_GET("network","eth.cfg",$_ITOKEN);
+	if(_ARRAY_NULL($_ITOKEN)) {
+                return FALSE;
+	}
+	foreach($_ITOKEN as $_ID => $_DATA) {
+		if(_NULL($_DATA['NAME']) || _NULL($_DATA['TYPE'])) continue;
+		if(!_NULL($_DATA['DEFAULT']) && $_DATA['DEFAULT']==1) {
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+?>

@@ -1,0 +1,322 @@
+﻿<?xml version="1.0"?>
+<CLISH_MODULE>
+<VIEW name="system" prompt="${SYSTEM_NAME}/system/&gt; ">
+
+        <COMMAND name="."
+                help="Return to previous menu"
+                view="main"
+                viewid=""/>
+
+        <COMMAND name="config"
+                help="Display or change general configuration">
+                <ACTION>exec /service/tools/system_config.exc print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+        <COMMAND name="config print"
+                help="Display current config">
+                <ACTION>exec /service/tools/system_config.exc print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+        <COMMAND name="config print country"
+                help="Display country name">
+                <ACTION>exec /service/tools/system_config.exc show_country 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+        <COMMAND name="config set"
+                help="Change current configuration"/>
+
+        <COMMAND name="config set hostname"
+                help="Set hostname">
+                <PARAM name="hostname"
+                        help="hostname"
+                        ptype="HOST" />
+                <ACTION>exec /service/tools/system_config.exc set hostname "${hostname}" 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="config set country"
+                help="Set country code">
+                <PARAM name="code"
+                        help="country code. Enter 'config print country' to view country code."
+                        ptype="STRING" />
+                <ACTION>exec /service/tools/system_config.exc set country "${code}" 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="config set city"
+                help="Set city name">
+                <PARAM name="city"
+                        help="city name"
+                        ptype="STRING_ANY" />
+                <ACTION>exec /service/tools/system_config.exc set city "${city}" 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="config set state"
+                help="Set state name">
+                <PARAM name="state"
+                        help="state name"
+                        ptype="STRING_ANY" />
+                <ACTION>exec /service/tools/system_config.exc set state "${state}" 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="config set organization"
+                help="Set organization name">
+                <PARAM name="organization"
+                        help="organization name"
+                        ptype="STRING_ANY" />
+                <ACTION>exec /service/tools/system_config.exc set organization "${organization}" 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="config set admin"
+                help="Set admin email">
+                <PARAM name="email"
+                        help="Admin email address"
+                        ptype="STRING_ANY" />
+                <ACTION>exec /service/tools/system_config.exc set admin "${email}" 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="config set language"
+                help="Set system language">
+                <PARAM name="language"
+                        help="Available language"
+                        ptype="LANG_OPTION" />
+                <ACTION>exec /service/tools/system_config.exc set lang "${language}" 2>/dev/null</ACTION>
+        </COMMAND>
+
+	<COMMAND name="access-control/"
+		help="Display or configure system access control"
+		view="acl"/>
+
+        <COMMAND name="time-date"
+                help="Set Date and Time">
+                <ACTION>exec /service/tools/timedate_config.exc print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+        <COMMAND name="time-date print"
+                help="Display current config">
+                <ACTION>exec /service/tools/timedate_config.exc print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+        <COMMAND name="time-date print timezone"
+                help="Display time zone">
+                <ACTION>exec /service/tools/timedate_config.exc show_timezone 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+
+        <COMMAND name="time-date set"
+                help="Change time and date configuration">
+        </COMMAND>
+
+        <COMMAND name="time-date set date"
+                help="Set date">
+		<PARAM name="date"
+                        help="Date"
+                        ptype="TIMEDATE_DATE"/>
+		<ACTION>exec /service/tools/timedate_config.exc date ${date} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="time-date set time"
+                help="Set time">
+		<PARAM name="time"
+                        help="Time"
+                        ptype="HOUR_MIN"/>
+		<ACTION>exec /service/tools/timedate_config.exc time ${time} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="time-date set timezone"
+                help="Set timezone">
+		 <PARAM name="zone_id"
+                        help="Resource Id for timezone"
+                        ptype="NUM" />
+		<ACTION>exec /service/tools/timedate_config.exc timezone ${zone_id} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="time-date set ntp-server"
+                help="Synchronize time with internet server">
+		 <PARAM name="server_id"
+                        help="Resource Id for definition network. NULL for disable"
+                        ptype="STRING_ANY"
+			default=""/>
+		<ACTION>exec /service/tools/timedate_config.exc ntp "${server_id}" 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="backup"
+                help="Backup or restore configuration">
+                <ACTION>exec /service/tools/backup.exc print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+	<COMMAND name="backup print"
+                help="Display backup file">
+                <ACTION>exec /service/tools/backup.exc print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+        <COMMAND name="backup delete"
+                help="Delete backup file">
+                <PARAM name="id"
+                        help="Resource Id '*' will delete all log"
+                        ptype="MULTI_NUM_ALL" />
+                <ACTION>exec /service/tools/backup.exc delete "${id}" 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="backup create"
+                help="Create backup file">
+ 		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/backup.exc create "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="backup restore"
+                help="Restore backup file">
+                <PARAM name="id"
+                        help="Resource Id"
+                        ptype="NUM" />
+                <ACTION>exec /service/tools/backup.exc restore ${id} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="backup config"
+                help="Display or change backup configuration">
+ 		<ACTION>exec /service/tools/backup.exc config print 2>/dev/null |more -dl</ACTION>
+	</COMMAND>
+        <COMMAND name="backup config print"
+                help="Display current config">
+                <ACTION>exec /service/tools/backup.exc config print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+        <COMMAND name="backup config set"
+                help="Change current config" />
+        <COMMAND name="backup config set autobackup"
+                help="Enable/Disable auto backup">
+		<PARAM name="enable"
+                        help="Set enable"
+                        ptype="ONOFF"/>
+                <ACTION>exec /service/tools/backup.exc config auto_stat ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="backup config set autobackup-interval"
+                help="Auto backup interval">
+                <PARAM name="interval"
+                        help="Interval"
+                        ptype="BINTERVAL" />
+                <ACTION>exec /service/tools/backup.exc config auto_interval ${interval} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="backup config set max-file"
+                help="Maximum file backup">
+                <PARAM name="num"
+                        help="Maximum"
+                        ptype="NUM" />
+                <ACTION>exec /service/tools/backup.exc config auto_count ${num} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="backup config set email-recipient"
+                help="Email recipient">
+ 		<PARAM name="email"
+                        help="Email address"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/backup.exc config thru_email "${email}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!-- start update -->
+        <COMMAND name="update"
+                help="Firmware update">
+                <ACTION>exec /service/tools/update.exc print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+	<COMMAND name="update print"
+                help="Display downloaded firmware updates">
+                <ACTION>exec /service/tools/update.exc print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+        <COMMAND name="update config"
+                help="Display or change firmware update configuration">
+ 		<ACTION>exec /service/tools/update.exc config print 2>/dev/null |more -dl</ACTION>
+	</COMMAND>
+        <COMMAND name="update config print"
+                help="Display current config">
+               <ACTION>exec /service/tools/update.exc config print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+        <COMMAND name="update check"
+                help="Check available update">
+               <ACTION>exec /service/tools/update.exc -v check 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+        <COMMAND name="update download"
+                help="Download firmware">
+               <ACTION>/service/tools/update.exc -v download</ACTION>
+        </COMMAND>
+
+        <COMMAND name="update install"
+                help="Install downloaded firmware">
+               <ACTION>/service/tools/update.exc -v install</ACTION>
+        </COMMAND>
+
+        <COMMAND name="update clean"
+                help="Clean update files">
+               <ACTION>exec /service/tools/update.exc -v clean 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="update config set"
+                help="Change current config" />
+        <COMMAND name="update config set check-interval"
+                help="Set firmware update checking">
+		<PARAM name="check"
+                        help="Available options"
+                        ptype="UINTERVAL"
+			default="never"/>
+                <ACTION>exec /service/tools/update.exc config update_check ${check} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="update config set auto-download"
+		help="Enable/Disable auto download firmware">
+		<PARAM name="enable"
+                        help="Set enable"
+                        ptype="ONOFF"/>
+                <ACTION>exec /service/tools/update.exc config download ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="update config set save-firmware"
+		help="Enable/Disable never remove downloaded firmware">
+		<PARAM name="enable"
+                        help="Set enable"
+                        ptype="ONOFF"/>
+                <ACTION>exec /service/tools/update.exc config save_download ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="update config set proxy-enable"
+		help="Enable/Disable using parent proxy to fetch firmware updates">
+		<PARAM name="enable"
+                        help="Set enable"
+                        ptype="ONOFF"/>
+                <ACTION>exec /service/tools/update.exc config proxy_stat ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="update config set proxy-host"
+		help="Set parent proxy host">
+		<PARAM name="id"
+                        help="Resource Id"
+                        ptype="NUM"/>
+                <ACTION>exec /service/tools/update.exc config proxy_host ${id} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="update config set proxy-port"
+		help="Set parent proxy port">
+		<PARAM name="port"
+                        help="Port Number"
+                        ptype="NUM"
+			default="8080" />
+                <ACTION>exec /service/tools/update.exc config proxy_port ${port} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="update config set proxy-auth-enable"
+		help="Enable/Disable a proxy authentication">
+		<PARAM name="enable"
+                        help="Set enable"
+                        ptype="ONOFF"/>
+                <ACTION>exec /service/tools/update.exc config proxy_auth_stat ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="update config set proxy-auth-user"
+		help="Set proxy user">
+ 		<PARAM name="user"
+                        help="Set proxy user"
+                        ptype="STRING_ANY" />
+                <ACTION>exec /service/tools/update.exc config proxy_user ${user} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="update config set proxy-auth-password"
+		help="Set proxy password">
+ 		<PARAM name="password"
+                        help="Set proxy password"
+                        ptype="STRING" />
+                <ACTION>exec /service/tools/update.exc config proxy_password ${password} 2>/dev/null</ACTION>
+        </COMMAND>
+<!-- end update -->
+</VIEW>
+
+</CLISH_MODULE>

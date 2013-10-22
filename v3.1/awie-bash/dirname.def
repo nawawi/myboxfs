@@ -1,0 +1,57 @@
+This file is dirname.def, from which is created dirname.c.
+It implements the builtin "dirname" in Bash.
+dirname - return directory portion of pathname
+
+$PRODUCES dirname.c
+/*
+  modified from examples/loadables/dirname.c
+*/
+#include <config.h>
+#include <stdio.h>
+#include "../builtins.h"
+#include "../shell.h"
+
+$BUILTIN dirname
+$FUNCTION dirname_builtin
+$SHORT_DOC dirname STRING
+The STRING is converted to the name of the directory containing
+the filename corresponding to the last pathname component in STRING.
+$END
+
+int dirname_builtin(WORD_LIST *list) {
+	int slen;
+	char *string;
+
+	if(list==0 || list->next) {
+		builtin_usage();
+		return(EX_USAGE);
+	}
+	if(no_options(list)) return(EX_USAGE);
+
+	string = list->word->word;
+	slen = strlen (string);
+	while(slen > 0 && string[slen - 1] == '/') slen--;
+  
+	if(slen==0) {
+		fputs("/\n", stdout);
+		return(EXECUTION_SUCCESS);
+	}
+
+	string[slen] = '\0';
+	while(--slen >= 0) {
+		if(string[slen] == '/') break;
+	}
+
+	if(slen < 0) {
+		fputs(".\n", stdout);
+		return(EXECUTION_SUCCESS);
+	}
+
+	while(--slen >= 0) {
+    		if(string[slen] != '/') break;
+	}
+	string[++slen] = '\0';
+
+	printf("%s\n", (slen == 0) ? "/" : string);
+ 	return(EXECUTION_SUCCESS);
+}

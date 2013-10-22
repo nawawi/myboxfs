@@ -1,0 +1,1900 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid   ""
+msgstr  "Project-Id-Version: TraceOS Language\n"
+        "Report-Msgid-Bugs-To: jedi@tracenetworkcorporation.com\n"
+        "POT-Creation-Date: 2008-12-23 20:12+0800\n"
+        "PO-Revision-Date: 2008-12-23 20:12+0800\n"
+        "Last-Translator: mispit\n"
+        "Language-Team: jedi@tracenetworkcorporation.com\n"
+        "MIME-Version: 1.0\n"
+        "Content-Type: text/plain; charset=UTF-8\n"
+        "Content-Transfer-Encoding: 8bit\n"
+
+msgid   "monday"
+msgstr  ""
+
+msgid   "tuesday"
+msgstr  ""
+
+msgid   "wednesday"
+msgstr  ""
+
+msgid   "thursday"
+msgstr  ""
+
+msgid   "friday"
+msgstr  ""
+
+msgid   "saturday"
+msgstr  ""
+
+msgid   "sunday"
+msgstr  ""
+
+# short day name
+msgid   "mon"
+msgstr  ""
+
+msgid   "tue"
+msgstr  ""
+
+msgid   "wed"
+msgstr  ""
+
+msgid   "thu"
+msgstr  ""
+
+msgid   "fri"
+msgstr  ""
+
+msgid   "sat"
+msgstr  ""
+
+msgid   "sun"
+msgstr  ""
+
+# minimum day name
+msgid   "mo"
+msgstr  ""
+
+msgid   "tu"
+msgstr  ""
+
+msgid   "we"
+msgstr  ""
+
+msgid   "th"
+msgstr  ""
+
+msgid   "fr"
+msgstr  ""
+
+msgid   "sa"
+msgstr  ""
+
+msgid   "su"
+msgstr  ""
+
+msgid   "january"
+msgstr  ""
+
+msgid   "February"
+msgstr  ""
+
+msgid   "march"
+msgstr  ""
+
+msgid   "april"
+msgstr  ""
+
+msgid   "may"
+msgstr  ""
+
+msgid   "june"
+msgstr  ""
+
+msgid   "july"
+msgstr  ""
+
+msgid   "august"
+msgstr  ""
+
+msgid   "september"
+msgstr  ""
+
+msgid   "october"
+msgstr  ""
+
+msgid   "november"
+msgstr  ""
+
+msgid   "december"
+msgstr  ""
+
+# short month name
+msgid   "jan"
+msgstr  ""
+
+msgid   "Feb"
+msgstr  ""
+
+msgid   "mar"
+msgstr  ""
+
+msgid   "apr"
+msgstr  ""
+
+msgid   "jun"
+msgstr  ""
+
+msgid   "jul"
+msgstr  ""
+
+msgid   "aug"
+msgstr  ""
+
+msgid   "sep"
+msgstr  ""
+
+msgid   "oct"
+msgstr  ""
+
+msgid   "nov"
+msgstr  ""
+
+msgid   "dec"
+msgstr  ""
+
+msgid   "monthly"
+msgstr  ""
+
+msgid   "weekly"
+msgstr  ""
+
+msgid   "daily"
+msgstr  ""
+
+#: utils.exl:228
+msgid   "hour"
+msgstr  ""
+
+#: utils.exl:227
+msgid   "hours"
+msgstr  ""
+
+#: utils.exl:232
+msgid   "minute"
+msgstr  ""
+
+#: utils.exl:231
+msgid   "minutes"
+msgstr  ""
+
+msgid   "second"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab3.exl:173
+msgid   "seconds"
+msgstr  ""
+
+msgid   "month"
+msgstr  ""
+
+msgid   "months"
+msgstr  ""
+
+msgid   "year"
+msgstr  ""
+
+msgid   "years"
+msgstr  ""
+
+#: utils.exl:222
+msgid   "day"
+msgstr  ""
+
+#: utils.exl:223
+msgid   "days"
+msgstr  ""
+
+# short time
+msgid   "hou"
+msgstr  ""
+
+msgid   "min"
+msgstr  ""
+
+msgid   "sec"
+msgstr  ""
+
+msgid   "never"
+msgstr  ""
+
+#: iosh.c:97 iosh.c:98
+msgid   "Entering system shell"
+msgstr  ""
+
+#: iosh.c:107 sessions.exl:154 _cgi_page_system_preference_tab1.exl:126
+#: _cgi_session.exl:105 syslog.exc:46 tn_page.js:222
+msgid   "Session logout"
+msgstr  ""
+
+#: iosh.c:131
+msgid   "Please enter console password.."
+msgstr  ""
+
+#: iosh.c:134 login.c:108 _cgi_session.exl:54 _cgi_session.exl:55
+#: syslog.exc:39 syslog.exc:110
+msgid   "Password Accepted"
+msgstr  ""
+
+#: iosh.c:138 login.c:113
+msgid   "Invalid access password"
+msgstr  ""
+
+#: login.c:64 login.c:65
+msgid   "No password defined"
+msgstr  ""
+
+#: login.c:72 _cgi_session.exl:79 _cgi_session.exl:80 syslog.exc:55
+msgid   "Password incorrect"
+msgstr  ""
+
+#: login.c:120
+msgid   "Console password disabled"
+msgstr  ""
+
+#: commons:104 commons:117
+msgid   "Logged %s %s"
+msgstr  ""
+
+#: commons:143
+msgid   "Logout from system shell"
+msgstr  ""
+
+#: _policy_sysinput_dhcrelay.exl:9 _policy_sysinput_dhcp.exl:9
+#: _policy_sysinput_named.exl:56 _policy_sysinput_ntp.exl:52
+#, php-format
+msgid   "%s: rules failed"
+msgstr  ""
+
+#: _policy_admin.exl:17 _policy_admin.exl:24 _policy_admin.exl:34
+#, php-format
+msgid   "ACL: invalid %s %s"
+msgstr  ""
+
+#: _policy_admin.exl:43
+msgid   "ACL: function failed"
+msgstr  ""
+
+#: _policy_admin.exl:55 _policy_sysinput.exl:48 _policy_sysforward.exl:48
+#: policy.exl:108
+msgid   "Reloading previous saved policy"
+msgstr  ""
+
+#: _policy_admin.exl:140 _policy_sysinput.exl:75 _policy_sysforward.exl:71
+#, php-format
+msgid   "Loading %s failed"
+msgstr  ""
+
+#: _policy_sysinput_named.exl:18 _policy_sysinput_named.exl:26
+#: _policy_sysinput_named.exl:37 _policy_sysinput_ntp.exl:17
+#: _policy_sysinput_ntp.exl:24 _policy_sysinput_ntp.exl:34
+#, php-format
+msgid   "%s ACL: invalid %s %s"
+msgstr  ""
+
+#: _policy_sysinput_named.exl:47 _policy_sysinput_ntp.exl:43
+#, php-format
+msgid   "%s ACL: function failed"
+msgstr  ""
+
+#: update.exl:37
+#, php-format
+msgid   "Firmware update file '%s' already installed"
+msgstr  ""
+
+#: update.exl:45
+#, php-format
+msgid   "Firmware update file '%s' corrupted"
+msgstr  ""
+
+#: update.exl:62
+msgid   "No description available"
+msgstr  ""
+
+#: update.exl:125
+#, php-format
+msgid   "Updating firmware to version '%s' released on %s"
+msgstr  ""
+
+#: update.exl:134
+#, php-format
+msgid   "Stopping firmware update installer. %d update(s) installed."
+msgstr  ""
+
+#: update.exl:178
+msgid   "Firmware update disabled."
+msgstr  ""
+
+#: update.exl:182
+msgid   "Starting firmware update checker."
+msgstr  ""
+
+#: update.exl:196
+#, php-format
+msgid   "Stopping firmware update checker. %d update(s) available"
+msgstr  ""
+
+#: update.exl:203
+msgid   "Stopping firmware update checker. No updates available"
+msgstr  ""
+
+#: update.exl:214
+msgid   "Starting firmware update downloader."
+msgstr  ""
+
+#: update.exl:216
+msgid   "Stopping firmware update downloader. Internal error."
+msgstr  ""
+
+#: update.exl:220
+msgid   "Another instance of this process is already running, exiting.."
+msgstr  ""
+
+#: update.exl:233 update.exl:240
+#, php-format
+msgid   "Error while downloading file %s."
+msgstr  ""
+
+#: update.exl:263
+#, php-format
+msgid   "Stopping firmware update downloader. %d file(s) ready to install."
+msgstr  ""
+
+#: update.exl:266
+msgid   "Stopping firmware update downloader. No file need to install."
+msgstr  ""
+
+#: _cli_access_control_password.exl:7 _cli_dns_config_dyndns.exl:9
+#: _cli_dns_config_dyndns.exl:45 _cli_route_config_static.exl:9
+#: _cli_route_config_static.exl:67 _cli_definitions_timeevents.exl:10
+#: _cli_definitions_timeevents.exl:94 _cli_definitions.exl:28
+#: _cli_definitions.exl:48 _cli_definitions.exl:55 _cli_definitions.exl:75
+#: _cli_static_arp.exl:9 _cli_static_arp.exl:37 _cli_log.exl:221
+#: _cli_timedate_config.exl:40 _cli_timedate_config.exl:58
+#: _cli_access_control.exl:9 _cli_access_control.exl:52 _cli_backup.exl:115
+#: _cli_interfaces.exl:9 _cli_interfaces.exl:141 _cli_interfaces.exl:221
+#: _cli_interfaces.exl:247 _cli_system_config.exl:15 _cli_system_config.exl:29
+#: _cli_system_config.exl:36 _cli_system_config.exl:59
+#: _cli_definitions_services.exl:9 _cli_definitions_services.exl:202
+#: _cli_definitions_networks.exl:9 _cli_definitions_networks.exl:237
+#: _cli_dhcp_config_relay.exl:7 _cli_ipwatch_config.exl:8
+#: _cli_access_control_service.exl:7 _cli_access_control_service.exl:28
+#: _cli_dhcp_config_server.exl:9 _cli_dhcp_config_server.exl:62
+#: _cli_access_control_security.exl:7 _cli_access_control_security.exl:31
+#: _cli_access_control_security.exl:51 _cli_dns_config.exl:8
+#: _cli_ntp_config_acl.exl:9 _cli_ntp_config_acl.exl:48
+#: _cli_dhcp_config_static.exl:9 _cli_dhcp_config_static.exl:41
+#: _cli_dns_config_routing.exl:9 _cli_dns_config_routing.exl:62
+#: _cli_dns_config_static.exl:9 _cli_dns_config_static.exl:39
+#: _cli_ntp_config.exl:8 _cli_dns_config_acl.exl:9 _cli_dns_config_acl.exl:48
+#: _cgi_page_auth.exl:65 _cgi_page_definitions_networks.exl:29
+#: _cgi_page_definitions_networks.exl:53
+#: _cgi_page_definitions_networks.exl:104
+#: _cgi_page_definitions_timeevents.exl:10
+#: _cgi_page_definitions_timeevents.exl:55 _cgi_page_definitions.exl:190
+#: _cgi_page_definitions.exl:208 _cgi_page_definitions_services.exl:9
+#: _cgi_page_definitions_services.exl:67
+msgid   "No data available"
+msgstr  ""
+
+#: _cli_access_control_password.exl:33 _cli_access_control_password.exl:43
+#: _cli_access_control_password.exl:63
+msgid   "Password already exist"
+msgstr  ""
+
+#: _cli_access_control_password.exl:37 _cli_access_control_password.exl:53
+#: _cli_access_control_password.exl:67 _cli_dns_config_dyndns.exl:80
+#: _cli_dns_config_dyndns.exl:108 _cli_dns_config_dyndns.exl:114
+#: _cli_dns_config_dyndns.exl:120 _cli_dns_config_dyndns.exl:128
+#: _cli_dns_config_dyndns.exl:135 _cli_dns_config_dyndns.exl:141
+#: _cli_route_config_static.exl:168 _cli_static_arp.exl:107 _cli_log.exl:243
+#: _cli_log.exl:267 _cli_log.exl:293 _cli_log.exl:315
+#: _cli_timedate_config.exl:149 _cli_access_control.exl:96
+#: _cli_access_control.exl:132 _cli_backup.exl:157 _cli_interfaces.exl:165
+#: _cli_system_config.exl:66 _cli_system_config.exl:91
+#: _cli_dhcp_config_relay.exl:69 _cli_ipwatch_config.exl:24
+#: _cli_access_control_service.exl:48 _cli_interfaces_vlan.exl:56
+#: _cli_interfaces_vlan.exl:101 _cli_interfaces_vlan.exl:109
+#: _cli_interfaces_vlan.exl:116 _cli_interfaces_vlan.exl:125
+#: _cli_interfaces_vlan.exl:134 _cli_interfaces_vlan.exl:146
+#: _cli_interfaces_vlan.exl:163 _cli_interfaces_vlan.exl:189
+#: _cli_interfaces_vlan.exl:200 _cli_interfaces_vlan.exl:208
+#: _cli_dhcp_config_server.exl:124 _cli_dhcp_config_server.exl:215
+#: _cli_access_control_security.exl:20 _cli_access_control_security.exl:95
+#: _cli_interfaces_vip.exl:51 _cli_interfaces_vip.exl:92
+#: _cli_interfaces_vip.exl:121 _cli_interfaces_vip.exl:132
+#: _cli_interfaces_vip.exl:140 _cli_interfaces_vip.exl:159
+#: _cli_interfaces_vip.exl:168 _cli_dns_config.exl:79 _cli_dns_config.exl:89
+#: _cli_ntp_config_acl.exl:98 _cli_dhcp_config_static.exl:102
+#: _cli_dhcp_config_static.exl:164 _cli_dns_config_routing.exl:118
+#: _cli_dns_config_routing.exl:146 _cli_dns_config_routing.exl:171
+#: _cli_dns_config_routing.exl:178 _cli_dns_config_routing.exl:184
+#: _cli_interfaces_static.exl:61 _cli_interfaces_static.exl:106
+#: _cli_interfaces_static.exl:114 _cli_interfaces_static.exl:123
+#: _cli_interfaces_static.exl:132 _cli_interfaces_static.exl:141
+#: _cli_interfaces_static.exl:153 _cli_interfaces_static.exl:170
+#: _cli_interfaces_static.exl:196 _cli_interfaces_static.exl:207
+#: _cli_interfaces_static.exl:215 _cli_dns_config_static.exl:78
+#: _cli_dns_config_static.exl:106 _cli_dns_config_static.exl:116
+#: _cli_dns_config_static.exl:123 _cli_dns_config_static.exl:129
+#: _cli_ntp_config.exl:44 _cli_dns_config_acl.exl:98
+msgid   "Configuration saved successfully"
+msgstr  ""
+
+#: _cli_access_control_password.exl:46
+msgid   "User already exist"
+msgstr  ""
+
+#: _cli_access_control_password.exl:49
+msgid   "Invalid username"
+msgstr  ""
+
+#: _cli_dns_config_dyndns.exl:43 _cli_route_config_static.exl:65
+#: _cli_definitions_timeevents.exl:92 _cli_static_arp.exl:35 _cli_log.exl:80
+#: _cli_access_control.exl:50 _cli_definitions_services.exl:200
+#: _cli_definitions_networks.exl:235 _cli_dhcp_config_server.exl:60
+#: _cli_ntp_config_acl.exl:46 _cli_dhcp_config_static.exl:39
+#: _cli_dns_config_routing.exl:60 _cli_dns_config_static.exl:37
+#: _cli_dns_config_acl.exl:46
+msgid   "No results found"
+msgstr  ""
+
+#: _cli_dns_config_dyndns.exl:53 _cli_route_config_static.exl:75
+#: _cli_definitions_timeevents.exl:102 _cli_static_arp.exl:45
+#: _cli_access_control.exl:60 _cli_definitions_services.exl:210
+#: _cli_definitions_networks.exl:245 _cli_dhcp_config_server.exl:70
+#: _cli_ntp_config_acl.exl:56 _cli_dhcp_config_static.exl:49
+#: _cli_dns_config_routing.exl:70 _cli_dns_config_static.exl:47
+#: _cli_dns_config_acl.exl:56
+#, php-format
+msgid   "Search results match for '%s':"
+msgstr  ""
+
+#: _cli_dns_config_dyndns.exl:66 _cli_dns_config_dyndns.exl:103
+#: _cli_system_config.exl:87 _cli_dns_config_static.exl:60
+#: _cli_dns_config_static.exl:101 cgi.exl:56
+#, php-format
+msgid   "Invalid hostname %s"
+msgstr  ""
+
+#: _cli_dns_config_dyndns.exl:95 _cli_dns_config_dyndns.exl:152
+#: _cli_route_config_static.exl:181 _cli_route_config_static.exl:195
+#: _cli_definitions_timeevents.exl:112 _cli_static_arp.exl:119
+#: _cli_access_control.exl:143 _cli_definitions_services.exl:220
+#: _cli_definitions_networks.exl:255 _cli_dhcp_config_server.exl:136
+#: _cli_dhcp_config_server.exl:226 _cli_access_control_security.exl:106
+#: _cli_interfaces_vip.exl:180 _cli_ntp_config_acl.exl:108
+#: _cli_dhcp_config_static.exl:60 _cli_dhcp_config_static.exl:114
+#: _cli_dhcp_config_static.exl:176 _cli_dns_config_routing.exl:133
+#: _cli_dns_config_routing.exl:195 _cli_dns_config_static.exl:93
+#: _cli_dns_config_static.exl:140 _cli_dns_config_acl.exl:108
+msgid   "No Resource Id available."
+msgstr  ""
+
+#: _cli_dns_config_dyndns.exl:96 _cli_dns_config_dyndns.exl:153
+#: _cli_route_config_static.exl:90 _cli_route_config_static.exl:100
+#: _cli_route_config_static.exl:116 _cli_route_config_static.exl:126
+#: _cli_route_config_static.exl:133 _cli_route_config_static.exl:147
+#: _cli_route_config_static.exl:157 _cli_route_config_static.exl:182
+#: _cli_route_config_static.exl:196 _cli_definitions_timeevents.exl:113
+#: _cli_static_arp.exl:120 _cli_log.exl:39 _cli_log.exl:112 _cli_log.exl:253
+#: _cli_log.exl:279 _cli_log.exl:286 _cli_log.exl:301 _cli_log.exl:308
+#: _cli_timedate_config.exl:86 _cli_timedate_config.exl:126
+#: _cli_timedate_config.exl:139 _cli_access_control.exl:78
+#: _cli_access_control.exl:112 _cli_access_control.exl:144 _cli_backup.exl:70
+#: _cli_backup.exl:107 _cli_interfaces.exl:158
+#: _cli_definitions_services.exl:221 _cli_definitions_services.exl:268
+#: _cli_definitions_services.exl:340 _cli_definitions_networks.exl:256
+#: _cli_definitions_networks.exl:304 _cli_definitions_networks.exl:427
+#: _cli_session.exl:10 _cli_interfaces_vlan.exl:16 _cli_interfaces_vlan.exl:71
+#: _cli_dhcp_config_server.exl:227 _cli_access_control_security.exl:66
+#: _cli_access_control_security.exl:78 _cli_access_control_security.exl:107
+#: _cli_interfaces_vip.exl:15 _cli_interfaces_vip.exl:67
+#: _cli_interfaces_vip.exl:149 _cli_interfaces_vip.exl:181
+#: _cli_dns_config.exl:49 _cli_dns_config.exl:66 _cli_ntp_config_acl.exl:67
+#: _cli_ntp_config_acl.exl:77 _cli_ntp_config_acl.exl:109
+#: _cli_dhcp_config_static.exl:61 _cli_dhcp_config_static.exl:115
+#: _cli_dns_config_routing.exl:82 _cli_dns_config_routing.exl:99
+#: _cli_dns_config_routing.exl:134 _cli_dns_config_routing.exl:165
+#: _cli_dns_config_routing.exl:196 _cli_interfaces_static.exl:15
+#: _cli_interfaces_static.exl:76 _cli_dns_config_static.exl:94
+#: _cli_dns_config_static.exl:141 _cli_dns_config_acl.exl:67
+#: _cli_dns_config_acl.exl:77 _cli_dns_config_acl.exl:109
+#, php-format
+msgid   "Enter -> '%s' to view Resource Id."
+msgstr  ""
+
+#: _cli_dns_config_dyndns.exl:157 _cli_route_config_static.exl:200
+#: _cli_definitions_timeevents.exl:117 _cli_static_arp.exl:125 _cli_log.exl:96
+#: _cli_backup.exl:55 _cli_definitions_services.exl:225
+#: _cli_definitions_networks.exl:260 _cli_dhcp_config_server.exl:231
+#: _cli_interfaces_vip.exl:185 _cli_ntp_config_acl.exl:113
+#: _cli_dhcp_config_static.exl:181 _cli_dns_config_routing.exl:200
+#: _cli_dns_config_static.exl:145 _cli_dns_config_acl.exl:113
+#, php-format
+msgid   "This action will delete all %s.\n"
+        "Continue this action? %s"
+msgstr  ""
+
+#: _cli_route_config_static.exl:89 _cli_route_config_static.exl:115
+#: _cli_route_config_static.exl:146 _cli_log.exl:38 _cli_log.exl:111
+#: _cli_log.exl:278 _cli_timedate_config.exl:125 _cli_backup.exl:69
+#: _cli_interfaces.exl:157 _cli_session.exl:9 _cli_dhcp_config_relay.exl:35
+#: _cli_access_control_security.exl:65 _cli_dns_config.exl:48
+#: _cli_dns_config.exl:65 _cli_ntp_config_acl.exl:66
+#: _cli_ntp_config_acl.exl:76 _cli_dns_config_routing.exl:81
+#: _cli_dns_config_routing.exl:98 _cli_dns_config_routing.exl:164
+#: _cli_dns_config_acl.exl:66 _cli_dns_config_acl.exl:76
+msgid   "Resource Id not available."
+msgstr  ""
+
+#: _cli_route_config_static.exl:99 _cli_route_config_static.exl:125
+#: _cli_route_config_static.exl:132 _cli_route_config_static.exl:156
+#: _cli_log.exl:285 _cli_log.exl:300 _cli_log.exl:307
+#: _cli_timedate_config.exl:85 _cli_timedate_config.exl:138
+#: _cli_access_control.exl:77 _cli_access_control.exl:111 _cli_backup.exl:106
+#: _cli_definitions_services.exl:267 _cli_definitions_services.exl:339
+#: _cli_definitions_networks.exl:303 _cli_definitions_networks.exl:426
+#: _cli_interfaces_vlan.exl:15 _cli_interfaces_vlan.exl:70
+#: _cli_interfaces_vip.exl:14 _cli_interfaces_vip.exl:66
+#: _cli_interfaces_vip.exl:148 _cli_interfaces_static.exl:14
+#: _cli_interfaces_static.exl:75
+#, php-format
+msgid   "Resource Id '%s' not available."
+msgstr  ""
+
+#: _cli_definitions_timeevents.exl:159 _cli_definitions_timeevents.exl:172
+#: _cli_definitions_services.exl:289 _cli_definitions_services.exl:300
+#: _cli_definitions_services.exl:316 _cli_definitions_services.exl:328
+#: _cli_definitions_services.exl:347 _cli_definitions_networks.exl:333
+#: _cli_definitions_networks.exl:348 _cli_definitions_networks.exl:372
+#: _cli_definitions_networks.exl:389 _cli_definitions_networks.exl:414
+#: _cli_definitions_networks.exl:434
+#, php-format
+msgid   "Definition name '%s' already exist"
+msgstr  ""
+
+#: _cli_definitions_timeevents.exl:162 _cli_definitions_timeevents.exl:175
+#: _cli_definitions_services.exl:292 _cli_definitions_services.exl:303
+#: _cli_definitions_services.exl:319 _cli_definitions_services.exl:331
+#: _cli_definitions_services.exl:350 _cli_definitions_networks.exl:336
+#: _cli_definitions_networks.exl:351 _cli_definitions_networks.exl:375
+#: _cli_definitions_networks.exl:392 _cli_definitions_networks.exl:418
+#: _cli_definitions_networks.exl:437
+msgid   "Definition saved"
+msgstr  ""
+
+#: _cli_static_arp.exl:55
+msgid   "No ARP cache available"
+msgstr  ""
+
+#: _cli_static_arp.exl:87 _cli_interfaces_vlan.exl:169
+#: _cli_dhcp_config_server.exl:163 _cli_dhcp_config_server.exl:167
+#: _cli_interfaces_vip.exl:20 _cli_interfaces_vip.exl:101
+#: _cli_dhcp_config_static.exl:72 _cli_dhcp_config_static.exl:144
+#: _cli_interfaces_static.exl:176 _cli_dns_config_static.exl:68
+#: _cli_dns_config_static.exl:111
+#, php-format
+msgid   "Invalid IP Address '%s'"
+msgstr  ""
+
+#: _cli_static_arp.exl:91 _cli_dhcp_config_static.exl:76
+#: _cli_dhcp_config_static.exl:156
+#, php-format
+msgid   "Invalid MAC Address '%s'"
+msgstr  ""
+
+#: _cli_static_arp.exl:103 _cli_dhcp_config_static.exl:93
+#, php-format
+msgid   "IP Address '%s' already exist"
+msgstr  ""
+
+#: _cli_log.exl:9 _cli_log.exl:25 _cli_log.exl:82 _cli_log.exl:93
+msgid   "No log available"
+msgstr  ""
+
+#: _cli_log.exl:104 _cli_dns_config.exl:73
+msgid   "Action aborted"
+msgstr  ""
+
+#: _cli_log.exl:140
+msgid   "Configuration file missing"
+msgstr  ""
+
+#: _cli_log.exl:252
+#, php-format
+msgid   "Resource Id '%s' for '%s' not available."
+msgstr  ""
+
+#: _cli_timedate_config.exl:72
+#, php-format
+msgid   "Date set to %s"
+msgstr  ""
+
+#: _cli_timedate_config.exl:77
+msgid   "Invalid date format"
+msgstr  ""
+
+#: _cli_timedate_config.exl:94
+#, php-format
+msgid   "Timezone set to %s"
+msgstr  ""
+
+#: _cli_timedate_config.exl:111
+#, php-format
+msgid   "Time set to %s"
+msgstr  ""
+
+#: _cli_timedate_config.exl:116
+msgid   "Invalid time format"
+msgstr  ""
+
+#: _cli_access_control.exl:83 _cli_access_control_security.exl:87
+#, php-format
+msgid   "Host '%s' already exist"
+msgstr  ""
+
+#: _cli_access_control.exl:187
+msgid   "System access list set successfully"
+msgstr  ""
+
+#: _cli_backup.exl:32 _cli_backup.exl:41 _cli_backup.exl:51
+msgid   "No backup available"
+msgstr  ""
+
+#: _cli_backup.exl:58
+#, php-format
+msgid   "-> Deleting %s"
+msgstr  ""
+
+#: _cli_backup.exl:99 _cgi_page_system_backup_restore.exl:18
+msgid   "Configuration restored successfully"
+msgstr  ""
+
+#: _cli_backup.exl:103
+msgid   "Invalid backup file"
+msgstr  ""
+
+#: _cli_backup.exl:128 _cli_backup.exl:134
+msgid   "Email recipients"
+msgstr  ""
+
+#: _cli_backup.exl:146 _cli_system_config.exl:109
+#, php-format
+msgid   "Invalid email format '%s'"
+msgstr  ""
+
+#: _cli_backup.exl:182 _cgi_page_system_backup_restore.exl:23
+msgid   "Backup created successfully"
+msgstr  ""
+
+#: _cli_backup.exl:191
+#, php-format
+msgid   "File '%s' not exist"
+msgstr  ""
+
+#: _cli_backup.exl:195
+msgid   "Configuration restored"
+msgstr  ""
+
+#: _cli_interfaces.exl:163 _cli_dns_config.exl:72
+#, php-format
+msgid   "This action will remove %s.\n"
+        "Continue this action? %s"
+msgstr  ""
+
+#: _cli_interfaces.exl:190 _cli_interfaces.exl:211
+msgid   "No free device available"
+msgstr  ""
+
+#: _cli_system_config.exl:96
+msgid   "Short Country name not available."
+msgstr  ""
+
+#: _cli_system_config.exl:97
+#, php-format
+msgid   "Enter -> '%s' to view short country name"
+msgstr  ""
+
+#: _cli_definitions_services.exl:244
+msgid   "Cannot delete builtin type definitions"
+msgstr  ""
+
+#: _cli_definitions_networks.exl:279
+msgid   "Cannot delete builtin or interface type definitions"
+msgstr  ""
+
+#: _cli_definitions_networks.exl:318
+msgid   "Invalid host"
+msgstr  ""
+
+#: _cli_definitions_networks.exl:359
+#, php-format
+msgid   "Invalid range '%s'"
+msgstr  ""
+
+#: _cli_definitions_networks.exl:382
+msgid   "Invalid MAC Address"
+msgstr  ""
+
+#: _cli_session.exl:14
+#, php-format
+msgid   "This action will delete %s.\n"
+        "Continue this action? %s"
+msgstr  ""
+
+#: _cli_dhcp_config_relay.exl:36 _cli_dhcp_config_relay.exl:43
+#: _cli_dhcp_config_server.exl:137 _cli_dhcp_config_static.exl:177
+#, php-format
+msgid   "Enter -> '%s' to view Resource Id"
+msgstr  ""
+
+#: _cli_dhcp_config_relay.exl:42
+msgid   "Resource Id for DHCP Server not available."
+msgstr  ""
+
+#: _cli_dhcp_config_relay.exl:53
+msgid   "DHCP Relay required at least two interfaces"
+msgstr  ""
+
+#: _cli_interfaces_vlan.exl:21 _cli_interfaces_static.exl:20
+msgid   "Invalid IP Address"
+msgstr  ""
+
+#: _cli_interfaces_vlan.exl:26 _cli_interfaces_vlan.exl:155
+#: _cli_interfaces_vip.exl:25 _cli_interfaces_vip.exl:84
+#: _cli_interfaces_static.exl:25 _cli_interfaces_static.exl:162
+#, php-format
+msgid   "Interface name '%s' already exist"
+msgstr  ""
+
+#: _cli_interfaces_vlan.exl:31 _cli_interfaces_vlan.exl:176
+#: _cli_interfaces_vip.exl:30 _cli_interfaces_vip.exl:108
+#: _cli_interfaces_static.exl:30 _cli_interfaces_static.exl:183
+#, php-format
+msgid   "Interface address '%s' already exist"
+msgstr  ""
+
+#: _cli_interfaces_vlan.exl:36 _cli_interfaces_vlan.exl:182
+#: _cli_interfaces_vip.exl:35 _cli_interfaces_vip.exl:114
+#: _cli_interfaces_static.exl:35 _cli_interfaces_static.exl:189
+#, php-format
+msgid   "IP Address '%s' already in used. Continue this action? %s"
+msgstr  ""
+
+#: _cli_interfaces_vlan.exl:78 _cli_interfaces_vip.exl:74
+#: _cli_interfaces_static.exl:83
+#, php-format
+msgid   "No data available for Resource Id '%s'"
+msgstr  ""
+
+#: _cli_interfaces_vlan.exl:82
+#, php-format
+msgid   "Invalid interface type '%s'"
+msgstr  ""
+
+#: _cli_interfaces_vlan.exl:90 _cli_dhcp_config_server.exl:188
+#, php-format
+msgid   "Invalid gateway Address '%s'"
+msgstr  ""
+
+#: _cli_interfaces_vlan.exl:94 _cli_interfaces_static.exl:99
+msgid   "Default gateway already defined on other interface"
+msgstr  ""
+
+#: _cli_interfaces_vlan.exl:140 _cli_interfaces_static.exl:147
+#, php-format
+msgid   "Invalid MTU size '%s'"
+msgstr  ""
+
+#: _cli_dhcp_config_server.exl:97
+#, php-format
+msgid   "No data available for interface '%s'"
+msgstr  ""
+
+#: _cli_dhcp_config_server.exl:101
+msgid   "Invalid interface type. DHCP Server only accept interface type "
+        "static and vlan"
+msgstr  ""
+
+#: _cli_dhcp_config_server.exl:149 _cli_dhcp_config_server.exl:153
+#, php-format
+msgid   "Invalid DNS Server IP '%s'"
+msgstr  ""
+
+#: _cli_dhcp_config_server.exl:171
+#, php-format
+msgid   "Invalid address range %s"
+msgstr  ""
+
+#: _cli_dhcp_config_server.exl:179
+#, php-format
+msgid   "Invalid address range %s on interface %s"
+msgstr  ""
+
+#: _cli_dhcp_config_server.exl:195
+#, php-format
+msgid   "Invalid domain '%s'"
+msgstr  ""
+
+#: _cli_dhcp_config_server.exl:203
+#, php-format
+msgid   "Invalid WINS Server '%s'"
+msgstr  ""
+
+#: _cli_access_control_security.exl:10
+msgid   "Block password guessing:"
+msgstr  ""
+
+#: _cli_access_control_security.exl:11
+#, php-format
+msgid   "After %s attempts."
+msgstr  ""
+
+#: _cli_access_control_security.exl:12
+#, php-format
+msgid   "Block access for %s seconds"
+msgstr  ""
+
+#: _cli_interfaces_vip.exl:199
+#, php-format
+msgid   "This action will delete additional interface Id '%s'.\n"
+        "Continue this action? %s"
+msgstr  ""
+
+#: _cli_ntp_config_acl.exl:88 _cli_dns_config_acl.exl:88
+#, php-format
+msgid   "Address '%s' already exist"
+msgstr  ""
+
+#: _cli_dhcp_config_static.exl:84
+#, php-format
+msgid   "No data available for DHCP Server Id '%s'"
+msgstr  ""
+
+#: _cli_dhcp_config_static.exl:89 _cli_dhcp_config_static.exl:149
+#, php-format
+msgid   "IP Address not in range %s"
+msgstr  ""
+
+#: _cli_dhcp_config_static.exl:128
+#, php-format
+msgid   "No data available for Static mapping Id '%s'"
+msgstr  ""
+
+#: _cli_dhcp_config_static.exl:137
+#, php-format
+msgid   "No data available for DHCP Server '%s'"
+msgstr  ""
+
+#: _cli_dns_config_routing.exl:104 _cli_dns_config_routing.exl:141
+#, php-format
+msgid   "Invalid domain %s"
+msgstr  ""
+
+#: _cli_dns_config_routing.exl:108
+#, php-format
+msgid   "Request routing for Domain '%s' already exist"
+msgstr  ""
+
+#: _cli_interfaces_static.exl:87
+msgid   "Invalid interface type"
+msgstr  ""
+
+#: _cli_interfaces_static.exl:95
+msgid   "Invalid gateway Address"
+msgstr  ""
+
+#: _cli_dns_config_static.exl:64
+#, php-format
+msgid   "Static hostname '%s' already exist"
+msgstr  ""
+
+#: utils.exl:212
+msgid   "unknown"
+msgstr  ""
+
+#: init.exl:225
+msgid   "No network device found"
+msgstr  ""
+
+#: init.exl:283
+#, php-format
+msgid   "%s Invalid command '%s'"
+msgstr  ""
+
+#: init.exl:323
+#, php-format
+msgid   "%s (pid %s) is running..."
+msgstr  ""
+
+#: init.exl:393 network.exl:321
+#, php-format
+msgid   "Starting %s"
+msgstr  ""
+
+#: init.exl:399 xinet.exl:47 anyterm.exl:41 cron.exl:62 ntp.exl:93 ssh.exl:105
+#: inadyn.exl:91 name.exl:268 ftp.exl:160 syslog.exl:655 ulog.exl:72
+#: dhcp.exl:170 dhcrelay.exl:75 ipwatch.exl:90 network.exl:318 snmp.exl:31
+#: http.exl:266
+#, php-format
+msgid   "Starting %s failed"
+msgstr  ""
+
+#: init.exl:426 init.exl:431 init.exl:437 network.exl:352
+#, php-format
+msgid   "Stopping %s"
+msgstr  ""
+
+#: init.exl:441
+#, php-format
+msgid   "Stopping %s failed"
+msgstr  ""
+
+#: cgi.exl:28 tn_page.js:463
+msgid   "Permission denied"
+msgstr  ""
+
+#: cgi.exl:40
+msgid   "Configuration applied successfully"
+msgstr  ""
+
+#: cgi.exl:68
+msgid   "Failed to set Date and Time"
+msgstr  ""
+
+#: xinet.exl:6 keymap.exl:6 anyterm.exl:6 cron.exl:6 ntp.exl:6 ssh.exl:6
+#: policy.exl:6 inadyn.exl:6 name.exl:6 ftp.exl:6 syslog.exl:6 clock.exl:6
+#: ulog.exl:6 dhcp.exl:6 dhcrelay.exl:6 ipwatch.exl:6 network.exl:7 snmp.exl:6
+#: http.exl:6 rng.exl:6
+#, php-format
+msgid   "Cannot execute %s. Internal error"
+msgstr  ""
+
+#: xinet.exl:68 http.exl:288
+#, php-format
+msgid   "Reloading %s daemon"
+msgstr  ""
+
+#: xinet.exl:72 http.exl:292
+#, php-format
+msgid   "Reloading %s daemon failed"
+msgstr  ""
+
+#: keymap.exl:25
+#, php-format
+msgid   "%s setting failed"
+msgstr  ""
+
+#: keymap.exl:29
+#, php-format
+msgid   "Setting keymap to %s"
+msgstr  ""
+
+#: anyterm.exl:19 ntp.exl:27 ntp.exl:72 ssh.exl:49 inadyn.exl:23 inadyn.exl:70
+#: ftp.exl:85 dhcp.exl:86 dhcp.exl:147 dhcrelay.exl:18 dhcrelay.exl:24
+#: ipwatch.exl:29 ipwatch.exl:71 http.exl:150
+#, php-format
+msgid   "%s daemon (%s) disabled"
+msgstr  ""
+
+#: ssh.exl:35
+#, php-format
+msgid   "Generating %s RSA key"
+msgstr  ""
+
+#: ssh.exl:40
+#, php-format
+msgid   "Generating %s DSA key"
+msgstr  ""
+
+#: policy.exl:128
+#, php-format
+msgid   "Loading policy %s failed"
+msgstr  ""
+
+#: policy.exl:191
+msgid   "Loading firewall rules"
+msgstr  ""
+
+#: ftp.exl:77
+msgid   "Generating SSL certificate failed"
+msgstr  ""
+
+#: clock.exl:42
+#, php-format
+msgid   "Setting timezone to %s"
+msgstr  ""
+
+#: clock.exl:46
+#, php-format
+msgid   "Setting system clock to %s"
+msgstr  ""
+
+#: dhcrelay.exl:70
+#, php-format
+msgid   "Cannot start %s while %s enabled."
+msgstr  ""
+
+#: ipwatch.exl:22
+#, php-format
+msgid   "%s: no interfaces found"
+msgstr  ""
+
+#: network.exl:15
+#, php-format
+msgid   "Some other machine (%s) already uses address %s"
+msgstr  ""
+
+#: network.exl:128
+#, php-format
+msgid   "Setting additional address on interface %s"
+msgstr  ""
+
+#: network.exl:154
+#, php-format
+msgid   "Setting MAC Address %s"
+msgstr  ""
+
+#: network.exl:161
+#, php-format
+msgid   "Setting interface %s"
+msgstr  ""
+
+#: network.exl:166 network.exl:224
+#, php-format
+msgid   "Setting default gateway: %s via %s"
+msgstr  ""
+
+#: network.exl:177
+#, php-format
+msgid   "Setting interface %s failed"
+msgstr  ""
+
+#: network.exl:205
+#, php-format
+msgid   "Setting interface %s MAC Address %s"
+msgstr  ""
+
+#: network.exl:216
+#, php-format
+msgid   "Setting VLAN interface %s"
+msgstr  ""
+
+#: network.exl:233
+#, php-format
+msgid   "Setting VLAN interface %s failed"
+msgstr  ""
+
+#: network.exl:273
+msgid   "Updating ARP cache"
+msgstr  ""
+
+#: http.exl:173 http.exl:198 http.exl:219
+#, php-format
+msgid   "%s daemon (%s) generating SSL certificate for host %s failed"
+msgstr  ""
+
+#: hostname.exl:45
+#, php-format
+msgid   "Setting system hostname to %s"
+msgstr  ""
+
+#: hostname.exl:48
+#, php-format
+msgid   "Setting %s Failed"
+msgstr  ""
+
+#: definitions.exl:134
+#, php-format
+msgid   "Broadcast address of interface '%s'"
+msgstr  ""
+
+#: definitions.exl:150
+#, php-format
+msgid   "Broadcast address of alias '%s' on interface '%s'"
+msgstr  ""
+
+#: _cgi_page_system.exl:60
+msgid   "Access"
+msgstr  ""
+
+#: _cgi_page_system.exl:61
+msgid   "Date"
+msgstr  ""
+
+#: _cgi_page_system.exl:62
+msgid   "Time"
+msgstr  ""
+
+#: _cgi_page_system.exl:63
+msgid   "IP Address"
+msgstr  ""
+
+#: _cgi_page_system.exl:64
+msgid   "Status"
+msgstr  ""
+
+#: _cgi_page_system.exl:88
+#, php-format
+msgid   "Last %s Sessions"
+msgstr  ""
+
+#: _cgi_page_system_preference_tab1.exl:11
+msgid   "System Hostname"
+msgstr  ""
+
+#: _cgi_page_system_preference_tab1.exl:15
+msgid   "Hostname:"
+msgstr  ""
+
+#: _cgi_page_system_preference_tab1.exl:17
+msgid   "This is the hostname of the system. It should be a fully qualified "
+        "DNS hostname, including a domain."
+msgstr  ""
+
+#: _cgi_page_system_preference_tab1.exl:26
+msgid   "Organizational Information"
+msgstr  ""
+
+#: _cgi_page_system_preference_tab1.exl:30
+msgid   "Organization Name:"
+msgstr  ""
+
+#: _cgi_page_system_preference_tab1.exl:32
+msgid   "This is the name and location of your organization."
+msgstr  ""
+
+#: _cgi_page_system_preference_tab1.exl:35
+msgid   "City:"
+msgstr  ""
+
+#: _cgi_page_system_preference_tab1.exl:39
+msgid   "State:"
+msgstr  ""
+
+#: _cgi_page_system_preference_tab1.exl:43
+msgid   "Country:"
+msgstr  ""
+
+#: _cgi_page_system_preference_tab1.exl:50
+msgid   "Administrator's Email:"
+msgstr  ""
+
+#: _cgi_page_system_preference_tab1.exl:60
+msgid   "Language setting"
+msgstr  ""
+
+#: _cgi_page_system_preference_tab1.exl:64
+msgid   "Language:"
+msgstr  ""
+
+#: _cgi_page_system_preference_tab1.exl:73
+msgid   "This sets the language used in system. You will have to re-login "
+        "when you change this setting"
+msgstr  ""
+
+#: _cgi_page_system_preference_tab1.exl:110
+msgid   "Invalid Administrator's Email"
+msgstr  ""
+
+#: _cgi_page_system_backup_restore.exl:33
+msgid   "Backup imported successfully"
+msgstr  ""
+
+#: _cgi_page_system_backup_restore.exl:59
+#: _cgi_page_system_backup_restore.exl:63 _cgi_page_system_notification.exl:20
+#: _cgi_page_system_notification.exl:24 _cgi_page_system_preference.exl:22
+#: _cgi_page_system_preference.exl:26 _cgi_page_system_update.exl:20
+#: _cgi_page_system_update.exl:24 _cgi_page_system_acl.exl:189
+#: _cgi_page_system_acl.exl:193 _cgi_page_auth.exl:42
+#: _cgi_page_definitions.exl:255 tn_dialog.js:291
+msgid   "Reading data. Please wait.."
+msgstr  ""
+
+#: _cgi_page_system_antivirus.exl:16
+msgid   "Engine version:"
+msgstr  ""
+
+#: _cgi_page_system_antivirus.exl:18
+msgid   "This table display current Sophos Antivirus version that used by "
+        "system. The information will automatically update when new pattern "
+        "installed.<br />The system will connect to updates server and "
+        "download if newer version is available. For security reasons pattern "
+        "can only be updated automatically."
+msgstr  ""
+
+#: _cgi_page_system_antivirus.exl:21
+msgid   "Pattern version:"
+msgstr  ""
+
+#: _cgi_page_system_antivirus.exl:25
+msgid   "Virus detection:"
+msgstr  ""
+
+#: _cgi_page_system_backup_restore_tab2.exl:161
+msgid   "Automatic backup"
+msgstr  ""
+
+#: _cgi_page_system_backup_restore_tab2.exl:177
+msgid   "When automatic backups are enabled, the system will create backups "
+        "in the specified interval. You can also specify how many backups "
+        "should be stored on the system. If this number is exceeded, the "
+        "oldest backups are automatically deleted."
+msgstr  ""
+
+#: _cgi_page_system_backup_restore_tab2.exl:180
+msgid   "Maximum backup:"
+msgstr  ""
+
+#: _cgi_page_system_backup_restore_tab2.exl:181
+msgid   "backups."
+msgstr  ""
+
+#: _cgi_page_system_backup_restore_tab2.exl:192
+msgid   "In addition to be stored on the system, automatic backups can also "
+        "be mailed to email recipients. Specify the recipients that should "
+        "receive the backups."
+msgstr  ""
+
+#: _cgi_page_system_backup_restore_tab2.exl:222
+msgid   "Enabling Auto backup, please wait"
+msgstr  ""
+
+#: _cgi_page_system_backup_restore_tab2.exl:226
+msgid   "Disabling Auto backup, please wait"
+msgstr  ""
+
+#: _cgi_page_system_notification_tab1.exl:10
+msgid   "Recipients"
+msgstr  ""
+
+#: _cgi_page_system_notification_tab1.exl:158
+msgid   "Notifications"
+msgstr  ""
+
+#: _cgi_page_system_notification_tab1.exl:166
+msgid   "When notifications are enabled, the system will send all "
+        "notifications using this common sender."
+msgstr  ""
+
+#: _cgi_page_system_notification_tab1.exl:175
+msgid   "Specify the recipients that should receive the notifications."
+msgstr  ""
+
+#: _cgi_page_system_update_tab2.exl:7
+msgid   "Last checked:"
+msgstr  ""
+
+#: _cgi_page_system_update_tab2.exl:13
+msgid   "Next check:"
+msgstr  ""
+
+#: _cgi_page_system_update_tab2.exl:18
+msgid   "Check Now"
+msgstr  ""
+
+#: _cgi_page_system_update_tab2.exl:33
+msgid   "Firmware updates"
+msgstr  ""
+
+#: _cgi_page_system_update_tab2.exl:37
+msgid   "Check for updates:"
+msgstr  ""
+
+#: _cgi_page_system_update_tab2.exl:47
+msgid   "The system will connect to updates server and check if newer version "
+        "is available. Select never to disable this operation."
+msgstr  ""
+
+#: _cgi_page_system_update_tab2.exl:57
+msgid   "Firmware download"
+msgstr  ""
+
+#: _cgi_page_system_update_tab2.exl:62
+msgid   "Enable automatic firmware download"
+msgstr  ""
+
+#: _cgi_page_system_update_tab2.exl:63
+msgid   "When this option is enabled and newer version is available, the "
+        "system will automatically download the updates. Make sure check for "
+        "updates is enabled."
+msgstr  ""
+
+#: _cgi_page_system_update_tab2.exl:68
+msgid   "Enable keep update files"
+msgstr  ""
+
+#: _cgi_page_system_update_tab2.exl:69
+msgid   "When this option is enabled, the system will never remove downloaded "
+        "updates."
+msgstr  ""
+
+#: _cgi_page_system_update_tab2.exl:78
+msgid   "Parent Proxy"
+msgstr  ""
+
+#: _cgi_page_system_update_tab2.exl:83
+msgid   "Enable a parent proxy"
+msgstr  ""
+
+#: _cgi_page_system_update_tab2.exl:84
+msgid   "When this option is enabled, the system will use parent proxy to "
+        "fetch firmware updates.<br /><br />You can enable a proxy "
+        "authentication and specify username and password if your parent "
+        "proxy requires authentication. Leaving a password's fields empty "
+        "will preserve the existing password."
+msgstr  ""
+
+#: _cgi_page_system_update_tab2.exl:88
+msgid   "Proxy host:"
+msgstr  ""
+
+#: _cgi_page_system_update_tab2.exl:100
+msgid   "Proxy port:"
+msgstr  ""
+
+#: _cgi_page_system_update_tab2.exl:107
+msgid   "Enable a proxy authentication"
+msgstr  ""
+
+#: _cgi_page_system_update_tab2.exl:111
+msgid   "Username:"
+msgstr  ""
+
+#: _cgi_page_system_update_tab2.exl:116
+msgid   "Password:"
+msgstr  ""
+
+#: _cgi_page_system_update_tab2.exl:121 _cgi_page_system_acl_tab1.exl:38
+#: _cgi_page_system_acl_tab1.exl:47 _cgi_page_system_acl_tab1.exl:122
+#: _cgi_page_system_acl_tab1.exl:236 _cgi_page_system_acl_tab1.exl:356
+msgid   "Repeat:"
+msgstr  ""
+
+#: _cgi_page_system_update_tab2.exl:142
+msgid   "Not checking yet"
+msgstr  ""
+
+#: _cgi_page_system_update_tab2.exl:147
+msgid   "updates available"
+msgstr  ""
+
+#: _cgi_page_system_update_tab2.exl:212
+msgid   "Entered values at Parent Proxy is syntactically or logically "
+        "incorrect"
+msgstr  ""
+
+#: _cgi_page_system_update_tab2.exl:223
+msgid   "No Proxy User defined"
+msgstr  ""
+
+#: _cgi_page_dashboard.exl:215
+msgid   "Product Information"
+msgstr  ""
+
+#: _cgi_page_dashboard.exl:221
+msgid   "System Time"
+msgstr  ""
+
+#: _cgi_page_dashboard.exl:228
+msgid   "Active Sessions"
+msgstr  ""
+
+#: _cgi_page_dashboard.exl:236
+msgid   "Ethernet Port Usage"
+msgstr  ""
+
+#: _cgi_page_dashboard.exl:250
+msgid   "Resource Usage"
+msgstr  ""
+
+#: _cgi_page_auth.exl:19
+msgid   "Add new user/group.."
+msgstr  ""
+
+#: _cgi_page_auth.exl:25
+msgid   "Find"
+msgstr  ""
+
+#: _cgi_session.exl:89 _cgi_page.exl:343
+msgid   "Session expired"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab2.exl:217
+msgid   "Access list configuration"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab2.exl:225
+#, php-format
+msgid   "In %s, specify the host that should have system access. In addition, "
+        "you can specify what type of access. If you want to explicitly log "
+        "such traffic in the packet filter log, activate the %s checkbox."
+msgstr  ""
+
+#: _cgi_page_system_acl_tab3.exl:160
+msgid   "Security configuration"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab3.exl:167
+msgid   "Maximum attempt:"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab3.exl:168
+msgid   "attempts"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab3.exl:172
+msgid   "Blocking period:"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab3.exl:183
+#, php-format
+msgid   "These settings allow you to block System access from IP addresses "
+        "that have repeatedly failed authentication. This applies to all "
+        "access type authentication. The %s contains networks that should "
+        "never be subject to access blocking."
+msgstr  ""
+
+#: _cgi_page_system_acl_tab3.exl:215 _cgi_page_system_acl_tab1.exl:99
+#: _cgi_page_system_acl_tab1.exl:187 _cgi_page_system_acl_tab1.exl:311
+#: _cgi_page_system_acl_tab1.exl:411
+msgid   "Entered values is syntactically or logically incorrect"
+msgstr  ""
+
+#: _cgi_page_system_notification_tab2.exl:20
+msgid   "This options will let you set which notification type you want "
+        "receive. The system will send each notification thru email "
+        "previously added on configuration tab."
+msgstr  ""
+
+#: _cgi_global_vars.exl:5 _cgi_global_vars.exl:6
+msgid   "The uploaded file exceeds the maximum file size"
+msgstr  ""
+
+#: _cgi_global_vars.exl:7
+msgid   "The uploaded file was only partially uploaded"
+msgstr  ""
+
+#: _cgi_global_vars.exl:8
+msgid   "No file was uploaded"
+msgstr  ""
+
+#: _cgi_global_vars.exl:9
+msgid   "Missing a temporary folder"
+msgstr  ""
+
+#: _cgi_global_vars.exl:10
+msgid   "Failed to write file to disk"
+msgstr  ""
+
+#: _cgi_global_vars.exl:11
+msgid   "File upload stopped by extension"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab1.exl:29
+#, php-format
+msgid   "%s Access Password"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab1.exl:33 _cgi_page_system_acl_tab1.exl:43
+#, php-format
+msgid   "Password for %s access:"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab1.exl:35
+#, php-format
+msgid   "This is an access password for login to %s. Leaving a password's "
+        "fields empty will preserve the existing password."
+msgstr  ""
+
+#: _cgi_page_system_acl_tab1.exl:80 _cgi_page_system_acl_tab1.exl:84
+#: _cgi_page_system_acl_tab1.exl:183 _cgi_page_system_acl_tab1.exl:307
+#: _cgi_page_system_acl_tab1.exl:407
+#, php-format
+msgid   "Password for %s access not match"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab1.exl:88
+msgid   "Password set successfully"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab1.exl:108 _cgi_page_system_acl_tab1.exl:222
+#, php-format
+msgid   "%s Access Setting"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab1.exl:112 _cgi_page_system_acl_tab1.exl:226
+msgid   "Access User:"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab1.exl:114 _cgi_page_system_acl_tab1.exl:228
+#, php-format
+msgid   "This is an access setting for %s. Default username set to '%s', you "
+        "can change it to your own with conditions: <ul><li>Maximum <b>8</b> "
+        "characters</li><li>Only accept <b>a-z A-Z 0-9 .-_@$</b> combination "
+        "characters</li><li>Only accept <b>$</b> as a last character</"
+        "li><li>Not accept <b>-</b> or <b>@</b> as a first character</li></ul>"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab1.exl:118 _cgi_page_system_acl_tab1.exl:232
+msgid   "Access Password:"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab1.exl:134 _cgi_page_system_acl_tab1.exl:250
+#, php-format
+msgid   "%s Daemon Setting"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab1.exl:138 _cgi_page_system_preference_tab2.exl:15
+msgid   "TCP Port:"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab1.exl:140 _cgi_page_system_acl_tab1.exl:256
+#, php-format
+msgid   "This is the TCP port number used to access %s service. It defaults "
+        "to TCP port %d. You can change it to %d or any value between %d and %"
+        "d"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab1.exl:144 _cgi_page_system_acl_tab1.exl:262
+#: _cgi_page_system_preference_tab2.exl:23
+msgid   "Session Idle Timeout:"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab1.exl:146 _cgi_page_system_acl_tab1.exl:264
+msgid   "This specifies the number of seconds after which an idle will "
+        "timeout."
+msgstr  ""
+
+#: _cgi_page_system_acl_tab1.exl:204 _cgi_page_system_acl_tab1.exl:329
+msgid   "Invalid TCP Port"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab1.exl:208 _cgi_page_system_acl_tab1.exl:333
+msgid   "Invalid timeout"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab1.exl:270
+msgid   "When this option enabled. You can connect to FTP daemon using "
+        "explicit TLS/SSL connection."
+msgstr  ""
+
+#: _cgi_page_system_acl_tab1.exl:347
+msgid   "Console Access Password"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab1.exl:351
+msgid   "Console Password:"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab1.exl:353
+msgid   "This is an access setting for console access. Leaving a fields empty "
+        "will preserve the existing setting."
+msgstr  ""
+
+#: _cgi_page_system_acl_tab1.exl:369
+msgid   "Web Terminal Setting"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab1.exl:374
+msgid   "Enable Web Terminal"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab1.exl:375
+#, php-format
+msgid   "When this option enabled. You can connect to console thru %s."
+msgstr  ""
+
+#: _cgi_page_system_acl_tab1.exl:436
+msgid   "Disable this daemon"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab1.exl:439
+msgid   "Enable this daemon"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab1.exl:461
+msgid   "Enabling daemon, please wait"
+msgstr  ""
+
+#: _cgi_page_system_acl_tab1.exl:467
+msgid   "Disabling daemon, please wait"
+msgstr  ""
+
+#: _cgi_page.exl:263
+msgid   "About"
+msgstr  ""
+
+#: _cgi_page.exl:264
+msgid   "Reload"
+msgstr  ""
+
+#: _cgi_page.exl:265
+msgid   "Logout"
+msgstr  ""
+
+#: _cgi_page.exl:334
+#, php-format
+msgid   "For more information about %s products, and technical support, "
+        "please visit our <a style='color: blue; text-decoration: none;' "
+        "href='%s' target='_blank'>website</a>"
+msgstr  ""
+
+#: _cgi_page_system_backup_restore_tab1.exl:119
+msgid   "Available backups"
+msgstr  ""
+
+#: _cgi_page_system_backup_restore_tab1.exl:120
+msgid   "Date/Time of creation"
+msgstr  ""
+
+#: _cgi_page_system_backup_restore_tab1.exl:130
+#: _cgi_page_system_update_tab1.exl:79
+msgid   "Options"
+msgstr  ""
+
+#: _cgi_page_system_backup_restore_tab1.exl:134
+#: _cgi_page_system_backup_restore_tab1.exl:162
+msgid   "Create backup"
+msgstr  ""
+
+#: _cgi_page_system_backup_restore_tab1.exl:135
+msgid   "This will backup current configuration and add it to the list of "
+        "available backups above."
+msgstr  ""
+
+#: _cgi_page_system_backup_restore_tab1.exl:141
+msgid   "Import backup"
+msgstr  ""
+
+#: _cgi_page_system_backup_restore_tab1.exl:142
+msgid   "This will upload existing backup file and added to list above."
+msgstr  ""
+
+#: _cgi_page_system_backup_restore_tab1.exl:157
+msgid   "Description (optional)"
+msgstr  ""
+
+#: _cgi_page_system_backup_restore_tab1.exl:209
+msgid   "Invalid file"
+msgstr  ""
+
+#: _cgi_page_system_update_tab1.exl:70
+msgid   "Available firmware updates"
+msgstr  ""
+
+#: _cgi_page_system_update_tab1.exl:83
+msgid   "Install updates"
+msgstr  ""
+
+#: _cgi_page_system_update_tab1.exl:84
+msgid   "This will install all updates on list of available firmware updates "
+        "above."
+msgstr  ""
+
+#: _cgi_page_system_update_tab1.exl:90
+msgid   "Upload firmware"
+msgstr  ""
+
+#: _cgi_page_system_update_tab1.exl:91
+#, php-format
+msgid   "This will upload update file manually and add it to the list of "
+        "available firmware updates above. Firmware file can be downloaded at "
+        "%s"
+msgstr  ""
+
+#: _cgi_page_system_update_tab1.exl:100
+msgid   "Download firmware"
+msgstr  ""
+
+#: _cgi_page_system_update_tab1.exl:101
+msgid   "This will download available update file and add it to the list of "
+        "available firmware updates above."
+msgstr  ""
+
+#: _cgi_page_system_update_tab1.exl:126
+msgid   "Updates File"
+msgstr  ""
+
+#: _cgi_page_system_update_tab1.exl:131
+msgid   "Start Upload"
+msgstr  ""
+
+#: _cgi_page_system_reboot.exl:16
+msgid   "Reboot the system now"
+msgstr  ""
+
+#: _cgi_page_system_reboot.exl:17
+msgid   "Click this button to reboot the system."
+msgstr  ""
+
+#: _cgi_page_system_reboot.exl:28
+msgid   "Shutdown the system now"
+msgstr  ""
+
+#: _cgi_page_system_reboot.exl:29
+msgid   "Click this button to shutdown the system."
+msgstr  ""
+
+#: _cgi_page_system_reboot.exl:46
+msgid   "This action will reboot the system. Are you really want to proceed?"
+msgstr  ""
+
+#: _cgi_page_system_reboot.exl:54
+msgid   "This action will shutdown the system. Are you really want to proceed?"
+msgstr  ""
+
+#: _cgi_page_system_reboot.exl:66
+msgid   "The system is rebooting now. The operation may take some time to "
+        "complete."
+msgstr  ""
+
+#: _cgi_page_system_reboot.exl:69
+msgid   "The system is shutting down now. The operation may take some time to "
+        "complete."
+msgstr  ""
+
+#: _cgi_page_system_preference_tab3.exl:19
+msgid   "System clock"
+msgstr  ""
+
+#: _cgi_page_system_preference_tab3.exl:23
+msgid   "Date:"
+msgstr  ""
+
+#: _cgi_page_system_preference_tab3.exl:25
+msgid   "This should be the date, time and time zone of the system's "
+        "location, which may be different from your local time."
+msgstr  ""
+
+#: _cgi_page_system_preference_tab3.exl:28
+msgid   "Time:"
+msgstr  ""
+
+#: _cgi_page_system_preference_tab3.exl:50
+msgid   "Timezone:"
+msgstr  ""
+
+#: _cgi_page_system_preference_tab3.exl:64
+msgid   "Time synchronization"
+msgstr  ""
+
+#: _cgi_page_system_preference_tab3.exl:77
+msgid   "Select an NTP (Network Time Protocol) Server to synchronize the time "
+        "and date."
+msgstr  ""
+
+#: _cgi_page_system_preference_tab3.exl:108
+msgid   "Date and time have been set successfully"
+msgstr  ""
+
+#: _cgi_page_system_preference_tab3.exl:118
+msgid   "NTP server configuration applied successfully"
+msgstr  ""
+
+#: _cgi_page_system_preference_tab2.exl:11
+#, php-format
+msgid   "%s Setting"
+msgstr  ""
+
+#: _cgi_page_system_preference_tab2.exl:17
+#, php-format
+msgid   "This is the TCP port number used to access %s. It defaults to TCP "
+        "port %d. You can change it to %d or any value between %d and %d."
+msgstr  ""
+
+#: _cgi_page_system_preference_tab2.exl:25
+#, php-format
+msgid   "This specifies the number of seconds after which an idle %s will "
+        "automatically be logout. Set '0' to disabled idle timeout."
+msgstr  ""
+
+#: _cgi_page_system_preference_tab2.exl:34
+#, php-format
+msgid   "%s HTTPS Certificate"
+msgstr  ""
+
+#: _cgi_page_system_preference_tab2.exl:39
+msgid   "Import CA Certificate"
+msgstr  ""
+
+#: _cgi_page_system_preference_tab2.exl:40
+#, php-format
+msgid   "By clicking this button will import %s Certificate Authority (CA) "
+        "into your browser."
+msgstr  ""
+
+#: _cgi_page_system_preference_tab2.exl:46
+msgid   "Re-generate HTTPS certificate"
+msgstr  ""
+
+#: _cgi_page_system_preference_tab2.exl:47
+#, php-format
+msgid   "By clicking this button %s Certificate Authority (CA) will be re-"
+        "generated. You need to remove any previous certificate's saved on "
+        "your browser and re-login to %s."
+msgstr  ""
+
+#: _cgi_page_system_preference_tab2.exl:103
+msgid   "This action will re-generate Web SSL certificate. Are you really "
+        "want to proceed?"
+msgstr  ""
+
+#: sophos-update.exc:29
+#, php-format
+msgid   "Stopping %s program."
+msgstr  ""
+
+#: sophos-update.exc:38
+#, php-format
+msgid   "Cannot running %s. Internal error"
+msgstr  ""
+
+#: sophos-update.exc:42
+#, php-format
+msgid   "%s already running.."
+msgstr  ""
+
+#: sophos-update.exc:61 sophos-update.exc:70
+#, php-format
+msgid   "%s: error while updating.."
+msgstr  ""
+
+#: sophos-update.exc:93
+#, php-format
+msgid   "Starting %s program."
+msgstr  ""
+
+#: syslog.exc:33 syslog.exc:67 syslog.exc:90
+msgid   "Invalid login request"
+msgstr  ""
+
+#: tools.exc:82
+#, php-format
+msgid   "%% File does not exist !!"
+msgstr  ""
+
+#: cli.exc:107
+msgid   "Entered command is syntactically or logically incorrect"
+msgstr  ""
+
+#: index.exh:53
+#, php-format
+msgid   "JavaScript must be enabled in order for you to use %s Web-based "
+        "interface.<br>However, it seems JavaScript is either disabled or not "
+        "supported by your browser."
+msgstr  ""
+
+#: index.exh:60
+msgid   "Page loading. Please wait.."
+msgstr  ""
+
+#: index.exh:71
+msgid   "ERROR: Your browser's cookie functionality is turned off. Please "
+        "turn it on."
+msgstr  ""
+
+#: index.exh:78
+msgid   "ERROR: The page could not be loaded."
+msgstr  ""
+
+#: tn_page.js:36
+msgid   "Unable to complete backend request. Please reload your browser."
+msgstr  ""

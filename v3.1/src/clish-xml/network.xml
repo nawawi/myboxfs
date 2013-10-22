@@ -1,0 +1,27 @@
+﻿<?xml version="1.0"?>
+<CLISH_MODULE>
+<VIEW name="network" prompt="${SYSTEM_NAME}/network/&gt; ">
+        <COMMAND name="."
+                help="Return to previous menu"
+                view="main"
+                viewid=""/>
+        <COMMAND name="interfaces/"
+                help="Network Interface configuration"
+		view="interface"/>
+        <COMMAND name="routing/"
+                help="Routes configuration"
+		view="routes"/>
+        <COMMAND name="arp/"
+                help="Static ARP management"
+		view="arp"/>
+        <COMMAND name="dns/"
+                help="DNS Server configuration"
+		view="dns"/>
+        <COMMAND name="dhcp/"
+                help="DHCP Server configuration"
+		view="dhcp"/>
+        <COMMAND name="ntp/"
+                help="NTP Server configuration"
+		view="ntp"/>
+</VIEW>
+</CLISH_MODULE>

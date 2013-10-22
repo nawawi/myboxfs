@@ -1,0 +1,201 @@
+<?php
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+function dhcp_check() {
+	if(!_INIT_CHECK_BINARY(array("/bin/dhcpd"))) {
+		_INIT_ECHO(1,_GETTEXT("Cannot execute %s. Internal error",_INIT_NAME()));
+		exit(1);
+	}
+}
+
+function dhcp_quiet() {
+	_INIT_QUIET('1');
+}
+
+// for use with other function
+function _dhcp_server_isenable() {
+	_INI_TOKEN_GET("network","dhcp_server.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+		return FALSE;
+	}
+	$_count=0;
+	foreach($_TOKEN as $_ID => $_DATA) {
+		if(_NULL($_DATA['DNAME'])
+			|| _NULL($_DATA['RANGE_START'])
+			|| _NULL($_DATA['RANGE_END'])) {
+			_INI_TOKEN_DELETE("network","dhcp_server.cfg",$_ID);
+			continue;
+		}
+		if(_NULL($_DATA['STAT']) || $_DATA['STAT']==0) continue;
+		$_count++;
+	}
+	if($_count!=0) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+function _dhcp_set_prog(&$_prog) {
+	_INI_TOKEN_GET("network","dhcp_server.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+		return FALSE;
+	}
+	$_dev="";
+	foreach($_TOKEN as $_ID => $_DATA) {
+		if(_NULL($_DATA['DNAME'])) continue;
+		$_dev=_DEFINITIONS_GET_INTERFACE_DEVICE($_DATA['DNAME']);
+		if(!_NULL($_dev)) $_prog .="$_dev ";
+		unset($_dev);
+	}
+	return $_prog;
+}
+
+function _dhcp_config_static(&$_data,$_dns,$_gw) {
+	_INI_TOKEN_GET("network","dhcp_static.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+                return FALSE;
+	}
+	$_config="";
+	foreach($_TOKEN as $_ID => $_DATA) {
+		if(_NULL($_DATA['DNAME'])
+			|| _NULL($_DATA['IP'])
+			|| _NULL($_DATA['MAC'])
+			|| !_CHECK_IP($_DATA['IP'])
+			|| !_CHECK_MACADDR($_DATA['MAC'])) {
+			_INI_TOKEN_DELETE("network","dhcp_static.cfg",$_ID);
+			continue;
+		}
+		$_key=_INI_TOKEN_CREATE_KEY(time());
+		$_config .="\thost HOST_{$_key} {\n";
+		$_config .="\t\thardware ethernet {$_DATA['MAC']};\n";
+		$_config .="\t\tfixed-address {$_DATA['IP']};\n";
+		$_config .="\t\toption domain-name-servers {$_dns};\n";
+		$_config .="\t\toption routers {$_gw};\n";
+		$_config .="\t}\n";
+		unset($_key);
+	}
+	if(!_NULL($_config)) {
+		$_data .="$_config\n";
+	}
+}
+
+function dhcp_config($_scriptdata='') {
+	@unlink("/etc/dhcpd.conf");
+	_INI_TOKEN_GET("network","dhcp_server.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+		_INIT_ECHO(0,_GETTEXT("%s daemon (%s) disabled","DHCP","dhcpd"));
+		dhcp_quiet();
+		return FALSE;
+	}
+	$_shared="";
+	foreach($_TOKEN as $_ID => $_DATA) {
+		if(_NULL($_DATA['DNAME'])
+			|| _NULL($_DATA['RANGE_START'])
+			|| _NULL($_DATA['RANGE_END'])) {
+			_INI_TOKEN_DELETE("network","dhcp_server.cfg",$_ID);
+			continue;
+		}
+		if(_NULL($_DATA['STAT']) || $_DATA['STAT']==0) continue;
+		_INI_TOKEN_GET_BYPARAM("network","eth.cfg","NAME",$_DATA['DNAME'],$_NTOKEN);
+		if(_ARRAY_NULL($_NTOKEN)
+			|| _NULL($_NTOKEN['DEVICE'])
+			|| _NULL($_NTOKEN['ADDR'])
+			|| _NULL($_NTOKEN['NETWORK'])
+			|| _NULL($_NTOKEN['MASK'])
+			|| _NULL($_NTOKEN['BCAST'])) continue;
+		
+		if($_NTOKEN['TYPE']=="vlan") $_NTOKEN['DEVICE']="{$_NTOKEN['DEVICE']}.{$_NTOKEN['TAG']}";
+
+		if(_NULL($_DATA['GATEWAY'])) $_DATA['GATEWAY']=$_NTOKEN['ADDR'];
+		if(_NULL($_DATA['DNS1'])) $_DATA['DNS1']=$_NTOKEN['ADDR'];
+		if(!_NULL($_DATA['DNS2'])) $_DATA['DNS1'] .=",{$_DATA['DNS2']}";
+		if($_DATA['WINS_NODE']==0) unset($_DATA['WINS_ADDR']);
+		$_shared .="shared-network {$_NTOKEN['DEVICE']} {\n";
+		_dhcp_config_static($_shared,$_DATA['DNS1'],$_DATA['GATEWAY']);
+		$_shared .="\tsubnet {$_NTOKEN['NETWORK']} netmask {$_NTOKEN['MASK']} {\n";
+		$_shared .="\t\toption subnet-mask {$_NTOKEN['MASK']};\n";
+		$_shared .="\t\toption broadcast-address {$_NTOKEN['BCAST']};\n";
+		$_shared .="\t\toption domain-name-servers {$_DATA['DNS1']};\n";
+		$_shared .="\t\toption routers {$_DATA['GATEWAY']};\n";
+		if(!_NULL($_DATA['DOMAIN'])) $_shared .="\t\toption domain-name \"{$_DATA['DOMAIN']}\";\n";
+		$_shared .="\t\trange {$_DATA['RANGE_START']} {$_DATA['RANGE_END']};\n";
+		if(!_NULL($_DATA['WINS_ADDR'])) $_shared .="\t\toption netbios-name-servers {$_DATA['WINS_ADDR']};\n";
+		if($_DATA['WINS_NODE']!=1) $_shared .="\t\toption netbios-node-type {$_DATA['WINS_NODE']};\n";
+		$_shared .="\t}\n";
+		$_shared .="}\n";
+		unset($_NTOKEN);
+	}
+	$_config="";
+	$_config .="deny bootp;\n";
+	$_config .="allow booting;\n";
+	$_config .="deny declines;\n";
+	$_config .="max-lease-time 172800; # 2d\n";
+	$_config .="default-lease-time 86400; # 1d\n";
+	$_config .="min-lease-time 600; # 5m\n";
+	$_config .="ddns-update-style ad-hoc;\n";
+	$_config .="local-port 67;\n";
+	$_config .="ping-checks;\n";
+	$_config .="one-lease-per-client on;\n";
+	$_config .="authoritative;\n";
+	_TRIM($_shared);
+	if(!_NULL($_shared)) {
+		@_MKDIR("/var/lib/dhcpd");
+		@touch("/var/lib/dhcpd/dhcpd.leases");
+		$_config .="$_shared\n";
+		return _FILE_SAVE("/etc/dhcpd.conf","$_config");
+	}
+	_INIT_ECHO(0,_GETTEXT("%s daemon (%s) disabled","DHCP","dhcpd"));
+	dhcp_quiet();
+	return FALSE;
+}
+
+
+function dhcp_up() {
+	@unlink(_TASKQ_PATH."/dhcp_up");
+	$_prog="/bin/dhcpd";
+	$_dev="";
+	_dhcp_set_prog($_dev);
+	if(_EXEC_CMD("$_prog $_dev")==0) {
+		_INIT_CHKPROG_LOG("dhcpd");
+		return TRUE;
+	}
+	return dhcp_restart();
+}
+
+
+function dhcp_start() {
+	_INIT_CHECK_DAEMON_STATUS("dhcpd");
+	$_prog="/bin/dhcpd";
+	if(!dhcp_config()) {
+		_INIT_ECHO(1,_GETTEXT("Starting %s failed","dhcpd"));
+		return FALSE;
+	}
+	$_dev="";
+	_dhcp_set_prog($_dev);
+	_INIT_START_DAEMON("$_prog $_dev","dhcp_up");
+	if(_INIT_BOOTUP()==FALSE) {
+		_INIT_TASKQ("policy_sysinput");
+	}
+	return TRUE;
+}
+
+function dhcp_stop() {
+	_INIT_STOP_DAEMON("dhcpd","dhcp_up",1);
+	if(_INIT_BOOTUP()==FALSE) {
+		_INIT_TASKQ("policy_sysinput");
+	}
+	sleep(2);
+	return TRUE;
+}
+
+function dhcp_restart() {
+	_INIT_EXEC("dhcp_stop");
+	_INIT_EXEC("dhcp_start");
+	return TRUE;
+}
+
+function dhcp_reload() {
+	return _INIT_EXEC("dhcp_restart");
+}
+
+?>

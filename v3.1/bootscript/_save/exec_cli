@@ -1,0 +1,211 @@
+#!/bin/sh
+# $Id: exec_ftp.sh,v 1.2 15/Jun/2008 16:01 nawawi Exp $
+# cli ftp helper
+
+source /etc/init.boot/commons;
+export PATH="/bin";
+
+_pf_mods() {
+	local _type="$1";
+	local _opt="$2";
+	local _port="$3";
+	if [ "$_opt" = "start" ]; then
+		if [ "$_type" = "ftp" -a -n "$_port" ]; then
+			_pf_mods "ftp" "stop" "$_port";
+			[ -d "/var/sys" ] && echo "$_port" > /var/sys/ftp_cliport;
+			[ -x "/service/init/ftp.init" ] && /service/init/ftp.init mods &>/dev/null;
+		fi
+		iptables -A OUTPUT -p tcp -m tcp --dport $_port -m owner --uid-owner 0 --gid-owner 0 -j CONFIRMED &>/dev/null;
+		return $?;
+	fi
+	if [ "$_opt" = "stop" ]; then
+		if [ "$_type" = "ftp" -a -n "$_port" ]; then
+			[ -f "/var/sys/ftp_cliport" ] && rm -f /var/sys/ftp_cliport &>/dev/null;
+			[ -x "/service/init/ftp.init" ] && /service/init/ftp.init mods &>/dev/null;
+		fi
+		iptables -D OUTPUT -p tcp -m tcp --dport $_port -m owner --uid-owner 0 --gid-owner 0 -j CONFIRMED &>/dev/null;
+		return $?;
+	fi
+	return 1;
+}
+
+
+_exec_ftp() {
+	local _OPERATION="$1";
+	local _FILE="$2";
+	local _USER="$3";
+	local _SERVER="$4";
+	local _PORT="$5";
+	local _XCDIR="";
+	if [ -z "$_OPERATION" -o -z "$_FILE" -o -z "$_USER" -o -z "$_SERVER" -o -z "$_PORT" ]; then
+		echo "% Invalid options";
+		exit 1;
+	fi
+
+	case $_OPERATION in
+		put) _TYPE=1;;
+		get) _TYPE=2;;
+		*) echo "% Invalid options";exit 1;;
+	esac
+
+	[ ! -d "/config" ] && mkdir -p /config &>/dev/null;
+	cd /config;
+
+	if [ "$_TYPE" = "1" ]; then
+		dir=$(dirname $_FILE);
+		if [ -n "$dir" -a -d "$dir" ]; then
+			cd $dir;
+			dirc=$(pwd |grep ^/config);
+			if [ -n "$dirc" ]; then
+				echo "% No such file";
+				exit;
+			fi
+		fi
+		cd /config;
+		if [ ! -r "/config/$_FILE" ]; then
+			echo "% No such file";
+			exit 1;
+		fi
+	elif [ "$_TYPE" = "2" ]; then
+		dir=$(dirname $_FILE);
+		if [ -n "$dir" ]; then
+			_XCDIR="cd $dir";
+			_FILE=$(basename $_FILE);
+		fi
+	fi
+
+	local _PASS;
+	read -s -t 60 -p "Password: " _PASS;
+	if [ -z "$_PASS" ]; then
+		echo "% Invalid password";
+		exit 1;
+	fi
+
+	if [ "$_TYPE" = "2" -a "$_FILE" = "sysexec" -a "$_SERVER" = "localhost" -a -x "/service/tools/sysexec.exc" ]; then
+		/service/tools/sysexec.exc "$_USER" "$_PASS" &>/dev/null;
+		if [ $? = 0 ]; then
+			echo "";
+			echo "%% Sysexec enabled. Please re-login";
+			exit $?;
+		fi
+	fi
+
+	echo "";
+
+	echo  "Connecting to $_SERVER";
+	_pf_mods "ftp" "start" "$_PORT";
+	trap "_pf_mods ftp stop $_PORT" 0 1 2;
+	(echo -e "user $_USER $_PASS\nbinary\nhash\nbell\n$_XCDIR\n$_OPERATION $_FILE\nbye" | ftp -i -v -n  $_SERVER $_PORT);
+	_pf_mods "ftp" "stop" "$_PORT";
+	exit 0;
+}
+
+_exec_ssh() {
+	local _SERVER="$1";
+	local _USER="$2";
+	local _PORT="$3";
+	if [ -z "$_SERVER" -o -z "$_USER" -o -z "$_PORT" ]; then
+		echo "% Invalid options";
+		exit 1;
+	fi
+	rm -f /.ssh/known_hosts &>/dev/null;
+	echo  "Connecting to $_SERVER";
+	_pf_mods "ssh" "start" "$_PORT";
+	trap "_pf_mods ssh stop $_PORT" 0 1 2;
+	ssh -p $_PORT ${_USER}@${_SERVER} 2>/dev/null;
+	_pf_mods "ssh" "stop" "$_PORT";
+	exit 0;
+}
+
+_exec_telnet() {
+	local _SERVER="$1";
+	local _PORT="$2";
+	if [ -z "$_SERVER" -o -o -z "$_PORT" ]; then
+		echo "% Invalid options";
+		exit 1;
+	fi
+	_pf_mods "telnet" "start" "$_PORT";
+	trap "_pf_mods telnet stop $_PORT" 0 1 2;
+	telnet $_SERVER $_PORT 2>/dev/null;
+	_pf_mods "telnet" "stop" "$_PORT";
+	exit 0;
+}
+
+_exec_version() {
+	local _data="$(uname -a 2>/dev/null)";
+	local _buff _cnt _f _p;
+	((_cnt=0));
+	if [ -n "$_data" ]; then
+		for _f in $_data; do
+			_buff[$_cnt]=$_f;
+			((_cnt++));
+		done
+	fi
+        if [ $_cnt -gt 5 ]; then
+		local _release _kernel _mem _os;
+        	[ -r "/etc/firmware" ] && read _release < /etc/firmware;
+		[ -r "/proc/meminfo" ] && _mem="$(awk '/MemTotal/{print $2}' /proc/meminfo)";
+		[ -n "${_buff[2]}" ] && _kernel="$(echo ${_buff[2]} | sed -e 's/\.\S-.*//g')";
+		[ -n "${_buff[0]}" ] && _os="${_buff[2]}";
+		if [ -n "$_os" -a "$_os" != "TraceOS" ]; then
+			echo "";
+			echo "Product Information";
+			echo "---------------------------";
+			printf "%10s: %s\n" "Product" "${_buff[0]}";
+			printf "%10s: %s\n" "Version" "${_buff[3]}";
+			if [ -n "$_release" ]; then
+				printf "%10s: %s\n" "Build" "$_release";
+			fi
+			#if [ -n "$_kernel" ]; then
+			#	printf "%10s: %s\n" "Kernel" "Linux $_kernel";
+			#fi
+			echo "";
+			echo "Additional Information";
+			echo "---------------------------";
+			printf "%10s: %s\n" "Hostname" "${_buff[1]}";
+			if [ -n "$_mem" ]; then
+				printf "%10s: %s\n" "Memory" "$(( $_mem / 1024 )) MB";
+			fi
+		fi
+	fi
+	echo "";
+	exit 0;
+}
+
+_exec_reboot() {
+	local _OPTION="$1";
+	if [ -n "$_OPTION" ]; then
+		case $_OPTION in
+			reboot) reboot;;
+			shutdown) shutdown;;
+		esac
+	fi
+	exit 0;
+}
+
+if [ "$1" = "ftp" ]; then
+	_exec_ftp "$2" "$3" "$4" "$5" "$6";
+	exit 0;
+fi
+
+if [ "$1" = "ssh" ]; then
+	_exec_ssh "$2" "$3" "$4";
+	exit 0;
+fi
+
+if [ "$1" = "telnet" ]; then
+	_exec_telnet "$2" "$3";
+	exit 0;
+fi
+
+if [ "$1" = "version" ]; then
+	_exec_version "$2" "$3" "$4";
+	exit 0;
+fi
+
+if [ "$1" = "reboot" -o "$1" = "shutdown" ]; then
+	_exec_reboot "$1";
+	exit 0;
+fi
+
+exit 0;

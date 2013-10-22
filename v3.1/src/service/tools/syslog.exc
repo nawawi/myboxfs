@@ -1,0 +1,180 @@
+<?php
+class EXE {
+	private function _parse_sshlog($_ldate,$_pid,$_str) {
+		$_pat1="Accepted\s+password\s+for\s+(\w+)\s+from\s+(\S+)";
+		$_pat2="Connection\s+closed\s+by\s+(\S+)";
+		$_pat3="Failed\s+password\s+for\s+(\w+)\s+from\s+(\S+)";
+		$_pat4="Invalid\s+user\s+(\w+)\s+from\s+(\S+)";
+		$_thisyear=date('Y');
+		if(preg_match("/$_pat1/",$_str,$_match)) {
+			$_who=_TRIM($_match[1]);
+			$_ip="unknown";
+			if(_CHECK_IP($_match[2])) {
+				$_ip=$_match[2];
+			}
+			$_sshuser=_FILE_GET("/etc/ssh/ssh_user");
+			if(_NULL($_sshuser)) $_sshuser="sshuser";
+			if($_who!="$_sshuser") {
+				_KILL($_pid,9);
+				$_txt="ECODE=00 TYPE=ssh USER=$_who IP=$_ip MSG="._GETTEXT("Invalid login request");
+				_LOG_AUTH($_txt);
+				_SESSION_RESET_AUTH_PASSWORD();
+				_SESSION_ATTEMPT($_ip,"ssh");
+				return FALSE;
+			}
+			$_txt="ECODE=00 TYPE=ssh USER=$_who IP=$_ip MSG="._GETTEXT("Password Accepted");
+			_SESSION_SSH('1',$_pid,$_ldate,$_ip);
+			_LOG_AUTH($_txt);
+			_SESSION_ATTEMPT_DELETE($_ip);
+		} elseif(preg_match("/$_pat2/",$_str,$_match)) {
+			$_who=$_match[1];
+			$_ip=_SESSION_SSH('2',$_pid,$_ldate);
+			$_txt="ECODE=01 TYPE=ssh USER=$_who IP=$_ip MSG="._GETTEXT("Session logout");
+			_LOG_AUTH($_txt);
+		} elseif(preg_match("/$_pat3/",$_str,$_match)) {
+			$_who=$_match[1];
+			$_ip="unknown";
+			if(_CHECK_IP($_match[2])) {
+				$_ip=$_match[2];
+			}
+			_KILL($_pid,9);
+			$_txt="ECODE=01 TYPE=ssh USER=$_who IP=$_ip MSG="._GETTEXT("Password incorrect");
+			_LOG_AUTH($_txt);
+			_SESSION_ATTEMPT($_ip,"ssh");
+		} elseif(preg_match("/$_pat4/",$_str,$_match)) {
+			$_ip="unknown";
+			$_who=$_mm[1];
+			if(_NULL($_who)) $_who="unknown";
+			if(_CHECK_IP($_match[2])) {
+				$_ip=$_match[2];
+			}
+			_KILL($_pid,9);
+			_SESSION_RESET_AUTH_PASSWORD();
+			$_txt="ECODE=01 TYPE=ssh USER=$_who IP=$_ip MSG="._GETTEXT("Invalid login request");
+			_LOG_AUTH($_txt);
+			_SESSION_ATTEMPT($_ip,"ssh");
+		}
+	
+		_SESSION_RESET_AUTH_PASSWORD();
+		unset($_ldate,$_pid,$_str);
+		return TRUE;
+	}
+
+	private function _parse_ftplog($_ldate,$_pid,$_str) {
+		$_pat="\s+\[(\S+)\]\s+OK\s+LOGIN\:\s+Client\s+\"(\S+)\"";
+
+		if(preg_match("/$_pat/",$_str,$_match)) {
+			$_who=_TRIM($_match[1]);
+			$_ip="unknown";
+			if(_CHECK_IP($_match[2])) {
+				$_ip=$_match[2];
+			}
+			$_ftpuser=_FILE_GET("/etc/vsftpd/ftp_user");
+			if(_NULL($_ftpuser)) $_ftpuser="ftpuser";
+			if($_who!="$_ftpuser") {
+				_KILL($_pid,9);
+				$_txt="ECODE=01 TYPE=ftp USER=$_who IP=$_ip MSG="._GETTEXT("Invalid login request");
+				_LOG_AUTH($_txt);
+				_SESSION_RESET_AUTH_PASSWORD();
+				_SESSION_ATTEMPT($_ip,"ftp");
+				return FALSE;
+			}
+			_GET_PID("ftpd",$_ppid);
+			if(!_ARRAY_NULL($_ppid)) {
+				$_tag=0;
+				foreach($_ppid as $_xpid) {
+					if($_xpid=="$_pid") {
+						$_tag=1; continue;
+					}
+					if($_tag==1) {
+						$_pid2=$_xpid;
+						$_tag=0;
+					}
+				}
+			}
+			_SESSION_FTP('1',$_pid,$_pid2,$_ldate,$_ip);
+			$_txt="ECODE=00 TYPE=ftp USER=$_who IP=$_ip MSG="._GETTEXT("Password Accepted");
+			_LOG_AUTH($_txt);
+			_SESSION_ATTEMPT_DELETE($_ip);
+		}
+		_SESSION_RESET_AUTH_PASSWORD();
+		unset($_ldate,$_pid,$_str,$_match);
+		return TRUE;
+	}
+	/*
+	ECODE:
+	00=OK
+	01=KO
+	*/
+	private function _parse_loginlog($_time,$_msg,$_pid) {
+		if(preg_match("/ECODE=(\d+)\s+TYPE=console\s+USER=console\s+IP=(.*?)\s+MSG=/",$_msg,$_mm)) {
+			$_ecode=$_mm[1];
+			$_dev=$_mm[2];
+			if(_NULL($_dev)) {
+				return FALSE;
+			}
+			if($_ecode=="00") {
+				$_console="console_{$_pid}_{$_dev}_{$_time}";
+				@touch(_CONSOLE_SESSIONS_PATH."/$_console");
+			} else {
+				@_UNLINK(_CONSOLE_SESSIONS_PATH."/console_{$_pid}_{$_dev}:*");
+			}
+			return TRUE;
+		}
+		return FALSE;
+	}
+
+	private function _read($_time,$_prog,$_pid,$_msg) {
+		if(!_NULL($_time) && !_NULL($_prog) && !_NULL($_msg) ) {
+			_LOWER($_prog);
+			switch($_prog) {
+		                case 'sshd':
+					self::_parse_sshlog($_time,$_pid,$_msg);
+				break;
+		                case 'vsftpd':
+					self::_parse_ftplog($_time,$_pid,$_msg);
+				break;
+		                case 'login':
+					self::_parse_loginlog($_time,$_msg,$_pid);
+				break;
+				default:
+		                break;
+			}
+		}
+	}
+
+	private function _SYSLOG_MAIN() {
+		define('_AWIE_CODE','ef3802a1fce98f3985e6a9a1f7c1a024');
+		include_once("lib.exl");
+		include_once("init.exl");
+		proc_nice(-5);
+		if(!is_resource(STDIN)) {
+			define('STDIN',fopen("php://stdin","r"));
+			register_shutdown_function(create_function('','fclose(STDIN);return true;'));
+                }
+		while($_buff=fgets(STDIN)) {
+			_TRIM($_buff);
+			if(_NULL($_buff)) continue;
+			list($_date,$_prog,$_pid,$_msg)=preg_split("/,/",$_buff,4);
+			_TRIM($_msg);
+			if(_NULL($_date) || _NULL($_msg) ) continue;
+			if(!_NULL($_pid)) {
+				if(preg_match("/^pid\s+(\d+)$/",$_pid,$_mm)) {
+					$_pidt=_TRIM($_mm[1]);
+					if(!_NULL($_pidt)) $_pid=$_pidt;
+					unset($_pidt,$_mm);
+				}
+			}
+			$_time=strtotime($_date);
+			if($_time==FALSE) continue;
+			self::_read($_time,$_prog,$_pid,$_msg);
+			unset($_buff,$_date,$_prog,$_pid,$_msg,$_time);
+		}
+		exit(0);
+	}
+
+	public static function MAIN() {
+		self::_SYSLOG_MAIN();
+	}
+}
+?>

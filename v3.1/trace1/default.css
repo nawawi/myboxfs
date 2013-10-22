@@ -1,0 +1,147 @@
+body {
+	font-family: Arial, Verdana,  Helvetia, Sans-Serif;
+	font-size: 12px;
+	background-color: #a7a7a7;
+	background-image: url(bg.png);
+}
+
+div {
+	margin: 0px;
+	padding: 0px;
+	border: 0px;
+}
+
+img {border: 0px;}
+
+div#top_box {
+	overflow: hidden; 
+	position: absolute; 
+	left: 2px; top: 2px; 
+	width: 1010px;
+	height: 116px; 
+	background-image: url(box_top.png);
+	background-position: left;
+	background-attachment: scroll;
+	background-repeat: repeat-x;
+}
+
+div#login_box {
+	overflow: hidden; 
+	position: absolute; 
+	left: 2px; top: 118px; 
+	width: 1010px;
+	height: 365px; 
+	background-image: url(box_login.png);
+	background-position: left;
+	background-attachment: scroll;
+	background-repeat: repeat-x;
+}
+
+div#login_input {
+	overflow: hidden; 
+	position: absolute; 
+	left: 430px; 
+	top: 140px; 
+	vertical-align: middle;
+}
+
+input#login_pass {
+	position: relative;
+	width: 125px; 
+	height: 15px;
+	border: 0px;
+	background: #ffffff;
+}
+
+div#login_submit {
+	cursor: pointer;
+	position: absolute;
+	left: 575px; 
+	top: 140px; 
+	width: 65px; 
+	height: 18px;
+}
+
+div#main_box {
+	overflow: hidden; 
+	position: absolute; 
+	left: 2px; top: 118px; 
+	width: 1010px;
+	height: 680px; 
+	background-image: url(box_content.png);
+}
+
+div#dashboard {
+	overflow: hidden; 
+	position: absolute; 
+	left: 12px; top: 83px;
+	cursor: pointer;
+	background-image: url(dashboard.png);
+	width: 149px;
+	height: 27px; 
+}
+
+div#box_title {
+	overflow: hidden; 
+	position: absolute; 
+	left: 160px; top: 90px;
+	font-size: 14px;
+	font-weight: bold;
+	color: #ffffff;
+}
+
+div#pbar {
+	overflow: hidden; 
+	position: absolute; 
+	left: 880px; top: 65px;
+	background-image: url(prosesbar.gif ) ;
+	border: 0px;
+	width: 124px;
+	height: 15px; 
+}
+
+div#toolbox {
+	overflow: hidden; 
+	position: absolute; 
+	left: 880px; top: 40px;
+	background-image: url(toolbox.png);
+	width: 112px;
+	height: 26px; 
+}
+
+div#toolbox_a {
+	overflow: hidden; 
+	position: absolute; 
+	left: 12px; top: 0px;
+	cursor: pointer;
+	width: 24px;
+	height: 24px; 
+}
+
+div#toolbox_b {
+	overflow: hidden; 
+	position: absolute; 
+	left: 40px; top: 0px;
+	cursor: pointer;
+	width: 24px;
+	height: 24px; 
+}
+
+div#toolbox_c {
+	overflow: hidden; 
+	position: absolute; 
+	left: 70px; top: 0px;
+	cursor: pointer;
+	width: 25px;
+	height: 24px; 
+}
+
+div#content_box {
+	overflow: hidden; 
+	position: absolute; 
+	left: 156px; top: 1px;
+	width: 846px;
+	height: 670px;
+	overflow: auto;
+	background: #dddddd;
+}

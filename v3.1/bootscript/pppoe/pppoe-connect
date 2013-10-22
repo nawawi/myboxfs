@@ -1,0 +1,76 @@
+#!/bin/sh
+if [ $# != 5 ] ; then
+	echo "$0: INTERFACE REFID MTU TIMEOUT NAT";
+	exit 1;
+fi
+
+trap "" SIGHUP;
+
+_PARAM="$1#$2#$5";
+_HW=$1;
+_ID=$2;
+_MTU=$3;
+_RETRY=$4;
+_MINTIME=60;
+_OPTIONS="/etc/ppp/pppoe/options";
+_DLOG="/tmp/pppoe-connect$$.debug";
+__pppoe_log() {
+	local _msg="$@";
+	[[ $_msg =~ ^- ]] && _msg=${_msg:1:${#_msg}};
+	logger -p daemon.info -t pppoe-connect "$_msg";
+}
+
+# pppd path setting
+PPPD_IPUP="/etc/ppp/pppoe/ip-up";
+PPPD_IPDOWN="/etc/ppp/pppoe/ip-down";
+PPPD_UPAPFILE="/etc/ppp/pppoe/pap-secrets";
+PPPD_CHAPFILE="/etc/ppp/pppoe/chap-secrets";
+PPPD_PEERFILES="/etc/ppp/pppoe/peers/";
+export PPPD_IPUP PPPD_IPDOWN PPPD_UPAPFILE PPPD_CHAPFILE PPPD_PEERFILES;
+
+if [ ! -f "${PPPD_PEERFILES}/${_ID}" ]; then
+	echo "peers file '${_ID}' not exist";
+	exit 1;
+fi
+# set network interface
+/bin/ifconfig $_HW down;
+/bin/ifconfig $_HW 0.0.0.0 up;
+
+while [ true ]; do
+	_CHECK=1;
+	while [ $_CHECK = 1 ] ; do 
+		_MSG="$(/bin/pppoe -I $_HW -A -m $_MTU 2>$_DLOG)";
+		if [ $? != 0 ] && [ -f "$_DLOG" ]; then
+			_MSG="$(iocat $_DLOG)";
+			unlink $_DLOG;
+			if [ -n "$_MSG" ]; then
+				_MSG=${_MSG//-m: /MTU: };
+				if [[ $_MSG =~ "$_MTU is too high \(max ([0-9]+)\)" ]]; then
+					_MTU="${BASH_REMATCH[1]}";
+					_MSG+=" set mtu to $_MTU";
+				fi
+				__pppoe_log "$_MSG";
+				sleep $_RETRY;
+				continue;
+			fi
+		fi
+
+		if [ ${#_MSG} = 0 ]; then
+			_MSG="Failed to get Access-Concentrator - retry in $_RETRY seconds";
+			__pppoe_log "$_MSG";
+			sleep $_RETRY;
+		else
+			_CHECK=0;
+			__pppoe_log "$_MSG";
+		fi
+	done
+	_START=$(strftime %s);
+	/bin/pppd-pppoe file $_OPTIONS call $_ID ipparam "$_PARAM" pty "/bin/pppoe -I $_HW -m $_MTU";
+	_END=$(strftime %s);
+
+	_DIFF=$(($_END - $_START));
+	if [ $_DIFF -lt $_MINTIME ] ; then
+		__pppoe_log "DSL connection time shorter then $_MINTIME seconds ($_DIFF sec), wait $_RETRY seconds.";
+	fi
+	sleep $_RETRY;
+done

@@ -1,0 +1,114 @@
+<?php
+if(!defined('_CGI_CODE')||_CGI_CODE!="90d45215e48dac81e802f17310ad0c1f") exit("\n\nERROR: _CGI_CODE not set\n\n");
+/* req_data = p_definitions_timeevents */
+
+
+function _CGI_PAGE_DEFINITIONS_NAV_TIMEEVENTS() {
+	extract($GLOBALS['_IMG']);
+	_DEFINITIONS_GET("timeevents",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+		return _GETTEXT("No data available");
+        }
+	$_page_s=array();
+	foreach($_TOKEN as $_type => $_id_array) {
+		foreach($_id_array as $_id => $_set_a) {
+			if(_NULL($_set_a['NAME'])) {
+				_DEFINITIONS_DELETE("timeevents",$_type,$_id);
+				continue;
+			}
+			$_name=htmlspecialchars($_set_a['NAME']);
+			$_alt="$_name";
+			if($_type=="single") {
+				$_alt="From {$_set_a['SDATE']} {$_set_a['STIME']} until {$_set_a['EDATE']} {$_set_a['ETIME']}";
+			} elseif($_type=="recurring") {
+				if(!_NULL($_set_a['WDAYS'])) {
+					$_wdays=_STR_ARRAY($_set_a['WDAYS'],",");
+					$_wdd="";
+					foreach($_wdays as $_wd) {
+						$_wdd .=_DEFINITIONS_TIMEEVENT_WEEKDAYS($_wd).",";
+					}
+					_TRIM($_wdd,",");
+					unset($_wd);
+					$_set_a['WDAYS']="on $_wdd";
+				}
+				$_alt="From {$_set_a['SDATE']} {$_set_a['STIME']} until {$_set_a['EDATE']} {$_set_a['ETIME']} {$_set_a['WDAYS']}";
+			}
+			$_page_s[strtolower($_name)]="<div class='dnd_drag' id='dnd_{$_type}'><span "._CGI_TOOLTIPS($_alt)."><img style='width: 14px; float: left;margin-right: 2px;' src='{$_ICON_DEFTIMEEVENT[$_type]}'>$_name</span></div>";
+		}
+		unset($_id_array,$_type,$_id,$_set_a,$_alt,$_name,$_wdays);
+	}
+
+	$_page="";
+	if(!_ARRAY_NULL($_page_s)) {
+		ksort($_page_s);
+		foreach($_page_s as $_line) {
+			$_page .="$_line";
+		}
+	}
+	return trim($_page);
+}
+
+function _CGI_PAGE_DEFINITIONS_PBOX_TIMEEVENTS($_stype='all',$_sfind='') {
+	extract($GLOBALS['_IMG']);
+	_DEFINITIONS_GET("timeevents",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+		return _GETTEXT("No data available");
+        }
+
+	$_page_s=array();
+	foreach($_TOKEN as $_type => $_id_array) {
+		foreach($_id_array as $_id => $_set_a) {
+			if(_NULL($_set_a['NAME'])) {
+				_DEFINITIONS_DELETE("timeevents",$_type,$_id);
+				continue;
+			}
+
+			if($_stype!='all' && $_stype!="$_type") continue;
+			if(!_NULL($_sfind) && !eregi($_sfind,$_set_a['NAME'])) continue;
+
+			$_name=htmlspecialchars($_set_a['NAME']);
+			$_alt="$_name";
+			if($_type=="single") {
+				$_alt="From {$_set_a['SDATE']} {$_set_a['STIME']} until {$_set_a['EDATE']} {$_set_a['ETIME']}";
+			} elseif($_type=="recurring") {
+				if(!_NULL($_set_a['WDAYS'])) {
+					$_wdays=_STR_ARRAY($_set_a['WDAYS'],",");
+					$_wdd="";
+					foreach($_wdays as $_wd) {
+						$_wdd .=_DEFINITIONS_TIMEEVENT_WEEKDAYS($_wd).",";
+					}
+					_TRIM($_wdd,",");
+					unset($_wd);
+					$_set_a['WDAYS']="on $_wdd";
+				}
+				$_alt="From {$_set_a['SDATE']} {$_set_a['STIME']} until {$_set_a['EDATE']} {$_set_a['ETIME']} {$_set_a['WDAYS']}";
+			}
+
+			$_desc=htmlspecialchars($_set_a['NOTE']);
+			if(!_NULL($_desc)) $_desc="<br /><span "._CGI_TOOLTIPS($_desc)."<span style='color: #ff6600;'>&#8764;</span> $_desc</span>";
+			$_page_s[strtolower($_name)]="
+				<tr id='page_def_{$_type}'>
+					<td class='defpbox_img'><img style='margin-right: 2px; float: left;' src='{$_ICON_DEFTIMEEVENT[$_type]}'></td>
+					<td><div class='defpbox_name' style='width: 150px;'>$_name</div></td>
+					<td><div class='defpbox_name' style='width: 450px; font-weight: normal;'><span><b>[$_type]</b> $_alt</span>$_desc</div></td>
+					<td class='defpbox_opt'>
+						"._CGI_BUTTON(array('id'=>"bdel_{$_id}|$_type",'class'=>'button_s','text'=>'Delete','css'=>'width: 80px;'))."
+						"._CGI_BUTTON(array('id'=>"bedit_{$_id}|$_type",'class'=>'button_s','text'=>'Edit','css'=>'width: 80px; margin-top: 2px;'))."
+					</td>
+				</tr>
+			";
+		}
+		unset($_id_array,$_type,$_id,$_set_a,$_alt,$_name,$_wdays);
+	}
+
+	$_page="<table id='defpbox_table'>";
+	if(!_ARRAY_NULL($_page_s)) {
+		ksort($_page_s);
+		foreach($_page_s as $_line) {
+			$_page .="$_line";
+		}
+	}
+	$_page .="</table>";
+	return trim($_page);
+}
+?>

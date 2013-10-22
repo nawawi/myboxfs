@@ -1,0 +1,86 @@
+This file is crypt.def, from which is created crypt.c.
+It implements the builtin "crypt" in Bash.
+
+$PRODUCES crypt.c
+#define _XOPEN_SOURCE
+#include <config.h>
+#include <stdio.h>
+#include "../builtins.h"
+#include "../shell.h"
+#include "bashgetopt.h"
+
+$BUILTIN crypt
+$FUNCTION crypt_builtin
+$SHORT_DOC crypt key [salt]
+Shell wrapper for crypt(3), which is used for password encryption.
+Encrypted output is printed to stdout.
+$END
+
+$BUILTIN cryptpw
+$FUNCTION crypt_builtin
+$SHORT_DOC crypt key
+Output encrypted key
+$END
+
+static int i64c(int i) {
+	i &= 0x3f;
+	if(i == 0) return '.';
+        if(i == 1) return '/';
+        if(i < 12) return ('0' - 2 + i);
+        if(i < 38) return ('A' - 12 + i);
+        return('a' - 38 + i);
+}
+
+static int crypt_make_salt(char *p, int cnt, int x) {
+        x += getpid() + time(NULL);
+        do {
+                /* x = (x*1664525 + 1013904223) % 2^32 generator is lame
+                 * (low-order bit is not "random", etc...),
+                 * but for our purposes it is good enough */
+                x = x*1664525 + 1013904223;
+                /* BTW, Park and Miller's "minimal standard generator" is
+                 * x = x*16807 % ((2^31)-1)
+                 * It has no problem with visibly alternating lowest bit
+                 * but is also weak in cryptographic sense + needs div,
+                 * which needs more code (and slower) on many CPUs */
+                *p++ = i64c(x >> 16);
+                *p++ = i64c(x >> 22);
+        } while (--cnt);
+        *p = '\0';
+        return x;
+}
+
+int crypt_builtin(WORD_LIST *list) {
+	char *key, *out;
+	char salt[sizeof("$N$XXXXXXXX")];
+
+	if(list==0) {
+		builtin_usage();
+		return(EX_USAGE);
+	}
+
+	if(no_options(list)) return(EX_USAGE);
+
+	key=list->word->word;
+	if(list->next) {
+		list=list->next;
+		strncpy(salt,list->word->word,sizeof(salt));
+	} else {
+		salt[0] = '$';
+		salt[1] = '1';
+		salt[2] = '$';
+		crypt_make_salt(salt + 3, 4, 0);
+	}
+	if(list->next) {
+		builtin_usage();
+		return(EX_USAGE);
+	}
+	out=crypt(key, salt);
+	if(out) {
+		puts(out);
+		return(EXECUTION_SUCCESS);
+	} else {
+		return(EXECUTION_FAILURE);
+	}
+}
+

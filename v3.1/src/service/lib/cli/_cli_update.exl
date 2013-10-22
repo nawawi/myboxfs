@@ -1,0 +1,212 @@
+<?php
+if(!defined('_CLI_CODE')||_CLI_CODE!="a098846421a09ab1cacd3b3a753cbe05") exit("\n\nERROR: _CLI_CODE not set\n\n");
+
+function ___CLI_UPDATE_PRINT() {
+	$_buff=_GLOB(_UPDATE_PATH."/*.mpu");
+	$_cbuff=array();
+	if(!_ARRAY_NULL($_buff)) {
+		foreach($_buff as $_lnx) {
+			if(($_control=_UPDATE_READ_CONTROL($_lnx))==FALSE) {
+				continue;
+			}
+			$_ln=basename($_lnx,".mpu");
+			$_desc=_UPDATE_READ_NOTE($_lnx);
+			$_date=date('d-M-Y H:i',$_control['TIME']);
+			$_version=$_control['VERSION'];
+			$_release=$_control['BUILD'];
+			$_cbuff[$_control['TIME']]['date']="$_date";
+			$_cbuff[$_control['TIME']]['version']="$_version build-{$_release}";
+			$_cbuff[$_control['TIME']]['desc']=$_desc;
+			$_cbuff[$_control['TIME']]['file']=$_ln;
+			unset($_date,$_version,$_release,$_desc,$_control,$_ln);
+		}
+	}
+	if(!_ARRAY_NULL($_cbuff)) {
+		krsort($_cbuff);
+		$_cnt=1;
+		_CLI_ECHO_HEADER(_GETTEXT("Available firmware updates"));
+		foreach($_cbuff as $_line_a) {
+			echo _CLI_DATA_BODY(
+				array(
+					_GETTEXT_U("NO")=>$_cnt,
+					_GETTEXT_U("VERSION")=>$_line_a['version'],
+					_GETTEXT_U("RELEASE")=>$_line_a['date'],
+					_GETTEXT_U("DESCRIPTION")=>$_line_a['desc']
+				)
+			);
+			echo "\n";
+			$_cnt++;
+		}
+		return TRUE;
+	}
+	_CLI_ECHO(_GETTEXT("No updates available for installation"));
+	return FALSE;
+}
+
+function ___CLI_UPDATE_CONFIG_PRINT() {
+	_INI_TOKEN_GET("system","update.cfg",$_NTOKEN);
+	if(_ARRAY_NULL($_NTOKEN['update'])) {
+		_CLI_ECHO(_GETTEXT("No data available"));
+		return FALSE;
+	}
+	$_DATA=$_NTOKEN['update'];
+	_STR_ONOFF($_proxy_stat,$_DATA['PROXY_STAT']);
+	_STR_ONOFF($_proxy_auth_stat,$_DATA['PROXY_AUTH_STAT']);
+	_STR_ONOFF($_download,$_DATA['DOWNLOAD']);
+	_STR_ONOFF($_save_download,$_DATA['SAVE_DOWNLOAD']);
+	$_last_check=_UPDATE_LAST_CHECK(0);
+	$_next_check=date('D d-M-Y H:i',_UPDATE_NEXT_CHECK($_DATA['UPDATE_CHECK']));
+
+	if(!_NULL($_DATA['PROXY_HOST'])) {
+		_DEFINITIONS_GET_BYNAME("networks",$_DATA['PROXY_HOST'],$_DTOKEN);
+		if(!_NULL($_DTOKEN['ADDR'])) {
+			if($_DTOKEN['__DATA_TYPE']=='dnshost') {
+				$_DATA['PROXY_HOST']="{$_DATA['PROXY_HOST']} [{$_DTOKEN['HOSTNAME']} - {$_DTOKEN['ADDR']}]";
+			} elseif($_DTOKEN['__DATA_TYPE']=='host') {
+				$_DATA['PROXY_HOST']="{$_DATA['PROXY_HOST']} [{$_DTOKEN['ADDR']}]";
+			}
+		}
+	}
+	_CLI_ECHO_HEADER(_GETTEXT("Firmware updates"));
+	echo _CLI_DATA_BODY(
+		array(
+			_GETTEXT_U("CHECK INTERVAL")=>_GETTEXT($_DATA['UPDATE_CHECK']),
+			_GETTEXT_U("LAST CHECK")=>$_last_check ? $_last_check : __CLI_BODY_SKIP_DATA_TAG,
+			_GETTEXT_U("NEXT CHECK")=>$_next_check ? $_next_check : __CLI_BODY_SKIP_DATA_TAG
+		)
+	);
+
+	echo "\n";
+	_CLI_ECHO_HEADER(_GETTEXT("Firmware download"));
+	echo _CLI_DATA_BODY(
+		array(
+			_GETTEXT_U("ENABLE")=>$_download,
+			_GETTEXT_U("KEEP FILE")=>$_save_download
+		)
+	);
+
+	echo "\n";
+	_CLI_ECHO_HEADER(_GETTEXT("Parent Proxy"));
+	echo _CLI_DATA_BODY(
+		array(
+			_GETTEXT_U("ENABLE")=>$_proxy_stat,
+			_GETTEXT_U("PROXY HOST")=>$_DATA['PROXY_HOST'],
+			_GETTEXT_U("PROXY PORT")=>$_DATA['PROXY_PORT']
+		)
+	);
+
+	echo "\n";
+	_CLI_ECHO_HEADER(_GETTEXT("Proxy Authentication"));
+	echo _CLI_DATA_BODY(
+		array(
+			_GETTEXT_U("ENABLE")=>$_proxy_auth_stat,
+			_GETTEXT_U("USER")=>$_DATA['PROXY_USER'],
+			_GETTEXT_U("PASSWORD")=>$_DATA['PROXY_PASSWORD']
+		)
+	);
+
+	return TRUE;
+}
+
+function ___CLI_UPDATE_CONFIG_SET($_scmd,$_sval) {
+	_STR_ONOFF($_value,$_sval);
+	$_sval=$_value;
+	_UPPER($_scmd);
+	$_DATA[$_scmd]="$_sval";
+	if(_INI_TOKEN_UPDATE("system","update.cfg","update",$_DATA)) {
+		_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+		if(!_NULL($_DATA['UPDATE_CHECK'])) {
+			_INIT_TASKQ("cron_restart");
+		}
+		return TRUE;
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function ___CLI_UPDATE_CHECK() {
+	if(($_data=_UPDATE_CHECK_LIST())!=FALSE) {
+		if(!_NULL($GLOBALS['_firmware_update_verbose']) && $GLOBALS['_firmware_update_verbose']==1) {
+			$_cnt=1;
+			echo "    Available files:\n";
+			foreach($_data as $_file) {
+				echo "    ($_cnt) $_file\n";
+				$_cnt++;
+			}
+		}
+		return TRUE;
+	}
+	return FALSE;
+}
+
+function ___CLI_UPDATE_DOWNLOAD() {
+	if(_UPDATE_DOWNLOAD()!=FALSE) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+function ___CLI_UPDATE_INSTALL() {
+	return _UPDATE_INSTALL();
+}
+
+function ___CLI_UPDATE_CRONCHECK() {
+	_INI_TOKEN_GET("system","update.cfg",$_NTOKEN);
+	if(_ARRAY_NULL($_NTOKEN['update'])) return FALSE;
+	$_DATA=$_NTOKEN['update'];
+	if(_NULL($_DATA['UPDATE_CHECK']) || $_DATA['UPDATE_CHECK']=='never') {
+		return FALSE;
+	}
+	$_download=$_DATA['DOWNLOAD'] ? $_DATA['DOWNLOAD'] : 0;
+	$_nextcheck=_FILE_GET(_ROOT_PATH."/info-cache/update/nextcheck");
+	if(_NULL($_nextcheck) || !_ISNUM($_nextcheck)) {
+		$_nextcheck=time();
+	}
+	if(time() >= $_nextcheck) {
+		if($_download!=1) {
+			return _UPDATE_CHECK_LIST();
+		}
+		return _UPDATE_DOWNLOAD();
+	}
+	return FALSE;
+}
+
+function _cli_update() {
+	if($_SERVER["argc"] > 1 ) {
+		$_max=$_SERVER["argc"];
+		_CLI_TRIM_ARGS($_SERVER['argv']);
+                for($_x=1;$_x < $_max;$_x++) {
+			$_options=$_SERVER["argv"][$_x];
+			if($_options=="-v" || $_options=="--verbose" || $_options=="verbose") {
+				$GLOBALS['_firmware_update_verbose']=1;
+				break;
+			}
+		}
+		unset($_options);
+		for($_x=1;$_x < $_max;$_x++) {
+			$_cmd=$_SERVER["argv"][$_x];
+			if($_cmd=="print") {
+				return ___CLI_UPDATE_PRINT();
+			} elseif($_cmd=="config") {
+				$_scmd=$_SERVER["argv"][$_x+1];
+                        	if($_scmd=="print") {
+					return ___CLI_UPDATE_CONFIG_PRINT();
+				}
+				$_sval=$_SERVER["argv"][$_x+2];
+				return ___CLI_UPDATE_CONFIG_SET($_scmd,$_sval);
+			} elseif($_cmd=="check") {
+				return ___CLI_UPDATE_CHECK();
+			} elseif($_cmd=="download") {
+				return ___CLI_UPDATE_DOWNLOAD();
+			} elseif($_cmd=="clean") {
+				return _UPDATE_CLEAR();
+			} elseif($_cmd=="install") {
+				return ___CLI_UPDATE_INSTALL();
+			} elseif($_cmd=="croncheck") {
+				return ___CLI_UPDATE_CRONCHECK();
+			}
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+?>

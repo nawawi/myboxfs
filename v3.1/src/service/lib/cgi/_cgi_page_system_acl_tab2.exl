@@ -1,0 +1,279 @@
+<?php
+if(!defined('_CGI_CODE')||_CGI_CODE!="90d45215e48dac81e802f17310ad0c1f") exit("\n\nERROR: _CGI_CODE not set\n\n");
+
+function _CGI_PAGE_SYSTEM_ACL_LIST() {
+	extract($GLOBALS['_IMG']);
+
+	_INI_TOKEN_GET("system","acl.cfg",$_TOKEN);
+	_INI_TOKEN_GET("system","system.cfg",$_STOKEN);
+	$_log_drop=$_STOKEN['security']['LOG_DROP'] ? $_STOKEN['security']['LOG_DROP'] : 0;
+	if($_log_drop==1) {
+		$_log_drop="checked";
+	} else {
+		$_log_drop='';
+	}
+
+	$_pid="acl_list";
+	$_page="
+		<div id='tbox_acl' style='height: 230px;'>
+			<div id='tbox_acl_title'>
+				<div id='tbox_acl_title_t'>Allowed networks</div>
+				<div id='tbox_acl_title_r'></div>
+				<div id='tbox_acl_title_l'></div>
+			</div>
+			<div id='tbox_acl_content'>
+				<table class='tbox_acl_tb'><tbody><tr>
+				<td class='tbox_acl_td_it'><input type='text' class='tbox_acl_it'></td>
+				<td class='tbox_acl_td'>Enable</td>
+				<td class='tbox_acl_td'>Web</td>
+				<td class='tbox_acl_td'>SSH</td>
+				<td class='tbox_acl_td'>FTP</td>
+				</tr>
+	";
+	$_did=0;
+	if(!_ARRAY_NULL($_TOKEN)) {
+		foreach($_TOKEN as $_ID => $_DATA) {
+			if(_NULL($_DATA['HOST'])) {
+				_INI_TOKEN_DELETE("system","acl.cfg",$_ID);
+				continue;
+			}
+			if(_NULL($_DATA['STAT'])) $_DATA['STAT']=0;
+			_DEFINITIONS_GET_BYNAME_R("networks",$_DATA['HOST'],$_DTOKEN);
+			if(!_ARRAY_NULL($_DTOKEN)) {
+				foreach($_DTOKEN as $_DID => $_DDATA) {
+					if(!_NULL($_DDATA['ADDR'])) {
+						if(!_NULL($_DDATA['PREF'])) $_DDATA['ADDR']="{$_DDATA['ADDR']}/{$_DDATA['PREF']}";
+						$_DATA['ADDR'] .="{$_DDATA['ADDR']},";
+					}
+				}
+				_TRIM($_DATA['ADDR'],",");
+			}
+			unset($_DTOKEN);
+			$_web=0;$_ssh=0;$_ftp=0;
+			if(stripos($_DATA['TYPE'],"web")!==FALSE) $_web=1;
+			if(stripos($_DATA['TYPE'],"ssh")!==FALSE) $_ssh=1;
+			if(stripos($_DATA['TYPE'],"ftp")!==FALSE) $_ftp=1;
+			$_icon=_CGI_PAGE_DEFINITIONS_GET_ICON($_DATA['HOST'],"networks");
+			if(!_NULL($_icon)) {
+				$_icon="<img style='width: 14px; margin-right: 2px; float: left;' src='$_icon'>";
+			}
+			$_page .="
+				<tr id='del$_did'>
+				<td class='tbox_acl_td_it tbox_acl_itt'><img id='del$_did' style='padding-right: 2px; float: left; height: 14px;' src='$_ICON_DELETE'><div class='def_ibox1_ii' "._CGI_TOOLTIPS($_DATA['ADDR'])."'>$_icon{$_DATA['HOST']}</div></td>
+				<td class='tbox_acl_td tbox_acl_itt'><img src='{$_ICON_ENABLE[$_DATA['STAT']]}'></td>
+				<td class='tbox_acl_td tbox_acl_itt'><img src='{$_ICON_YESNO[$_web]}'></td>
+				<td class='tbox_acl_td tbox_acl_itt'><img src='{$_ICON_YESNO[$_ssh]}'></td>
+				<td class='tbox_acl_td tbox_acl_itt'><img src='{$_ICON_YESNO[$_ftp]}'></td>
+				</tr>
+			";
+			$_did++;
+			unset($_icon);
+		}
+		if($_did!=0) $_did--;
+	}
+
+	$_page .="
+		</tbody></table></div>
+		<div style='text-align: left; margin-top: 5px; padding: 2px;'><input id='traffic_log' type='checkbox' $_log_drop>&nbsp;Log access traffic</div>
+		</div>
+		<script type='text/javascript'>
+			\$(document).ready(function() {
+				var _rcolor=function() {
+					__tndefinitions.rowcolor('table.tbox_acl_tb tr[id*=del]','','',true);
+					\$('table.tbox_acl_tb tr[id*=del]').each(function(i) {
+						var _color=\$(this).css('background-color');
+						\$(this).find('td').css('background-color',_color);
+					});
+
+				};
+				_rcolor();
+				var _click_action=function() {
+					\$('table.tbox_acl_tb img').hover(
+						function() {
+							\$(this).css({'cursor':'pointer'});
+						},
+						function() {
+							\$(this).css({'cursor':'default'});
+						}
+					).click(function() {
+						var _attr=basename($(this).attr('src'));
+						if(_attr==='".basename($_ICON_ENABLE[0])."') {
+							\$(this).attr({'src':'{$_ICON_ENABLE[1]}'});
+						}
+						if(_attr==='".basename($_ICON_ENABLE[1])."') {
+							\$(this).attr({'src':'{$_ICON_ENABLE[0]}'});
+						}
+						if(_attr==='".basename($_ICON_YESNO[0])."') {
+							\$(this).attr({'src':'{$_ICON_YESNO[1]}'});
+						}
+						if(_attr==='".basename($_ICON_YESNO[1])."') {
+							\$(this).attr({'src':'{$_ICON_YESNO[0]}'});
+						}
+						if(_attr==='".basename($_ICON_DELETE)."') {
+							var _delid=$(this).attr('id');
+							\$('tr#'+_delid).remove();
+							_rcolor();
+						}
+					});
+					_rcolor();
+				};
+
+				var _search_action=function() {
+					var _search_hide=function(opt) {
+						\$('table.tbox_acl_tb tr').each(function(i) {
+							var _tid=\$(this).attr('id');
+							if(_tid && _tid.match(/del\d+/)) {
+								if(opt===1) {
+									\$(this).hide();
+								} else {
+									\$(this).show();
+								}
+							}
+						});
+					};
+					\$('div#tbox_acl_content input.tbox_acl_it').keyup(function(event) {
+						var _str=$(this).val();
+						if(_str.length===0) {
+							_search_hide(0);
+						} else {
+							_search_hide(1);
+							\$('table.tbox_acl_tb tr').each(function(i) {
+								var _tid=\$(this).attr('id');
+								if(_tid && _tid.match(/del\d+/)) {
+									var _p=\$.trim(\$(this).text());
+									var _regex=new RegExp(_str, 'i');
+									if(_regex.exec(_p)) {
+										\$(this).show().filter(function() {
+											_rcolor();
+										});
+									}
+								}
+							});
+						}
+					});
+				};
+
+				_click_action();
+				_search_action();
+
+				var _accept=__defa_n['all'];
+				\$('div#tbox_acl_title_r').click(function(evt) {
+					var e=evt || window.event;
+					e.preventDefault();
+					var _top=e.pageY+'px';
+					var _left=e.pageX+'px';
+					__tndefinitions.defopen('$_pid','networks',_top,_left,_accept);
+
+				});
+				\$('div#tbox_acl_title_l').click(function(evt) {
+					var e=evt || window.event;
+					e.preventDefault();
+					__tndefinitions.navopen('networks');
+
+				});
+
+				\$('div#tbox_acl_content').droppable({
+					accept: _accept, 
+					drop: function(ev, ui) {
+						var _me=\$(this).html();
+						ui.draggable.clone().filter(
+							function() {
+								var _delcnt=parseInt(\$('table.tbox_acl_tb tr[id*=del]').length);
+								if(_delcnt!==0) {
+									_delcnt++;
+								}
+								var _name=\$(this).html();
+								var _namef=\$(this).text();
+								if(__tndefinitions.checklist('table.tbox_acl_tb td',_namef)!==0) {
+									return false;
+								}
+								var _page=\$('table.tbox_acl_tb tbody').html()+\"<tr id='dummy'>\";
+								_page +=\"<td class='tbox_acl_td_it tbox_acl_itt'><img id='dummy' style='padding-right: 2px; float: left; height: 14px;' src='$_ICON_DELETE'><div class='def_ibox1_ii'>\"+_name+\"</div></td>\";
+								_page +=\"<td class='tbox_acl_td tbox_acl_itt'><img src='{$_ICON_ENABLE[0]}'></td>\";
+								_page +=\"<td class='tbox_acl_td tbox_acl_itt'><img src='{$_ICON_YESNO[0]}'></td>\";
+								_page +=\"<td class='tbox_acl_td tbox_acl_itt'><img src='{$_ICON_YESNO[0]}'></td>\";
+								_page +=\"<td class='tbox_acl_td tbox_acl_itt'><img src='{$_ICON_YESNO[0]}'></td>\";
+								_page +=\"</tr>\";
+								\$('table.tbox_acl_tb tbody').html(_page);
+								\$('tr#dummy').attr({'id':'del'+_delcnt});
+								\$('img#dummy').attr({'id':'del'+_delcnt});
+								_click_action();
+								_search_action();
+							});
+					}
+				});
+			});
+		</script>
+	";
+	return trim($_page);
+}
+
+function _CGI_PAGE_SYSTEM_ACL_TAB_2() {
+
+	$_bid=_CGI_ATTR_KEY();
+	$_page ="
+		<div class='fbox_c'>
+			<fieldset>
+			<legend>"._GETTEXT("Access list configuration")."</legend>
+			<div style='margin: 5px;'>
+			<table class='tbox_t'>
+			<tr>
+			<td class='tbox_tdl' style='width: 300px;'>
+				"._CGI_PAGE_SYSTEM_ACL_LIST()."
+			</td>
+				
+			<td class='tbox_tdr'>"._GETTEXT("In %s, specify the host that should have system access. In addition, you can specify what type of access. If you want to explicitly log such traffic in the packet filter log, activate the %s checkbox.","Allowed networks","Log access traffic")."</td>
+			</tr>
+			</table>
+			<hr />
+			"._CGI_BUTTON_APPLY("button_{$_bid}")."
+			</div>
+			</fieldset>
+		</div>
+		<script type='text/javascript'>
+			\$(document).ready(function() {
+				\$('#button_{$_bid}').click(function() {
+					if(!__tnpage.is_admin()) {
+						return false;
+					}
+					var _data_a='';
+					\$('table.tbox_acl_tb tr').each(function(i) {
+						var _tid=\$(this).attr('id');
+						if(_tid && _tid.match(/del\d+/)) {
+							var _p=\$.trim(\$(this).text());
+							var _type='';
+							\$(this).find('img').each(function(x) {
+								if(x > 1) {
+									var _st=icon2status(\$(this).attr('src'));
+									if(x==2) {
+										_data_a +='&_data['+_p+'][stat]='+_st;
+									}
+									if(_st==1) {
+										if(x==3) {
+											_type +='web,';
+										} else if(x==4) {
+											_type +='ssh,';
+										} else if(x==5) {
+											_type +='ftp,';
+										}
+									}
+								}
+							});
+							_data_a +='&_data['+_p+'][type]='+_type;
+						}
+					});
+					if(!is_null(_data_a)) {
+						_data='_update_data=acl_list'+_data_a;
+						__tnpage.data_update(_data);
+					}
+					var _log=\$('#traffic_log:checked').length;
+					var _data='_update_data=2&_sec=system&_secf=system&_id=security&_eq=policy_admin&_data[LOG_DROP]='+_log;
+					__tnpage.data_update(_data);
+				});
+			});
+		</script>
+	";
+	return trim($_page);
+}
+
+?>

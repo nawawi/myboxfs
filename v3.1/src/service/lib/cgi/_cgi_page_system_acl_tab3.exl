@@ -1,0 +1,223 @@
+<?php
+if(!defined('_CGI_CODE')||_CGI_CODE!="90d45215e48dac81e802f17310ad0c1f") exit("\n\nERROR: _CGI_CODE not set\n\n");
+
+function _CGI_PAGE_SYSTEM_ACL_SECURITY_EXCELUDE() {
+	extract($GLOBALS['_IMG']);
+	_INI_TOKEN_GET("system","attempt_exclude.cfg",$_TOKEN);
+	$_pid="acl_security";
+	$_DATA=$_TOKEN['security'];
+	$_page="
+		<div id='tbox_acl' style='height: 220px;'>
+			<div id='tbox_acl_title'>
+				<div id='tbox_acl_title_t'>Exclude List</div>
+				<div id='tbox_acl_title_r'></div>
+				<div id='tbox_acl_title_l'></div>
+			</div>
+			<div id='tbox_acl_content'>
+				<table class='tbox_acl_tb'><tbody><tr>
+				<td class='tbox_acl_td_it'><input type='text' class='tbox_acl_it'></td>
+				</tr>
+	";
+	$_did=0;
+	if(!_ARRAY_NULL($_TOKEN)) {
+		foreach($_TOKEN as $_ID => $_DATA) {
+			if(_NULL($_DATA['HOST'])) {
+				_INI_TOKEN_DELETE("system","attempt_exclude.cfg",$_ID);
+				continue;
+			}
+			_DEFINITIONS_GET_BYNAME("networks",$_DATA['HOST'],$_DTOKEN);
+			$_icon=_CGI_PAGE_DEFINITIONS_GET_ICON($_DATA['HOST'],"networks");
+			if(!_NULL($_icon)) {
+				$_icon="<img style='width: 14px; margin-right: 2px; float: left;' src='$_icon'>";
+			}
+			$_page .="
+				<tr id='del$_did'>
+				<td class='tbox_acl_td_it tbox_acl_itt'><img id='del$_did' style='padding-right: 2px; float: left; height: 14px;' src='$_ICON_DELETE'><div class='def_ibox1_ii' "._CGI_TOOLTIPS($_DTOKEN['ADDR']).">$_icon{$_DATA['HOST']}</div></td>
+				</tr>
+			";
+			$_did++;
+			unset($_DTOKEN,$_icon);
+		}
+		if($_did!=0) $_did--;
+	}
+	$_page .="
+		</tbody></table>
+			</div>
+		</div>
+		<script type='text/javascript'>
+			\$(document).ready(function() {
+				__tndefinitions.rowcolor('table.tbox_acl_tb tr[id*=del] td','','',true);
+				var _accept=__defa_n['all'];
+				var _click_action=function() {
+					\$('table.tbox_acl_tb img[id*=del]').hover(
+						function() {
+							\$(this).css({'cursor':'pointer'});
+						},
+						function() {
+							\$(this).css({'cursor':'default'});
+						}
+					).click(function() {
+						var _delid=$(this).attr('id');
+						\$('tr#'+_delid).remove();
+						__tndefinitions.rowcolor('table.tbox_acl_tb tr[id*=del] td','','',true);
+					});
+					__tndefinitions.rowcolor('table.tbox_acl_tb tr[id*=del] td','','',true);
+				};
+
+				var _search_action=function() {
+					var _search_hide=function(opt) {
+						\$('table.tbox_acl_tb tr').each(function(i) {
+							var _tid=\$(this).attr('id');
+							if(_tid && _tid.match(/del\d+/)) {
+								if(opt===1) {
+									\$(this).hide();
+								} else {
+									\$(this).show();
+								}
+							}
+						});
+					};
+					\$('div#tbox_acl_content input.tbox_acl_it').keyup(function(event) {
+						var _str=$(this).val();
+						if(_str.length===0) {
+							_search_hide(0);
+						} else {
+							_search_hide(1);
+							\$('table.tbox_acl_tb tr').each(function(i) {
+								var _tid=\$(this).attr('id');
+								if(_tid && _tid.match(/del\d+/)) {
+									var _p=\$(this).text();
+									var _regex=new RegExp(_str, 'i');
+									if(_regex.exec(_p)) {
+										\$(this).show().filter(function() {
+											__tndefinitions.rowcolor('table.tbox_acl_tb tr[id*=del] td','','',true);
+										});
+									}
+								}
+							});
+						}
+					});
+				};
+
+				_click_action();
+				_search_action();
+
+				\$('div#tbox_acl_title_r').click(function(evt) {
+					var e=evt || window.event;
+					e.preventDefault();
+					var _top=e.pageY+'px';
+					var _left=e.pageX+'px';
+					__tndefinitions.defopen('$_pid','networks',_top,_left,_accept);
+
+				});
+				
+				\$('div#tbox_acl_title_l').click(function(evt) {
+					var e=evt || window.event;
+					e.preventDefault();
+					__tndefinitions.navopen('networks');
+
+				});
+
+				\$('div#tbox_acl_content').droppable({
+					accept: _accept,
+					drop: function(ev, ui) {
+						var _me=\$(this).html();
+						ui.draggable.clone().filter(
+							function() {
+								var _delcnt=parseInt(\$('table.tbox_acl_tb tr[id*=del]').length);
+								if(_delcnt!==0) {
+									_delcnt++;
+								}
+								var _name=\$(this).html();
+								var _namef=\$(this).text();
+								if(__tndefinitions.checklist('table.tbox_acl_tb td',_namef)!==0) {
+									return false;
+								}
+								var _page=\$('table.tbox_acl_tb tbody').html()+\"<tr id='dummy'>\";
+								_page +=\"<td class='tbox_acl_td_it tbox_acl_itt'><img id='dummy' style='padding-right: 2px; float: left; height: 14px;' src='$_ICON_DELETE'><div class='def_ibox1_ii'>\"+_name+\"</div></td>\";
+								_page +=\"</tr>\";
+								\$('table.tbox_acl_tb tbody').html(_page);
+								\$('tr#dummy').attr({'id':'del'+_delcnt});
+								\$('img#dummy').attr({'id':'del'+_delcnt});
+								_click_action();
+								_search_action();
+							});
+					}
+				});
+			});
+		</script>
+	";
+	return trim($_page);
+}
+
+function _CGI_PAGE_SYSTEM_ACL_TAB_3() {
+	_INI_TOKEN_GET("system","system.cfg",$_TOKEN);
+	$_DATA=$_TOKEN['security'];
+	$_bid=_CGI_ATTR_KEY();
+	$_page="
+		<div class='fbox_c'>
+		<fieldset>
+		<legend>"._GETTEXT("Security configuration")."</legend>
+		<div style='margin: 5px;'>
+		<table class='tbox_t'>
+		<tr>
+		<td class='tbox_tdc' style='width: 300px;'>
+			<table class='tbox_t'>
+			<tr>
+			<td class='tbox_tdl'>"._GETTEXT("Maximum attempt:")."</td>
+			<td class='tbox_tdc'><input type='text' style='width: 50px;' id='attempt' class='tbox_i' value='{$_DATA['ATTEMPT']}' /> "._GETTEXT("attempts")."</td
+			</tr>
+
+			<tr>
+			<td class='tbox_tdl'>"._GETTEXT("Blocking period:")."</td>
+			<td class='tbox_tdc'><input type='text' style='width: 50px;' id='block' class='tbox_i' value='{$_DATA['BLOCK']}' /> "._GETTEXT("seconds")."</td
+			</tr>
+
+			<tr><td colspan='2'><hr /></td></tr>
+			<tr><td colspan='2'>
+				"._CGI_PAGE_SYSTEM_ACL_SECURITY_EXCELUDE()."
+			</td></tr>
+			</table>
+		</td>
+				
+		<td class='tbox_tdr'>"._GETTEXT("These settings allow you to block System access from IP addresses that have repeatedly failed authentication. This applies to all access type authentication. The %s contains networks that should never be subject to access blocking.","Exclude list")."</td>
+		</tr>
+		</table>
+		<hr />
+		"._CGI_BUTTON_APPLY("button_{$_bid}")."
+		</div>
+		</fieldset>
+		</div>
+
+		<script type='text/javascript'>
+			\$(document).ready(function() {
+				\$('#button_{$_bid}').click(function() {
+					if(!__tnpage.is_admin()) {
+						return false;
+					}
+					var _attempt=\$.trim(\$('#attempt').val());
+					var _block=\$.trim(\$('#block').val());
+					if(is_num(_attempt) && is_num(_block)) {
+						var _data_a='';
+						\$('table.tbox_acl_tb tr').each(function(i) {
+							var _tid=\$(this).attr('id');
+							if(_tid && _tid.match(/del\d+/)) {
+								var _p=\$.trim(\$(this).text());
+								_data_a +='&_data['+i+']='+_p;
+							}
+						});
+						if(!is_null(_data_a)) {
+							var _data='_update_data=acl_security&_attempt='+_attempt+'&_block='+_block+_data_a;
+							__tnpage.data_update(_data);
+							return true;
+						}
+					}
+					__tndialog.ebox('"._GETTEXT("Entered values is syntactically or logically incorrect")."');
+					return false;
+				});
+			});
+		</script>
+	";
+	return trim($_page);
+}
+?>

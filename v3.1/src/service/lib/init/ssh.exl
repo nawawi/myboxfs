@@ -1,0 +1,128 @@
+<?php
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+function ssh_check() {
+	if(!_INIT_CHECK_BINARY(array("/bin/sshd","/bin/ssh-keygen"))) {
+		_INIT_ECHO(1,_GETTEXT("Cannot execute %s. Internal error",_INIT_NAME()));
+		exit(1);
+	}
+}
+
+function ssh_quiet() {
+	_INIT_QUIET('1');
+}
+
+function _ssh_inet6() {
+	_INI_TOKEN_GET("system","system.cfg",$_NTOKEN);
+	$_DATA=$_NTOKEN['service_ssh'];
+	if(_ARRAY_NULL($_DATA)) {
+		return FALSE;
+	}
+	if(!_NULL($_DATA['INET6']) && $_DATA['INET6']==1) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+function ssh_cert() {
+	/*if(!file_exists("/etc/ssh/rsa1_key")) {
+		if(_EXEC_CMD("/bin/ssh-keygen -q -t rsa1 -f /etc/ssh/rsa1_key -C '' -N ''")==0) {
+			_INIT_ECHO(0,_GETTEXT("Generating SSH1 RSA key"));
+		}
+	}*/
+	if(!file_exists("/etc/ssh/rsa_key")) {
+		if(_EXEC_CMD("ssh-keygen -q -t rsa -f /etc/ssh/rsa_key -C '' -N ''")==0) {
+			_INIT_ECHO(0,_GETTEXT("Generating %s RSA key","SSH"));
+		}
+	}
+	if(!file_exists("/etc/ssh/dsa_key")) {
+		if(_EXEC_CMD("ssh-keygen -q -t dsa -f /etc/ssh/dsa_key -C '' -N ''")==0) {
+			_INIT_ECHO(0,_GETTEXT("Generating %s DSA key","SSH"));
+		}
+	}
+}
+
+function ssh_config($_scriptdata='') {
+	_INI_TOKEN_GET("system","system.cfg",$_NTOKEN);
+	$_DATA=$_NTOKEN['service_ssh'];
+	if(_NULL($_DATA['STAT']) || $_DATA['STAT']==0) {
+		_INIT_ECHO(0,_GETTEXT("%s daemon (%s) disabled","SSH","sshd"));
+		ssh_quiet();
+		return FALSE;
+	}
+	@_MKDIR("/etc/ssh");
+	@ssh_cert();
+	if(_NULL($_DATA['PORT'])) $_DATA['PORT']=5052;
+	if(_NULL($_DATA['USER'])) $_DATA['USER']="sshuser";
+	if(_NULL($_DATA['TIMEOUT'])) $_DATA['TIMEOUT']="300";
+	$_config="";
+	$_config .="Port {$_DATA['PORT']}\n";
+	$_config .="Protocol 2\n";
+	//$_config .="HostKey /etc/ssh/rsa1_key\n";
+	$_config .="HostKey /etc/ssh/rsa_key\n";
+	$_config .="HostKey /etc/ssh/dsa_key\n";
+	$_config .="SyslogFacility AUTHPRIV\n";
+	$_config .="LogLevel VERBOSE\n";
+	$_config .="AcceptEnv LANG LC_CTYPE LC_NUMERIC LC_TIME LC_COLLATE LC_MONETARY LC_MESSAGES\n";
+	$_config .="AcceptEnv LC_PAPER LC_NAME LC_ADDRESS LC_TELEPHONE LC_MEASUREMENT\n";
+	$_config .="AcceptEnv LC_IDENTIFICATION LC_ALL\n";
+	$_config .="ChallengeResponseAuthentication no\n";
+	$_config .="MaxAuthTries 1\n";
+	$_config .="ClientAliveInterval {$_DATA['TIMEOUT']}\n";
+	$_config .="ClientAliveCountMax 1\n";
+	$_config .="PrintMotd no\n";
+	$_config .="PrintLastLog no\n";
+	$_config .="UsePrivilegeSeparation no\n";
+	$_config .="AllowTcpForwarding no\n";
+	#$_config .="Banner /etc/banner\n";
+	$_config .="AllowUsers {$_DATA['USER']}\n";
+	_FILE_SAVE("/etc/ssh/ssh_user",$_DATA['USER']);
+	if(!_NULL($_scriptdata)) {
+		return _FILE_SAVE("/etc/ssh/sshd_config","$_scriptdata\n");
+	}
+	return _FILE_SAVE("/etc/ssh/sshd_config","$_config");
+}
+
+
+function ssh_up() {
+	@unlink(_TASKQ_PATH."/ssh_up");
+	$_prog="/bin/sshd -4";
+	if(_ssh_inet6()) {
+		$_prog="/bin/sshd";
+	}
+	if(_EXEC_CMD("$_prog")==0) {
+		_INIT_NICE_LEVEL("sshd","-5");
+		_INIT_CHKPROG_LOG("sshd");
+		return TRUE;
+	}
+	return ssh_restart();
+}
+
+
+function ssh_start() {
+	_INIT_CHECK_DAEMON_STATUS("sshd");
+	if(!ssh_config()) {
+		_INIT_ECHO(1,_GETTEXT("Starting %s failed","sshd"));
+		return FALSE;
+	}
+	$_prog="/bin/sshd -4";
+	if(_ssh_inet6()) {
+		$_prog="/bin/sshd";
+	}
+	_INIT_START_DAEMON("$_prog","ssh_up","-5");
+	return TRUE;
+}
+
+function ssh_stop() {
+	_INIT_STOP_DAEMON("sshd","ssh_up",1);
+	sleep(1);
+	return TRUE;
+}
+
+function ssh_restart() {
+	_INIT_EXEC("ssh_stop");
+	_INIT_EXEC("ssh_start");
+	return TRUE;
+}
+
+?>

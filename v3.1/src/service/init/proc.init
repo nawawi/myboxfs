@@ -1,0 +1,15 @@
+<?php
+class EXE {
+	private function _PROC_MAIN() {
+		define('_AWIE_CODE','ef3802a1fce98f3985e6a9a1f7c1a024');
+		include_once("lib.exl");
+		if(!defined('_SERVICE_LIB_PATH')) exit("\n\nERROR: _SERVICE_LIB_PATH not set\n\n");
+		include_once(_SERVICE_LIB_PATH.'/init.exl');
+		_INIT_PROC(basename($_SERVER["argv"][0],".init"));
+		exit(0);
+	}
+	public static function MAIN() {
+		self::_PROC_MAIN();
+	}
+}
+?>

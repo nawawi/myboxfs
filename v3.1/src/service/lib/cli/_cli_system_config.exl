@@ -1,0 +1,138 @@
+<?php
+if(!defined('_CLI_CODE')||_CLI_CODE!="a098846421a09ab1cacd3b3a753cbe05") exit("\n\nERROR: _CLI_CODE not set\n\n");
+
+function ___cli_system_config_chk_country($_country) {
+	_INI_TOKEN_GET("system","country.cfg",$_CTOKEN);
+	if(!_NULL($_CTOKEN['country'][$_country])) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+function ___cli_system_config_print_country() {
+	_INI_TOKEN_GET("system","country.cfg",$_CTOKEN);
+	if(_ARRAY_NULL($_CTOKEN)) {
+		_CLI_ECHO(_GETTEXT("No data available"));
+		return FALSE;
+	}
+	$_output="";$_DTL=array();
+	unset($_CTOKEN['country']['__DATA_ID']);
+	foreach($_CTOKEN['country'] as $_short => $_long) {
+		$_DTL[]=array($_short,$_long);
+	}
+	if(!_ARRAY_NULL($_DTL)) {
+		$_DTH=array(_GETTEXT_U("Code"),_GETTEXT_U("Country Name"));
+		$_output .=_CLI_DATA_BODY_LINE($_DTH,$_DTL,array("","-"));
+	}
+	if(!_NULL($_output)) {
+		echo "$_output";
+		return TRUE;
+	}
+	_CLI_ECHO(_GETTEXT("No data available"));
+	return FALSE;
+}
+
+function ___cli_system_config_print() {
+	_INI_TOKEN_GET("system","system.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+		_CLI_ECHO(_GETTEXT("No data available"));
+		return FALSE;
+	}
+	$_DTS=array();
+	foreach(array(_GETTEXT_U("HOSTNAME"),
+			_GETTEXT_U("COUNTRY"),
+			_GETTEXT_U("CITY"),
+			_GETTEXT_U("STATE"),
+			_GETTEXT_U("ORGANIZATION"),
+			_GETTEXT_U("ADMIN"),
+			"LANG"
+		) as $_key) {
+		if(!_NULL($_TOKEN['system'][$_key])) {
+			if($_key==_GETTEXT_U("COUNTRY")) {
+				_INI_TOKEN_GET("system","country.cfg",$_CTOKEN);
+				if(!_NULL($_CTOKEN['country'][$_TOKEN['system'][$_key]])) {
+					$_value="{$_CTOKEN['country'][$_TOKEN['system'][$_key]]} ({$_TOKEN['system'][$_key]})";
+					$_DTS[$_key]=$_value;
+					continue;
+				}
+			} elseif($_key==_GETTEXT("LANG")) {
+				$_DTS[_GETTEXT_U("LANGUAGE")]=$GLOBALS['_LOCALE'][$_TOKEN['system'][$_key]];
+				continue;
+			}
+			$_DTS[$_key]=$_TOKEN['system'][$_key];
+		}
+	}
+
+	if(!_ARRAY_NULL($_DTS)) {
+		_CLI_ECHO_HEADER(_GETTEXT("System configuration"));
+		echo _CLI_DATA_BODY($_DTS);
+		unset($_DTS);
+		return TRUE;
+	}
+	_CLI_ECHO(_GETTEXT("No data available"));
+	return FALSE;
+}
+
+function ___cli_system_config_set($_param,$_value) {
+	$_DATA[$_param]="$_value";
+	if(_INI_TOKEN_UPDATE("system","system.cfg","system",$_DATA)) {
+		_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+		return TRUE;
+	}
+	return FALSE;
+}
+
+function _cli_system_config() {
+	if($_SERVER["argc"] > 1 ) {
+		$_max=$_SERVER["argc"];
+		_CLI_TRIM_ARGS($_SERVER['argv']);
+		for($_x=1;$_x < $_max;$_x++) {
+			$_options=$_SERVER["argv"][$_x];
+			if($_options=="print") {
+				return ___cli_system_config_print();
+			} elseif($_options=="show_country") {
+				return ___cli_system_config_print_country();
+			} elseif($_options=="set") {
+				$_param=$_SERVER["argv"][$_x+1];
+				$_value=$_SERVER["argv"][$_x+2];
+				if($_param=="hostname" && !_NULL($_value)) {
+					if(!_CHECK_DOMAIN_VAR($_value)) {
+						_CLI_ECHO(_GETTEXT("Invalid hostname %s","$_value"));
+						return FALSE;
+					}
+					if(_hostname_set($_value)) {
+						_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+						return TRUE;
+					}
+				} elseif($_param=="country" && !_NULL($_value)) {
+					if(!___cli_system_config_chk_country($_value)) {
+						_CLI_ECHO(_GETTEXT("Country code not available."));
+						_CLI_ECHO(_GETTEXT("Enter -> '%s' to view country code","config print country"));
+						return FALSE;
+					}
+					return ___cli_system_config_set("COUNTRY","$_value");
+				} elseif($_param=="city" && !_NULL($_value)) {
+					return ___cli_system_config_set("CITY","$_value");
+				} elseif($_param=="state" && !_NULL($_value)) {
+					return ___cli_system_config_set("STATE","$_value");
+				} elseif($_param=="organization" && !_NULL($_value)) {
+					return ___cli_system_config_set("ORGANIZATION","$_value");
+				} elseif($_param=="admin" && !_NULL($_value)) {
+					if(!_CHECK_EMAIL($_value)) {
+						_CLI_ECHO(_GETTEXT("Invalid email format '%s'","$_value"));
+						return FALSE;
+					}
+					return ___cli_system_config_set("ADMIN","$_value");
+				} elseif($_param=="lang" && !_NULL($_value)) {
+					if(___cli_system_config_set("LANG","$_value")) {
+						return _SET_LANG($_value);
+					}
+					return FALSE;
+				}
+			}
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+?>

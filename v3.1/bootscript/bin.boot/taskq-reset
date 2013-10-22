@@ -1,0 +1,5 @@
+#!/bin/sh
+while pkill -f -9 taskq-check &>/dev/null;do usleep 750;done
+/bin/start-stop-daemon -S -q -b -m -p /var/run/taskq-check.pid -x /bin/taskq-check &>/dev/null;
+exit 0;
+

@@ -1,0 +1,190 @@
+<?php
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+function ftp_check() {
+	if(!_INIT_CHECK_BINARY(array("/bin/ftpd"))) {
+		_INIT_ECHO(1,_GETTEXT("Cannot execute %s. Internal error",_INIT_NAME()));
+		exit(1);
+	}
+}
+
+function ftp_quiet() {
+	_INIT_QUIET('1');
+}
+
+function ftp_debug() {
+	_INIT_DEBUG('1');
+}
+
+function ftp_mods() {
+	$_ports="21,20";
+	$_port=_FILE_GET("/etc/vsftpd/ftp_port");
+	if(!_NULL($_port)) {
+		$_ports .=",$_port";
+	}
+	$_nfport=_FILE_GET(_PROC_PATH."/ftp_nfport");
+	if(!_NULL($_nfport)) {
+		$_ports .=",$_nfport";
+	}
+	$_cliport=_FILE_GET(_PROC_PATH."/ftp_cliport");
+	if(!_NULL($_cliport)) {
+		$_ports .=",$_cliport";
+	}
+	_RMMOD("nf_conntrack_ftp");
+	_EXEC_CMD("modprobe nf_conntrack_ftp ports=$_ports");
+	_EXEC_CMD("modprobe nf_nat_ftp");
+}
+
+function _ftp_config_cert() {
+	_INI_TOKEN_GET("system","system.cfg",$_NTOKEN);
+	$_DATA=$_NTOKEN['system'];
+	if(_NULL($_DATA['HOSTNAME'])) $_DATA['HOSTNAME']='mybox.traceos.local';
+
+	$_cdir="/etc/vsftpd";
+	$_config ="RANDFILE = $_cdir/.server.rnd\n";
+        $_config .="[ req ]\n";
+        $_config .="default_bits = 1024\n";
+        $_config .="encrypt_key = yes\n";
+        $_config .="distinguished_name = req_dn\n";
+        $_config .="x509_extensions = cert_type\n";
+        $_config .="[ req_dn ]\n";
+        $_config .="countryName = Country Name (2 letter code)\n";
+        $_config .="countryName_default = {$_DATA['COUNTRY']}\n";
+        $_config .="countryName_min = 2\n";
+        $_config .="countryName_max = 2\n";
+        $_config .="stateOrProvinceName = State or Province Name (full name)\n";
+        $_config .="stateOrProvinceName_default = {$_DATA['CITY']}\n";
+        $_config .="localityName = Locality Name (eg, city)\n";
+        $_config .="localityName_default = $_city\n";
+        $_config .="0.organizationName = Organization Name (eg, company)\n";
+        $_config .="0.organizationName_default = {$_DATA['ORGANIZATION']}\n";
+        $_config .="organizationalUnitName = Organizational Unit Name (eg, section)\n";
+        $_config .="organizationalUnitName_default = {$_DATA['ORGANIZATION']}\n";
+        $_config .="0.commonName = Common Name (FQDN of your server)\n";
+        $_config .="0.commonName_default = {$_DATA['HOSTNAME']}\n";
+        $_config .="emailAddress = Email Address\n";
+        $_config .="emailAddress_default = {$_DATA['ADMIN']}\n";
+        $_config .="emailAddress_max = 40\n";
+        $_config .="[ cert_type ]\n";
+        $_config .="nsCertType = server\n";
+
+	if(_FILE_SAVE("$_cdir/openssl.cnf",$_config)) {
+		@unlink("/etc/vsftpd/vsftpd.pem");
+		if(_EXEC_CMD("/bin/openssl req -x509 -batch -config $_cdir/openssl.cnf -nodes -days 365 -newkey rsa:1024 -keyout $_cdir/vsftpd.pem -out $_cdir/vsftpd.pem")==0) {
+			return TRUE;
+		}
+	}
+	_INIT_ECHO(1,_GETTEXT("Generating SSL certificate failed"));
+	return FALSE;
+}
+
+function ftp_config($_scriptdata='') {
+	_INI_TOKEN_GET("system","system.cfg",$_NTOKEN);
+	$_DATA=$_NTOKEN['service_ftp'];
+	if(_NULL($_DATA['STAT']) || $_DATA['STAT']==0) {
+		_INIT_ECHO(0,_GETTEXT("%s daemon (%s) disabled","FTP","ftpd"));
+		ftp_quiet();
+		return FALSE;
+	}
+	@_MKDIR("/etc/vsftpd");
+	@_MKDIR("/usr/share/empty");
+
+	if(_NULL($_DATA['PORT'])) $_DATA['PORT']=5053;
+	if(_NULL($_DATA['USER'])) $_DATA['USER']="ftpuser";
+	if(_NULL($_DATA['TIMEOUT'])) $_DATA['TIMEOUT']="300";
+	if(_NULL($_DATA['SSL'])) $_DATA['SSL']=0;
+
+	$_config="";
+	$_config .="anonymous_enable=NO\n";
+	$_config .="local_enable=YES\n";
+	$_config .="write_enable=YES\n";
+	$_config .="local_umask=022\n";
+	$_config .="dirmessage_enable=YES\n";
+	$_config .="connect_from_port_20=YES\n";
+	$_config .="xferlog_enable=NO\n";
+	$_config .="xferlog_std_format=NO\n";
+	$_config .="idle_session_timeout=600\n";
+	$_config .="data_connection_timeout=120\n";
+	$_config .="ftpd_banner=MyboxOS ("._VERSION().")\n";
+	$_config .="userlist_enable=YES\n";
+	$_config .="listen=YES\n";
+	$_config .="listen_port={$_DATA['PORT']}\n";
+	$_config .="chmod_enable=NO\n";
+	if(_INIT_DEBUG()) {
+		$_config .="chroot_local_user=NO\n";
+	} else {
+		$_config .="chroot_local_user=YES\n";
+	}
+	$_config .="syslog_enable=YES\n";
+	$_config .="userlist_deny=NO\n";
+	$_config .="use_localtime=YES\n";
+	$_config .="ftp_data_port=20\n";
+	$_config .="idle_session_timeout={$_DATA['TIMEOUT']}\n";
+	if($_DATA['SSL']==1 && _ftp_config_cert()==TRUE) {
+		$_config .="ssl_enable=YES\n";
+		$_config .="allow_anon_ssl=NO\n";
+		$_config .="force_local_data_ssl=NO\n";
+		$_config .="force_local_logins_ssl=NO\n";
+		$_config .="ssl_tlsv1=YES\n";
+		$_config .="ssl_sslv2=NO\n";
+		$_config .="ssl_sslv3=NO\n";
+		$_config .="rsa_cert_file=/etc/vsftpd/vsftpd.pem\n";
+	}
+
+	_FILE_SAVE("/etc/vsftpd/ftp_user",$_DATA['USER']);
+	_FILE_SAVE("/etc/vsftpd/ftp_port",$_DATA['PORT']);
+	_FILE_SAVE("/etc/vsftpd/user_list","{$_DATA['USER']}\n");
+	ftp_mods();
+	if(!_NULL($_scriptdata)) {
+		return _FILE_SAVE("/etc/vsftpd/vsftpd.conf","$_scriptdata\n");
+	}
+	return _FILE_SAVE("/etc/vsftpd/vsftpd.conf","$_config");
+}
+
+
+function ftp_up() {
+	@unlink(_TASKQ_PATH."/ftp_up");
+	if(_EXEC_CMD("/bin/ftpd")==0) {
+		_INIT_NICE_LEVEL("ftpd","-5");
+		_INIT_CHKPROG_LOG("ftpd");
+		return TRUE;
+	}
+	return ftp_restart();
+	
+}
+
+
+function ftp_start() {
+	_INIT_CHECK_DAEMON_STATUS("ftpd");
+	if(!ftp_config()) {
+		_INIT_ECHO(1,_GETTEXT("Starting %s failed","ftpd"));
+		return FALSE;
+	}
+	_INIT_START_DAEMON("/bin/ftpd","ftp_up","-5");
+	return TRUE;
+}
+
+function ftp_stop() {
+	_INIT_STOP_DAEMON("ftpd","ftp_up",1);
+	sleep(1);
+	return TRUE;
+}
+
+function ftp_restart() {
+	_INIT_EXEC("ftp_stop");
+	_INIT_EXEC("ftp_start");
+	return TRUE;
+}
+
+function ftp_reload() {
+	if(ftp_config()) {
+		if(_SIGHUP("ftpd")) {
+			_INIT_ECHO(0,_GETTEXT("Reloading %s daemon","ftpd"));
+			return TRUE;
+		}
+	}
+	_INIT_ECHO(1,_GETTEXT("Reloading %s daemon failed","ftpd"));
+	return FALSE;
+}
+
+?>

@@ -1,0 +1,1233 @@
+#!/bin/sh
+# +-------------------------------------------------------------------------------------+
+# | Copyright (c) 2002-2008 Tracenetwork Corporation Sdn. Bhd.           		|
+# +-------------------------------------------------------------------------------------+
+# | This source file is belongs to nawawi, the author.                    		|
+# | Any changes/use of the source, please email to the author.           		|
+# +-------------------------------------------------------------------------------------+
+# | Authors: nawawi, Mohd nawawi Mohamad Jamili <nawawi@tracenetworkcorporation.com	|
+# +-------------------------------------------------------------------------------------+
+#
+# $Id: rc.init.sh,v 7.0 2008/01/21 03:29:00 nawawi Exp $
+# $Id: rc.init.sh,v 8.0 2008/10/31 11:38:00 nawawi Exp $
+# $Id: rc.init.sh,v 9.0 2009/03/31 09:54:00 nawawi Exp $
+
+trap : 1 2 3 15;
+PATH="/bin";
+[ -z "$TERM" ] && TERM=linux;
+export PATH TERM;
+umask 006;
+cd /;
+
+source /etc/init.boot/commons;
+__SPACE="                                       ";
+__GRUBCONF="/boot/grub/grub.conf";
+__LOOPFS="/strg/mybox/loopfs";
+__FSCKCNT=30;
+__FALLBACK=0;
+
+_ERROR() {
+        local msg=$@;
+        echo -e "<< ERROR >> $msg";
+	sleep 1;
+}
+
+_RC_SPIN() {
+	local msg="$1";
+	local spin="- \\ | / \\ | /";
+	for x in $spin; do
+		usleep 0;
+		echo -n -e "\r>> $msg $x";
+	done
+}
+
+_RC_RANDOM_SEED() {
+	local _opt="$1";
+	if [ -n "$_opt" -a "$_opt" = "start" ]; then
+		if [ -r "/strg/mybox/random-seed" -a -w "/dev/urandom" ]; then
+        		cat /strg/mybox/random-seed > /dev/urandom;
+		fi
+	else
+		echo -e "\n* Saving random seed..";
+		if [ -f "/strg/mybox/random-seed" ]; then
+			touch /strg/mybox/random-seed;
+			chmod 600 /strg/mybox/random-seed;
+		fi
+		dd if=/dev/urandom of=/strg/mybox/random-seed count=1 bs=512 2>/dev/null;
+	fi
+}
+
+_RC_READAHEAD() {
+	if [ -f "/tmp/readahead.list" ] && [ -x "/bin/readahead" ]; then
+		#echo "* Starting background readahead";
+		/bin/readahead /tmp/readahead.list &>/dev/null &
+	fi
+}
+
+_RC_PROGRESS_BAR() {
+	local msg="$1";
+	local ok=0;
+	while read buff; do
+		_RC_SPIN "$msg";
+		[ -z "$buff" ] && continue;
+		if stristr "$buff" "unlicensed"; then
+			echo -n -e "\r* $msg Unlicensed.${__SPACE}\n";
+			ok=1;
+			break;
+		elif stristr "$buff" "error"; then
+			echo -n -e "\r* $msg Error ($(echo "$buff" |sed -e 's/^\[//g' -e 's/.*\]\s//g')).${__SPACE}\n";
+			ok=1;
+			break;
+		elif stristr "$buff" "failed"; then
+			echo -n -e "\r* $msg Failed ($(echo "$buff" |sed -e 's/^\[//g' -e 's/.*\]\s//g')).${__SPACE}\n";
+			ok=1;
+			break;
+		elif stristr "$buff" "disabled"; then
+			echo -n -e "\r* $msg Disabled.${__SPACE}\n";
+			ok=1;
+			break;
+		elif stristr "$buff" "Timeout" || stristr "$buff" "CPU time limit exceeded"; then
+			echo -n -e "\r* $msg Timeout.${__SPACE}\n";
+			ok=1;
+			break;
+		elif stristr "$buff" "Done" ; then
+			ok=0;
+			break;
+		fi
+    	done
+	[ "$ok" = "0" ] && echo -n -e "\r* $msg Done.${__SPACE}\n";
+}
+
+_RC_WAIT_PROG() {
+	local _cprog="$1";
+	local _cmsg="$2";
+	local _ltitle="$3";
+	lcdd_msg "$_ltitle" "$_cmsg";
+	softlimit -t 60 $_cprog 2>/dev/null | _RC_PROGRESS_BAR "$_cmsg";
+}
+
+_RC_SERVICE() {
+	#local _p _n _x _f _opt _dcnt=0;
+	local _opt _list _f _x;
+	_opt="$1";
+	if [ -n "$_opt" ] && [ -f "/etc/init.boot/rc.${_opt}" ]; then
+		_list="$(cat /etc/init.boot/rc.${_opt} 2>/dev/null)";
+		if [ -z "$_list" ]; then
+			_ERROR "no startup config";
+		fi
+		if [ "$_opt" = "start" ]; then
+			[ -x "/service/tools/update_nic_vendor.exc" ] && _EXECQ "/service/tools/update_nic_vendor.exc";
+			for _x in $_list; do
+				[ ! -x "$_x" ] && continue;
+				_f=$(basename $_x .init);
+				_RC_WAIT_PROG "$_x start" "Starting $_f" "START SERVICES";
+			done
+		fi
+		if [ "$_opt" = "stop" ]; then
+			[ -f "/.network_ok" ] && export _NETWORK_OK=1;
+			for _x in $_list; do
+				[ ! -x "$_x" ] && continue;
+				_f=$(basename $_x .init);
+				_RC_WAIT_PROG "$_x stop" "Stopping $_f" "STOP SERVICES";
+			done
+			_EXECQ "rm -f /var/sys/lcd_msg";
+		fi
+	fi
+	#if [ -n "$_opt" -a -d "/etc/init.boot/rc" ]; then
+	#	if [ "$_opt" = "start" ]; then
+	#		[ -x "/service/tools/update_nic_vendor.exc" ] && _EXECQ "/service/tools/update_nic_vendor.exc";
+	#		((_n=0));
+	#		_dcnt="$(count_file "/etc/init.boot/rc/S*")";
+	#		while (( _n < $_dcnt )); do
+	#			_p="/etc/init.boot/rc/S${_n}";
+	#			if [ -L "$_p" ]; then
+	#				_x=$(readlink $_p);
+	#				_f=$(basename $_x .init);
+	#				if [ -x "$_x" ]; then
+	#					_RC_WAIT_PROG "$_x start" "Starting $_f" "START SERVICES";
+	#				fi
+	#			fi;
+	#			((_n++));
+	#		done;
+	#	fi
+	#	if [ "$_opt" = "stop" ]; then
+	#		[ -f "/.network_ok" ] && export _NETWORK_OK=1;
+	#		((_n=0));
+	#		_dcnt="$(count_file "/etc/init.boot/rc/K*")";
+	#		while (( _n < $_dcnt )); do
+	#			_p="/etc/init.boot/rc/K${_n}";
+	#			if [ -L "$_p" ]; then
+	#				_x=$(readlink $_p);
+	#				_f=$(basename $_x .init);
+	#				if [ -x "$_x" ] && [ -f "/var/sys/fastdown/${_f}" ]; then
+	#					_RC_WAIT_PROG "$_x stop" "Stopping $_f" "STOP SERVICES";
+	#				fi
+	#			fi;
+	#			((_n++));
+	#		done;
+	#		_EXECQ "rm -f /var/sys/lcd_msg";
+	#	fi
+	#fi
+}
+
+####################################################################
+# RC.BOOTUP START
+####################################################################
+
+# ramdisk
+_RAMSIZE=0;
+_DEFAULTSIZE=65536;
+_MINLEFT=16000;
+# 256MB
+_MINRAM=262144;
+# 200M for filesystem
+#_MINMEM=204800;
+# 100M for filesystem
+_MINMEM=102400;
+
+_CALCULATE_MEM() {
+	local _FOUNDMEM _TOTALMEM;
+	if [ -r "/proc/meminfo" ]; then
+		_FOUNDMEM="$(awk '/MemTotal/{print $2}' /proc/meminfo)";
+		_TOTALMEM="$(awk 'BEGIN{m=0};/MemFree|Cached/{m+=$2};END{print m}' /proc/meminfo)";
+	fi
+	if [ -z "$_FOUNDMEM" -o "$_FOUNDMEM" = 0 ]; then
+		_ERROR "MEMORY COUNTING FAILED";
+		exit 1;
+	fi
+
+	if [ "$_FOUNDMEM" -lt "$_MINMEM" ]; then
+		_ERROR "NOT ENOUGH MEMORY $_FOUNDMEM kB ($(( $_FOUNDMEM / 1024 )) MB), YOU NEED AT LEAST $(( $_MINMEM / 1024 ))MB";
+		exit 1;
+	fi
+	
+        echo "* Total memory found: $_FOUNDMEM kB ($(( $_FOUNDMEM / 1024 )) MB)";
+
+	if [ "$_TOTALMEM" -gt "$_MINMEM" ] && [ "$_TOTALMEM" -gt "$_MINRAM" ]; then
+		_RAMSIZE="$_MINRAM";
+	else
+		_RAMSIZE="$(( $_TOTALMEM / 5))";
+		if [ -n "$_TOTALMEM" -a "$_TOTALMEM" -gt "$_MINLEFT" ]; then
+			[ -z "$_RAMSIZE" -o "$_RAMSIZE" -lt "0" ] && _RAMSIZE=$_DEFAULTSIZE;
+			_RAMSIZE="$(( $_RAMSIZE * 4 ))";
+		fi
+	fi
+}
+
+_PRINT_BANNER() {
+	if [ -x "/bin/banner" ]; then
+		echo -e "$(/bin/banner)\n";
+	fi
+}
+
+_STAGE1() {
+	_EXECQ "mount -t proc -o ro virtual /proc";
+	_EXECQ "mount -t sysfs -o ro virtual /sys";
+	_CALCULATE_MEM;
+	echo "* Creating filesystem ($_RAMSIZE kB) on virtual memory.";
+	_EXECQ "mount -t tmpfs -o "rw,noatime,size=${_RAMSIZE}k" virtual /ramd";
+	_EXECQ "chmod 700 /ramd";
+	cd /ramd;
+	local _DIR;
+	for _DIR in /*; do
+		case $_DIR in 
+			/lost+found|/ramd|/proc|/dev|/sys) continue;; 
+			*) _COPY "$_DIR /ramd/" ;; 
+		esac 
+	done
+	_MKDIR "dev/pts dev/shm initrd";
+	_EXECQ "umount /proc";
+	_EXECQ "umount /sys";
+}
+
+_STAGE2() {
+	cd /ramd;
+	pivot_root . initrd;
+	cd /;
+	_MKDIR "proc sys";
+	_EXECQ "mount -t proc -o rw,noexec,nosuid,nodev virtual /proc";
+	_EXECQ "mount -t sysfs -o rw,noexec,nosuid,nodev virtual /sys";
+	[ -w "/proc/sys/kernel/printk" ] && echo "0 0 0 0" > /proc/sys/kernel/printk;
+	[ -w "/proc/sys/kernel/hotplug" ] && echo "/bin/mdev" > /proc/sys/kernel/hotplug;
+	[ -w "/proc/sys/kernel/modprobe" ] && echo "/bin/modprobe" > /proc/sys/kernel/modprobe;
+	_RC_READAHEAD;
+	local _PKG;
+	echo -n ">> Extracting base tools: ";
+	for _PKG in /tmp/*.mpk;do
+		if _EXECQ "tar -C / -axf $_PKG"; then
+			echo -n "#"; usleep 0; wait;
+			_EXECQ "rm -f $_PKG";
+		else
+			echo "$(basename $_PKG)" >> /base_pkg_error;
+		fi
+	done
+	echo -n -e "\r* Extracting base tools. Done.${__SPACE}\n";
+	_EXECQ "depmod -a";wait;
+	_EXECQ "mdev -s";wait;
+	_EXECQ "mount -t tmpfs -o rw virtual /dev/shm";
+	_EXECQ "mount -t devpts -o \"rw,gid=0,mode=620\" virtual /dev/pts";
+	#_EXECQ "mv /dev/random /dev/random-block";
+	#_EXECQ "ln -s /dev/urandom /dev/random";
+}
+
+_STAGE3() {
+	local _DATA _SERIAL_PORT _SERIAL_SPEED;
+	cd /;
+	_EXECQ "chmod 700 *";
+	if [ -r "/proc/cmdline" ]; then
+		_DATA="$(grep console=ttyS /proc/cmdline)";
+		if [ -n "$_DATA" ]; then
+			_SERIAL_PORT="$(echo $_DATA |sed -e 's/.*console=ttyS//g' -e 's/,.*//g')";
+			[ -n "$_SERIAL_PORT" ] && _SERIAL_PORT="ttyS$_SERIAL_PORT";
+			_SERIAL_SPEED="$(echo $_DATA |sed -e 's/.*console=ttyS//g' -e 's/\s.*//g' -e 's/.*,//g' -e 's/n.*//g')";
+		fi
+	fi
+	echo "::sysinit:/bin/rcstart" >/etc/inittab;
+	if [ -n "$_SERIAL_PORT" ] && [ -n "$_SERIAL_SPEED" ]; then
+		echo "${_SERIAL_PORT}::respawn:/bin/getty -h -n -L ${_SERIAL_PORT} ${_SERIAL_SPEED} vt100" >>/etc/inittab;
+	fi
+	echo "tty1::respawn:/bin/getty -h -n -L tty1 115200 linux" >>/etc/inittab;
+	echo "tty7::respawn:/bin/chkprog" >>/etc/inittab;
+	echo "::restart:/bin/init" >>/etc/inittab;
+	echo "::ctrlaltdel:/bin/bootdown" >>/etc/inittab;
+	echo "::ctrlaltdel:/bin/reset" >>/etc/inittab;
+	echo "::ctrlaltdel:/bin/reboot" >>/etc/inittab;
+	echo "::shutdown:/bin/bootdown" >>/etc/inittab;
+
+	if [ -n "$resetpasswd" ] && [ "$resetpasswd" = "yes" -o "$resetpasswd" = "1" ]; then
+		echo -e "\r<< WARNING >> LOGIN DISABLED";
+		:>/etc/noconsole;
+	fi
+
+	exec chroot . /bin/init < /dev/console > /dev/console 2>&1;
+	_ERROR "Failed to boot file system.\nPress Ctrl+Alt+Del or switch off/on for reboot.";
+	read _PRESS;
+	exit 1;
+}
+
+_MAIN_BOOTUP() {
+	local _v="$(uname)";
+	_PRINT_BANNER;
+	if [ -n "$_v" ] && [ "$_v" != "TraceOS" ] && [ "$_v" != "MyboxOS" ]; then
+		_ERROR "Invalid kernel";
+		read _PRESS;
+		exit 1;
+	fi
+	_STAGE1;
+	_STAGE2;
+	_STAGE3;
+}
+
+####################################################################
+# RC.BOOTUP END
+# RC.BOOTDOWN START
+####################################################################
+_BOOTDOWN_POLICY_CLEAR() {
+	local _p _buf;
+	if [ -r "/proc/net/ip_tables_names" ]; then
+		_buf="$(cat /proc/net/ip_tables_names)";
+		for _p in $_buf; do
+			_EXECQ "iptables -t $_p -F";
+			_EXECQ "iptables -t $_p -X"; 
+		done
+	fi
+	_EXECQ "iptables -F";
+	_EXECQ "iptables -P INPUT DROP";
+	_EXECQ "iptables -P FORWARD DROP";
+	_EXECQ "iptables -P OUTPUT ACCEPT";
+}
+
+_BOOTDOWN_LOG() {
+	[ -f "/var/sys/log_setting/nolog" ] || [ -f "/.nolog" ] && return 1;
+	local _dt=$(date "+%Y%m%d");
+	local _flog="/logfs/system-$_dt.log";
+	local _log="[$(date +"%d-%b-%Y %T")] TYPE=INFO MSG=****** SYSTEM SHUTDOWN ******";
+	if [ -f "$_flog" ]; then
+		echo "$_log" >> $_flog;
+	else
+		echo "$_log" > $_flog;
+	fi
+	_EXECQ "chmod 700 $_flog";
+	return 0;
+}
+
+_BOOTDOWN_UMOUNT() {
+	local _DIR _M _B;
+	lcdd_msg "SYSTEM SHUTDOWN." ">> STORAGE OFF";
+	for _DIR in logs backup update; do
+		_EXECQ "umount /config/$_DIR";
+	done
+	if [ -f "/var/sys/strg_mount" ]; then
+		_B="$(cat /var/sys/strg_mount)";
+		for _M in $_B; do
+			_EXECQ "umount -r $_M";
+		done
+	fi
+	lcdd_msg "SYSTEM SHUTDOWN." ">> SWAP OFF";
+	_EXECQ "swapoff -a";
+	lcdd_msg "SYSTEM SHUTDOWN." ">> POWEROFF/REBOOT";
+}
+
+_BOOTDOWN_LAST() {
+	if [ -w "${__GRUBCONF}" ]; then
+		if [ -r "/.checkfsck" ]; then
+			local _cnt;
+			_cnt="$(cat /.checkfsck |tr -d [a-z] | tr -d [A-Z])";
+			if [ -n "$_cnt" ]; then
+				((_cnt++));
+				_COPY "${__GRUBCONF} ${__GRUBCONF}.bb";
+				sed -i -e "s|checkfsck=\S*|checkfsck=$_cnt|g" ${__GRUBCONF} 2>/dev/null;
+				if [ $? != 0 ]; then
+					_EXECQ "mv ${__GRUBCONF}.bb ${__GRUBCONF}";
+				fi
+				_EXECQ "rm -f ${__GRUBCONF}.bb";
+			fi
+		fi
+		if [ -r "/var/sys/moduleslist" ]; then
+			source /var/sys/moduleslist;
+			if [ -n "$__mods" ]; then
+				local _mark=0 _BUF;
+				_EXECQ "rm -f ${__GRUBCONF}.bb";
+				while read _BUF; do
+					if ! [[ "$_BUFF" =~ "^#" ]] && strstr "$_BUF" "title"; then
+						if strstr "$_BUF" "MYBOXOS"; then
+							_mark=1;
+						else
+							_mark=0;
+                        			fi
+                			fi
+					if ! [[ "$_BUFF" =~ "^#" ]] && strstr "$_BUF" "kernel" && test "$_mark" = "1"; then
+						_BUF="$(echo $_BUF | sed -e "s|root=/dev/ram0|mods=\"$__mods\" root=/dev/ram0|g")";
+					fi
+					[ -n "$_BUF" ] && echo "$_BUF" >> ${__GRUBCONF}.bb;
+				done < ${__GRUBCONF};
+				if [ -w "${__GRUBCONF}.bb" ]; then
+					_EXECQ "mv ${__GRUBCONF}.bb ${__GRUBCONF}";
+				fi
+				unset _mark _BUF;
+			fi
+		fi
+	fi
+}
+
+_MAIN_BOOTDOWN() {
+	cd /;
+	:>/var/sys/init_no_restart;
+	:>/var/sys/init_down;
+	:>/etc/resolv.conf;
+	[ -r "/.lcdtype" ] && source /.lcdtype;
+	if [ "$_LCD_PROG" != "-1" -a -x "/bin/lcd-reset" ]; then
+		_EXECQ "/bin/lcd-reset bootdown ${_LCD_PROG}";
+	fi
+	_BOOTDOWN_POLICY_CLEAR;
+	[ -w "/proc/sys/kernel/printk" ] && echo "0 0 0 0" > /proc/sys/kernel/printk;
+	_RC_RANDOM_SEED "stop";
+	_RC_SERVICE "stop";
+	_EXECQ "/bin/hwclock -w";
+	_BOOTDOWN_LOG;
+	_BOOTDOWN_LAST;
+        if [ -r "/etc/firmware" ]; then
+                local __VER="$(cat /etc/firmware 2>/dev/null)";
+		[ ! -d "/strg/mybox/info-cache/update" ] && _MKDIR "/strg/mybox/info-cache/update";
+                [ -n "$__VER" -a ! -f "/strg/mybox/info-cache/update/FIRMWARE_VERSION" ] && echo "$__VER" > /strg/mybox/info-cache/update/FIRMWARE_VERSION;
+        fi
+	_BOOTDOWN_UMOUNT;
+}
+
+####################################################################
+# RC.BOOTDOWN END
+# RC.INIT START
+####################################################################
+
+_NETWORK_OK=0;
+_MOUNT_OK=0;
+_LCD_PROG=-1;
+_INITDIR="/etc/init.boot";
+export _NETWORK_OK _MOUNT_OK _LCD_PROG _INITDIR;
+
+_RC_BANNER() {
+	echo -e "$(/bin/banner)\n\n" > /etc/banner;
+}
+
+_RC_SETPASSWD() {
+	local _fd="/strg/mybox/registry/system";
+	if [ -r "$_fd/system.cfg" ]; then
+		local _BUF _ID _SID;
+		#while read _BUF; do
+		#	[ -z "$_BUF" ] && continue;
+		#	_ID=$(echo "$_BUF" |grep ^ID= |sed -e 's/^ID=//g' -e 's/^\s//g');
+		#	[ -n "$_ID" ] && _SID=$(echo $_ID |tr [a-z] [A-Z]);
+		#	[ -n "$_SID" ] && export "${_SID}_${_BUF}";
+		#done < $_fd/system.cfg;
+		while read _BUF; do
+			[ -z "$_BUF" ] && continue;
+			if [[ "$_BUF" =~ "^ID=" ]]; then
+				_ID=$(echo "$_BUF" |sed -e 's/^ID=//g' -e 's/^\s//g');
+			fi
+			if [ -n "$_ID" ]; then
+				_SID=$(echo $_ID |tr [a-z] [A-Z]);
+				[ -n "$_SID" ] && export "${_SID}_${_BUF}";
+				unset _SID;
+			fi
+		done < $_fd/system.cfg;
+	fi
+	# default user
+	echo "sys:x:0:0:systemroot:/:/bin/false" > /etc/passwd.tmp;
+
+	[ -z "$SYSTEM_CONSOLE_PASSWD" ] && SYSTEM_CONSOLE_PASSWD="*";
+	echo "console:$SYSTEM_CONSOLE_PASSWD:0:0:console:/config:/bin/iosh" >> /etc/passwd.tmp;
+
+	[ -z "$SERVICE_HTTP_STAT" ] && SERVICE_HTTP_STAT=0;
+	if [ "$SERVICE_HTTP_STAT" = "1" ]; then
+		[ -z "$SERVICE_HTTP_ADMIN" ] && SERVICE_HTTP_ADMIN="*";
+		[ -z "$SERVICE_HTTP_LOOK" ] && SERVICE_HTTP_LOOK="*";
+		echo "sysadmin:$SERVICE_HTTP_ADMIN:100:100:sysadmin:/tmp:/bin/false" >> /etc/passwd.tmp;
+		echo "syslook:$SERVICE_HTTP_LOOK:100:100:syslook:/tmp:/bin/false" >> /etc/passwd.tmp;
+	fi
+
+	[ -z "$SERVICE_SSH_STAT" ] && SERVICE_SSH_STAT=0;
+	if [ "$SERVICE_SSH_STAT" = "1" ]; then
+		[ -z "$SERVICE_SSH_USER" ] && SERVICE_SSH_USER="sshuser";
+		[ -z "$SERVICE_SSH_PASSWD" ] && SERVICE_SSH_PASSWD="*";
+		echo "$SERVICE_SSH_USER:$SERVICE_SSH_PASSWD:0:0:ssh:/config:/bin/iosh" >> /etc/passwd.tmp;
+	fi
+
+	[ -z "$SERVICE_FTP_STAT" ] && SERVICE_FTP_STAT=0;
+	if [ "$SERVICE_FTP_STAT" = "1" ]; then
+		[ -z "$SERVICE_FTP_USER" ] && SERVICE_FTP_USER="sshuser";
+		[ -z "$SERVICE_FTP_PASSWD" ] && SERVICE_FTP_PASSWD="*";
+		echo "$SERVICE_FTP_USER:$SERVICE_FTP_PASSWD:0:0:ftp:/config:/bin/iosh" >> /etc/passwd.tmp;
+	fi
+	
+	if [ -w "/etc/passwd.tmp" ]; then
+		echo "nobody:*:0:0:nobody:/:/bin/false" >> /etc/passwd.tmp;
+		echo "pcap:*:0:0:pcap:/:/bin/false" >> /etc/passwd.tmp;
+		mv /etc/passwd.tmp /etc/passwd;
+	fi
+}
+
+_RC_NIC_VENDOR() {
+	local _CNT _BUF _DEV;
+	[ ! -x "/bin/lspci" ] && return 1;
+	_CNT=0;
+	#( /bin/lspci 2>/dev/null |grep -i "Ethernet controller" | while read _BUF;do
+	#		[ -z "$_BUF" ] && continue;
+	#		_DEV=$(echo $_BUF |cut -d ':' -f 3 |sed -e 's/(rev.*)//g' -e 's/^\s//g' 2>/dev/null);
+	#		if [ -n "$_DEV" ]; then
+	#			echo "eth$_CNT=$_DEV" >>/var/sys/___nic_info;
+	#			((_CNT++));
+	#		fi
+	#	done
+        #);
+	( /bin/lspci 2>/dev/null | grep -i "Ethernet controller" |sed -e 's/.*Ethernet controller:\s//g' -e 's/.*:\s//g' -e 's/(.*//g'  |while read _BUF;do
+		[ -z "$_BUF" ] && continue;	
+		echo "eth${_CNT}=$_BUF" >> /var/sys/___nic_info;
+		((_CNT++));
+		done
+	);
+	return 0;
+}
+ 
+_RC_SETTING() {
+	if [ ! -r "/proc/cmdline" ]; then
+		_ERROR "/proc/ is not present -- aborted";
+		exit 1;
+	fi
+	read CMDLINE < /proc/cmdline;
+	for cmd in $CMDLINE; do
+		 case "$cmd" in
+			\#*) break;;
+			hwapp=*) export "$cmd";;
+			mods=*) export "$cmd";;
+			modsf=*) export "$cmd";;
+			lcdtype=*) export "$cmd";;
+			forcefsck=*) export "$cmd";;
+			resetpasswd=*) export "$cmd";;
+			resetinit=*) export "$cmd";;
+			nofsck=*) export "$cmd";;
+			checkfsck=*) export "$cmd";;
+			fsckcnt=*) export "$cmd";;
+			_debug=*) export "$cmd";;
+			_fallback=*) export "$cmd";;
+		esac
+	done
+	[ -n "$mods" ] && mods=$(rmstr "$mods");
+	[ -n "$modsf" ] && modsf=$(rmstr "$modsf");
+	[ -n "$resetpasswd" ] && resetpasswd=$(rmstr "$resetpasswd");
+	[ -n "$resetinit" ] && resetinit=$(rmstr "$resetinit");
+	[ -n "$nofsck" ] && nofsck=$(rmstr "$nofsck");
+	[ -n "$checkfsck" ] && checkfsck=$(rmstr "$checkfsck");
+	if [ -n "$fsckcnt" -a "$fsckcnt" != "$__FSCKCNT" ]; then
+		__FSCKCNT="$fsckcnt";
+	fi
+
+	if [ -n "$hwapp" ]; then
+		hwapp=$(rmstr "$hwapp");
+		echo "$hwapp" > /.hwapp;
+	fi
+	[ -n "$lcdtype" ] && lcdtype=$(rmstr "$lcdtype");
+	[ -n "$forcefsck" ] && forcefsck=$(rmstr "$forcefsck");
+	[ -n "$_debug" ] && set -x;
+	[ -n "$_fallback" ] && __FALLBACK=1;
+}
+
+
+_RC_LCD() {
+	if [ "$_LCD_PROG" != "-1" ]; then
+		if [ "$_LCD_PROG" = "0" -a -x "/bin/lcdd" ]; then
+			_EXECQ "ln -sf /dev/ttyS1 /dev/lcd";wait;
+			if [ -c "/dev/lcd" ] && [ -x "/bin/lcdd" ]; then
+				echo -n "* Starting LCD server";
+				_EXECQ "/bin/lcdd";
+				if [ $? = 0 ]; then
+					echo " Done.";
+				else
+					echo " Failed.";
+				fi
+			fi
+		fi
+		if [ "$_LCD_PROG" = "1" ]; then
+			_EXECQ "mknod /dev/parport0 c 99 0";
+			_EXECQ "/dev/lp0 c 6 0";
+			_EXECQ "ln -sf /dev/parport0 /dev/lcd";wait;
+			if [ -c "/dev/lcd" ] && [ -x "/bin/LCDd" ]; then
+				echo -n "* Starting LCD server";
+				_EXECQ "/bin/LCDd";
+				if [ $? = 0 ]; then
+					echo " Done.";
+					echo "Starting up.." > /var/sys/lcd_msg;
+				else
+					echo " Failed.";
+				fi
+			fi
+		fi
+	fi
+}
+
+
+_RC_INIT() {
+	_RC_BANNER;
+	echo "0 0 0 0" > /proc/sys/kernel/printk;
+	echo "fw.tracenetwork.lo" > /proc/sys/kernel/hostname;
+	_EXECQ "blockdev --flushbufs /dev/ram0";
+	_EXECQ "umount /initrd/sys";wait;
+	_EXECQ "umount /initrd";wait;
+	_EXECQ "rm -rf /initrd /bootup";
+	#echo -e '#!/bin/sh\necho "sys"\nexit 0;' > /bin/groups;
+	#_EXECQ "chmod 700 /bin/groups";
+	#_EXECQ "pkill -f -9 getkey";
+	_RC_SETTING;
+	if [ -n "$__FALLBACK" -a "$__FALLBACK" = "1" ]; then
+		echo "<< Running Fallback Image >>";
+	fi
+	if [ -n "$hwapp" -a -f "$_INITDIR/rc.conf/${hwapp}.conf" ]; then
+		source $_INITDIR/rc.conf/${hwapp}.conf;
+		if [ -n "$__DRIVERS" ]; then
+			if [ -n "$mods" ]; then 
+				local _xmods="${__DRIVERS},${mods}";
+				mods="$(echo $_xmods |tr ',' '\n' |sort -u)";
+			else
+				export mods="$__DRIVERS";
+			fi
+		fi
+		if [ -z "$lcdtype" -a -n "$__LCDTYPE" ]; then
+			export lcdtype="$__LCDTYPE";
+		fi
+		if [ -n "$__MODPROBE" -a -f "$__MODPROBE" ]; then
+			echo -n -e "$(cat $__MODPROBE)" >> /etc/modprobe.conf;
+		fi
+	fi
+	if [ -n "$lcdtype" ]; then
+		echo "_LCD_PROG=$lcdtype" > /.lcdtype;
+		_LCD_PROG=$lcdtype;
+	fi
+	if [ -n "$modsf" ]; then
+		echo -n -e "$modsf" >> /etc/modprobe.conf;
+	fi
+}
+
+_RC_COMPV() {
+        local a="$(echo $1 |tr -d '.')";
+        local b="$(echo $2 |tr -d '.')";
+        if [ "$a" -gt "$b" ]; then
+                return 0;
+        fi
+        return 1;
+}
+
+_RC_FIRMWARE_VERSION() {
+	if [ -x "/service/tools/firmware_version.exc" ]; then
+		_EXECQ "/service/tools/firmware_version.exc";
+	fi
+}
+
+_RC_GET_HWADDR() {
+	local _D=$1;
+	[ -z "$_D" ] && return;
+	local _HW;
+	_HW=$(ifconfig |grep ^$_D |sed -e 's/.*HWaddr//g' -e 's/^\s//g');
+	[ -n "$_HW" ] && echo "${_D}=${_HW}" >> /var/sys/___nic_hwaddr;
+}
+
+_RC_CHECK_NETWORK() {
+	local x;
+        local NET_DEVICE="$(awk -F: '/eth.:/{print $1}' /proc/net/dev)";
+        if [ -n "$NET_DEVICE" ]; then
+                echo -n "* Detecting network interfaces: "
+                lcdd_msg "SYSTEM LOADING.." ">> CHECKING NIC";
+                for x in $NET_DEVICE; do
+                        _EXECQ "ip link set $x up";
+                        if [ $? = 0 ]; then
+                                echo -n "$x ";
+				[ ! -f "/var/sys/nic" ] && echo "$x" > /var/sys/nic;
+				_RC_GET_HWADDR "$x";
+                                _EXECQ "ip link set $x down";
+                        fi
+                done
+                _EXECQ "ip route flush cache";
+                _EXECQ "ip route flush table main";
+		_RC_NIC_VENDOR;
+                echo "";
+		_NETWORK_OK=1;
+        else
+                echo "* No network device found";
+                lcdd_msg "SYSTEM LOADING.." ">> NO NIC FOUND";
+        fi
+}
+
+
+_RC_EXEC_SCRIPT() {
+	[ ! -d "/strg/mybox/scripts" ] && return 1;
+	local opt="$1";
+	if [ -n "$opt" -a -x "/strg/mybox/scripts/$opt-init" ]; then
+		echo "* Executing $opt-init";
+		_EXECQ "/strg/mybox/scripts/$opt-init";
+		return $?;
+	fi
+	return 1;
+}
+
+_RC_MOUNT_LOCAL() {
+	local _DIR;
+	for _DIR in backup update; do
+		_MKDIR "/config/$_DIR";
+		_MKDIR "/strg/mybox/$_DIR";
+		_EXECQ "mount --bind /strg/mybox/$_DIR /config/$_DIR";
+	done
+	_MKDIR "/config/logs";
+	_EXECQ "mount --bind /logfs /config/logs";
+}
+
+_RC_MICROCODE() {
+	[ ! -x "/bin/microcode_ctl" ] && [ ! -f "/lib/firmware/microcode.dat" ] && return 1;
+	local _cpuvendor _cpufamily;
+	_cpuvendor="$(/bin/grep "^vendor_id" /proc/cpuinfo 2>/dev/null |sed -e 's/.*:\s//g')";
+	_cpufamily="$(/bin/grep "^cpu family" /proc/cpuinfo 2>/dev/null |sed -e 's/.*:\s//g')";
+	if [ "$_cpuvendor" = "GenuineIntel" ] && [ "$_cpufamily" = "6" ] || [ "$_cpufamily" -gt "6" ]; then
+		_MKDIR "/dev/cpu";
+		_EXECQ "mknod /dev/cpu/microcode c 10 184";
+		_EXECQ "/bin/microcode_ctl -Qui";
+	fi
+}
+
+_RC_HWDETECT() {
+	if [ -n "$mods" ]; then
+		echo -n ">> Loading hardware drivers.";
+		for f in $(echo $mods |sed -e 's/,/ /g');do
+			_EXECQ "modprobe -q $f";
+			echo -n ".";
+			usleep 0; wait;
+		done
+		echo -e -n "\r* Loading hardware drivers. Done.${__SPACE}\n";
+	else 
+		echo -n ">> Checking hardware drivers.";
+		/etc/init.boot/rc.hwdetect;
+		# earlier probe
+		if [ -f "/var/spool/modules/moduleslist" ]; then
+			for f in $(cat /var/spool/modules/moduleslist); do
+				_EXECQ "modprobe -q $f";
+				echo -n ".";
+				usleep 0; wait;
+			done
+			echo -e -n "\r* Checking hardware drivers. Done.${__SPACE}\n";
+		fi
+		echo -n ">> Loading hardware drivers.";
+		/etc/init.boot/rc.hwdetect;
+		if [ -f "/var/spool/modules/moduleslist" ]; then
+			for f in $(cat /var/spool/modules/moduleslist); do
+				_EXECQ "modprobe -q $f";
+				echo -n ".";
+				usleep 0; wait;
+			done
+			echo -e -n "\r* Loading hardware drivers. Done.${__SPACE}\n";
+		fi
+	fi
+	if [ -f "/lib/modules/ppp.txt" ]; then
+		for f in $(cat /lib/modules/ppp.txt); do
+			_EXECQ "modprobe -q $(basename $f .ko)";
+			usleep 0; wait;
+		done
+		mknod /dev/ppp c 180 0 >/dev/null 2>&1;
+	fi
+	if [ -f "/lib/modules/lcd.txt" -a "$_LCD_PROG" = "1" ]; then
+		for f in $(cat /lib/modules/lcd.txt); do
+			_EXECQ "modprobe -q $(basename $f .ko)";
+			usleep 0; wait;
+		done
+	fi
+	# intel microcode frimware
+	_RC_MICROCODE;
+
+	# create device incase hotplug failed
+	_EXECQ "mdev";
+	[ -e "/proc/bus/usb" ] && _EXECQ "mount -t usbfs none /proc/bus/usb";
+	if [ -f "/var/spool/modules/moduleslist" ]; then
+		local __mods="$(cat /var/spool/modules/moduleslist | tr '\n' ',' |sed -e 's/,$//g')";
+		if [ -n "$__mods" ]; then
+			echo "__mods=\"$__mods\"" > /var/sys/moduleslist;
+		fi
+	fi
+	return 0;
+}
+
+_RC_CHECK_ERROR() {
+	lcdd_msg "SYSTEM LOADING..." ">> STORAGE ERROR";
+	_ERROR "An error occurred during the file system check.\nDropping you to a shell; the system will reboot\nwhen you leave the shell.";
+	:> /var/sys/do_single;
+       	/bin/sh;
+}
+
+_DCHK_RET=-1;
+_RC_FSCK_PROGRESS() {
+	local msg="$1";
+	local _p;
+	echo -n -e "\r>> $msg -";
+	while read buff; do
+		for _p in $buff; do
+			_RC_SPIN "$msg";
+		done
+    	done
+}
+_RC_FSCK() {
+	local _disk="$1";
+	local _force="$2";
+	_DCHK_RET=-1;
+	fsck $_force -T -a -C $_disk;
+	_DCHK_RET=$?;
+}
+
+_RC_CHECK_DISK() {
+	local disk="$1";
+	local force="";
+	[ -n "$forcefsck" -a "$forcefsck" = "1" ] && force="-f";
+	local msg="Routine check of drives: [${disk}]";
+	_RC_FSCK "$disk" "$force" 2>/dev/null | _RC_FSCK_PROGRESS "$msg";
+	local ret=$_DCHK_RET;
+	if [ $ret -gt 1 ]; then
+		echo -n -e "\r${__SPACE}\n";
+		_RC_CHECK_ERROR;
+	else
+		echo -n -e "\r* $msg Done.${__SPACE}";
+	fi
+}
+
+_RC_DO_MOUNT() {
+	local _label="$1";
+	local _mount="$2";
+	local _fs="$3";
+	[ "x$_fs" = "x" ] && _fs="ext3";
+	
+	_MKDIR "/${_mount}";
+
+	_opt="-orw";
+	if [ "$_fs" = "ext3" ]; then
+		_opt="-t ext3 ${_opt},errors=remount-ro,noatime";
+	elif [ "$_fs" = "reiserfs" ]; then
+		_opt="-t reiserfs ${_opt},notail";
+	fi
+	
+	if _EXECQ "mount ${_opt} LABEL=/${_label} /${_mount}"; then
+		_MOUNT_OK=1;
+		echo "/${_mount}" >> /var/sys/strg_mount;
+	else
+		_MOUNT_OK=0;
+	fi
+}
+
+_RC_MOUNT() {
+	local _lb _disk _docheck;
+	for _lb in BOOT MAIN LOG CACHE; do
+		_disk="$(findfs LABEL=/$_lb)";
+		if [ -n "$_disk" ]; then
+			if [ -z "$nofsck" ]; then
+				if [ -n "$checkfsck" ] && [ "$checkfsck" -gt "$__FSCKCNT" ]; then
+					_RC_CHECK_DISK "$_disk";
+				fi
+				if [ -z "$checkfsck" ]; then
+					_RC_CHECK_DISK "$_disk";
+				fi
+			fi
+			echo "$_disk" |tr -d [0-9] >> /tmp/disk;
+		fi
+		unset _disk;
+	done
+	[ -n "$checkfsck" ] && [ "$checkfsck" -gt "$__FSCKCNT" ] && checkfsck=0;
+
+	unset _lb;
+	echo -n -e "\r";
+	_EXECQ "swapon LABEL=/SWAP";
+	_RC_DO_MOUNT "MAIN" "strg" "reiserfs";
+	_RC_DO_MOUNT "BOOT" "boot" "reiserfs";
+	_RC_DO_MOUNT "CACHE" "cachefs" "reiserfs";
+	_RC_DO_MOUNT "LOG" "logfs" "reiserfs";
+
+	if bool "$_MOUNT_OK" && [ -r "/tmp/disk" ]; then
+		unset _lb;
+		for _lb in $(cat /tmp/disk |sort -u); do
+			_EXECQ "hdparm -d 1 -c 1 -u 1 $_lb";
+		done
+	fi
+
+	if ! bool "$_MOUNT_OK"; then
+		_ERROR "MOUNTING STORAGE DISK FAILED";
+		lcdd_msg "SYSTEM LOADING..." ">> STORAGE FAILED";
+		:> /var/sys/log_setting/nolog;
+		:> /var/sys/do_single;
+	fi
+}
+
+#_RC_PKG_CHECK_DISK() {
+#	local _size;
+#	_size="$(/bin/df / 2>/dev/null |grep -v ^Filesystem |awk '{print $5}' |tr -d '%' 2>/dev/null)";
+#	if [ "x$_size" != "x" ]; then
+#		if [ "$_size" -lt "90" ]; then
+#			return 0;
+#		fi
+#	fi
+#	return 1;
+#}
+
+#_RC_PKG() {
+#	local _VER=$(rmstr "$(uname -v)" "v");
+#	local _ff _f _bb;
+#	local _pkgdir="/strg/mybox/pkg";
+#	if bool "$__FALLBACK"; then
+#		_pkgdir="/strg/mybox/pkg.work";
+#	fi
+#	if [ -d "$_pkgdir" -a -r "/tmp/pkg.list" ] && ! empty_dir "$_pkgdir" "*.mpk"; then
+#		_bb="$(cat /tmp/pkg.list)";
+#		echo -n -e ">> Extracting packages: ";
+#		for _ff in $_bb; do
+#			_f="$_pkgdir/${_ff}-${_VER}.mpk";
+#			if [ -f "$_f" ]; then
+#				if _EXECQ "tar -C / --exclude \"tmp/*-RELEASE\" --exclude \"tmp/*-DEPEND\" -axf $_f"; then
+#					echo -n -e "#";
+#				fi
+#				usleep 0; wait;
+#			fi
+#			unset _f;
+#        	done
+#		echo -n -e "\r* Extracting packages. Done${__SPACE}\n";
+#		return 0;
+#	fi
+#	echo "<< WARNING >> No packages found";
+#	return 1;
+#}
+
+#_RC_PKG_EXT() {
+#	local _ff;
+#	if [ -d "/strg/mybox/ext-pkg" ] && ! empty_dir "/strg/mybox/ext-pkg" "*.mpk"; then
+#		echo -n -e ">> Extracting external packages: ";
+#		for _ff in /strg/mybox/ext-pkg/*.mpk; do
+#			if [ -f "$_ff" ]; then
+#				if _EXECQ "tar -C / -axf $_ff"; then
+#					echo -n -e "#";
+#				fi
+#				usleep 0; wait;
+#			fi
+#        	done
+#		echo -n -e "\r* Extracting external packages. Done${__SPACE}\n";
+#	fi
+#	return 0;
+#}
+
+#_RC_PKG_END() {
+#	[ -d "/service/main" ] && _EXECQ "chmod 700 /service/main/*.exh";
+#	[ -d "/service/tools" ] && _EXECQ "chmod 700 /service/tools/*.exc";
+#	[ -x "/bin/ldconfig" ] && _EXECQ "/bin/ldconfig";
+#}
+
+#_RC_PKG_EXTRACT() {
+#	_RC_PKG;
+#	_RC_PKG_EXT;
+#	_RC_PKG_END;
+#}
+
+_RC_MOUNT_LOOPFS() {
+	if bool "$__FALLBACK"; then
+		__LOOPFS="${__LOOPFS}.work";
+	fi
+	if bool "$_MOUNT_OK"; then
+		if [ -d "$__LOOPFS" ] && ! empty_dir "$__LOOPFS" "mybox-*.mce"; then
+			local _fx _fn _fe="";
+			for _fx in $__LOOPFS/*.mce; do
+				_fn="$(rmstr "$(rmstr "$(basename $_fx)" "mybox-")" ".mce")";
+				[ -z "$_fn" ] && continue;
+				_MKDIR "/${_fn}";
+				if _EXECQ "mount -oloop ${_fx} /${_fn}"; then
+					echo "/${_fn}" >> /var/sys/strg_mount;
+					if [ -x "/${_fn}/${_fn}-setup" ]; then
+						_EXECQ "/${_fn}/${_fn}-setup";
+					fi
+				else
+					_fe+="$_fn ";
+				fi
+			done
+			[ -f "/etc/ld.so.conf.d/libloopfs.conf" ] && [ -x "/bin/ldconfig" ] && _EXECQ "/bin/ldconfig";
+			if [ -n "$_fe" ]; then
+				_ERROR "Failed to mount: $_fe";
+				return 1;
+			fi
+			return 0;
+		fi
+	fi
+	echo "<< INFO >> No loopfs found";
+	return 1;
+}
+
+_RC_POLICY_DEFAULT() {
+	# policy order
+	_EXECQ "ifconfig lo 127.0.0.1 netmask 255.0.0.0";
+	_EXECQ "iptables -F";
+	_EXECQ "iptables -P INPUT DROP";
+	_EXECQ "iptables -P FORWARD DROP";
+	_EXECQ "iptables -P OUTPUT ACCEPT";
+	_EXECQ "iptables -A INPUT -i lo -j ACCEPT";
+	_EXECQ "iptables -A INPUT -m confirmed -j ACCEPT";
+	_EXECQ "iptables -A INPUT -m state --state RELATED -j CONFIRMED";
+	_EXECQ "iptables -A INPUT -p icmp -m icmp --icmp-type 8/0 -j CONFIRMED";
+	_EXECQ "iptables -A FORWARD -m confirmed -j ACCEPT";
+	_EXECQ "iptables -A FORWARD -m state --state RELATED -j CONFIRMED";
+}
+
+_RC_START() {
+	:> /etc/resolv.conf;
+	:> /var/sys/init_no_restart;
+	:> /var/sys/init_start;
+	export _INIT_START=1;
+	if [ -x "/bin/boottime" ] && [ ! -f "/var/sys/log_setting/nolog" ] && [ ! -f "/.nolog" ]; then
+		local _dt=$(date "+%Y%m%d");
+		local _flog="/logfs/system-$_dt.log";
+		local _llog="[$(boottime log)] TYPE=INFO MSG=****** SYSTEM LOADING ******";
+		if [ -f "$_flog" ]; then
+			echo "$_llog" >> $_flog;
+		else
+			echo "$_llog" >> $_flog;
+		fi
+		_EXECQ "chmod 700 $_flog";
+	fi
+
+	_RC_POLICY_DEFAULT;
+	_RC_RANDOM_SEED "start";
+	_RC_SERVICE "start";
+
+	unset _INIT_START;
+}
+
+_RC_SYSCTL() {
+	echo -n "* Setting kernel parameters.";
+	local _f;
+	if [ -r "/strg/mybox/registry/system/sysctl.cnf" ]; then
+		_COPY "/strg/mybox/registry/system/sysctl.cnf /etc/sysctl.conf";
+	fi
+	_EXECQ "/bin/sysctl -p";
+	(/bin/sysctl -a 2>/dev/null| while read _f; do
+			# Protect ICMP accept redirect
+        		if [[ $_f = *net.ipv4.conf.*.accept_redirects* ]]; then
+                		[[ $_f = *net.ipv4.conf.lo.accept_redirects* ]] && continue;
+                		_EXECQ "/bin/sysctl -w $_f=0";
+			fi
+			# arp flux
+        		if [[ $_f = *net.ipv4.conf.*.hidden* ]]; then
+                		[[ $_f = *net.ipv4.conf.lo.hidden* ]] && continue;
+                		_EXECQ "/bin/sysctl -w $_f=1";
+			fi
+		done
+	);
+	[ -x "/bin/set_conntrack" ] && _EXECQ "/bin/set_conntrack";
+	echo -n -e " Done.\n";
+}
+
+_RC_CONF_CHECK() {
+	local _cf _cg _cgd;
+	if [ -d "/etc/factory/registry" ]; then
+		if [ -d "/strg/mybox/registry" ]; then
+			for _cf in $(find /etc/factory/registry/* -type f); do
+				_cg=$(echo "$_cf" | sed -e 's|/etc/factory|/strg/mybox|g');
+				if [ -n "$_cg" ]; then
+					_cgd="$(dirname $_cg)";
+					[ ! -d "$_cgd" ] && _MKDIR "$_cgd";
+					[ ! -f "$_cg" ] && _COPY "$_cf $_cg";
+				fi
+			done
+		else
+			_MKDIR "/strg/mybox/registry";
+			_COPY "/etc/factory/registry/* /strg/mybox/registry/";
+		fi
+
+		if [ -r "/var/sys/nic" ]; then
+			if [ ! -d "/strg/mybox/registry/network" ]; then
+				_MKDIR "/strg/mybox/registry/network";
+				local _NIC0="$(cat /var/sys/nic)";
+				if [ -n "$_NIC0" ]; then 
+					echo "ID=1" > /strg/mybox/registry/network/eth.cfg;
+					echo "NAME=default" >> /strg/mybox/registry/network/eth.cfg;
+					echo "DEVICE=$_NIC0" >> /strg/mybox/registry/network/eth.cfg;
+					echo "TYPE=static" >> /strg/mybox/registry/network/eth.cfg;
+					echo "ADDR=" >> /strg/mybox/registry/network/eth.cfg;
+					echo "MASK=" >> /strg/mybox/registry/network/eth.cfg;
+					echo "PREF=" >> /strg/mybox/registry/network/eth.cfg;
+					echo "BCAST=" >> /strg/mybox/registry/network/eth.cfg;
+					echo "MTU=" >> /strg/mybox/registry/network/eth.cfg;
+					echo "PROXYARP=0" >> /strg/mybox/registry/network/eth.cfg;
+					echo "DEFAULT=0" >> /strg/mybox/registry/network/eth.cfg;
+					echo "STAT=0" >> /strg/mybox/registry/network/eth.cfg;
+					echo "NOTE=factory default" >> /strg/mybox/registry/network/eth.cfg;
+				fi
+			fi
+			_EXECQ "rm -f /var/sys/nic";
+		fi
+	fi
+	if [ -x "/service/tools/initlang.exc" ]; then
+		_EXECQ "/service/tools/initlang.exc";
+	fi
+}
+
+_RC_CLEAN() {
+	# clean
+	_EXECQ "rm -f /var/sys/init_no_restart";
+	_EXECQ "rm -f /var/sys/init_start";
+	_EXECQ "rm -rf /etc/inittab";
+	_EXECQ "rm -rf /var/lib/microcode.dat";
+	_EXECQ "rm -rf /bin/microcode_ctl";
+	_EXECQ "rm -rf /strg/mybox/download/*";
+	_EXECQ "rm -rf /tmp/*";
+	_EXECQ "rm -rf /etc/init.boot/rc.conf";
+	_EXECQ "rm -rf /etc/init.boot/rc.hwdetect";
+	_EXECQ "rm -rf /usr/share/fonts";
+	_EXECQ "rm -rf /var/sys/lcd_msg";
+	_EXECQ "rm -fr /var/spool/modules";
+	_EXECQ "rm -f /bin/rcstart";
+}
+_RC_LAST() {
+	echo "0 0 0 0" > /proc/sys/kernel/printk;
+	if [ -x "/service/tools/log.exc" ]; then
+		echo -n -e ">> Compressing log files.. please wait..";
+		_EXECQ "/service/tools/log.exc compress";
+		echo -n -e "\r* Compressing log files. Done${__SPACE}\n";
+	fi
+	if [ -w "${__GRUBCONF}" ]; then
+		local _mark=0 _BUF;
+		_EXECQ "rm -f ${__GRUBCONF}.bb";
+		while read _BUF; do
+			if ! [[ "$_BUFF" =~ "^#" ]] && strstr "$_BUF" "title"; then
+				if strstr "$_BUF" "MYBOXOS"; then
+					_mark=1;
+				else
+					_mark=0;
+                        	fi
+                	fi
+			if ! [[ "$_BUFF" =~ "^#" ]] && strstr "$_BUF" "kernel" && test "$_mark" = "1"; then
+				if [ -z "$checkfsck" ]; then
+					if ! strstr "$_BUF" "checkfsck"; then
+						_BUF="$(echo $_BUF | sed -e 's|root=/dev/ram0|checkfsck=1 root=/dev/ram0|g')";
+					fi
+				fi
+			fi
+			[ -n "$_BUF" ] && echo "$_BUF" >> ${__GRUBCONF}.bb;
+		done < ${__GRUBCONF};
+		if [ -w "${__GRUBCONF}.bb" ]; then
+			_EXECQ "mv ${__GRUBCONF}.bb ${__GRUBCONF}";
+		fi
+	fi
+	[ -z "$checkfsck" ] && checkfsck=0;
+	echo "$checkfsck" > /.checkfsck 2>/dev/null;
+	# see /service/lib/init.exl -> _INIT_NETWORK_OK
+	[ ! -z "$_NETWORK_OK" ] && :> /.network_ok;
+	[ -x "/service/init/http.init" ] && _EXECQ "/service/init/http.init check";
+}
+
+_MAIN_INIT() {
+	_RC_INIT;
+	_RC_HWDETECT;
+	_RC_LCD;
+	_RC_MOUNT;
+	if bool "$_MOUNT_OK"; then
+		#_RC_PKG_EXTRACT;
+		_RC_MOUNT_LOOPFS;
+		_RC_FIRMWARE_VERSION;
+		_RC_CHECK_NETWORK;
+		_RC_CONF_CHECK;
+		if bool "$resetinit"; then
+			echo -e "\r<< WARNING >> STARTUP SCRIPTS DISABLED";
+			:>/var/sys/init_down;
+			if yesno "Start syslog service?"; then
+				_EXECQ "/service/init/syslog.init start";
+			fi
+			if yesno "Start cron service?"; then
+				_EXECQ "/service/init/cron.init start";
+			fi
+		else
+			_RC_EXEC_SCRIPT "pre";
+			_RC_START;
+			_RC_EXEC_SCRIPT "post";
+		fi
+		_RC_SYSCTL;
+		_RC_MOUNT_LOCAL;
+		if [ "$_LCD_PROG" != "-1" -a -x "/bin/lcd-reset" ]; then
+			if [ "$_LCD_PROG" = "1" ]; then
+				echo -n "* Starting LCD client";
+				_EXECQ "/bin/lcd-reset bootup ${_LCD_PROG}";
+				if [ $? = 0 ]; then
+					echo " Done.";
+				else
+					echo " Failed.";
+				fi
+			fi
+			if [ -d "/etc/cron/1m" ]; then
+				_EXECQ "/bin/lcd-reset cron ${_LCD_PROG}";
+			fi
+		fi
+		dmesg -c > /strg/mybox/boot.msg;		
+	fi
+	_RC_CLEAN;
+	_RC_SETPASSWD;
+	_RC_LAST;
+
+	if [ "$_LCD_PROG" != "1" ]; then
+		# clean lcdproc file around 136k
+		_EXECQ "rm -rf /lib/lcdproc /etc/lcdproc /bin/LCD*";
+	fi
+	if [ -x "/bin/beep" ]; then
+		/bin/beep -f 900 -r 5 -d 1000;
+	fi
+}
+
+####################################################################
+# RC.INIT END
+####################################################################
+
+
+_PROGRAM="$(basename $0)";
+if [ "$_PROGRAM" = "bootup" ]; then
+	_MAIN_BOOTUP;
+	exit 0;
+elif [ "$_PROGRAM" = "bootdown" ]; then
+	_MAIN_BOOTDOWN;
+	exit 0;
+elif [ "$_PROGRAM" = "rcstart" ]; then
+	_MAIN_INIT;
+	exit 0;
+fi
+
+exit 0;

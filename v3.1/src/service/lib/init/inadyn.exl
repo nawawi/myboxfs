@@ -1,0 +1,110 @@
+<?php
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+function inadyn_check() {
+	if(!_INIT_CHECK_BINARY(array("/bin/inadynd"))) {
+		_INIT_ECHO(1,_GETTEXT("Cannot execute %s. Internal error",_INIT_NAME()));
+		exit(1);
+	}
+}
+
+function inadyn_quiet() {
+	_INIT_QUIET('1');
+}
+
+function inadyn_config($_scriptdata='') {
+	_INI_TOKEN_GET("network","named.cfg",$_NTOKEN);
+	_INI_TOKEN_GET("network","named_dyndns.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN) 
+		|| _ARRAY_NULL($_NTOKEN)
+		|| _NULL($_NTOKEN['dynprovider']['noip'])
+		|| _NULL($_NTOKEN['dynprovider']['dyndns'])
+		) {
+		_INIT_ECHO(0,_GETTEXT("%s daemon (%s) disabled","Dynamic DNS","inadynd"));
+		inadyn_quiet();
+		return FALSE;
+	}
+	$_string="";
+	foreach($_TOKEN as $_ID => $_DATA) {
+		if(_NULL($_DATA['HOSTNAME']) 
+			|| _NULL($_DATA['PROVIDER'])
+			|| _NULL($_DATA['USERNAME'])
+			|| _NULL($_DATA['PASSWORD'])
+			|| _NULL($_DATA['HOSTNAME'])
+			|| _NULL($_DATA['HASH'])
+			|| (_NULL($_DATA['STAT']) || $_DATA['STAT']==0)
+		) continue;
+		$_password=_BASE64_DECRYPT($_DATA['PASSWORD'],$_DATA['HASH']);
+		if($_DATA['PROVIDER']=="no-ip") {
+			$_string .="dyndns_system {$_NTOKEN['dynprovider']['noip']}\n";
+		} elseif($_DATA['PROVIDER']=="dyndns") {
+			$_string .="dyndns_system {$_NTOKEN['dynprovider']['dyndns']}\n";
+		} else {
+			continue;
+		}
+		$_string .="username {$_DATA['USERNAME']}\n";
+		$_string .="password $_password\n";
+		$_string .="update_period_sec 300\n";
+		$_string .="alias {$_DATA['HOSTNAME']}\n";
+		if(!_NULL($_DATA['ALIASES'])) {
+			$_alias_a=_STR_ARRAY($_DATA['ALIASES'],",");
+			if(!_ARRAY_NULL($_alias_a)) {
+				foreach($_alias_a as $_alias) {
+					$_string .="alias $_alias\n";
+				}
+			}
+		}
+		unset($_password);
+	}	
+
+	$_config="";
+	_TRIM($_string);
+	if(!_NULL($_string)) {
+		$_config .="background\n";
+		$_config .="verbose 0\n";
+		$_config .="syslog\n";
+		$_config .="pid_file /var/run/inadynd.pid\n";
+		$_config .="$_string\n";
+		return _FILE_SAVE("/etc/inadyn.conf","$_config");
+	}
+	_INIT_ECHO(0,_GETTEXT("%s daemon (%s) disabled","Dynamic DNS","inadynd"));
+	inadyn_quiet();
+	return FALSE;
+}
+
+
+function inadyn_up() {
+	@unlink(_TASKQ_PATH."/inadyn_up");
+	$_prog="/bin/inadynd";
+	if(_EXEC_CMD("$_prog")==0) {
+		_INIT_CHKPROG_LOG("inadynd");
+		return TRUE;
+	}
+	return inadyn_restart();
+}
+
+
+function inadyn_start() {
+	_INIT_CHECK_DAEMON_STATUS("inadynd");
+	$_prog="/bin/inadynd";
+	if(!inadyn_config()) {
+		_INIT_ECHO(1,_GETTEXT("Starting %s failed","inadynd"));
+		return FALSE;
+	}
+	_INIT_START_DAEMON("$_prog","inadyn_up");
+	return TRUE;
+}
+
+function inadyn_stop() {
+	_INIT_STOP_DAEMON("inadynd","inadyn_up",1);
+	sleep(2);
+	return TRUE;
+}
+
+function inadyn_restart() {
+	_INIT_EXEC("inadyn_stop");
+	_INIT_EXEC("inadyn_start");
+	return TRUE;
+}
+
+?>

@@ -1,0 +1,655 @@
+<?php
+/**
+* Init function library
+*
+* Mengandungi function-function untuk mengawal
+* process service (init).<br />Process service script digunakan ketika system up dan system down<br /><br />
+* <b>Penerangan</b><br />
+* Script untuk mengawal service berada didalam folder /service/init/.
+* Setiap script yang terdapat didalamnya adalah symlink ke
+* script /service/init/proc.init. Setiap symlink adalah berasaskan nama file library
+* yang terdapat dalam folder /service/lib/init/ dengan mengabaikan extension ".exl".<br />
+* Apabila script di run, script proc.init akan mengambil nama file yang di link kan kepadanya 
+* dengan mengabaikan extension ".init". Setiap nama file tersebut adalah nama prefix function kepada script tersebut.
+* Sepert network.init,"network" adalah nama prefix function kepada script "network.init".
+* Setiap argument yang diberi kepada script adalah function yang hendak di run.<br />
+* Tujuan struktur ini adalah untuk memudahkan memanggil function script dari function-function yang lain,
+* tanpa perlu menggunakan shell command line. <br />
+* Data rajah seperti dibawah:<br /><br />
+* <b># /service/init/command.init argument</b><br />
+* <pre>
+* /service/init/command.init --[symlink]-----> /service/init/proc.init
+*                    |             |
+*                    |         [reference]---> /service/lib/init/command.exl
+*                    |                                            |
+*               [argument]                                    [prefix]-----> command
+*                    |                                            |
+*                    `----------------------------------------[function]---> command_argument()
+* </pre><br />
+*
+* @author Mohd Nawawi Mohamad Jamili <nawawi@tracenetworkcorporation.com>
+* @copyright 2008 Nawawi, Tracenetwork Corporation Sdn. Bhd. 
+* @package library
+* @filesource
+*/
+/**
+* @ignore
+*/
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n"); 
+
+/**
+* Execute script function
+*
+* Berfungsi sebagai main function untuk proc.init. Digunakan
+* untuk memanggil function yang berasaskan nama script dengan
+* mengabaikan extension ".init".
+*
+* @param string $_name nama function
+* @return void Call $_name function
+*/
+function _INIT_PROC($_name) {
+	_INIT_NAME($_name);
+	if(function_exists("{$_name}_check")) {
+		$_func="{$_name}_check";
+		$_func();
+		unset($_func);
+	}
+	if(_ARRAY($_SERVER["argv"])) {
+        	$_max=$_SERVER["argc"];
+		$_cmd=array();$_bcmd=array();
+        	for($_x=1;$_x < $_max;$_x++) {
+			$_agx=$_SERVER["argv"][$_x];
+			$_fn="{$_name}_{$_agx}";
+			if($_agx=="quiet" && function_exists($_fn)) {
+				$_fn();
+				unset($_fn);
+				continue;
+			}
+			if($_agx=="debug" && function_exists($_fn)) {
+				$_fn();
+				unset($_fn);
+				continue;
+			}
+			if(!function_exists($_fn)) continue;
+                	$_cmd[$_name]="$_fn";
+			if($_agx=="start" || $_agx=="stop") {
+				$_bcmd[$_name]=$_agx;
+			}
+			unset($_agx,$_fn);
+        	}
+		if(!_ARRAY_NULL($_cmd)) {
+			foreach($_cmd as $_nm => $_func) {
+				$_icheck=0;
+				_INIT_SCRIPT("pre","$_func");
+				if(_INIT_SCRIPT("exec","$_func")==TRUE) continue;
+				if(_INIT_SCRIPT("config","$_func")==TRUE) continue;
+				if($_func()==TRUE) $_icheck=1;
+				_INIT_SCRIPT("post","$_func");
+				if(!_NULL($_bcmd[$_nm])) {
+					if($_bcmd[$_nm]=="start" && $_icheck==1) {
+						_FILE_SAVE("/var/sys/fastdown/{$_nm}","");
+					}
+					if($_bcmd[$_nm]=="stop") {
+						@unlink("/var/sys/fastdown/{$_nm}");
+					}
+				}
+			}
+		}
+	}
+	_INIT_NAME_UNSET();
+}
+
+/**
+* Set nama script
+*
+* Digunakan pada function _INIT_PROC() untuk memsetkan nama script
+* yang sedang di run atau memberi nama script yang sedang di run secara global.
+* Bertujuan untuk digunakan pada function lain, seperti memaparkan status.
+*
+* @param string $_set nama function
+* @return void Set atau beri nama function
+*/
+function _INIT_NAME($_set='') {
+	if(!_NULL($_set)) {
+		$GLOBALS['INIT_NAME']="$_set.init";
+		return $_set;
+	}
+	if(!_NULL($GLOBALS['INIT_NAME'])) {
+		return $GLOBALS['INIT_NAME'];
+	}
+}
+
+/**
+* Delete nama script
+*
+* Digunakan pada function _INIT_PROC() untuk delete nama script
+* yang telah di run secara global.
+*
+* @return void
+*/
+function _INIT_NAME_UNSET() {
+	if(!_NULL($GLOBALS['INIT_NAME'])) {
+		unset($GLOBALS['INIT_NAME']);
+	}
+}
+
+/**
+* Set atau berikan level paparan/status
+*
+* Digunakan secara global untuk function lain memaparkan status atau log
+* <pre>0 = verbose, 1 = quiet, 2 = system log only, 3 = echo only</pre>
+*
+* @param string $_set level number or empty
+* @return integer level number
+*/
+function _INIT_QUIET($_set='') {
+	if(!_NULL($_set)) {
+		$GLOBALS['QUIET']=$_set;
+		return $_set;
+	}
+	if(!_NULL($GLOBALS['QUIET'])) {
+		return $GLOBALS['QUIET'];
+	}
+	return 0;
+}
+
+/**
+* Delete level paparan/status
+*
+* Digunakan secara global untuk delete level status
+*
+* @return void
+*/
+function _INIT_UNQUIET() {
+	unset($GLOBALS['QUIET']);
+}
+
+/**
+* Enable/disable debug
+*
+* Untuk enable/disable debug pada function debug
+*
+* @return void
+*/
+function _INIT_DEBUG($_set='') {
+	if(!_NULL($_set)) {
+		$GLOBALS['DEBUG']=$_set;
+		return $_set;
+	}
+	if(!_NULL($GLOBALS['DEBUG'])) {
+		return $GLOBALS['DEBUG'];
+	}
+	return 0;
+}
+
+/**
+* Delete debug mode
+*
+* Delete debug mode
+*
+* @return void
+*/
+function _INIT_UNDEBUG() {
+	unset($GLOBALS['DEBUG']);
+}
+
+/**
+* Paparkan status
+*
+* Digunakan untuk memparkan status dengan level yang tertentu
+* <pre>type: 0 = INFO, 1 = ERROR, 2 = WARNING</pre>
+*
+* @param string $_type status type
+* @param string $_txt status string
+* @return void
+*/
+function _INIT_ECHO($_type,$_txt) {
+	$_TG[0]='INFO';
+	$_TG[1]='ERROR';
+	$_TG[2]='WARNING';
+	$_TG[3]='ALERT';
+	if(_NULL($_TG[$_type])) $_type=0;
+        if(_INIT_QUIET()==0 && !_NULL($_txt)) {
+		echo "[{$_TG[$_type]}] $_txt\n";
+                _LOG_SYSTEM($_TG[$_type],$_txt);
+        }
+        if(_INIT_QUIET()==2 && !_NULL($_txt)) {
+                _LOG_SYSTEM($_TG[$_type],$_txt);
+        }
+}
+
+/**
+* Periksa jika network interface ada
+*
+* Digunakan pada script-script yang memerlukan network connection.
+* Exit script dengan status 1 jika tiada network.
+*
+* @return void
+*/
+function _INIT_NETWORK_OK() {
+	if(!_NULL($_SERVER['_NETWORK_OK'])&& $_SERVER['_NETWORK_OK']==0) {
+		_INIT_ECHO(1,_GETTEXT("No network device found"));
+		exit(1);
+	}
+}
+
+/**
+* Periksa jika system bootup failed
+*
+* Digunakan pada script-script init untuk memastikan script tidak dirun ketika ada error.
+*
+* @return bool TRUE or FALSE
+*/
+function _INIT_START_FALSE() {
+	if(_NULL($_SERVER['_INIT_START'])) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+/**
+* Periksa jika system dalam mode bootup
+*
+* Digunakan pada script-script init untuk memastikan sub function tidak dirun ketika mode bootup.
+*
+* @return bool TRUE or FALSE
+*/
+function _INIT_BOOTUP() {
+	if(!_NULL($_SERVER['_INIT_START']) && $_SERVER['_INIT_START']==1) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+/**
+* Panggil function dari dalam function
+*
+* Untuk memastikan function yang dipanggil itu wujud.
+*
+* @param string $_name nama function
+* @param bool $_verbose 1/0
+* @return bool TRUE or FALSE
+*/
+function _INIT_EXEC($_name,$_verbose=1) {
+	if($_name{0}!="_") {
+		if(function_exists($_name)) {
+			if($_verbose==0) {
+				_INIT_QUIET(2);
+			}
+			$_func="$_name";
+			_INIT_SCRIPT("pre","$_func");
+			if(_INIT_SCRIPT("exec","$_func")==TRUE) continue;
+			if(_INIT_SCRIPT("config","$_func")==TRUE) continue;
+			$_icheck=0;
+			if($_func()==TRUE) $_icheck=1;
+			_INIT_SCRIPT("post","$_func");
+			list($_nm,$_cm)=preg_split("/_/",$_func);
+			if($_cm=="start" && $_icheck==1) {
+				_FILE_SAVE("/var/sys/fastdown/{$_nm}","");
+			}
+			if($_cm=="stop") {
+				@unlink("/var/sys/fastdown/{$_nm}");
+			}
+			return TRUE;
+		}
+	}
+	if(substr($_name,0,4)=="FUNC") {
+		$_func=str_replace("FUNC","",$_name);
+		if(function_exists($_func)) {
+			return $_func();
+		}
+	}
+	_INIT_QUIET(2);
+	_INIT_ECHO(3,_GETTEXT("%s Invalid command '%s'","_INIT_EXEC();","$_name"));
+	_INIT_UNQUIET();
+	return FALSE;
+}
+
+/**
+* Periksa external program file
+*
+* Untuk memastikan external program wujud.
+*
+* @param array $_array nama-nama external program
+* @return bool TRUE or FALSE
+*/
+function _INIT_CHECK_BINARY($_array) {
+	if(!_ARRAY_NULL($_array)) {
+		foreach($_array as $_bin) {
+			clearstatcache();
+			if(!file_exists($_bin)) return FALSE;
+		}
+	}
+	return TRUE;
+}
+
+/**
+* Periksa service/daemon status
+*
+* Periksa sama ada masih running atau tidak
+*
+* @param string $_prog service/daemon name
+* @return void paparkan PID status jika masih run
+*/
+function _INIT_CHECK_DAEMON_STATUS($_prog) {
+	_GET_PID($_prog,$_pid);
+	if(!_ARRAY_NULL($_pid)) {
+		foreach($_pid as $_a) {
+			if(_NULL($_a)) continue;
+			$_pp .="$_a ";
+		}
+		_TRIM($_pp);
+		if(!_NULL($_pp)) {
+			_INIT_ECHO(1,_GETTEXT("%s (pid %s) is running...","$_prog","$_pp"));
+			exit(1);
+		}
+	}
+}
+
+/**
+* Tukar nice level service/daemon
+*
+* Tukar nice level service/daemon dan create kan file PID jika tiada.
+*
+* @param string $_prog service/daemon name
+* @param string $_lv nice level
+* @return void
+*/
+function _INIT_NICE_LEVEL($_prog,$_lv='') {
+	$_pidf="/var/run/{$_prog}.pid";
+	$_pid=_FILE_GET($_pidf);
+	if(!_NULL($_pid)) {
+		if(_CHECK_PID($_pid)==TRUE) {
+			$_pid=$_pid;
+		}
+	} else {
+		_GET_PID($_prog,$_ppid);
+		if(!_ARRAY_NULL($_ppid)) {
+			$_pid=$_ppid[0];
+			if(!_NULL($_pid) && _CHECK_PID($_pid)==TRUE) {
+				_FILE_SAVE($_pidf,"$_pid\n");
+			}
+		}
+	}
+	if(!_NULL($_lv) && !_NULL($_pid) && _CHECK_PID($_pid)==TRUE) {
+		_EXEC_CMD("/bin/renice -n $_lv -p $_pid");
+		_EXEC_CMD("/bin/ionice -c2 -n7 -p $_pid");
+	}
+}
+
+/**
+* Start service/daemon
+*
+* Function untuk mengawal process start service/daemon.
+* Jika berjaya, create kan file process check dalam folder
+* _CHECKQ_PATH
+*
+* @see _CHECKQ_PATH
+* @param string $_cmd command line
+* @param string $_func function name untuk process check
+* @param string $_nl nice level
+* @return bool TRUE or FALE
+*/
+function _INIT_START_DAEMON($_cmd,$_func,$_nl='') {
+	if(_NULL($_cmd)) {
+		_INIT_ECHO(1,"_INIT_START_DAEMON(): cmd not set");
+		exit(1);
+	}
+	list($_pname)=preg_split("/\s+/",$_cmd,2);
+	_BASENAME($_pname);
+	// handle timeout 60 seconds on startup
+	// refer /etc/init.boot/rc.init :_RC_WAIT_PROG()
+	// chkprog will send *_restart to taskq.exc
+	// this command will overwrite if no timeout
+	if(!_INIT_START_FALSE()) {
+		list($_pnamei)=preg_split("/_/",$_func,2);
+		$_funci="{$_pnamei}_restart";
+		if(function_exists($_funci)) {
+			_FILE_SAVE(_CHECKQ_PATH."/$_pname",$_funci);	
+		}
+	}
+	if(_EXEC_CMD($_cmd)==0) {
+		_GET_PID($_pname,$_ppid);
+		if(!_ARRAY_NULL($_ppid)) {
+			_INIT_ECHO(0,_GETTEXT("Starting %s","$_pname"));
+			_FILE_SAVE(_CHECKQ_PATH."/$_pname",$_func);
+			_INIT_NICE_LEVEL($_pname,$_nl);
+			return TRUE;
+		}
+	}
+	_INIT_ECHO(1,_GETTEXT("Starting %s failed","$_pname"));
+	return FALSE;
+}
+
+/**
+* Stop service/daemon
+*
+* Function untuk mengawal process stop service/daemon.
+* Jika berjaya, delete kan file process check dalam folder
+* _CHECKQ_PATH
+*
+* @see _CHECKQ_PATH
+* @param string $_prog nama service/daemon
+* @param string $_func function name untuk process check
+* @param integer $_force jika 1 kill nama yang match
+* @return bool TRUE or FALE
+*/
+function _INIT_STOP_DAEMON($_prog,$_func,$_force=0) {
+	$_fok=0;
+	if(file_exists(_CHECKQ_PATH."/$_prog")) {
+		$_fok=1;
+		@unlink(_CHECKQ_PATH."/$_prog");
+		// delete incase taskq program not reading yet
+		@unlink(_TASKQ_PATH."/$_func");
+	}
+	if($_force==0) {
+		if(_KILL_DAEMON($_prog)) {
+			_INIT_ECHO(0,_GETTEXT("Stopping %s","$_prog"));
+			return TRUE;
+		}
+	} else {
+		if(_KILLMATCH($_prog,9)) {
+			_INIT_ECHO(0,_GETTEXT("Stopping %s","$_prog"));
+			return TRUE;
+		} 
+	}
+	_GET_PID($_prog,$_ppid);
+	if(_ARRAY_NULL($_ppid)) {
+		_INIT_ECHO(0,_GETTEXT("Stopping %s","$_prog"));
+		return TRUE;
+	}
+	if($_fok==1) _FILE_SAVE(_CHECKQ_PATH."/$_prog",$_func);
+	_INIT_ECHO(1,_GETTEXT("Stopping %s failed","$_prog"));
+	return FALSE;
+}
+
+/**
+* Function log untuk service check program
+*
+* Function untuk menyimpan log service check program
+*
+* @param string $_prog nama service/daemon
+* @return void
+*/
+function _INIT_CHKPROG_LOG($_prog) {
+	_GET_PID($_prog,$_pid);
+	if(!_ARRAY_NULL($_pid)) {
+		foreach($_pid as $_pid) {
+			if(_NULL($_pid)) continue;
+			$_pp .="$_pid";
+		}
+		if(!_NULL($_pp)) {
+			$_msg=_GETTEXT("Service %s up (pid %s)","$_prog","$_pp");
+			_LOG_CHKPROG($_msg);
+		}
+	}
+}
+
+/**
+* Function untuk execute external script
+*
+* function untuk execute external script
+*
+* @param string $_operation operation
+* @param string $_func function name
+* @return bool TRUE or FALSE
+*/
+function _INIT_SCRIPT($_operation,$_func) {
+	list($_name,$_cmd)=preg_split("/_/",$_func);
+	if(_NULL($_name) || _NULL($_cmd)) return FALSE;
+	if(!file_exists(_SCRIPT_PATH."/$_name")) return FALSE;
+	$_root=_SCRIPT_PATH."/$_name";
+	if($_operation=="pre" || $_operation=="post") {
+		$_file="$_root/{$_operation}-{$_cmd}";
+		if(file_exists("$_file")) {
+			chmod("$_file",0700);
+			system("$_file",$_ret);
+			if(!$_ret) return TRUE;
+		}
+		return FALSE;
+	} elseif($_operation=="config") {
+		$_file="$_root/{$_operation}-{$_cmd}";
+		if(file_exists("$_file")) {
+			$_data=_FILE_GET($_file);
+			if(!_NULL($_data)) {
+				if($_func($_data)==TRUE) {
+					return TRUE;
+				}
+			}
+		}
+		return FALSE;
+	} elseif($_operation=="exec") {
+		$_file="$_root/$_name";
+		if(file_exists("$_file")) {
+			system("$_file",$_ret);
+			if(!$_ret) return TRUE;
+		}
+		return FALSE;
+	}
+	return FALSE;
+}
+
+/**
+* Hantar arahan ke task daemon
+*
+* Hantar arahan ke task daemon.
+*
+* @param string $_name nama function
+* @return bool TRUE or FALSE
+*/
+function _INIT_TASKQ($_name) {
+	if($_name{0}!="_") {
+		if(function_exists($_name)) {
+			return _FILE_SAVE(_TASKQ_PATH."/$_name",time());
+		}
+	}
+	if(substr($_name,0,4)=="FUNC") {
+		$_func=str_replace("FUNC","",$_name);
+		if(function_exists($_func)) {
+			return _FILE_SAVE(_TASKQ_PATH."/$_name",time());
+		}
+	}
+	return FALSE;
+}
+
+/**
+* Function library untuk script clock.init
+*/
+include_once(_SERVICE_LIB_PATH.'/init/clock.exl');
+
+/**
+* Function library untuk script hostname.init
+*/
+include_once(_SERVICE_LIB_PATH.'/init/hostname.exl');
+
+/**
+* Function library untuk script keymap.init
+*/
+include_once(_SERVICE_LIB_PATH.'/init/keymap.exl');
+
+/**
+* Function library untuk script network.init
+*/
+include_once(_SERVICE_LIB_PATH.'/init/network.exl');
+
+/**
+* Function library untuk script syslog.init
+*/
+include_once(_SERVICE_LIB_PATH.'/init/syslog.exl');
+
+/**
+* Function library untuk script ulog.init
+*/
+include_once(_SERVICE_LIB_PATH.'/init/ulog.exl');
+
+/**
+* Function library untuk script ssh.init
+*/
+include_once(_SERVICE_LIB_PATH.'/init/ssh.exl');
+
+/**
+* Function library untuk script ftp.init
+*/
+include_once(_SERVICE_LIB_PATH.'/init/ftp.exl');
+
+/**
+* Function library untuk script http.init
+*/
+include_once(_SERVICE_LIB_PATH.'/init/http.exl');
+
+/**
+* Function library untuk script anyterm.init
+*/
+include_once(_SERVICE_LIB_PATH.'/init/anyterm.exl');
+
+/**
+* Function library untuk script xinet.init
+*/
+include_once(_SERVICE_LIB_PATH.'/init/xinet.exl');
+
+/**
+* Function library untuk script cron.init
+*/
+include_once(_SERVICE_LIB_PATH.'/init/cron.exl');
+
+/**
+* Function library untuk script ipwatch.init
+*/
+include_once(_SERVICE_LIB_PATH.'/init/ipwatch.exl');
+
+/**
+* Function library untuk script name.init
+*/
+include_once(_SERVICE_LIB_PATH.'/init/name.exl');
+
+/**
+* Function library untuk script inadyn.init
+*/
+include_once(_SERVICE_LIB_PATH.'/init/inadyn.exl');
+
+/**
+* Function library untuk script ntp.init
+*/
+include_once(_SERVICE_LIB_PATH.'/init/ntp.exl');
+
+/**
+* Function library untuk script dhcp.init
+*/
+include_once(_SERVICE_LIB_PATH.'/init/dhcp.exl');
+
+/**
+* Function library untuk script dhcrelay.init
+*/
+include_once(_SERVICE_LIB_PATH.'/init/dhcrelay.exl');
+
+/**
+* Function library untuk script rng.init
+*/
+include_once(_SERVICE_LIB_PATH.'/init/rng.exl');
+
+/**
+* Function library untuk script policy.init
+*/
+include_once(_SERVICE_LIB_PATH.'/init/policy.exl');
+
+?>

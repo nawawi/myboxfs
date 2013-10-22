@@ -1,0 +1,20 @@
+#!/bin/sh
+# $Id: extract_base.sh,v 1.0 2007/12/31 23:20:00 nawawi Exp $
+
+trap : 1 2 3 15
+PATH="/bin"
+TERM=linux
+export PATH TERM
+umask 077
+cd /
+
+if [ -d "/tmp" ]; then
+        echo -n "-> Extracting base tools."
+        for f in /tmp/*.mpk;do
+                tar -C / -axf $f
+                echo -n "."; usleep 0; wait
+        done
+        echo -e "                                  \r* Extracting base tools. Done"
+fi
+
+exit 0;

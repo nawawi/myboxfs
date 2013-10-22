@@ -1,0 +1,691 @@
+﻿<?xml version="1.0"?>
+<CLISH_MODULE>
+<VIEW name="interface" prompt="${SYSTEM_NAME}/network/interfaces/&gt; ">
+        <COMMAND name="."
+                help="Return to main menu"
+                view="main"
+                viewid=""/>
+        <COMMAND name=".."
+                help="Return to previous menu"
+                view="network"
+                viewid=""/>
+        <COMMAND name="apply"
+                help="Apply changes">
+                <ACTION>exec /service/tools/interfaces.exc apply 2>/dev/null</ACTION>
+        </COMMAND>
+
+       <COMMAND name="ipwatch"
+                help="Display or change IP conflict detector configuration">
+                <ACTION>exec /service/tools/ipwatch_config.exc print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+       <COMMAND name="ipwatch print"
+                help="Display current config">
+                <ACTION>exec /service/tools/ipwatch_config.exc print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+       <COMMAND name="ipwatch enable"
+                help="Set enable ipwatch">
+		<PARAM name="enable"
+                        help="Set enable"
+                        ptype="ONOFF"/>
+                <ACTION>exec /service/tools/ipwatch_config.exc enable ${enable} 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+        <COMMAND name="vip"
+                help="Display or change additional addresses configuration">
+                <ACTION>exec /service/tools/interfaces.exc vip print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+        <COMMAND name="vip print"
+                help="Display current config">
+                <ACTION>exec /service/tools/interfaces.exc vip print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+        <COMMAND name="vip add"
+                help="Add new additional addresses">
+ 		<PARAM name="name"
+                        help="Name"
+                        ptype="STRING_ANY"/>
+ 		<PARAM name="interface_id"
+                        help="Resource Id for network interfaceses"
+                        ptype="NUM" />
+ 		<PARAM name="addr"
+                        help="Address"
+                        ptype="IPV4"/>
+		<PARAM name="nmask"
+                        help="Netmask or prefix"
+                        ptype="NMASK"
+			default="24"/>
+ 		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/interfaces.exc vip add "${name}" ${interface_id} ${addr} ${nmask} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!-- start vip set -->
+        <COMMAND name="vip set"
+                help="Change additional addresses setting"/>
+	<COMMAND name="vip set name"
+                help="Change name">
+ 		<PARAM name="id"
+                        help="Resource Id for additional addresses"
+                        ptype="NUM"/>
+ 		<PARAM name="name"
+                        help="Interface name"
+                        ptype="STRING_ANY"/>
+                <ACTION>exec /service/tools/interfaces.exc vip set name "${id}" ${name} 2>/dev/null</ACTION>
+        </COMMAND>
+
+
+        <COMMAND name="vip set address"
+                help="Change interface address">
+ 		<PARAM name="id"
+                        help="Resource Id for additional addresses"
+                        ptype="NUM"/>
+ 		<PARAM name="addr"
+                        help="Interface address"
+                        ptype="IPV4"/>
+                <ACTION>exec /service/tools/interfaces.exc vip set address "${id}" ${addr} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="vip set netmask"
+                help="Change interface netmask">
+ 		<PARAM name="id"
+                        help="Resource Id for additional addresses"
+                        ptype="NUM"/>
+ 		<PARAM name="nmask"
+                        help="Netmask or prefix"
+                        ptype="NMASK"/>
+                <ACTION>exec /service/tools/interfaces.exc vip set netmask "${id}" ${nmask} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="vip set description"
+                help="Set interface description">
+ 		<PARAM name="id"
+                        help="Resource Id for additional addresses"
+                        ptype="NUM"/>
+ 		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/interfaces.exc vip set description "${id}" "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="vip set enable"
+                help="Set enable">
+ 		<PARAM name="id"
+                        help="Resource Id for additional addresses"
+                        ptype="NUM"/>
+ 		<PARAM name="enable"
+                        help="Set enable"
+                        ptype="ONOFF"/>
+                <ACTION>exec /service/tools/interfaces.exc vip set enable "${id}" ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="vip set interface"
+                help="Change interface">
+ 		<PARAM name="id"
+                        help="Resource Id for additional addresses"
+                        ptype="NUM"/>
+ 		<PARAM name="interface_id"
+                        help="Resource Id for network interfaceses"
+                        ptype="NUM" />
+                <ACTION>exec /service/tools/interfaces.exc vip set pname "${id}" ${interface_id} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="vip delete"
+                help="Delete additional interface">
+		<PARAM name="id"
+                        help="Resource Id '*' for all"
+                        ptype="MULTI_NUM_ALL"/>
+                <ACTION>exec /service/tools/interfaces.exc vip delete "${id}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!-- end vip set -->
+
+        <COMMAND name="ip"
+                help="Display or change interface configuration">
+                <ACTION>exec /service/tools/interfaces.exc ip print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+        <COMMAND name="ip print"
+                help="Display current config">
+		<PTYPE name="IF_OPTION"
+                        method="select"
+                        pattern="all(all) static(static) vlan(vlan) pppoe(pppoe) dhcp(dhcp)"
+                        help="Select"/>
+		<PARAM name="option"
+			help="Display option"
+			ptype="IF_OPTION"
+			default="all"/>
+                <ACTION>exec /service/tools/interfaces.exc ip print ${option} 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+        <COMMAND name="ip device"
+                help="Display network device">
+                <ACTION>exec /service/tools/interfaces.exc show_hardware 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+<!-- start ip add static -->
+        <COMMAND name="ip add"
+                help="Add new interface"/>
+        <COMMAND name="ip add static"
+                help="Add new additional addresses">
+ 		<PARAM name="name"
+                        help="Name"
+                        ptype="STRING_ANY"/>
+ 		<PARAM name="device_id"
+                        help="Resource Id for network device"
+                        ptype="NUM" />
+ 		<PARAM name="addr"
+                        help="Address"
+                        ptype="IPV4"/>
+		<PARAM name="nmask"
+                        help="Netmask or prefix"
+                        ptype="NMASK"
+			default="24"/>
+ 		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/interfaces.exc ip add static "${name}" ${device_id} ${addr} ${nmask} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!-- end ip add static -->
+<!-- start ip add vlan -->
+        <COMMAND name="ip add vlan"
+                help="Add new vlan interface">
+ 		<PARAM name="name"
+                        help="Name"
+                        ptype="STRING_ANY"/>
+ 		<PARAM name="device_id"
+                        help="Resource Id for network device"
+                        ptype="NUM" />
+ 		<PARAM name="vlan_tag"
+                        help="VLAN Tag"
+                        ptype="VLAN_ID" />
+ 		<PARAM name="addr"
+                        help="Address"
+                        ptype="IPV4"/>
+		<PARAM name="nmask"
+                        help="Netmask or prefix"
+                        ptype="NMASK"
+			default="24"/>
+ 		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/interfaces.exc ip add vlan "${name}" ${device_id} ${vlan_tag} ${addr} ${nmask} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!-- end ip add vlan -->
+<!-- start ip add dhcp -->
+        <COMMAND name="ip add dhcp"
+                help="Add new dhcp interface">
+ 		<PARAM name="name"
+                        help="Name"
+                        ptype="STRING_ANY"/>
+ 		<PARAM name="device_id"
+                        help="Resource Id for network device"
+                        ptype="NUM" />
+ 		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/interfaces.exc ip add dhcp "${name}" ${device_id} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!-- end ip add dhcp -->
+<!-- start ip add pppoe -->
+        <COMMAND name="ip add pppoe"
+                help="Add new pppoe interface">
+ 		<PARAM name="name"
+                        help="Name"
+                        ptype="STRING_ANY"/>
+ 		<PARAM name="device_id"
+                        help="Resource Id for network device"
+                        ptype="NUM" />
+ 		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/interfaces.exc ip add pppoe "${name}" ${device_id} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!-- end ip add pppoe -->
+<!-- start ip delete -->
+        <COMMAND name="ip delete"
+                help="Delete interface">
+ 		<PARAM name="id"
+                        help="Resource Id for interface"
+                        ptype="NUM"/>
+                <ACTION>exec /service/tools/interfaces.exc ip delete ${id} 2>/dev/null</ACTION>
+        </COMMAND>
+<!-- end ip delete -->
+
+<!-- start ip set -->
+        <COMMAND name="ip set"
+                help="Change interface setting"/>
+<!-- start ip set static -->
+        <COMMAND name="ip set static"
+                help="Change static interface setting"/>
+	<COMMAND name="ip set static name"
+                help="Change interface name">
+ 		<PARAM name="id"
+                        help="Resource Id for static interface"
+                        ptype="NUM"/>
+ 		<PARAM name="name"
+                        help="Interface name"
+                        ptype="STRING_ANY"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set static name "${id}" "${name}" 2>/dev/null</ACTION>
+        </COMMAND>
+
+
+        <COMMAND name="ip set static address"
+                help="Change interface address">
+ 		<PARAM name="id"
+                        help="Resource Id for static interface"
+                        ptype="NUM"/>
+ 		<PARAM name="addr"
+                        help="Interface address"
+                        ptype="IPV4"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set static address "${id}" ${addr} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ip set static netmask"
+                help="Change interface netmask">
+ 		<PARAM name="id"
+                        help="Resource Id for static interface"
+                        ptype="NUM"/>
+		<PARAM name="nmask"
+                        help="Netmask or prefix"
+                        ptype="NMASK"
+			default="24"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set static netmask "${id}" ${nmask} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ip set static description"
+                help="Set interface description">
+ 		<PARAM name="id"
+                        help="Resource Id for static interface"
+                        ptype="NUM"/>
+ 		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/interfaces.exc ip set static description "${id}" "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ip set static default-gateway"
+                help="Enable default gateway">
+ 		<PARAM name="id"
+                        help="Resource Id for static interface"
+                        ptype="NUM"/>
+ 		<PARAM name="enable"
+                        help="Set enable"
+                        ptype="ONOFF"/>
+ 		<PARAM name="gateway"
+                        help="Gateway address"
+                        ptype="IPV4_NULL"
+			default="NULL"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set static gateway "${id}" ${enable} ${gateway} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ip set static enable"
+                help="Set enable">
+ 		<PARAM name="id"
+                        help="Resource Id for static interface"
+                        ptype="NUM"/>
+ 		<PARAM name="enable"
+                        help="Set enable"
+                        ptype="ONOFF"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set static enable "${id}" ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ip set static proxyarp"
+                help="Enable Proxy ARP">
+ 		<PARAM name="id"
+                        help="Resource Id for static interface"
+                        ptype="NUM"/>
+ 		<PARAM name="enable"
+                        help="Set enable"
+                        ptype="ONOFF"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set static proxyarp "${id}" ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ip set static uplink"
+                help="Enable Uplink Failover">
+ 		<PARAM name="id"
+                        help="Resource Id for static interface"
+                        ptype="NUM"/>
+ 		<PARAM name="enable"
+                        help="Set enable"
+                        ptype="ONOFF"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set static uplink "${id}" ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ip set static nat"
+                help="Enable source NAT">
+ 		<PARAM name="id"
+                        help="Resource Id for static interface"
+                        ptype="NUM"/>
+ 		<PARAM name="enable"
+                        help="Set enable"
+                        ptype="ONOFF"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set static nat "${id}" ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ip set static mtu"
+                help="Set MTU size">
+ 		<PARAM name="id"
+                        help="Resource Id for static interface"
+                        ptype="NUM"/>
+ 		<PARAM name="mtu"
+                        help="MTU Size"
+                        ptype="NUM"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set static mtu "${id}" ${mtu} 2>/dev/null</ACTION>
+        </COMMAND>
+<!-- end ip set static -->
+<!-- start ip set vlan -->
+        <COMMAND name="ip set vlan"
+                help="Change vlan interface setting"/>
+	<COMMAND name="ip set vlan name"
+                help="Change interface name">
+ 		<PARAM name="id"
+                        help="Resource Id for vlan interface"
+                        ptype="NUM"/>
+ 		<PARAM name="name"
+                        help="Interface name"
+                        ptype="STRING_ANY"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set vlan name "${id}" "${name}" 2>/dev/null</ACTION>
+        </COMMAND>
+
+
+        <COMMAND name="ip set vlan enable"
+                help="Set enable">
+ 		<PARAM name="id"
+                        help="Resource Id for vlan interface"
+                        ptype="NUM"/>
+ 		<PARAM name="enable"
+                        help="Set enable"
+                        ptype="ONOFF"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set vlan enable "${id}" ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ip set vlan address"
+                help="Change interface address">
+ 		<PARAM name="id"
+                        help="Resource Id for vlan interface"
+                        ptype="NUM"/>
+ 		<PARAM name="addr"
+                        help="Interface address"
+                        ptype="IPV4"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set vlan address "${id}" ${addr} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ip set vlan netmask"
+                help="Change interface netmask">
+ 		<PARAM name="id"
+                        help="Resource Id for vlan interface"
+                        ptype="NUM"/>
+		<PARAM name="nmask"
+                        help="Netmask or prefix"
+                        ptype="NMASK"
+			default="24"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set vlan netmask "${id}" ${nmask} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ip set vlan description"
+                help="Set interface description">
+ 		<PARAM name="id"
+                        help="Resource Id for vlan interface"
+                        ptype="NUM"/>
+ 		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/interfaces.exc ip set vlan description "${id}" "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ip set vlan defaultgw"
+                help="Enable default gateway">
+ 		<PARAM name="id"
+                        help="Resource Id for vlan interface"
+                        ptype="NUM"/>
+ 		<PARAM name="enable"
+                        help="Set enable"
+                        ptype="ONOFF"/>
+ 		<PARAM name="gateway"
+                        help="Gateway address"
+                        ptype="IPV4_NULL"
+			default="NULL"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set vlan gateway "${id}" ${enable} ${gateway} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ip set vlan tag"
+                help="Set VLAN Tag">
+ 		<PARAM name="id"
+                        help="Resource Id for vlan interface"
+                        ptype="NUM"/>
+ 		<PARAM name="vlan_tag"
+                        help="VLAN Tag"
+                        ptype="VLAN_ID" />
+                <ACTION>exec /service/tools/interfaces.exc ip set vlan tag "${id}" ${vlan_tag} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ip set vlan uplink"
+                help="Enable Uplink Failover">
+ 		<PARAM name="id"
+                        help="Resource Id for vlan interface"
+                        ptype="NUM"/>
+ 		<PARAM name="enable"
+                        help="Set enable"
+                        ptype="ONOFF"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set vlan uplink "${id}" ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ip set vlan nat"
+                help="Enable source NAT">
+ 		<PARAM name="id"
+                        help="Resource Id for vlan interface"
+                        ptype="NUM"/>
+ 		<PARAM name="enable"
+                        help="Set enable"
+                        ptype="ONOFF"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set vlan nat "${id}" ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ip set vlan mtu"
+                help="Set MTU size">
+ 		<PARAM name="id"
+                        help="Resource Id for vlan interface"
+                        ptype="NUM"/>
+ 		<PARAM name="mtu"
+                        help="MTU Size"
+                        ptype="NUM"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set vlan mtu "${id}" ${mtu} 2>/dev/null</ACTION>
+        </COMMAND>
+<!-- end ip set vlan -->
+<!-- start ip set dhcp -->
+        <COMMAND name="ip set dhcp"
+                help="Change dhcp interface setting"/>
+	<COMMAND name="ip set dhcp name"
+                help="Change interface name">
+ 		<PARAM name="id"
+                        help="Resource Id for dhcp interface"
+                        ptype="NUM"/>
+ 		<PARAM name="name"
+                        help="Interface name"
+                        ptype="STRING_ANY"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set dhcp name "${id}" "${name}" 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ip set dhcp enable"
+                help="Set enable">
+ 		<PARAM name="id"
+                        help="Resource Id for dhcp interface"
+                        ptype="NUM"/>
+ 		<PARAM name="enable"
+                        help="Set enable"
+                        ptype="ONOFF"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set dhcp enable "${id}" ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ip set dhcp description"
+                help="Set interface description">
+ 		<PARAM name="id"
+                        help="Resource Id for dhcp interface"
+                        ptype="NUM"/>
+ 		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/interfaces.exc ip set dhcp description "${id}" "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ip set dhcp proxyarp"
+                help="Enable Proxy ARP">
+ 		<PARAM name="id"
+                        help="Resource Id for dhcp interface"
+                        ptype="NUM"/>
+ 		<PARAM name="enable"
+                        help="Set enable"
+                        ptype="ONOFF"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set dhcp proxyarp "${id}" ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ip set dhcp uplink"
+                help="Enable Uplink Failover">
+ 		<PARAM name="id"
+                        help="Resource Id for dhcp interface"
+                        ptype="NUM"/>
+ 		<PARAM name="enable"
+                        help="Set enable"
+                        ptype="ONOFF"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set dhcp uplink "${id}" ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ip set dhcp nat"
+                help="Enable source NAT">
+ 		<PARAM name="id"
+                        help="Resource Id for dhcp interface"
+                        ptype="NUM"/>
+ 		<PARAM name="enable"
+                        help="Set enable"
+                        ptype="ONOFF"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set dhcp nat "${id}" ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ip set dhcp mtu"
+                help="Set MTU size">
+ 		<PARAM name="id"
+                        help="Resource Id for dhcp interface"
+                        ptype="NUM"/>
+ 		<PARAM name="mtu"
+                        help="MTU Size"
+                        ptype="NUM"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set dhcp mtu "${id}" ${mtu} 2>/dev/null</ACTION>
+        </COMMAND>
+<!-- end ip set dhcp -->
+<!-- start ip set pppoe -->
+        <COMMAND name="ip set pppoe"
+                help="Change pppoe interface setting"/>
+	<COMMAND name="ip set pppoe name"
+                help="Change interface name">
+ 		<PARAM name="id"
+                        help="Resource Id for pppoe interface"
+                        ptype="NUM"/>
+ 		<PARAM name="name"
+                        help="Interface name"
+                        ptype="STRING_ANY"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set pppoe name "${id}" "${name}" 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ip set pppoe enable"
+                help="Set enable">
+ 		<PARAM name="id"
+                        help="Resource Id for pppoe interface"
+                        ptype="NUM"/>
+ 		<PARAM name="enable"
+                        help="Set enable"
+                        ptype="ONOFF"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set pppoe enable "${id}" ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ip set pppoe account"
+                help="Set pppoe account">
+ 		<PARAM name="id"
+                        help="Resource Id for pppoe interface"
+                        ptype="NUM"/>
+ 		<PARAM name="username"
+                        help="Username"
+                        ptype="STRING_ANY"/>
+		<PARAM name="password"
+			help="Password"
+			ptype="STRING_ANY"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set pppoe account "${id}" "${username}" "${password}" 2>/dev/null</ACTION>
+        </COMMAND>
+
+	<COMMAND name="ip set pppoe reconnect-delay"
+                help="Delay when reconnect">
+ 		<PARAM name="id"
+                        help="Resource Id for pppoe interface"
+                        ptype="NUM"/>
+ 		<PARAM name="retry"
+                        help="Retry in seconds"
+                        ptype="NUM"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set pppoe retry "${id}" "${retry}" 2>/dev/null</ACTION>
+        </COMMAND>
+
+	<COMMAND name="ip set pppoe daily-reconnect"
+                help="Daily reconnect">
+ 		<PARAM name="id"
+                        help="Resource Id for pppoe interface"
+                        ptype="NUM"/>
+ 		<PARAM name="time"
+                        help="Time"
+                        ptype="HOUR24"
+			default="NULL"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set pppoe reconnect "${id}" "${time}" 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ip set pppoe description"
+                help="Set interface description">
+ 		<PARAM name="id"
+                        help="Resource Id for pppoe interface"
+                        ptype="NUM"/>
+ 		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/interfaces.exc ip set pppoe description "${id}" "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ip set pppoe uplink"
+                help="Enable Uplink Failover">
+ 		<PARAM name="id"
+                        help="Resource Id for pppoe interface"
+                        ptype="NUM"/>
+ 		<PARAM name="enable"
+                        help="Set enable"
+                        ptype="ONOFF"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set pppoe uplink "${id}" ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ip set pppoe nat"
+                help="Enable source NAT">
+ 		<PARAM name="id"
+                        help="Resource Id for pppoe interface"
+                        ptype="NUM"/>
+ 		<PARAM name="enable"
+                        help="Set enable"
+                        ptype="ONOFF"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set pppoe nat "${id}" ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ip set pppoe mtu"
+                help="Set MTU size">
+ 		<PARAM name="id"
+                        help="Resource Id for pppoe interface"
+                        ptype="NUM"/>
+ 		<PARAM name="mtu"
+                        help="MTU Size"
+                        ptype="NUM"/>
+                <ACTION>exec /service/tools/interfaces.exc ip set pppoe mtu "${id}" ${mtu} 2>/dev/null</ACTION>
+        </COMMAND>
+<!-- end ip set pppoe -->
+<!-- end ip set -->
+</VIEW>
+</CLISH_MODULE>

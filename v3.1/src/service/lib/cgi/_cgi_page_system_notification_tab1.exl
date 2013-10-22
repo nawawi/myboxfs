@@ -1,0 +1,211 @@
+<?php
+if(!defined('_CGI_CODE')||_CGI_CODE!="90d45215e48dac81e802f17310ad0c1f") exit("\n\nERROR: _CGI_CODE not set\n\n");
+/* req_data = p_system_notification */
+
+function _CGI_PAGE_SYSTEM_NOTIFICATION_EMAIL($_RECIPIENT) {
+	extract($GLOBALS['_IMG']);
+	$_page="
+		<div id='tbox_acl' style='width: 250px; height: 220px;'>
+			<div id='tbox_acl_title'>
+				<div id='tbox_acl_title_t'>"._GETTEXT("Recipients")."</div>
+				<div id='tbox_acl_title_r'></div>
+			</div>
+			<div id='tbox_acl_content'>
+				<table class='tbox_acl_tb'><tbody><tr>
+				<td class='tbox_acl_td_it'><input type='text' class='tbox_acl_it'></td>
+				</tr>
+	";
+	$_did=0;
+	if(!_NULL($_RECIPIENT)) {
+		$_em_a=_STR_ARRAY($_RECIPIENT,",");
+		if(!_ARRAY_NULL($_em_a)) {
+			foreach($_em_a as $_em) {
+				$_page .="
+					<tr id='del$_did'>
+					<td class='tbox_acl_td_it tbox_acl_itt'><img id='del$_did' style='padding-right: 2px; float: left; height: 14px;' src='$_ICON_DELETE'><div class='def_ibox1_ii'>$_em</div></td>
+					</tr>
+				";
+				$_did++;
+			}
+			if($_did!=0) $_did--;
+		}
+	}
+
+	$_page .="
+		</tbody></table>
+			</div>
+		</div>
+		<script type='text/javascript'>
+			\$(document).ready(function() {
+				__tndefinitions.rowcolor('table.tbox_acl_tb tr[id*=del] td','','',true);
+
+				var _accept=__defa_n['all'];
+				var _delcnt=$_did;
+				var _click_action=function() {
+					\$('table.tbox_acl_tb img').hover(
+						function() {
+							\$(this).css({'cursor':'pointer'});
+						},
+						function() {
+							\$(this).css({'cursor':'default'});
+						}
+					).click(function() {
+						var _attr=basename($(this).attr('src'));
+						if(_attr==='".basename($_ICON_DELETE)."') {
+							var _delid=$(this).attr('id');
+							\$('tr#'+_delid).remove();
+							__tndefinitions.rowcolor('table.tbox_acl_tb tr[id*=del] td','','',true);
+						}
+					});
+				};
+
+				var _search_action=function() {
+					var _search_hide=function(opt) {
+						\$('table.tbox_acl_tb tr').each(function(i) {
+							var _tid=\$(this).attr('id');
+							if(_tid && _tid.match(/del\d+/)) {
+								if(opt===1) {
+									\$(this).hide();
+								} else {
+									\$(this).show();
+								}
+							}
+						});
+					};
+					\$('div#tbox_acl_content input.tbox_acl_it').keyup(function(event) {
+						var _str=$(this).val();
+						if(_str.length===0) {
+							_search_hide(0);
+						} else {
+							_search_hide(1);
+							\$('table.tbox_acl_tb tr').each(function(i) {
+								var _tid=\$(this).attr('id');
+								if(_tid && _tid.match(/del\d+/)) {
+									var _p=\$.trim(\$(this).text());
+									var _regex=new RegExp(_str, 'i');
+									if(_regex.exec(_p)) {
+										\$(this).show().filter(function() {
+											__tndefinitions.rowcolor('table.tbox_acl_tb tr[id*=del] td','','',true);
+										});
+									}
+								}
+							});
+						}
+					});
+				};
+
+				_click_action();
+				_search_action();
+
+				var _pclean=function() {
+					\$('table.tbox_acl_tb tbody input[id*=del]').each(function(i) {
+						var _tid=\$(this).attr('id');
+						\$('tr#'+_tid).remove();
+					});
+					__tndefinitions.rowcolor('table.tbox_acl_tb tr[id*=del] td','','',true);
+				};
+
+				var _pinsert=function(pid) {
+					var _tid=\$(pid).attr('id');
+					var _val=\$.trim(\$(pid).val());
+					if(_val==='' || is_email(_val)===false || __tndefinitions.checklist('table.tbox_acl_tb td',_val)!==0) {
+						\$('tr#'+_tid).remove();
+					} else {
+						\$('tr#'+_tid).remove();
+						var _page=\$('table.tbox_acl_tb tbody').html()+\"<tr id=\"+_tid+\">\";
+						_page +=\"<td class='tbox_acl_td_it tbox_acl_itt'><img id=\"+_tid+\" style='padding-right: 2px; float: left; height: 14px;' src='$_ICON_DELETE'><div class='def_ibox1_ii'>\"+_val+\"</div></td>\";
+						_page +=\"</tr>\";
+						\$('table.tbox_acl_tb tbody').html(_page);
+					}
+					_click_action();
+					_search_action();
+					__tndefinitions.rowcolor('table.tbox_acl_tb tr[id*=del] td','','',true);
+				};
+
+				\$('div#tbox_acl_title_r').click(function(evt) {
+					var e=evt || window.event;
+					e.preventDefault();
+					_pclean();
+					_delcnt++;
+					var _page=\$('table.tbox_acl_tb tbody').html()+\"<tr id='dummy'>\";
+					_page +=\"<td class='tbox_acl_td_it tbox_acl_itt'><img id='dummy' style='padding-right: 2px; float: left; height: 14px;' src='$_ICON_DELETE'><div class='def_ibox1_ii'><input id='dummy' type='text' class='tbox_i' style='height: 14px;'></div></td>\";
+					_page +=\"</tr>\";
+					\$('table.tbox_acl_tb tbody').html(_page);
+					\$('tr#dummy').attr({'id':'del'+_delcnt});
+					\$('img#dummy').attr({'id':'del'+_delcnt});
+					\$('input#dummy').attr({'id':'del'+_delcnt}).focus();
+					_click_action();
+					_search_action();
+					\$('table.tbox_acl_tb tbody input').blur(function() {
+						_pinsert(\$(this));
+					});
+				});
+				
+
+			});
+		</script>
+	";
+	return trim($_page);
+}
+function _CGI_PAGE_SYSTEM_NOTIFICATION_TAB_1() {
+	extract($GLOBALS['_IMG']);
+	_INI_TOKEN_GET("system","notification.cfg",$_TOKEN);
+	$_DATA=$_TOKEN['notification'];
+	$_bid=_CGI_ATTR_KEY();
+	$_page="
+		<div class='fbox_c'>
+		<fieldset>
+		<legend>"._GETTEXT("Notifications")."</legend>
+		<div style='margin: 5px;'>
+		"._CGI_BUTTON_ENABLE(array('img_id'=>'nt_stat'))."
+		<hr />
+		<table class='tbox_t' style='width: 100%;'>
+		<tr>
+		<td class='tbox_tdl' style='width: 40px;'>Sender:</td>
+		<td class='tbox_tdc'><input id='sender' type='text' class='tbox_i' style='width: 190px;' value='{$_DATA['SENDER']}' /></td>
+		<th class='tbox_tdr'>"._GETTEXT("When notifications are enabled, the system will send all notifications using this common sender.")."</th>
+		</tr>
+		</table>
+		<hr />
+		<table class='tbox_t'>
+		<tr>
+		<td class='tbox_tdc' style='width: 300px;'>
+		"._CGI_PAGE_SYSTEM_NOTIFICATION_EMAIL($_DATA['RECIPIENT'])."
+		</td>
+		<td class='tbox_tdr' style='padding-left: 0px;'>"._GETTEXT("Specify the recipients that should receive the notifications.")."</td>
+		</tr>
+		</table>
+		<hr />
+		"._CGI_BUTTON_APPLY("button_{$_bid}")."
+		</div>
+		</fieldset>
+		</div>
+		<script type='text/javascript'>
+			\$(document).ready(function() {
+				var _imgoff='{$_ICON_ONOFF[0]}';
+				var _imgon='{$_ICON_ONOFF[1]}';
+				var _stat_onoff=function(stat) {
+					if(stat==1) {
+						\$('div.fbox_c img#nt_stat').attr({'src': _imgon});
+						\$('div.fbox_c div#button_stat').text('Disable').attr('title','Disable');
+					} else {
+						\$('div.fbox_c img#nt_stat').attr({'src': _imgoff});
+						\$('div.fbox_c div#button_stat').text('Enable').attr('title','Enable');
+					}
+				};
+				_stat_onoff({$_DATA['STAT']});
+				\$('div.fbox_c div#button_stat').click(function() {
+					var _cstat=\$.trim(\$(this).text());
+					if(_cstat==='Enable') {
+						_stat_onoff(1);
+					} else {
+						_stat_onoff(0);
+					}
+				});
+			});
+		</script>
+	";
+	return trim($_page);
+}
+
+?>

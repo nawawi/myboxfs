@@ -1,0 +1,365 @@
+# -*-Shell-script-*-
+# +-------------------------------------------------------------------------------------+
+# | Copyright (c) 2002-2009 Tracenetwork Corporation Sdn. Bhd.           		|
+# +-------------------------------------------------------------------------------------+
+# | This source file is belongs to nawawi, the author.                    		|
+# | Any changes/use of the source, please email to the author.           		|
+# +-------------------------------------------------------------------------------------+
+# | Authors: nawawi, Mohd nawawi Mohamad Jamili <nawawi@tracenetworkcorporation.com	|
+# +-------------------------------------------------------------------------------------+
+#
+# commons functions
+#
+
+# 10-April-2009
+# bash patch extra function
+# iocat, basename, dirname, iocat, sleep, usleep, strtoupper, strtolower
+# unlink, sync, empty_dir, xmkdir, strstr, stristr, strcasestr, strtrim, strrtrim, strltrim
+# uname, strftime, ucwords, ucfirst, lcfirst
+
+#strtoupper() {
+#	[ $# -eq 1 ] || return 1;
+#	local _str;
+#	_str=${1//a/A};
+#	_str=${_str//b/B};
+#	_str=${_str//c/C};
+#	_str=${_str//d/D};
+#	_str=${_str//e/E};
+#	_str=${_str//f/F};
+#	_str=${_str//g/G};
+#	_str=${_str//h/H};
+#	_str=${_str//i/I};
+#	_str=${_str//j/J};
+#	_str=${_str//k/K};
+#	_str=${_str//l/L};
+#	_str=${_str//m/M};
+#	_str=${_str//n/N};
+#	_str=${_str//o/O};
+#	_str=${_str//p/P};
+#	_str=${_str//q/Q};
+#	_str=${_str//r/R};
+#	_str=${_str//s/S};
+#	_str=${_str//t/T};
+#	_str=${_str//u/U};
+#	_str=${_str//v/V};
+#	_str=${_str//w/W};
+#	_str=${_str//x/X};
+#	_str=${_str//y/Y};
+#	_str=${_str//z/Z};
+#	echo "${_str}";
+#	return 0;
+#}
+#
+#strtolower() {
+#	[ $# -eq 1 ] || return 1;
+#	local _str;
+#	_str=${1//A/a};
+#	_str=${_str//B/b};
+#	_str=${_str//C/c};
+#	_str=${_str//D/d};
+#	_str=${_str//E/e};
+#	_str=${_str//F/f};
+#	_str=${_str//G/g};
+#	_str=${_str//H/h};
+#	_str=${_str//I/i};
+#	_str=${_str//J/j};
+#	_str=${_str//K/k};
+#	_str=${_str//L/l};
+#	_str=${_str//M/m};
+#	_str=${_str//N/n};
+#	_str=${_str//O/o};
+#	_str=${_str//P/p};
+#	_str=${_str//Q/q};
+#	_str=${_str//R/r};
+#	_str=${_str//S/s};
+#	_str=${_str//T/t};
+#	_str=${_str//U/u};
+#	_str=${_str//V/v};
+#	_str=${_str//W/w};
+#	_str=${_str//X/x};
+#	_str=${_str//Y/y};
+#	_str=${_str//Z/z};
+#	echo "${_str}";
+#	return 0;
+#}
+#
+#strstr() {
+#	[ $# -eq 2 ] || return 1;
+#        [ "$1" = "$2" ] && return 0;
+#        local slice=${1#*$2*};
+#        [ "$slice" = "$1" ] && return 1;
+#        return 0;
+#}
+#
+#stristr() {
+#	[ $# -eq 2 ] || return 1;
+#	local _str1=$(strtolower "$1");
+#	local _str2=$(strtolower "$2");
+#	if strstr "$_str1" "$_str2"; then
+#		return 0;
+#	fi
+#	return 1;
+#}
+#
+#basename() {
+#	local name="${1##*/}";
+#	local opt="$2";
+#	[ -n "$opt" ] && name="${name%.$opt}";
+#	echo "${name%$2}";
+#}
+#
+#dirname() {
+#	local dir="${1%${1##*/}}";
+#	[ "${dir:=./}" != "/" ] && dir="${dir%?}";
+#	echo "$dir";
+#}
+
+rmstr() {
+	local _str="$1";
+	local _chr="$2";
+	[ -z "$_chr" ] && _chr='"';
+	if [ -n "$_str" -a -n "$_chr" ]; then
+		echo ${_str//$_chr};
+		return 0;
+	fi
+	return 1;
+}
+
+#empty_dir() {
+#        local _dir="$1" _mt="$2" _CK;
+#        [ ! -d "$_dir" ] && return 0;
+#	if [ -n "$_mt" ]; then
+#        	_CK="$(/bin/ls $_dir/${_mt} 2>/dev/null)";
+#	else
+#        	_CK="$(/bin/ls $_dir/ 2>/dev/null)";
+#	fi
+#        [ ${#_CK} -gt 0 ] && return 1;
+#        return 0;
+#}
+
+count_file() {
+	local _file="$1" _CK;
+	_CK="$(/bin/ls $_file |wc -l )";
+	if [ ${#_CK} -lt 1 ]; then
+		echo "0";
+		return 1;
+	fi
+	echo "$_CK";
+	return 0;
+}
+
+yesno() {
+	local _prompt="$1";
+	local _ANS="";
+        read -p "${_prompt} [yes/no]: " _ANS;
+        while [ "$_ANS" != "yes" ] && [ "$_ANS" != "no" ]; do
+                read -p "Please enter 'yes' or 'no': " _ANS;
+        done
+        [ "$_ANS" = "yes" ] && return 0;
+        return 1;
+}
+
+bool() {
+	[ $# -eq 1 ] || return 1;
+	local _val="$1";
+	if [ -n "$_val" ] && [ "$_val" = "yes" -o "$_val" = "1" ]; then
+		return 0;
+	fi
+	return 1;
+}
+
+lcdd_msg() {
+	[ $# -eq 2 ] || return 1;
+	[ -f "/.lcdtype" ] && source /.lcdtype;
+	if [ -n "$_LCD_PROG" ]; then
+       		if [ "$_LCD_PROG" = "1" ]; then
+			echo "$2" > /var/sys/lcd_msg;
+        	elif [ "$_LCD_PROG" = "0" ] && [ -c "/dev/lcd" ]; then
+			/bin/lcdd "$1" "$2";
+		fi
+        fi
+	return 0;
+}
+
+ps() {
+        /bin/ps;
+}
+
+cd() {
+	if [ -z "$1" ]; then
+		[ ! -d "/config" ] && mkdir /config &>/dev/null;
+		builtin cd /config;
+	else
+		builtin cd "$@";
+	fi
+}
+
+ls() {
+	/bin/ls -l $@;
+}
+
+dir() {
+	ls;
+}
+
+#df() {
+#	/bin/df -x rootfs $@;
+#}
+
+
+who() {
+	[ -f "/service/tools/session.exc" ] && /service/tools/session.exc print 2>/dev/null;
+}
+
+w() {
+	who;
+}
+
+lang_set() {
+	local _name=$1;
+	unset LANG;
+	if [ -n "$_name" -a -f "/etc/lang/${_name}/LC_MESSAGES/traceos.mo" ]; then
+		export LANG=$_name;
+		TEXTDOMAIN="traceos";
+		TEXTDOMAINDIR="/etc/lang";
+	fi
+}
+
+lang_init() {
+	local _LANG;
+	if [ -r "/etc/lang/default" ]; then
+		read _LANG < /etc/lang/default;
+		[ -n "$_LANG" ] && lang_set "$_LANG";
+	fi
+}
+
+reboot() {
+	#lang_init;
+	local _opt="$@";
+	#local _msg=$"Logged %s %s";
+	#if [ -n "$SSH_CLIENT" -a "$SSH_CLIENT" != "(null)" ]; then
+	#	echo $(printf "$_msg" "IP" "$(echo "$SSH_CLIENT" |awk '{print $1}')") > /var/sys/reboot_from_console; 
+	#else
+	#	echo $(printf "$_msg" "TTY" "$(tty)") > /var/sys/reboot_from_console; 
+	#fi
+	:> /var/sys/lcd_reboot;
+	if [ -f "/var/sys/shutdown_from_web" ]; then
+		pkill -f -9 iosh &>/dev/null;
+		unlink /var/sys/shutdown_from_web;
+	fi
+	/bin/reboot $_opt;
+	exit 0;
+}
+shutdown() {
+	#lang_init;
+	local _opt="$@";
+	#local _msg=$"Logged %s %s";
+	#if [ -n "$SSH_CLIENT" -a "$SSH_CLIENT" != "(null)" ]; then
+	#	echo $(printf "$_msg" "IP" "$(echo "$SSH_CLIENT" |awk '{print $1}')") > /var/sys/shutdown_from_console; 
+	#else
+	#	echo $(printf "$_msg" "TTY" "$(tty)") > /var/sys/shutdown_from_console; 
+	#fi
+	:> /var/sys/lcd_shutdown;
+	if [ -f "/var/sys/shutdown_from_web" ]; then
+		pkill -f -9 iosh &>/dev/null;
+		remove /var/sys/shutdown_from_web;
+	fi
+	/bin/poweroff $_opt;
+	exit 0;
+}
+
+poweroff() {
+	local _opt="$@";
+	shutdown $_opt;
+}
+
+halt() {
+	local _opt="$@";
+	shutdown $_opt;
+}
+
+sysexec_logout() {
+	lang_init;
+	local file="$1";
+	local ip="$2";
+	if [ -n "$file" -a -n "$ip" -a -f "$file" ]; then
+		local _msg=$"Logout from system shell";
+		if [ -n "$ANYTERM_SHELL" -a "$ANYTERM_SHELL" = "1" ]; then
+			_msg="(webshell) $_msg";
+		fi
+		logger -t LOGIN -p local6.notice "ECODE=01 TYPE=sysexec USER=console IP=$ip MSG=$_msg" 2>/dev/null;
+		unlink $file;
+	fi
+	exit 0;
+}
+sysexec_session() {
+	local mypid="$$";
+	local time="$(strftime %s)";
+	local file _xs="/var/sys/xsessions";
+	[ ! -d "$_xs" ] && xmkdir $_xs;
+	if [ -n "$SSH_CLIENT" ] && ! strstr $SSH_CLIENT "null"; then
+		local myip="${SSH_CLIENT}";
+		[ -n "$myip" ] && file="${mypid}_${myip}_${time}";
+	else
+		local tty="$(tty)";
+		local myip="$(basename ${tty//\/dev\/pts\//pts})";
+		[ -n "$myip" ] && file="${mypid}_${myip}_${time}";
+	fi
+	if [ -n "$file" ]; then
+		:> $_xs/sysexec_${file};
+		trap "sysexec_logout $file $myip" EXIT;
+		alias exit="sysexec_logout $file $myip";
+	fi
+	local _tm="$(iocat /etc/sysexec_timeout || echo 3600)";
+	TMOUT=${_tm};
+	readonly TMOUT;
+	export TMOUT;
+}
+
+object_clean() {
+        remove /var/sys/obj/*;
+}
+
+pico() {
+	[ ! -x "/bin/pico" ] && return 1;
+        local _ret=1 _f=$@;
+        /bin/pico $_f;
+	_ret=$?;
+        if [ -f "$_f" ] && [[ "$_f" =~ ".cfg$" ]]; then
+        	object_clean;
+	fi
+	return $_ret;
+}
+
+vi() {
+	[ ! -x "/bin/vi" ] && return 1;
+        local _ret=1 _f=$@;
+        /bin/vi $_f;
+	_ret=$?;
+        if [ -f "$_f" ] && [[ "$_f" =~ ".cfg$" ]]; then
+        	object_clean;
+	fi
+	return $_ret;
+}
+
+version() {
+	if [ -x "/bin/exec_cli" ]; then
+		/bin/exec_cli version;
+	fi
+}
+
+devtools() {
+	if [ -x "/strg/mybox/devtools" ]; then
+		/strg/mybox/devtools $@;
+		return $?;
+	fi
+	echo "devtools not available";
+	return 1;
+}
+
+_EXECQ() {
+	local cmd=$@;
+	$cmd &>/dev/null;
+	return $?;
+}
+

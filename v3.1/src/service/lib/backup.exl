@@ -1,0 +1,158 @@
+<?php
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+define('__BACKUP_KEY','26b0ed812fba481cc8244333895621ff');
+
+function _BACKUP_READ_NOTE($_file) {
+	$_note="";
+	if(file_exists($_file)) {
+		putenv("__BACKUP_KEY=".__BACKUP_KEY);
+		if(_EXEC_CMD_OUTPUT("/bin/openssl aes-128-cbc -pass env:__BACKUP_KEY -d -salt -in $_file |/bin/tar -O -zx tmp/BACKUP-NOTE",$_STDOUT,$_STDERR)==0) {
+			$_note=_ARRAY_STR($_STDOUT);
+		}
+	}
+	putenv("__BACKUP_KEY");
+	return trim($_note);
+}
+
+function _BACKUP_READ_CONTROL($_file) {
+	$_data=array();
+	if(file_exists($_file)) {
+		putenv("__BACKUP_KEY=".__BACKUP_KEY);
+		if(_EXEC_CMD_OUTPUT("/bin/openssl aes-128-cbc -pass env:__BACKUP_KEY -d -salt -in $_file |/bin/tar -O -zx tmp/BACKUP-CONTROL",$_STDOUT,$_STDERR)==0) {
+			$_data=unserialize(_ARRAY_STR($_STDOUT));
+		}
+	}
+	putenv("__BACKUP_KEY");
+	return $_data;
+}
+
+function _BACKUP_RESTORE_CHECK($_file) {
+	$_control=_BACKUP_READ_CONTROL($_file);
+	if(!_ARRAY_NULL($_control)) {
+		if(!_NULL($_control['KEY']) && $_control['KEY']==__BACKUP_KEY) {
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+function _BACKUP_BACKUP_CONFIG($_note="") {
+	if(!file_exists(_REG_PATH)) {
+		return FALSE;
+	}
+	if(!is_dir(_BACKUP_PATH)) {
+		_MKDIR(_BACKUP_PATH);
+	}
+	$_hostname=_FILE_GET("/proc/sys/kernel/hostname");
+	$_host=_STR_ARRAY("$_hostname","\.");
+	$_core=_FILE_GET("/etc/version_core");
+	$_firm=_FILE_GET("/etc/firmware");
+	$_date=date('YmdHi');
+	if(!_NULL($_host[0]) && !_NULL($_core) && !_NULL($_firm) && !_NULL($_date)) {
+		$_dst=_BACKUP_PATH."/{$_host[0]}-{$_date}.mbk";
+		$_src=_ROOT_PATH;
+		if($_note=="NULL") $_note="";
+		_FILE_SAVE("/tmp/BACKUP-NOTE","$_note");
+		$_control['KEY']=__BACKUP_KEY;
+		$_control['HOST']="$_hostname";
+		$_control['VERSION']="$_core";
+		$_control['BUILD']="$_firm";
+		$_control['TIME']=time();
+		_FILE_ARRAY_SAVE("/tmp/BACKUP-CONTROL",$_control);
+		//if(_EXEC_CMD("/bin/tar -C $_src -zcf $_dst registry /tmp/BACKUP-NOTE /tmp/BACKUP-CONTROL")==0) {
+		putenv("__BACKUP_KEY=".__BACKUP_KEY);
+		if(_EXEC_CMD("/bin/tar -C $_src -zcf - registry /tmp/BACKUP-NOTE /tmp/BACKUP-CONTROL |/bin/openssl aes-128-cbc -pass env:__BACKUP_KEY -salt -out $_dst")==0) {
+			@unlink("/tmp/BACKUP-NOTE");
+			@unlink("/tmp/BACKUP-CONTROL");
+			putenv("__BACKUP_KEY");
+			return TRUE;
+		}
+		@unlink("/tmp/BACKUP-NOTE");
+		@unlink("/tmp/BACKUP-CONTROL");
+	}
+	putenv("__BACKUP_KEY");
+	return FALSE;
+}
+
+function _BACKUP_RESTORE_CONFIG($_file) {
+	if(!file_exists($_file)) {
+		return FALSE;
+	}
+	if(!_BACKUP_RESTORE_CHECK($_file)) {
+		return FALSE;
+	}
+	$_src=$_file;
+	$_dst=_ROOT_PATH;
+	putenv("__BACKUP_KEY=".__BACKUP_KEY);
+	if(_EXEC_CMD("/bin/openssl aes-128-cbc -pass env:__BACKUP_KEY -d -salt -in $_src |/bin/tar -C $_dst -zx --exclude tmp/BACKUP-NOTE --exclude tmp/BACKUP-CONTROL")==0) {
+		_INI_OBJECT_CLEAN_ALL();
+		putenv("__BACKUP_KEY");
+		return TRUE;
+	}
+	putenv("__BACKUP_KEY");
+	return FALSE;
+}
+
+function _BACKUP_AUTO() {
+	_INI_TOKEN_GET("system","system.cfg",$_NTOKEN);
+	if(_ARRAY_NULL($_NTOKEN)) return FALSE;
+	$_DATA=$_NTOKEN['backup'];
+	if(_NULL($_DATA['AUTO_STAT']) || $_DATA['AUTO_STAT']!=1) {
+		return FALSE;
+	}
+	if(_NULL($_DATA['AUTO_COUNT']) || $_DATA['AUTO_COUNT'] <= 0) {
+		return FALSE;	
+	}
+	$_max=$_DATA['AUTO_COUNT'];
+	$_buff=_GLOB(_BACKUP_PATH."/*.mbk");
+	if(!_ARRAY_NULL($_buff)) {
+		$_cnt=0;
+		$_purge=0;
+		$_buff=array_reverse($_buff);
+		foreach($_buff as $_fl) {
+			$_cnt++;
+			if($_cnt >= $_max) {
+				@unlink($_fl);
+				$_purge++;
+			}
+		}
+		if($_purge > 0) {
+			$_file="file";
+                	if($_purge > 1) $_file="files";
+			_LOG_SYSTEM("INFO","Rotating '$_purge' $_file from maximum of $_max files");
+		}
+	}
+	return _BACKUP_BACKUP_CONFIG("auto-backup");
+}
+
+function _BACKUP_CRONTAB() {
+	@_UNLINK("/etc/cron/*/autobackup");
+	_INI_TOKEN_GET("system","system.cfg",$_NTOKEN);
+	if(_ARRAY_NULL($_NTOKEN['backup'])) return FALSE;
+	$_DATA=$_NTOKEN['backup'];
+	if(_NULL($_DATA['AUTO_STAT']) || $_DATA['AUTO_STAT']!=1) {
+		return FALSE;
+	}
+	if(_NULL($_DATA['AUTO_COUNT']) || $_DATA['AUTO_COUNT'] <= 0) {
+		return FALSE;
+	}
+	if(_NULL($_DATA['AUTO_INTERVAL']) || _ISNUM($_DATA['AUTO_INTERVAL'])) {
+		return FALSE;
+	}
+	$_intv=$_DATA['AUTO_INTERVAL'];
+	$_file="";
+	if($_intv=="daily") {
+		$_file="/etc/cron/d/autobackup";
+	} elseif($_intv=="monthly") {
+		$_file="/etc/cron/m/autobackup";
+	} elseif($_intv=="weekly") {
+		$_file="/etc/cron/w/autobackup";
+	}
+	if(!_NULL($_file)) {
+		return _SAVE_BASH_FILE($_file,"/bin/ionice -c3 /service/tools/backup.exc autobackup");
+	}
+	return FALSE;
+}
+
+?>

@@ -1,0 +1,132 @@
+<?php
+class EXE {
+	/* variable from pppd:
+		1) ppp device
+		2) tty
+		3) speed
+		4) local ip
+		5) remote ip (gateway)
+		6) ip-param (device#<id>)
+
+		Array
+		(
+		    [ORIG_UID] => 0
+		    [PPPLOGNAME] => sys
+		    [PPPD_PID] => 7400
+		    [SPEED] => 38400
+		    [IFNAME] => ppp0
+		    [IPLOCAL] => 60.49.51.161
+		    [IPREMOTE] => 219.93.218.177
+		    [DNS1] => 202.188.0.133
+		    [DNS2] => 202.188.1.5
+		    [USEPEERDNS] => 1
+		    [REQUEST_TIME] => 1239288399
+		    [argv] => Array
+			(
+			    [0] => /etc/ppp/pppoe/ip-up
+			    [1] => ppp0
+			    [2] => 
+			    [3] => 38400
+			    [4] => 60.49.51.161
+			    [5] => 219.93.218.177
+			    [6] => eth1#78bb59914e01b2d52f92#0
+			    [7] => 
+			)
+
+		    [argc] => 8
+		)
+
+	*/
+	private function _PPPOE_PEERDNS($_dev,$_ARGV) {
+		if(!_NULL($_ARGS['USEPEERDNS']) && $_ARGS['USEPEERDNS']==1) {
+			_INI_TOKEN_GET("network","named.cfg",$_NTOKEN);
+			$_TOKEN=$_NTOKEN['named'];
+			if(!_ARRAY_NULL($_TOKEN) && (!_NULL($_TOKEN['ISP']) && $_TOKEN['ISP']==1)) {
+				$_dns="";
+				if(!_NULL($_ARGS['DNS1'])) {
+					$_dns .="{$_ARGS['DNS1']};";
+				}
+				if(!_NULL($_ARGS['DNS2'])) {
+					$_dns .="{$_ARGS['DNS2']};";
+				}
+				if(!_NULL($_dns)) {
+					if(_FILE_SAVE("/etc/ppp/pppoe/resolv/{$_dev}.conf","$_dns")) {
+						_INIT_EXEC("name_reload");
+					}
+				}
+			}
+		}
+	}
+	private function _PPPOE_GETMASK($_dev) {
+		if(_EXEC_CMD_OUTPUT("/bin/ifconfig $_dev",$_STDOUT,$_STDERR)==0) {
+		        if(!_ARRAY_NULL($_STDOUT)) {
+				foreach($_STDOUT as $_line) {
+					if(_NULL($_line)) continue;
+					if(preg_match("/Mask:(.+)$/",$_line,$_mm)) {
+						if(!_NULL($_mm[1])) return $_mm[1];
+					}
+				}
+			}
+		}
+		return;
+	}
+
+	private function _PPPOE_DO($_opt) {
+		$_ARGC=$_SERVER["argc"];
+		$_ARGV=$_SERVER["argv"];
+		if($_ARGC > 1 ) {
+			if($_opt=="ip-up" || $_opt=="ip-down") {
+				$_device=$_ARGV[1];
+				$_ip=$_ARGV[4];
+				$_gw=$_ARGV[5];
+				$_param=$_ARGV[6];
+				list($_tdev,$_tid,$_nat)=explode("#",$_param);
+				if(($_opt=="ip-up") && (!_NULL($_tid) && !_NULL($_ip) && !_NULL($_gw))) {
+					$_nmask=self::_PPPOE_GETMASK($_device);
+					$_DATA=array();
+					_IPCALC::IP($_RESULT,$_ip,$_nmask);
+					if(!_NULL($_RESULT['total'])) {
+						$_DATA['HOST_TOTAL']=$_RESULT['total'];
+					}
+					if(!_NULL($_RESULT['hostmin'])) {
+						$_DATA['HOST_MIN']=$_RESULT['hostmin'];
+					}
+					if(!_NULL($_RESULT['hostmax'])) {
+						$_DATA['HOST_MAX']=$_RESULT['hostmax'];
+					}
+					if(!_NULL($_RESULT['type'])) {
+						$_DATA['HOST_TYPE']=$_RESULT['type'];
+					}
+					if(!_NULL($_RESULT['inet'])) {
+						$_DATA['INET']=$_RESULT['inet'];
+					}
+					$_DATA['ADDR']=$_ip;
+					$_DATA['GATEWAY']=$_gw;
+					$_DATA['PDEV']=$_device;
+					$_DATA['MASK']=$_nmask;
+					$_DATA['PREF']=$_RESULT['prefix'];
+					$_DATA['NETWORK']=$_RESULT['network'];
+					$_DATA['BCAST']=$_RESULT['broadcast'];
+					_INI_TOKEN_UPDATE("network","eth.cfg","$_tid",$_DATA);
+					self::_PPPOE_PEERDNS($_device,$_ARGV);
+					return TRUE;
+				}
+				if($_opt=="ip-down" && !_NULL($_tid)) {
+					return _network_clear_cache_config_pppoe($_tid);
+				}
+			}
+		}
+	}
+
+	private function _PPPOE_UPDOWN_MAIN() {
+		define('_AWIE_CODE','ef3802a1fce98f3985e6a9a1f7c1a024');
+		include_once("lib.exl");
+		include_once("init.exl");
+		self::_PPPOE_DO(basename($_SERVER["argv"][0]));
+		exit(0);
+	}
+	public static function MAIN() {
+		self::_PPPOE_UPDOWN_MAIN();
+	}
+}
+?>

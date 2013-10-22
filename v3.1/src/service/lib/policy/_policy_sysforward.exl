@@ -1,0 +1,77 @@
+<?php
+if(!defined('_POLICY_CODE')||_POLICY_CODE!="214162c595ce24bf9285f0a98cb0fbca") exit("\n\nERROR: _POLICY_CODE not set\n\n");
+
+function _policy_sysforward_loadtpl(&$_data) {
+	$_file=_SERVICE_PATH."/tpl/filter_sysforward.expl";
+	$_buff=_FILE_GET($_file);
+	if(!_NULL($_buff)) $_data .="$_buff\n";
+}
+
+function _policy_sysforward_traceroute(&$_data) {
+	_INI_TOKEN_GET("firewall","setting.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN['traceroute'])) {
+		return FALSE;
+	}
+	$_rulesid="-m comment --comment traceroute";
+	if($_TOKEN['traceroute']['FORWARD']==1) {
+		$_data .="-A SYS_FORWARD $_rulesid -p icmp -m icmp --icmp-type 30/0 -j CONFIRMED\n";
+		$_data .="-A SYS_FORWARD $_rulesid -p udp -m udp --sport 1024:65535 --dport 33000:34000 -j CONFIRMED\n";
+	} else {
+		$_data .="-A SYS_FORWARD $_rulesid -p icmp -m icmp --icmp-type 30/0 -j DROP\n";
+		$_data .="-A SYS_FORWARD $_rulesid -p udp -m udp --sport 1024:65535 --dport 33000:34000 -j DROP\n";
+	}
+	return TRUE;
+}
+
+function _policy_sysforward_ping(&$_data) {
+	_INI_TOKEN_GET("firewall","setting.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN['ping'])) {
+		return FALSE;
+	}
+	$_rulesid="-m comment --comment ping";
+	if($_TOKEN['ping']['FORWARD']==1) {
+		$_data .="-A SYS_FORWARD $_rulesid -p icmp -m icmp --icmp-type 8/0 -j CONFIRMED\n";
+	} else {
+		$_data .="-A SYS_FORWARD $_rulesid -p icmp -m icmp --icmp-type 8/0 -j DROP\n";
+	}
+	return TRUE;
+}
+
+function _policy_sysforward_restore() {
+	$_objf=_OBJ_PATH."/_policy_sysforward_save.obj";
+	$_data=_FILE_GET($_objf);
+	if(!_NULL($_data)) {
+		if(!_policy_data($_data,1)) {
+			@unlink($_objf);
+			return FALSE;
+		}
+		_INIT_ECHO(0,_GETTEXT("Reloading previous saved policy"));
+		return TRUE;
+	}
+	@unlink($_objf);
+	return FALSE;
+}
+
+function _policy_sysforward_save($_data) {
+	$_objf=_OBJ_PATH."/_policy_sysforward_save.obj";
+	return _FILE_SAVE($_objf,$_data);
+}
+
+function policy_sysforward() {
+	$_data="*filter\n";
+	$_data .="-F SYS_FORWARD\n";
+	_policy_sysforward_loadtpl($_data);
+	_policy_sysforward_ping($_data);
+	_policy_sysforward_traceroute($_data);
+	$_data .="COMMIT\n";
+	if(_policy_data($_data,0)) {
+		_policy_sysforward_save($_data);
+		return TRUE;	
+	}
+	_INIT_ECHO(1,_GETTEXT("Loading %s failed","policy sysforward"));
+	_FILE_SAVE(_OBJ_PATH."/_policy_sysforward_failed.obj","$_data");
+	_policy_sysforward_restore();
+	return FALSE;
+}
+
+?>

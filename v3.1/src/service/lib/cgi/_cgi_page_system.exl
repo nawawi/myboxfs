@@ -1,0 +1,101 @@
+<?php
+if(!defined('_CGI_CODE')||_CGI_CODE!="90d45215e48dac81e802f17310ad0c1f") exit("\n\nERROR: _CGI_CODE not set\n\n");
+
+function _CGI_PAGE_SYSTEM_OVERVIEW_GETDATA($_file,&$_data_array,&$_cnt) {
+	if($_cnt >= 10) return FALSE;
+	$_buff=_FILE($_file);
+	if(!_ARRAY_NULL($_buff)) {
+		$_buff=array_reverse($_buff);
+		foreach($_buff as $_line) {
+			_TRIM($_line);
+			if(_NULL($_line)) continue;
+			if(preg_match("/\[(\S+)\s+(\S+)\]\s+ECODE=\d+\s+TYPE=web\s+USER=(\S+)\s+IP=(\S+)\s+MSG=(.*)/",$_line,$_mm)) {
+				$_date=$_mm[1];
+				$_time=$_mm[2];
+				$_data_array[$_cnt]['access']=$_mm[3];
+				$_data_array[$_cnt]['date']=$_date;
+				$_data_array[$_cnt]['time']=$_time;
+				$_data_array[$_cnt]['ip']=$_mm[4];
+				$_data_array[$_cnt]['status']=$_mm[5];
+				$_cnt++;
+				unset($_strtime,$_time,$_date,$_mm);
+				if($_cnt >= 11) break;
+			}
+		}
+	}
+	unset($_buff);
+	return TRUE;
+}
+
+function _CGI_PAGE_SYSTEM_OVERVIEW_DATA() {
+	$_current=time();
+	$_prev=strtotime("-1 day");
+	$_ndate=date('Ymd',$_current);
+	$_pdate=date('Ymd',$_prev);
+	$_nfile=_LOG_PATH."/auth-{$_ndate}.log";
+
+	$_data_array=array();
+	$_cnt=1;
+	_CGI_PAGE_SYSTEM_OVERVIEW_GETDATA($_nfile,$_data_array,$_cnt);
+	if($_cnt < 10) {
+		unset($_buff);
+		$_pfile=_LOG_PATH."/auth-{$_pdate}.log*";
+		$_bfile=_GLOB("$_pfile");
+		if(!_NULL($_bfile[0])) {
+			_CGI_PAGE_SYSTEM_OVERVIEW_GETDATA($_bfile[0],$_data_array,$_cnt);
+		}
+	}
+	return $_data_array;
+}
+
+function _CGI_PAGE_SYSTEM_OVERVIEW() {
+
+	$_css_table="background-color: #ffffff; text-align: center;";
+	$_css_td_t="font-weight: bold; background-color: #d8e4f1; padding: 4px;";
+	$_css_td_c="padding: 4px;";
+	
+	$_data="
+		<table class='table_fixed' style='$_css_table'>
+  		<tr>
+		<td style='$_css_td_t;'>&nbsp;</td>
+    		<td style='$_css_td_t'>"._GETTEXT("Access")."</td>
+    		<td style='$_css_td_t'>"._GETTEXT("Date")."</td>
+    		<td style='$_css_td_t'>"._GETTEXT("Time")."</td>
+    		<td style='$_css_td_t'>"._GETTEXT("IP Address")."</td>
+    		<td style='$_css_td_t'>"._GETTEXT("Status")."</td>
+  		</tr>
+	";
+	$_data_array=_CGI_PAGE_SYSTEM_OVERVIEW_DATA();
+	if(!_ARRAY_NULL($_data_array)) {
+		foreach($_data_array as $_num => $_data_s) {
+			$_data .="
+		  		<tr>
+				<td style='$_css_td_c'>$_num</td>
+    				<td style='$_css_td_c'>{$_data_s['access']}</td>
+    				<td style='$_css_td_c'>{$_data_s['date']}</td>
+    				<td style='$_css_td_c'>{$_data_s['time']}</td>
+    				<td style='$_css_td_c'>{$_data_s['ip']}</td>
+    				<td style='$_css_td_c'>{$_data_s['status']}</td>
+  				</tr>	
+			";
+		}
+	}
+	
+	$_data .="</table>";
+
+	$_hkey=_RAND_TEXT(30);
+	$_page="";
+	$_page .="<div id='{$_hkey}' style='position: absolute; top: 10px; left: 10px;'>";
+	$_page .=_CGI_PAGE_CONTENT_BOX(array("title"=>_GETTEXT("Last %s Sessions","WebGui"),
+				"data"=>"$_data",
+				"width"=>"780",
+				"top"=>"0",
+				"left"=>"0",
+				"title_css"=>"font-size: 13px;")
+		);
+	$_page .="</div>";
+	return trim($_page);
+}
+
+
+?>

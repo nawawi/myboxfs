@@ -1,0 +1,90 @@
+<?php
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+function ulog_check() {
+	if(!_INIT_CHECK_BINARY(array("/bin/ulogd"))) {
+		_INIT_ECHO(1,_GETTEXT("Cannot execute %s. Internal error",_INIT_NAME()));
+		exit(1);
+	}
+}
+
+function ulog_quiet() {
+	_INIT_QUIET('1');
+}
+
+function ulog_config($_scriptdata='') {
+	if(!_NULL($_scriptdata)) {
+		return _FILE_SAVE("/etc/ulogd.conf","$_scriptdata\n");
+	}
+	$_rmem=1048576;
+        $_bufsize=4194304;
+        if(file_exists("/proc/sys/net/core/rmem_max")) {
+                $_rmem=("/proc/sys/net/core/rmem_max");
+                $_bufsize=$_rmem * 4;
+        }
+	$_fd=_FILE_GET("/proc/sys/net/core/rmem_max");
+	if(!_NULL($_fd)) {
+		$_rmem=$_fd;
+		$_bufsize=$_rmem * 4;
+	}
+
+        $_config='';
+        $_config .="[global]\n";
+        $_config .="logfile=\"syslog\"\n";
+        $_config .="loglevel=7\n";
+        $_config .="rmem=$_rmem\n";
+        $_config .="bufsize=$_bufsize\n";
+        $_config .="plugin=\"/lib/ulogd/ulogd_inpflow_NFCT.so\"\n";
+        $_config .="plugin=\"/lib/ulogd/ulogd_inppkt_NFLOG.so\"\n";
+        $_config .="plugin=\"/lib/ulogd/ulogd_raw2packet_BASE.so\"\n";
+        $_config .="plugin=\"/lib/ulogd/ulogd_filter_IFINDEX.so\"\n";
+        $_config .="plugin=\"/lib/ulogd/ulogd_filter_IP2STR.so\"\n";
+        $_config .="plugin=\"/lib/ulogd/ulogd_filter_IP2BIN.so\"\n";
+        $_config .="plugin=\"/lib/ulogd/ulogd_filter_PRINTPKT.so\"\n";
+        $_config .="plugin=\"/lib/ulogd/ulogd_filter_MAC2STR.so\"\n";
+        $_config .="plugin=\"/lib/ulogd/ulogd_filter_PRINTFLOW.so\"\n";
+        $_config .="plugin=\"/lib/ulogd/ulogd_output_SYSLOG.so\"\n";
+        $_config .="plugin=\"/lib/ulogd/ulogd_output_SQLITE3.so\"\n";
+	$_config .="stack=log1:NFLOG,base1:BASE,ifi1:IFINDEX,ip2str1:IP2STR,print1:PRINTPKT,sys1:SYSLOG\n";
+        $_config .="[log1]\n";
+        $_config .="unbind=1\n";
+        $_config .="[sys1]\n";
+        $_config .="facility=LOG_KERN\n";
+        $_config .="level=LOG_INFO\n";
+        return _FILE_SAVE("/etc/ulogd.conf",$_config);
+}
+
+
+function ulog_up() {
+	@unlink(_TASKQ_PATH."/ulog_up");
+	if(_EXEC_CMD("/bin/ulogd -d")==0) {
+		_INIT_NICE_LEVEL("ulogd","-1");
+		_INIT_CHKPROG_LOG("ulogd");
+		return TRUE;
+	}
+	return ulog_restart();
+}
+
+
+function ulog_start() {
+	_INIT_CHECK_DAEMON_STATUS("ulogd");
+	if(!ulog_config()) {
+		_INIT_ECHO(1,_GETTEXT("Starting %s failed","ulogd"));
+		return FALSE;
+	}
+	_INIT_START_DAEMON("/bin/ulogd -d","ulog_up","-1");
+	return TRUE;
+}
+
+function ulog_stop() {
+	_INIT_STOP_DAEMON("ulogd","ulog_up");
+	return TRUE;
+}
+
+function ulog_restart() {
+	_INIT_EXEC("ulog_stop");
+	_INIT_EXEC("ulog_start");
+	return TRUE;
+}
+
+?>

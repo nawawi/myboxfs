@@ -1,0 +1,597 @@
+<?php
+/**
+* Definitions function library
+*
+* Mengandungi function-function yang digunakan
+* untuk definitions.<br />
+* Setiap parameter (@param) yang mempunyai extra "-reference", function
+* tersebut adalah "Passing by Reference" type function.
+*
+* @author Mohd Nawawi Mohamad Jamili <nawawi@tracenetworkcorporation.com>
+* @copyright 2008 Nawawi, Tracenetwork Corporation Sdn. Bhd. 
+* @package library
+* @filesource
+* @link http://my.php.net/manual/en/language.references.whatdo.php -- Reference "Passing by Reference"
+*/
+/**
+* @ignore
+*/
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+/**
+* Add data definition baru ke data definition akhir
+*
+* Memasukkan data definition baru ke data definition akhir
+* dengan memasukkan key yang tertentu.
+*
+* @see _DEFINITIONS_GET()
+* @param string $_key data key
+* @param array $_TOKEN array baru
+* @param array &$_MTOKEN array-reference
+* @return void
+*/
+function _DEFINITIONS_GET_ADD_TOKEN($_key,$_TOKEN,&$_MTOKEN) {
+	if(!is_array($_MTOKEN)) $_MTOKEN=array();
+ 	if(!_ARRAY_NULL($_TOKEN)) {
+		$_MTOKEN[$_key]=$_TOKEN;
+	}
+}
+
+/**
+* Create Network Interfaces definition object
+*
+* Create Network Interfaces definition object dengan mengambil
+* data dari category network.
+* Section yang terlibat: eth dan additional.
+*
+* @param array &$_MTOKEN array-reference
+* @return void
+*/
+function _DEFINITIONS_GET_INTERFACE(&$_MTOKEN) {
+	if(!is_array($_MTOKEN)) $_MTOKEN=array();
+	_INI_TOKEN_GET("network","eth.cfg",$_ETOKEN);
+	_INI_TOKEN_GET("network","additional.cfg",$_PTOKEN);
+	$_ATOKEN=array();$_DELTOK=array();
+	if(!_ARRAY_NULL($_ETOKEN)) {
+		foreach($_ETOKEN as $_ID => $_DATA) {
+			if(_NULL($_DATA['NAME'])) continue;
+			$_ATOKEN[$_ID]['NAME']="{$_DATA['NAME']} (Address)";
+			if(!_NULL($_DATA['ADDR'])) {
+				$_ATOKEN[$_ID]['ADDR']=$_DATA['ADDR'];
+			} else {
+				$_ATOKEN[$_ID]['ADDR']=_GETTEXT("unresolved");
+			}
+			$_ATOKEN[$_ID]['NOTE']="{$_DATA['NAME']} Address";
+			$_ATOKEN[$_ID]['__DATA_ID']=$_DATA['__DATA_ID'];
+			$_DELTOK[$_DATA['NAME']]=1;
+		}
+	}
+	if(!_ARRAY_NULL($_PTOKEN)) {
+		foreach($_PTOKEN as $_ID => $_DATA) {
+			if(_NULL($_DATA['NAME'])) continue;
+			if(_NULL($_DATA['PNAME']) || _NULL($_DELTOK[$_DATA['PNAME']])) {
+				_INI_TOKEN_DELETE("network","additional.cfg",$_ID);
+				continue;
+			}
+			$_ATOKEN[$_ID]['NAME']="{$_DATA['PNAME']} [{$_DATA['NAME']}] (Address)";
+			if(!_NULL($_DATA['ADDR'])) {
+				$_ATOKEN[$_ID]['ADDR']=$_DATA['ADDR'];
+			} else {
+				$_ATOKEN[$_ID]['ADDR']=_GETTEXT("unresolved");
+			}
+			$_ATOKEN[$_ID]['NOTE']="Address of alias '{$_DATA['NAME']}' on interface '{$_DATA['PNAME']}'";
+			$_ATOKEN[$_ID]['__DATA_ID']=$_DATA['__DATA_ID'];
+		}
+	}
+	if(!_ARRAY_NULL($_ATOKEN)) {
+		_DEFINITIONS_GET_ADD_TOKEN("Interface Addresses",$_ATOKEN,$_MTOKEN);
+	}
+
+	$_ATOKEN=array();
+	if(!_ARRAY_NULL($_ETOKEN)) {
+		foreach($_ETOKEN as $_ID => $_DATA) {
+			if(_NULL($_DATA['NAME'])) continue;
+			$_ATOKEN[$_ID]['NAME']="{$_DATA['NAME']} (Network)";
+			if(!_NULL($_DATA['NETWORK']) ){
+				$_ATOKEN[$_ID]['ADDR']="{$_DATA['NETWORK']}/{$_DATA['PREF']}";
+			} else {
+				$_ATOKEN[$_ID]['ADDR']=_GETTEXT("unresolved");
+			}
+			$_ATOKEN[$_ID]['NOTE']="Attached network of interface {$_DATA['NAME']}";
+			$_ATOKEN[$_ID]['__DATA_ID']=$_DATA['__DATA_ID'];
+		}
+	}
+	if(!_ARRAY_NULL($_PTOKEN)) {
+		foreach($_PTOKEN as $_ID => $_DATA) {
+			if(_NULL($_DATA['NAME'])) continue;
+			if(_NULL($_DATA['PNAME']) || _NULL($_DELTOK[$_DATA['PNAME']])) {
+				continue;
+			}
+			$_ATOKEN[$_ID]['NAME']="{$_DATA['NAME']} (Network)";
+			if(!_NULL($_DATA['NETWORK']) ){
+				$_ATOKEN[$_ID]['ADDR']="{$_DATA['NETWORK']}/{$_DATA['PREF']}";
+			} else {
+				$_ATOKEN[$_ID]['ADDR']=_GETTEXT("unresolved");
+			}
+			$_ATOKEN[$_ID]['NOTE']="Attached network of alias '{$_DATA['NAME']}' on interface '{$_DATA['PNAME']}'";
+			$_ATOKEN[$_ID]['__DATA_ID']=$_DATA['__DATA_ID'];
+		}
+	}
+	if(!_ARRAY_NULL($_ATOKEN)) {
+		_DEFINITIONS_GET_ADD_TOKEN("Interface Networks",$_ATOKEN,$_MTOKEN);
+	}
+
+	$_ATOKEN=array();
+	if(!_ARRAY_NULL($_ETOKEN)) {
+		foreach($_ETOKEN as $_ID => $_DATA) {
+			if(_NULL($_DATA['NAME'])) continue;
+			$_ATOKEN[$_ID]['NAME']="{$_DATA['NAME']} (Broadcast)";
+			if(!_NULL($_DATA['BCAST'])) {
+				$_ATOKEN[$_ID]['ADDR']=$_DATA['BCAST'];
+			} else {
+				$_ATOKEN[$_ID]['ADDR']=_GETTEXT("unresolved");
+			}
+			$_ATOKEN[$_ID]['NOTE']=_GETTEXT("Broadcast address of interface '%s'","{$_DATA['NAME']}");
+			$_ATOKEN[$_ID]['__DATA_ID']=$_DATA['__DATA_ID'];
+		}
+	}
+	if(!_ARRAY_NULL($_PTOKEN)) {
+		foreach($_PTOKEN as $_ID => $_DATA) {
+			if(_NULL($_DATA['NAME'])) continue;
+			if(_NULL($_DATA['PNAME']) || _NULL($_DELTOK[$_DATA['PNAME']])) {
+				continue;
+			}
+			$_ATOKEN[$_ID]['NAME']="{$_DATA['NAME']} (Broadcast)";
+			if(!_NULL($_DATA['BCAST'])) {
+				$_ATOKEN[$_ID]['ADDR']=$_DATA['BCAST'];
+			} else {
+				$_ATOKEN[$_ID]['ADDR']=_GETTEXT("unresolved");
+			}
+			$_ATOKEN[$_ID]['NOTE']=_GETTEXT("Broadcast address of alias '%s' on interface '%s'","{$_DATA['NAME']}","{$_DATA['PNAME']}");
+			$_ATOKEN[$_ID]['__DATA_ID']=$_DATA['__DATA_ID'];
+		}
+	}
+	if(!_ARRAY_NULL($_ATOKEN)) {
+		_DEFINITIONS_GET_ADD_TOKEN("Interface Broadcast Addresses",$_ATOKEN,$_MTOKEN);
+	}
+}
+
+/**
+* Dapatkan network interface NAME berpandukan ID.
+*
+* Dapatkan network interface NAME berpandukan ID.
+*
+* @param string $_ID section ID
+* @return string string value
+*/
+function _DEFINITIONS_GET_INTERFACE_NAME($_ID) {
+	_INI_TOKEN_GET("network","eth.cfg",$_ETOKEN);
+	if(!_ARRAY_NULL($_ETOKEN)) {
+		return $_ETOKEN[$_ID]['NAME'];
+	}
+	return NULL;
+}
+
+/**
+* Dapatkan network interface DEVICE berpandukan NAME.
+*
+* Dapatkan network interface DEVICE berpandukan NAME.
+*
+* @param string $_NAME section NAME
+* @return string string value
+*/
+function _DEFINITIONS_GET_INTERFACE_DEVICE($_NAME) {
+	_INI_TOKEN_GET_BYPARAM("network","eth.cfg","NAME",$_NAME,$_ITOKEN);
+	if(!_NULL($_ITOKEN['DEVICE'])) {
+		if(!_NULL($_ITOKEN['TYPE'])) {
+			if($_ITOKEN['TYPE']=="vlan") {
+				if(!_NULL($_ITOKEN['TAG'])) {
+					return "{$_ITOKEN['DEVICE']}.{$_ITOKEN['TAG']}";
+				}
+			}
+			if($_ITOKEN['TYPE']=="pppoe") {
+				if(!_NULL($_ITOKEN['PDEV'])) {
+					return "{$_ITOKEN['PDEV']}";
+				}
+			}
+		}
+		return $_ITOKEN['DEVICE'];
+	}
+	unset($_ITOKEN);
+	_INI_TOKEN_GET_BYPARAM("network","additional.cfg","NAME",$_NAME,$_ITOKEN);
+	if(!_NULL($_ITOKEN['PNAME']) && !_NULL($_ITOKEN['__DATA_ID'])) {
+		$_device=_DEFINITIONS_GET_INTERFACE_DEVICE($_ITOKEN['PNAME']);
+		return "{$_device}:{$_ITOKEN['__DATA_ID']}";
+	}
+	return NULL;
+}
+
+/**
+* Create definition object
+*
+* Create definition object bagi setiap section.
+*
+* @param string $_option data section
+* @param array &$_MTOKEN array-reference
+* @return void
+*/
+function _DEFINITIONS_GET($_options,&$_MTOKEN) {
+	if(!is_array($_MTOKEN)) $_MTOKEN=array();
+        if($_options=="networks") {
+		$_buff=_GLOB(_DEFINITIONS_PATH."/network*.cfg");
+		if(!_ARRAY_NULL($_buff)) {
+			foreach($_buff as $_file) {
+				_BASENAME($_file);
+				if(preg_match("/^network_(\S+)\.cfg$/",$_file,$_mm) ||
+					preg_match("/^(network)\.cfg$/",$_file,$_mm)) {
+					$_ttype=$_mm[1];
+					_INI_TOKEN_GET("definitions","$_file",$_TOKEN);
+					_DEFINITIONS_GET_ADD_TOKEN($_ttype,$_TOKEN,$_MTOKEN);
+					unset($_ttype,$_mm);
+				}
+				unset($_TOKEN);
+			}
+		}
+		unset($_buff);
+		_DEFINITIONS_GET_INTERFACE($_MTOKEN);
+        } elseif($_options=="services") {
+		$_buff=_GLOB(_DEFINITIONS_PATH."/service*.cfg");
+		if(!_ARRAY_NULL($_buff)) {
+			foreach($_buff as $_file) {
+				_BASENAME($_file);
+				if(preg_match("/^service_(\S+)\.cfg$/",$_file,$_mm)) {
+					$_ttype=$_mm[1];
+					_INI_TOKEN_GET("definitions","$_file",$_TOKEN);
+					_DEFINITIONS_GET_ADD_TOKEN($_ttype,$_TOKEN,$_MTOKEN);
+					unset($_ttype,$_mm);
+				}
+				unset($_TOKEN);
+			}
+		}
+		unset($_buff);
+        } elseif($_options=="timeevents") {
+		$_buff=_GLOB(_DEFINITIONS_PATH."/timeevent*.cfg");
+		if(!_ARRAY_NULL($_buff)) {
+			foreach($_buff as $_file) {
+				_BASENAME($_file);
+				if(preg_match("/^timeevent_(\S+)\.cfg$/",$_file,$_mm)) {
+					$_ttype=$_mm[1];
+					_INI_TOKEN_GET("definitions","$_file",$_TOKEN);
+					_DEFINITIONS_GET_ADD_TOKEN($_ttype,$_TOKEN,$_MTOKEN);
+					unset($_ttype,$_mm);
+				}
+				unset($_TOKEN);
+			}
+		}
+		unset($_buff);
+        }
+	ksort($_MTOKEN);
+}
+
+/**
+* Dapatkan definition object by ID
+*
+* Dapatkan definition data berpandukan definition ID.
+*
+* @param string $_option data section
+* @param array &$_TOKEN array-reference
+* @param string $_type data type
+* @return bool TRUE or FALSE
+*/
+function _DEFINITIONS_GET_BYID($_options,$_id,&$_ITOKEN,$_type="") {
+	if(!_ARRAY($_ITOKEN)) $_ITOKEN=array();
+	$_TOKEN=array();
+	_DEFINITIONS_GET("$_options",$_TOKEN);
+	foreach($_TOKEN as $_ttype => $_id_array) {
+		if(!_NULL($_type) && ($_ttype!="$_type")) continue;
+		if(!_ARRAY_NULL($_id_array[$_id])) {
+			$_id_array[$_id]['__DATA_SECTION']="$_options";
+			$_id_array[$_id]['__DATA_TYPE']="$_ttype";
+			$_ITOKEN=$_id_array[$_id];
+			return TRUE;
+		}
+		unset($_ttype);
+	}
+	return FALSE;
+}
+
+/**
+* Dapatkan definition object by Parameter dan value
+*
+* Dapatkan definition data berpandukan definition parameter dan value.
+*
+* @param string $_options data section
+* @param string $_param data parameter
+* @param string $_value data value
+* @param array &$_ITOKEN array-refrence
+* @param string $_type data type
+* @return bool TRUE or FALSE
+*/
+function _DEFINITIONS_GET_BYPARAM($_options,$_param,$_value,&$_ITOKEN,$_type="") {
+	if(!_ARRAY($_ITOKEN)) $_ITOKEN=array();
+	$_TOKEN=array();
+	_DEFINITIONS_GET("$_options",$_TOKEN);
+	foreach($_TOKEN as $_ttype => $_id_array) {
+		if(!_NULL($_type) && ($_ttype!="$_type")) continue;
+		if(!_ARRAY_NULL($_id_array)) {
+			foreach($_id_array as $_id => $_data) {
+				if(!_NULL($_id_array[$_id][$_param])) {
+					if($_id_array[$_id][$_param]=="$_value") {
+						$_id_array[$_id]['__DATA_SECTION']="$_options";
+						$_id_array[$_id]['__DATA_TYPE']="$_ttype";
+						$_ITOKEN=$_id_array[$_id];
+						return TRUE;
+					}
+				}
+			}
+		}
+		unset($_ttype);
+	}
+	return FALSE;
+}
+
+/**
+* Dapatkan definition object by Parameter NAME
+*
+* Dapatkan definition data berpandukan definition parameter NAME.
+*
+* @see _DEFINITIONS_GET_BYPARAM()
+* @param string $_options data section
+* @param string $_name parameter NAME value
+* @param array &$_ITOKEN array-refrence
+* @param string $_type data type
+* @return bool TRUE or FALSE
+*/
+function _DEFINITIONS_GET_BYNAME($_options,$_name,&$_ITOKEN,$_type="") {
+	if(!_ARRAY($_ITOKEN)) $_ITOKEN=array();
+	_DEFINITIONS_GET_BYPARAM($_options,"NAME",$_name,$_ITOKEN,$_type);
+}
+
+/**
+* Delete definition data
+*
+* Delete definition data
+*
+* @param string $_options data section
+* @param string $_type data type
+* @param string $_id section id
+* @return bool TRUE or FALSE
+*/
+function _DEFINITIONS_DELETE($_options,$_type,$_id) {
+	$_file="";
+	if($_options=="networks") {
+		$_file="network.cfg";
+		if($_type!="network") {
+			$_file="network_{$_type}.cfg";
+		}
+	} elseif($_options=="services") {
+		$_file="service_{$_type}.cfg";
+	} elseif($_options=="timeevents") {
+		$_file="timeevent_{$_type}.cfg";
+	}
+	if(!_NULL($_file)) {
+		return _INI_TOKEN_DELETE("definitions",$_file,$_id);
+	}
+	return FALSE;
+}
+
+/**
+* Save definition data
+*
+* Save definition data
+*
+* @param string $_options data section
+* @param string $_type data type
+* @param array $_DATA data array yang mengandungi parameter dan value
+* @return bool TRUE or FALSE
+*/
+function _DEFINITIONS_SAVE($_options,$_type,$_DATA) {
+	$_file="";
+	if($_options=="networks") {
+		$_file="network.cfg";
+		if($_type!="network") {
+			$_file="network_{$_type}.cfg";
+		}
+	} elseif($_options=="services") {
+		$_file="service_{$_type}.cfg";
+	} elseif($_options=="timeevents") {
+		$_file="timeevent_{$_type}.cfg";
+	}
+	if(!_NULL($_file)&&!_ARRAY_NULL($_DATA)) {
+		if(_INI_TOKEN_SAVE("definitions",$_file,$_DATA)) {
+			_UNLINK(_OBJ_PATH."/iosh_definitions_{$_options}_print.obj");
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+/**
+* Update definition data
+*
+* Update definition data
+*
+* @param string $_options data section
+* @param string $_type data type
+* @param string $_id data id
+* @param array $_DATA data array yang mengandungi parameter dan value
+* @return bool TRUE or FALSE
+*/
+function _DEFINITIONS_UPDATE($_options,$_type,$_id,$_DATA) {
+	$_file="";
+	if($_options=="networks") {
+		$_file="network.cfg";
+		if($_type!="network") {
+			$_file="network_{$_type}.cfg";
+		}
+	} elseif($_options=="services") {
+		$_file="service_{$_type}.cfg";
+	} elseif($_options=="timeevents") {
+		$_file="timeevent_{$_type}.cfg";
+	}
+	if(!_NULL($_file)&&!_ARRAY_NULL($_DATA)) {
+		$_ret=_INI_TOKEN_UPDATE("definitions",$_file,$_id,$_DATA);
+		if($_ret===TRUE) {
+			_UNLINK(_OBJ_PATH."/iosh_definitions_{$_options}_print.obj");
+			return TRUE;
+		} elseif($_ret===-1) {
+			return $_ret;
+		}
+	}
+	return FALSE;
+}
+
+/**
+* Resolve kan DNS host
+*
+* Dapatkan IP hostname bagi kegunaan definition dnshost
+*
+* @param string $_host hostname
+* @return string IP address
+*/
+function _DEFINITIONS_DNSHOST_RESOLVE($_host) {
+	$_h=_GETHOSTBYNAMEL($_host);
+	$_ret="";
+	if(!_ARRAY_NULL($_h)) {
+		foreach($_h as $_j) {
+			$_ret .="$_j,";
+		}
+		$_ret=rtrim($_ret,",");
+	}
+	if(_NULL($_ret)) $_ret=_GETTEXT("unresolved");
+	return $_ret;
+}
+
+/**
+* Dapatkan definition value by Parameter NAME
+*
+* Dapatkan definition value berpandukan definition parameter NAME.
+* Dapatkan juga value untuk setiap object group.
+*
+* @see _DEFINITIONS_GET_BYPARAM()
+* @see _DEFINITIONS_GET_BYNAME()
+* @param string $_options data section
+* @param string $_name parameter NAME value
+* @param array &$_ITOKEN array-refrence
+* @param string $_type data type
+* @return bool TRUE or FALSE
+*/
+function _DEFINITIONS_GET_BYNAME_R($_options,$_name,&$_ITOKEN) {
+	if(!_ARRAY($_ITOKEN)) $_ITOKEN=array();
+	if($_options=="networks") {
+		_DEFINITIONS_GET_BYPARAM($_options,"NAME",$_name,$_TOKEN);
+		if(!_ARRAY_NULL($_TOKEN)) {
+			if($_TOKEN['__DATA_TYPE']=="group") {
+				$_list=_STR_ARRAY($_TOKEN['ADDR'],",");
+				foreach($_list as $_val) {
+					_DEFINITIONS_GET_BYPARAM($_options,"NAME",$_val,$_TOKEN);
+					if(!_NULL($_TOKEN['ADDR'])) {
+						$_ITOKEN[]=$_TOKEN;
+					}
+				}
+			} else {
+				if(!_NULL($_TOKEN['ADDR'])) {
+					$_ITOKEN[]=$_TOKEN;
+				}
+			}
+		}
+	} elseif($_options=="services") {
+		_DEFINITIONS_GET_BYPARAM($_options,"NAME",$_name,$_TOKEN);
+		if(!_ARRAY_NULL($_TOKEN)) {
+			if($_TOKEN['__DATA_TYPE']=="group") {
+				$_list=_STR_ARRAY($_TOKEN['SERVICE'],",");
+				foreach($_list as $_val) {
+					_DEFINITIONS_GET_BYPARAM($_options,"NAME",$_val,$_TOKEN);
+					if(!_NULL($_TOKEN['PROTO'])) {
+						$_ITOKEN[]=$_TOKEN;
+					}
+				}
+			} else {
+				if(!_NULL($_TOKEN['PROTO'])) {
+					$_ITOKEN[]=$_TOKEN;
+				}
+			}
+		}
+	}
+	return $_ITOKEN;
+}
+
+// TODO:
+function _DEFINITION_GET_COUNT($_options) {
+	if(!_ARRAY($_DATA)) $_DATA=array();
+	if($_options=='networks') {
+		_DEFINITIONS_GET("networks",$_TOKEN);
+		$_host_t=count($_TOKEN['host']) ? count($_TOKEN['host']) : 0;
+		$_networks_t=count($_TOKEN['network']) ? count($_TOKEN['network']) : 0;
+		$_dnshost_t=count($_TOKEN['dnshost']) ? count($_TOKEN['dnshost']) : 0;
+		$_hostrange_t=count($_TOKEN['hostrange']) ? count($_TOKEN['hostrange']) : 0;
+		$_hostmac_t=count($_TOKEN['hostmac']) ? count($_TOKEN['hostmac']) : 0;
+		$_groupt_t=count($_TOKEN['group']) ? count($_TOKEN['group']) : 0;
+		$_builtin_t=count($_TOKEN['builtin']) ? count($_TOKEN['builtin']) : 0;
+		$_interface_t=0;
+		foreach($_TOKEN as $_type => $_id_array) {
+			if((stripos($_type,"interface addresses")!==FALSE ||
+				stripos($_type,"interface network")!==FALSE ||
+				stripos($_type,"interface broadcast")!==FALSE)) {
+				$_interface_t +=count($_id_array);
+			}
+		}
+		$_other_t=$_builtin_t + $_interface_t;
+		$_ntotal=$_host_t + $_networks_t + $_dnshost_t + $_hostrange_t + $_hostmac_t + $_group_t + $_other_t;
+		$_DATA['host']=$_host_t;
+		$_DATA['networks']=$_networks_t;
+		$_DATA['dnshost']=$_dnshost_t;
+		$_DATA['hostrange']=$_hostrange_t;
+		$_DATA['hostmac']=$_hostmac_t;
+		$_DATA['group']=$_groupt_t;
+		$_DATA['interface']=$_interface_t;
+		$_DATA['builtin']=$_builtin_t;
+		$_DATA['other']=$_other_t;
+		$_DATA['total']=$_ntotal;
+	} elseif($_options=='services') {
+		_DEFINITIONS_GET("services",$_TOKEN);
+		$_tcp_t=count($_TOKEN['tcp']) ? count($_TOKEN['tcp']) : 0;
+		$_udp_t=count($_TOKEN['udp']) ? count($_TOKEN['udp']) : 0;
+		$_tcpudp_t=count($_TOKEN['tcpudp']) ? count($_TOKEN['tcpudp']) : 0;
+		$_icmp_t=count($_TOKEN['icmp']) ? count($_TOKEN['icmp']) : 0;
+		$_ip_t=count($_TOKEN['ip']) ? count($_TOKEN['ip']) : 0;
+		$_ah_t=count($_TOKEN['ah']) ? count($_TOKEN['ah']) : 0;
+		$_esp_t=count($_TOKEN['esp']) ? count($_TOKEN['esp']) : 0;
+		$_groupt_t=count($_TOKEN['group']) ? count($_TOKEN['group']) : 0;
+		$_builtin_t=count($_TOKEN['builtin']) ? count($_TOKEN['builtin']) : 0;
+		$_other_t=$_builtin_t + $_ah_t + $_esp_t;
+		$_ntotal=$_tcp_t + $_udp_t + $_tcpudp_t + $_icmp_t + $_ip_t + $_group_t + $_other_t;
+		$_DATA['tcp']=$_tcp_t;
+		$_DATA['udp']=$_udp_t;
+		$_DATA['tcpudp']=$_tcpudp_t;
+		$_DATA['icmp']=$_icmp_t;
+		$_DATA['ip']=$_ip_t;
+		$_DATA['group']=$_groupt_t;
+		$_DATA['ah']=$_ah_t;
+		$_DATA['esp']=$_esp_t;
+		$_DATA['builtin']=$_builtin_t;
+		$_DATA['other']=$_other_t;
+		$_DATA['total']=$_ntotal;
+	} elseif($_options=='timeevents') {
+		_DEFINITIONS_GET("timeevents",$_TOKEN);
+		$_single_t=count($_TOKEN['single']) ? count($_TOKEN['single']) : 0;
+		$_recurring_t=count($_TOKEN['recurring']) ? count($_TOKEN['recurring']) : 0;
+		$_ntotal=$_single_t + $_recurring_t;
+		$_DATA['single']=$_single_t;
+		$_DATA['recurring']=$_recurring_t;
+		$_DATA['total']=$_ntotal;
+	}
+	return $_DATA;
+}
+
+// TODO:
+function _DEFINITIONS_TIMEEVENT_WEEKDAYS(&$_day) {
+	_INI_TOKEN_GET("definitions","weekdays.cfg",$_DTOKEN);
+	if(!_ARRAY_NULL($_DTOKEN['weekdays'])) {
+		if(!_NULL($_DTOKEN['weekdays'][$_day])) {
+			$_day=_GETTEXT($_DTOKEN['weekdays'][$_day]);
+		}
+	}
+	return $_day;
+}
+?>

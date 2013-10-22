@@ -1,0 +1,453 @@
+<?php
+if(!defined('_CLI_CODE')||_CLI_CODE!="a098846421a09ab1cacd3b3a753cbe05") exit("\n\nERROR: _CLI_CODE not set\n\n");
+
+// return value for name; eg: SSH [TCP -> 1:65535:22]
+// only display linked name if group; eg: TEST [ssh,ftp,aa]
+function ___CLI_DEFINITIONS_SERVICES_OBJ_LOOKUP($_name) {
+	_DEFINITIONS_GET_BYNAME("services",$_name,$_DTOKEN);
+	if(!_ARRAY_NULL($_DTOKEN)
+		&& !_NULL($_DTOKEN['PROTO'])
+		&& !_NULL($_DTOKEN['__DATA_ID'])
+		&& ($_DTOKEN['__DATA_ID']!="any")) {
+			if($_DTOKEN['__DATA_TYPE']=="group" && !_NULL($_DTOKEN['SERVICE'])) {
+				return "{$_DTOKEN['SERVICE']}";
+			} elseif(!_NULL($_DTOKEN['SPI'])) {
+				return "{$_DTOKEN['PROTO']} -> {$_DTOKEN['SPI']}";
+			} elseif(!_NULL($_DTOKEN['CODE'])) {
+				return "{$_DTOKEN['PROTO']} -> {$_DTOKEN['CODE']}";
+			} elseif(!_NULL($_DTOKEN['NUM'])) {
+				return "{$_DTOKEN['PROTO']} -> {$_DTOKEN['NUM']}";
+			} else {
+				return "{$_DTOKEN['PROTO']} -> {$_DTOKEN['SPORT']}:{$_DTOKEN['DPORT']}";
+			}
+	}
+	return _GETTEXT("unresolved");
+}
+
+function ___CLI_DEFINITIONS_SERVICES_PRINT($_opt="all",$_find='') {
+	$_objf=_OBJ_PATH."/iosh_definitions_services_print.obj";
+	@unlink($_objf);
+	_DEFINITIONS_GET("services",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+              	_CLI_ECHO(_GETTEXT("No data available"));
+                return FALSE;
+        }
+
+	$_builtin=0;
+	$_tcp=0;$_udp=0;
+	$_tcpudp=0;$_icmp=1;$_ip=0;
+	$_esp=0;$_ah=0;$_group=0;
+
+	if($_opt=="tcp") {
+		$_builtin=0;
+		$_tcp=1;$_udp=0;
+		$_tcpudp=0;$_icmp=0;$_ip=0;
+		$_esp=0;$_ah=0;$_group=0;
+	} elseif($_opt=="udp") {
+		$_builtin=0;
+		$_tcp=0;$_udp=1;
+		$_tcpudp=0;$_icmp=0;$_ip=0;
+		$_esp=0;$_ah=0;$_group=0;
+	} elseif($_opt=="tcpudp") {
+		$_builtin=0;
+		$_tcp=0;$_udp=0;
+		$_tcpudp=1;$_icmp=0;$_ip=0;
+		$_esp=0;$_ah=0;$_group=0;
+	} elseif($_opt=="icmp") {
+		$_builtin=0;
+		$_tcp=0;$_udp=0;
+		$_tcpudp=0;$_icmp=1;$_ip=0;
+		$_esp=0;$_ah=0;$_group=0;
+	} elseif($_opt=="ip") {
+		$_builtin=0;
+		$_tcp=0;$_udp=0;
+		$_tcpudp=0;$_icmp=0;$_ip=1;
+		$_esp=0;$_ah=0;$_group=0;
+	} elseif($_opt=="esp") {
+		$_builtin=0;
+		$_tcp=0;$_udp=0;
+		$_tcpudp=0;$_icmp=0;$_ip=0;
+		$_esp=1;$_ah=0;$_group=0;
+	} elseif($_opt=="ah") {
+		$_builtin=0;
+		$_tcp=0;$_udp=0;
+		$_tcpudp=0;$_icmp=0;$_ip=0;
+		$_esp=0;$_ah=1;$_group=0;
+	} elseif($_opt=="group") {
+		$_builtin=0;
+		$_tcp=0;$_udp=0;
+		$_tcpudp=0;$_icmp=0;$_ip=0;
+		$_esp=0;$_ah=0;$_group=1;
+	} elseif($_opt=="builtin") {
+		$_builtin=1;
+		$_tcp=0;$_udp=0;
+		$_tcpudp=0;$_icmp=0;$_ip=0;
+		$_esp=0;$_ah=0;$_group=0;
+	} else {
+		$_builtin=1;
+		$_tcp=1;$_udp=1;
+		$_tcpudp=1;$_icmp=1;$_ip=1;
+		$_esp=1;$_ah=1;$_group=1;
+	}
+	$_cnt=1;$_obj=array();
+	$_output="";$_DTX=array();
+	foreach($_TOKEN as $_type => $_id_array) {
+		if($_type=="builtin" && $_builtin==1) {
+			foreach($_id_array as $_id => $_set_a) {
+				if(_NULL($_set_a['NAME'])) {
+					_DEFINITIONS_DELETE("services",$_type,$_id);
+					continue;
+				}
+				if(!_NULL($_find)) {
+					$_set_a['TYPE']=$_type;
+					if(!_ARRAY_FIND($_find,$_set_a)) {
+						continue;
+					}
+				}
+				if($_cnt > 1) $_DTX[$_cnt][__CLI_DATA_NL]=1;
+				$_DTX[$_cnt][_GETTEXT_U("ID")]=$_cnt;
+				$_DTX[$_cnt][_GETTEXT_U("TYPE")]=$_type;
+				$_DTX[$_cnt][_GETTEXT_U("NAME")]=$_set_a['NAME'];
+				$_DTX[$_cnt][_GETTEXT_U("PROTOCOL")]=$_set_a['PROTO'];
+				$_DTX[$_cnt][_GETTEXT_U("DESCRIPTION")]=$_set_a['NOTE'];;
+				$_obj[$_cnt][$_type]=$_id;
+				$_cnt++;
+			}
+			unset($_id,$_set_a);
+		}
+
+		if(($_type=="tcp" && $_tcp==1)||($_type=="udp" && $_udp==1)||($_type=="tcpudp" && $_tcpudp==1)) {
+			foreach($_id_array as $_id => $_set_a) {
+				if(_NULL($_set_a['NAME'])) {
+					_DEFINITIONS_DELETE("services",$_type,$_id);
+					continue;
+				}
+				if(!_NULL($_find)) {
+					$_set_a['TYPE']=$_type;
+					if(!_ARRAY_FIND($_find,$_set_a)) {
+						continue;
+					}
+				}
+				if($_cnt > 1) $_DTX[$_cnt][__CLI_DATA_NL]=1;
+				$_DTX[$_cnt][_GETTEXT_U("ID")]=$_cnt;
+				$_DTX[$_cnt][_GETTEXT_U("TYPE")]=$_type;
+				$_DTX[$_cnt][_GETTEXT_U("NAME")]=$_set_a['NAME'];
+				$_DTX[$_cnt][_GETTEXT_U("PROTOCOL")]=$_set_a['PROTO'];
+				$_DTX[$_cnt][_GETTEXT_U("SOURCE PORT")]=$_set_a['SPORT'];
+				$_DTX[$_cnt][_GETTEXT_U("DESTINATION PORT")]=$_set_a['DPORT'];
+				$_DTX[$_cnt][_GETTEXT_U("DESCRIPTION")]=$_set_a['NOTE'];;
+				$_obj[$_cnt][$_type]=$_id;
+				$_cnt++;
+			}
+			unset($_id,$_set_a);
+		}
+
+		if($_type=="ip" && $_ip==1) {
+			foreach($_id_array as $_id => $_set_a) {
+				if(_NULL($_set_a['NAME'])) {
+					_DEFINITIONS_DELETE("services",$_type,$_id);
+					continue;
+				}
+				if(!_NULL($_find)) {
+					$_set_a['TYPE']=$_type;
+					if(!_ARRAY_FIND($_find,$_set_a)) {
+						continue;
+					}
+				}
+				if($_cnt > 1) $_DTX[$_cnt][__CLI_DATA_NL]=1;
+				$_DTX[$_cnt][_GETTEXT_U("ID")]=$_cnt;
+				$_DTX[$_cnt][_GETTEXT_U("TYPE")]=$_type;
+				$_DTX[$_cnt][_GETTEXT_U("NAME")]=$_set_a['NAME'];
+				$_DTX[$_cnt][_GETTEXT_U("PROTOCOL NUMBER")]=$_set_a['NUM'];
+				$_DTX[$_cnt][_GETTEXT_U("DESCRIPTION")]=$_set_a['NOTE'];;
+				$_obj[$_cnt][$_type]=$_id;
+				$_cnt++;
+			}
+			unset($_id,$_set_a);
+		}
+		if($_type=="icmp" && $_icmp==1) {
+			_INI_TOKEN_GET("definitions","icmptype.cfg",$_ETOKEN);
+			foreach($_id_array as $_id => $_set_a) {
+				if(_NULL($_set_a['NAME'])) {
+					_DEFINITIONS_DELETE("services",$_type,$_id);
+					continue;
+				}
+				if(!_NULL($_find)) {
+					$_set_a['TYPE']=$_type;
+					if(!_ARRAY_FIND($_find,$_set_a)) {
+						continue;
+					}
+				}
+				if($_cnt > 1) $_DTX[$_cnt][__CLI_DATA_NL]=1;
+				$_DTX[$_cnt][_GETTEXT_U("ID")]=$_cnt;
+				$_DTX[$_cnt][_GETTEXT_U("TYPE")]=$_type;
+				$_DTX[$_cnt][_GETTEXT_U("NAME")]=$_set_a['NAME'];
+				$_DTX[$_cnt][_GETTEXT_U("PROTOCOL")]=$_set_a['PROTO'];
+				$_DTX[$_cnt][_GETTEXT_U("TYPE/CODE")]=$_ETOKEN['icmptype'][$_set_a['CODE']];
+				$_DTX[$_cnt][_GETTEXT_U("DESCRIPTION")]=$_set_a['NOTE'];;
+				$_obj[$_cnt][$_type]=$_id;
+				$_cnt++;
+			}
+			unset($_id,$_set_a);
+		}
+		if(($_type=="esp" && $_esp==1)||($_type=="ah" && $_ah==1)) {
+			foreach($_id_array as $_id => $_set_a) {
+				if(_NULL($_set_a['NAME'])) {
+					_DEFINITIONS_DELETE("services",$_type,$_id);
+					continue;
+				}
+				if(!_NULL($_find)) {
+					$_set_a['TYPE']=$_type;
+					if(!_ARRAY_FIND($_find,$_set_a)) {
+						continue;
+					}
+				}
+				// SPI => Security Parameters Index
+				if($_cnt > 1) $_DTX[$_cnt][__CLI_DATA_NL]=1;
+				$_DTX[$_cnt][_GETTEXT_U("ID")]=$_cnt;
+				$_DTX[$_cnt][_GETTEXT_U("TYPE")]=$_type;
+				$_DTX[$_cnt][_GETTEXT_U("NAME")]=$_set_a['NAME'];
+				$_DTX[$_cnt][_GETTEXT_U("PROTOCOL")]=$_set_a['PROTO'];
+				$_DTX[$_cnt][_GETTEXT_U("SPI")]=$_set_a['SPI'];
+				$_DTX[$_cnt][_GETTEXT_U("DESCRIPTION")]=$_set_a['NOTE'];;
+				$_obj[$_cnt][$_type]=$_id;
+				$_cnt++;
+			}
+			unset($_id,$_set_a);
+		}
+		if($_type=="group" && $_group==1) {
+			foreach($_id_array as $_id => $_set_a) {
+				if(_NULL($_set_a['NAME'])) {
+					_DEFINITIONS_DELETE("services",$_type,$_id);
+					continue;
+				}
+				if(!_NULL($_find)) {
+					$_set_a['TYPE']=$_type;
+					if(!_ARRAY_FIND($_find,$_set_a)) {
+						continue;
+					}
+				}
+				if(!_NULL($_set_a['SERVICE'])) {
+					$_lst_a=_STR_ARRAY($_set_a['SERVICE'],",");
+					if(!_ARRAY_NULL($_lst_a)) {
+						$_set_a['SERVICE']=$_lst_a;
+					}
+					unset($_lst_a);
+				}
+				if($_cnt > 1) $_DTX[$_cnt][__CLI_DATA_NL]=1;
+				$_DTX[$_cnt][_GETTEXT_U("ID")]=$_cnt;
+				$_DTX[$_cnt][_GETTEXT_U("TYPE")]=$_type;
+				$_DTX[$_cnt][_GETTEXT_U("NAME")]=$_set_a['NAME'];
+				$_DTX[$_cnt][_GETTEXT_U("MEMBERS")]=$_set_a['SERVICE'];
+				$_DTX[$_cnt][_GETTEXT_U("DESCRIPTION")]=$_set_a['NOTE'];;
+				$_obj[$_cnt][$_type]=$_id;
+				$_cnt++;
+			}
+			unset($_id,$_set_a);
+		}	
+	}
+	if(!_ARRAY_NULL($_DTX)) {
+		$_output .=_CLI_DATA_BODY_R($_DTX);
+		unset($_DTX);
+	}
+	if(_ARRAY_NULL($_obj) || !_FILE_ARRAY_SAVE($_objf,$_obj) || _NULL($_output)) {
+		if(!_NULL($_find)) {
+			_CLI_ECHO(_GETTEXT("No results found"));
+		} else {
+			_CLI_ECHO(_GETTEXT("No data available"));
+		}
+		@unlink($_objf);
+                return FALSE;	
+	}
+	_CLI_ECHO_HEADER(_GETTEXT("Definitions services configuration"));
+	if(!_NULL($_find)) {
+		echo _GETTEXT("Search results match for '%s':","$_find")."\n\n";
+	}
+	echo "$_output";
+	return TRUE;
+}
+
+function ___CLI_DEFINITIONS_SERVICES_DELETE($_num) {
+	$_objf=_OBJ_PATH."/iosh_definitions_services_print.obj";
+	$_obj=_FILE_ARRAY_GET($_objf);
+	if(_ARRAY_NULL($_obj)) {
+		_CLI_ECHO(_GETTEXT("No Resource Id available."));
+		_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions services print"));
+		@unlink($_objf);
+		return FALSE;
+	}
+	if($_num=='*' && _CLI_YESNO(_GETTEXT("This action will delete all %s.\nContinue this action? %s","services definitions","[yes/no]: "))==TRUE) {
+		foreach($_obj as $_cnt => $_array) {
+			foreach($_array as $_type => $_id) {
+				if($_type=="builtin") continue;
+				if(_DEFINITIONS_DELETE("services",$_type,$_id)) {
+					unset($_obj[$_cnt]);
+				}
+			}
+		}
+		if(_FILE_ARRAY_SAVE($_objf,$_obj)) {
+			return TRUE;
+		}
+	} else {
+		$_num_array=array();
+		_CLI_MULTINUM($_num,$_num_array);
+		foreach($_num_array as $_no) {
+			if(!_ARRAY_NULL($_obj[$_no])) {
+				foreach($_obj[$_no] as $_type => $_id) {
+					if($_type=="builtin") {
+						_CLI_ECHO(_GETTEXT("Cannot delete builtin type definitions"));
+						return FALSE;
+					}
+					if(_DEFINITIONS_DELETE("services",$_type,$_id)) {
+						unset($_obj[$_no]);
+					}
+				}
+			}
+		}
+		if(_FILE_ARRAY_SAVE($_objf,$_obj)) {
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+
+function ___CLI_DEFINITIONS_SERVICES_ADD_ICMP($_num,&$_val) {
+	if(!_NULL($_num)&&_ISNUM($_num)) {
+		$_obj=_FILE_ARRAY_GET(_OBJ_PATH."/iosh_definitions_icmptype.obj");
+		if(!_NULL($_obj[$_num])) {
+			$_val=$_obj[$_num];
+		} else {
+			_CLI_ECHO(_GETTEXT("Resource Id '%s' not available.","$_num"));
+			_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions services icmptype"));
+			@unlink(_OBJ_PATH."/iosh_definitions_icmptype.obj");
+			return FALSE;
+		}
+	}
+	return TRUE;
+}
+
+function ___CLI_DEFINITIONS_SERVICES_ADD($_args) {
+	$_objf=_OBJ_PATH."/iosh_definitions_services_print.obj";
+	if(!_ARRAY_NULL($_args)) {
+		$_option=$_args[0];
+		if($_option=="tcp" || $_option=="udp" || $_option=="tcpudp") {
+			$_proto="$_option";
+			if($_option=="tcpudp") $_proto="tcp/udp";
+			$_DATA['NAME']="{$_args[1]}";
+			$_DATA['PROTO']=strtoupper($_proto);
+			$_DATA['SPORT']="{$_args[2]}";
+			$_DATA['DPORT']="{$_args[3]}";
+			$_DATA['NOTE']="{$_args[4]}";
+			if(!_DEFINITIONS_SAVE("services",$_option,$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}"));
+				return FALSE;
+			}
+			_CLI_ECHO(_GETTEXT("Definition saved"));
+			return TRUE;
+		} elseif($_option=="ip") {
+			$_DATA['NAME']="{$_args[1]}";
+			$_DATA['PROTO']=strtoupper($_proto);
+			$_DATA['NUM']="{$_args[2]}";
+			$_DATA['NOTE']="{$_args[3]}";
+			if(!_DEFINITIONS_SAVE("services",$_option,$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}"));
+				return FALSE;
+			}
+			_CLI_ECHO(_GETTEXT("Definition saved"));
+			return TRUE;
+		} elseif($_option=="icmp") {
+			$_DATA['NAME']="{$_args[1]}";
+			$_DATA['PROTO']=strtoupper($_option);
+			$_DATA['CODE']="";
+			$_DATA['NOTE']="{$_args[3]}";
+
+			if(___CLI_DEFINITIONS_SERVICES_ADD_ICMP($_args[2],$_val)) {
+				$_DATA['CODE']="$_val";
+			}
+
+			if(!_DEFINITIONS_SAVE("services",$_option,$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}"));
+				return FALSE;
+			}
+			_CLI_ECHO(_GETTEXT("Definition saved"));
+			return TRUE;
+		} elseif($_option=="esp" || $_option=="ah") {
+			$_DATA['NAME']="{$_args[1]}";
+			$_DATA['PROTO']=strtoupper($_option);
+			$_DATA['SPI']="{$_args[2]}";
+			$_DATA['NOTE']="{$_args[3]}";
+
+			if(!_DEFINITIONS_SAVE("services",$_option,$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}"));
+				return FALSE;
+			}
+			_CLI_ECHO(_GETTEXT("Definition saved"));
+			return TRUE;
+		} elseif($_option=="group") {
+			$_DATA['NAME']="{$_args[1]}";
+			$_DATA['NOTE']="{$_args[3]}";
+			$_options=$_args[2];
+			$_obj=_FILE_ARRAY_GET($_objf);
+			if(_ARRAY_NULL($_obj)) {
+				_CLI_ECHO(_GETTEXT("Resource Id '%s' not available.","$_options"));
+				_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions services print"));
+				@unlink($_objf);
+				return FALSE;
+			}
+			$_srv=___CLI_DEFINITIONS_OBJGETNAME($_obj,"services",$_options,"");
+			$_DATA['SERVICE']="$_srv";
+			if(!_DEFINITIONS_SAVE("services",$_option,$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}"));
+				return FALSE;
+			}
+			_CLI_ECHO(_GETTEXT("Definition saved"));
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function ___CLI_DEFINITIONS_SERVICES_SET($_args) {
+	$_objf=_OBJ_PATH."/iosh_definitions_services_print.obj";
+	$_obj=_FILE_ARRAY_GET($_objf);
+
+	if(!_ARRAY_NULL($_args)) {
+		$_option=$_args[0];
+		$_sparm=$_args[1];
+		$_sid=$_args[2];
+		$_sval=$_args[3];
+		if(_ARRAY_NULL($_obj) || _NULL($_obj[$_sid][$_option])) {
+			_CLI_ECHO(_GETTEXT("Resource Id '%s' not available.","$_sid"));
+			_CLI_ECHO(_GETTEXT("Enter -> '%s %s' to view Resource Id.","definitions services print","$_option"));
+			@unlink($_objf);
+			return FALSE;
+		}
+		$_ID=$_obj[$_sid][$_option];
+		$_DATA=array();
+		if($_option=="icmp" && $_sparm=="code") {
+			if(___CLI_DEFINITIONS_SERVICES_ADD_ICMP($_sval,$_val)) {
+				$_sval="$_val";
+			}
+		} elseif($_option=="group" && $_sparm=="service") {
+			$_srv=___CLI_DEFINITIONS_OBJGETNAME($_obj,"services",$_sval,"");
+			$_sval="$_srv";
+		}
+		$_DATA[strtoupper($_sparm)]="$_sval";
+		if(!_ARRAY_NULL($_DATA)) {
+			$_ret=_DEFINITIONS_UPDATE("services",$_option,$_ID,$_DATA);
+			if($_ret===TRUE) {
+				_CLI_ECHO(_GETTEXT("Definition updated"));
+				return TRUE;
+			} elseif($_ret===FALSE) {
+				_CLI_ECHO(_GETTEXT("Failed to updating definitions services %s","$_option"));
+				return FALSE;	
+			} elseif($_ret===-1) {
+				_CLI_ECHO(_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}"));
+				return FALSE;
+			}
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+?>

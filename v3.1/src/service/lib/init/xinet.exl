@@ -1,0 +1,76 @@
+<?php
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+function xinet_check() {
+	if(!_INIT_CHECK_BINARY(array("/bin/xinetd"))) {
+		_INIT_ECHO(1,_GETTEXT("Cannot execute %s. Internal error",_INIT_NAME()));
+		exit(1);
+	}
+}
+
+function xinet_quiet() {
+	_INIT_QUIET('1');
+}
+
+
+function xinet_config($_scriptdata='') {
+	if(!_NULL($_scriptdata)) {
+		return _FILE_SAVE("/etc/xinetd.conf","$_scriptdata\n");
+	}
+	_INI_TOKEN_GET("system","system.cfg",$_NTOKEN);
+	$_config="";
+	$_config .="defaults\n";
+	$_config .="{\n";
+	$_config .="\tlog_type = SYSLOG authpriv\n";
+	$_config .="\tlog_on_success = HOST PID\n";
+	$_config .="\tlog_on_failure = HOST\n";
+	$_config .="\tcps = 25 30\n";
+	$_config .="}\n";
+
+	return _FILE_SAVE("/etc/xinetd.conf","$_config");
+}
+
+
+function xinet_up() {
+	@unlink(_TASKQ_PATH."/xinet_up");
+	if(_EXEC_CMD("/bin/xinetd -stayalive -pidfile /var/run/xinetd.pid")==0) {
+		_INIT_CHKPROG_LOG("xinetd");
+		return TRUE;
+	}
+	return xinet_restart();
+}
+
+
+function xinet_start() {
+	_INIT_CHECK_DAEMON_STATUS("xinetd");
+	if(!xinet_config()) {
+		_INIT_ECHO(1,_GETTEXT("Starting %s failed","xinetd"));
+		return FALSE;
+	}
+	_INIT_START_DAEMON("/bin/xinetd -stayalive -pidfile /var/run/xinetd.pid","xinet_up");
+	return TRUE;
+}
+
+function xinet_stop() {
+	_INIT_STOP_DAEMON("xinetd","xinet_up");
+	return TRUE;
+}
+
+function xinet_restart() {
+	_INIT_EXEC("xinet_stop");
+	_INIT_EXEC("xinet_start");
+	return TRUE;
+}
+
+function xinet_reload() {
+	if(xinet_config()) {
+		if(_SIGHUP("xinetd")) {
+			_INIT_ECHO(0,_GETTEXT("Reloading %s daemon","xinetd"));
+			return TRUE;
+		}
+	}
+	_INIT_ECHO(1,_GETTEXT("Reloading %s daemon failed","xinetd"));
+	return FALSE;
+}
+
+?>

@@ -1,0 +1,328 @@
+<?php
+if(!defined('_CGI_CODE')||_CGI_CODE!="90d45215e48dac81e802f17310ad0c1f") exit("\n\nERROR: _CGI_CODE not set\n\n");
+
+function _CGI_PAGE_AUTH_LOCAL_PBOX($_DATA_POST) {
+	exit;
+}
+
+function _CGI_PAGE_AUTH_LOCAL_PBOX_TABLE($_req_data) {
+	extract($GLOBALS['_IMG']);
+	$_bid=_CGI_ATTR_KEY();
+	$_pid="box_page_auth";
+	$_def_n="__deft_u";
+	$_defa_n="__defa_u";
+	$_page="
+		<div class='tbox_tee' style='overflow: hidden;'>
+		<div align='center'>
+			<table class='table_fixed'>
+			<tr>
+			<td style='width: 150px;' valign='top'>"._CGI_BUTTON(array('id'=>"button_{$_bid}1",'text'=>_GETTEXT("Add new user/group.."),'css'=>'width: 150px;'))."</td>
+			<td style='width: 500px;' valign='top' align='center'>
+				<table class='table_fixed' style='width: 500px;'>
+					<tr>
+					<td style='width: 250px; padding-right: 2px;' align='right'><select class='tbox_s' id='tsel_{$_bid}' size='1'></select></td>
+					<td style='width: 150px;'><input type='text' id='tsearch_{$_bid}' class='tbox_is' value='' /></td>
+					<td style='width: 100px;'><div style='margin-left: 2px; float: left;'>"._CGI_BUTTON(array('id'=>"bfind_{$_id}",'class'=>'button_s','text'=>_GETTEXT("Find"),'css'=>'width: 50px;'))."</div></td>
+					</tr>
+				</table>
+			</td>
+			<td style='width: 130px; padding-top: 4px;' valign='top' align='right'>
+				<table class='table_fixed'>
+					<tr>
+					<td valign='middle' align='right'><img id='iprev' src='{$_ICON_ARROW['previous']}'></td>
+					<td valign='middle' align='center'><span id='cnt_start'>0</span>-<span id='cnt_next'>0</span> of <span id='cnt_total'>0</span></span></td>
+					<td valign='middle' align='left'><img id='inext' src='{$_ICON_ARROW['next']}'></td>
+					</tr>
+				</table>
+			</td>
+			</tr>
+			</table>
+		</div>
+		<div id='defpbox_content' style='position: absolute; overflow: auto; margin-top: 10px; width: 780px; height: 510px; border: 1px solid #999999;'>
+			<img src='$_ICON_SPINNER'> "._GETTEXT("Reading data. Please wait..")."
+		</div>
+		</div>
+
+	";
+	$_page .="<script type='text/javascript'>
+			__tnpage.button_hover();
+			\$(document).ready(function() {
+
+				var _default_row_start=1;
+				var _default_row_max=10;
+
+				var _dopagenext_row=function(_lt,_gt) {
+					_lt--;
+					_gt--;
+					\$('table#defpbox_table tr').show();
+					\$('table#defpbox_table tr:lt('+_lt+')').hide();
+					\$('table#defpbox_table tr:gt('+_gt+')').hide();
+				};
+
+				var _dopagenext_status=function(_a,_b,_c) {
+					if(_c < 1) {
+						_a=0;_b=0;
+						\$('div#defpbox_content').html('"._GETTEXT("No data available")."');
+					}
+					\$('span#cnt_start').text(_a);
+					\$('span#cnt_next').text(_b);
+					\$('span#cnt_total').text(_c);
+				};
+				
+				var _dopagenext=function(_a,_b,_c) {
+					var _row_start=_a || _default_row_start;
+					var _row_max=_b || _default_row_max;
+					var _row_cnt=_c || 0;
+
+					if(_row_max > _row_cnt) {
+						_row_max=_row_cnt;
+					}
+
+					_dopagenext_row(_row_start,_row_max);
+					_dopagenext_status(_row_start,_row_max,_row_cnt);
+
+					\$('img#inext').hover(
+						function() {
+							if(parseInt(\$('span#cnt_next').text()) < parseInt(\$('span#cnt_total').text())) {
+								\$(this).css('cursor','pointer');
+							} else {
+								\$(this).css('cursor','default');
+							}
+						},
+						function() {
+							\$(this).css('cursor','default');
+						}
+					).click(function(evt) {
+						var e=evt || window.event;
+						e.preventDefault();
+
+						var _start=parseInt(\$('span#cnt_start').text());
+						var _next=parseInt(\$('span#cnt_next').text());
+						var _end=parseInt(\$('span#cnt_total').text());
+
+						if(_start < _end && _next < _end) {
+							_start +=_row_max;
+							_next +=_row_max;
+							_dopagenext_row(_start,_next);
+							if(_next >= _end) {
+								_next=_end;
+							}
+							_dopagenext_status(_start,_next,_end);
+						}
+					});
+
+					\$('img#iprev').hover(
+						function() {
+							if(parseInt(\$('span#cnt_start').text()) > _row_start) {
+								\$(this).css('cursor','pointer');
+							} else {
+								\$(this).css('cursor','default');
+							}
+						},
+						function() {
+							\$(this).css('cursor','default');
+						}
+					).click(function(evt) {
+						var e=evt || window.event;
+						e.preventDefault();
+
+						var _start=parseInt(\$('span#cnt_start').text());
+						var _next=parseInt(\$('span#cnt_next').text());
+						var _end=parseInt(\$('span#cnt_total').text());
+
+						if(_next===_end) {
+							var _test=\$('table#defpbox_table tr:visible').length;
+							if(_test < _row_max) {
+								_test=_row_max - _test;
+								_next +=_test;
+							}
+						}
+
+						if(_start > _row_start) {
+							_start -=_row_max;
+							_next -=_row_max;
+							_dopagenext_row(_start,_next);
+							_dopagenext_status(_start,_next,_end);
+						}
+					});
+
+				};
+
+				var _tnrcolor=function() {
+					__tndefinitions.rowcolor('table#defpbox_table tr','','',true);
+					\$('table#defpbox_table tr').each(function(i) {
+						var _color=\$(this).css('background-color');
+						\$(this).find('td').css('background-color',_color);
+					});
+				};
+
+
+				var _doloadtable=function(_opt,_str) {
+					var _stype=_opt || 'all';
+					var _find=_str || '';
+					var _data={'req_data':'$_req_data','sub_data':'pbox','stype':_stype,'sfind':_find};
+					\$.ajaxSetup({cache:false});
+					\$('div#defpbox_content').load('index.exh',_data, function() {
+						_tnrcolor();
+						var _start_cnt=\$('table#defpbox_table tr').length;
+						_dopagenext(_default_row_start,_default_row_max,_start_cnt);
+						__tnpage.button_hover();
+					});
+				};
+
+				var _doselect=function() {
+					var _page='';
+					var _sarray=$_def_n;
+					if(_sarray!=={}) {
+						for(var _x in _sarray) {
+							var _v=_x;
+							var _t=_sarray[_x];
+							if(_v==='all') {
+								_page +=\"<option value='\"+_v+\"' selected>\"+_t+\"</option>\";
+							} else {
+								_page +=\"<option value='\"+_v+\"'>\"+_t+\"</option>\";
+							}
+						}	
+					}
+					if(_page!=='') {
+						\$('select#tsel_{$_bid}').html(_page);
+						\$('select#tsel_{$_bid}').change(function() {
+							var _mid=\$(this).attr('value');
+							var _str=\$.trim(\$('input#tsearch_{$_bid}').attr('value'));
+							_doloadtable(_mid,_str);
+						});
+					}
+				};
+
+				var _dopagesearch_exec=function() {
+					var _str=\$('input#tsearch_{$_bid}').attr('value');
+					if(\$.trim(_str)!=='') {
+						var _opt=\$('select#tsel_{$_bid} option:selected').attr('value');
+						_doloadtable(_opt,_str);
+					} else {
+						_doloadtable();
+						_doselect();
+					}
+				};
+
+				var _dopagesearch=function() {
+					\$('input#tsearch_{$_bid}').click(function(evt) {
+						var e=evt || window.event;
+						e.preventDefault();
+						\$('input#tsearch_{$_bid}').attr('value','');
+					}).keyup(function(evt) {
+						var e=evt || window.event;
+						var knum = document.all ? window.event.keyCode : e.which;
+						if(knum===13) {
+							_dopagesearch_exec();
+						}
+					});
+					\$('div#bfind_{$_id}').click(function(evt) {
+						var e=evt || window.event;
+						e.preventDefault();
+						_dopagesearch_exec();
+					});
+				};
+
+				\$('div#button_{$_bid}1').click(function(evt) {
+					var e=evt || window.event;
+					e.preventDefault();
+					var _defa=$_defa_n;
+					var _top=e.pageY+'px';
+					var _left=e.pageX+'px';
+					__tndefinitions.defopen('$_pid','$_section',_top,_left,_defa['all']);
+
+				});
+
+				_doloadtable();
+				_doselect();
+				_dopagesearch();
+			});
+
+	</script>";
+	return trim($_page);
+}
+
+function _CGI_PAGE_AUTH_OVERVIEW() {
+	extract($GLOBALS['_IMG']);
+
+	$_css_table="padding: 1px; width: 100%;";
+	$_css_tdleft="width: 10px; padding: 2px;";
+	$_css_tdleftc="width: 150px; padding: 2px; font-weight: bold;";
+	$_css_tdright="padding: 2px;";
+
+	$_ucnt=0;$_gcnt=0;
+	_INI_TOKEN_GET("auth","user.cfg",$_TOKEN);
+	if(!_ARRAY_NULL($_TOKEN)) {
+		$_ucnt=count($_TOKEN);
+	}
+	unset($_TOKEN);
+	_INI_TOKEN_GET("auth","group.cfg",$_TOKEN);
+	if(!_ARRAY_NULL($_TOKEN)) {
+		$_gcnt=count($_TOKEN);
+	}
+	$_ugtotal=$_ucnt + $_gcnt;
+	$_udef_data="<b>Total:</b> $_ugtotal
+		<table class='gborder_t' style='$_css_table' cellpadding=1 cellspacing=0>
+		<tr>
+		<td style='$_css_tdleft'><img style='float: left;' src='{$_ICON_USER['user']}'></td>
+		<td style='$_css_tdleftc'>Users</td>
+		<td style='$_css_tdright'>$_ucnt</td>
+		</tr>
+		<tr>
+		<td style='$_css_tdleft'><img style='float: left;' src='{$_ICON_USER['group']}'></td>
+		<td style='$_css_tdleftc'>Group</td>
+		<td style='$_css_tdright'>$_gcnt</td>
+		</tr>
+		</table>
+	";
+	unset($_TOKEN);
+	_INI_TOKEN_GET("auth","server.cfg",$_TOKEN);
+	$_ldap_stat=$_TOKEN['ldap']['STAT'] ? $_TOKEN['ldap']['STAT'] : 0;
+	$_radius_stat=$_TOKEN['radius']['STAT'] ? $_TOKEN['radius']['STAT'] : 0;
+	$_ad_stat=$_TOKEN['active_directory']['STAT'] ? $_TOKEN['active_directory']['STAT'] : 0;
+	$_sdef_data="
+		<table style='$_css_table' cellpadding=1 cellspacing=0>
+		<tr>
+		<td style='$_css_tdleft'><img style='float: left;' src='$_ICON_SERVER'></td>
+		<td style='$_css_tdleftc'>LDAP</td>
+		<td style='$_css_tdright'><img src='{$_ICON_ENABLE[$_ldap_stat]}'></td>
+		</tr>
+		<tr>
+		<td style='$_css_tdleft'><img style='float: left;' src='$_ICON_SERVER'></td>
+		<td style='$_css_tdleftc'>RADIUS</td>
+		<td style='$_css_tdright'><img src='{$_ICON_ENABLE[$_radius_stat]}'></td>
+		</tr>
+		<tr>
+		<td style='$_css_tdleft'><img style='float: left;' src='$_ICON_SERVER'></td>
+		<td style='$_css_tdleftc'>Active Directory</td>
+		<td style='$_css_tdright'><img src='{$_ICON_ENABLE[$_ad_stat]}'></td>
+		</tr>
+		</table>
+	";
+
+	$_page="";
+	// left
+
+	$_page .="<div style='position: absolute; top: 10px; left: 10px;'>";
+	$_page .=_CGI_PAGE_CONTENT_BOX(array("title"=>"User / Group",
+				"data"=>"$_udef_data",
+				"width"=>"390",
+				"top"=>"0",
+				"left"=>"0")
+		);
+
+
+	// right
+	$_page .=_CGI_PAGE_CONTENT_BOX(array("title"=>"Authentication Server",
+				"data"=>"$_sdef_data",
+				"width"=>"390",
+				"top"=>"0",
+				"left"=>"400")
+		);
+
+
+	$_page .="</div>";
+	return trim($_page);
+}
+?>

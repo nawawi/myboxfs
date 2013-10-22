@@ -1,0 +1,67 @@
+<?php
+if(!defined('_CLI_CODE')||_CLI_CODE!="a098846421a09ab1cacd3b3a753cbe05") exit("\n\nERROR: _CLI_CODE not set\n\n");
+
+
+function _cli_dhcp_config() {
+	if($_SERVER["argc"] > 1 ) {
+		$_max=$_SERVER["argc"];
+		_CLI_TRIM_ARGS($_SERVER['argv']);
+		for($_x=1;$_x < $_max;$_x++) {
+			$_options=$_SERVER["argv"][$_x];
+			if($_options=="server") {
+				$_cmd=$_SERVER["argv"][$_x+1];
+				if($_cmd=="print") {
+					return ___CLI_DHCP_CONFIG_SERVER_PRINT();
+				} elseif($_cmd=="add") {
+					_CLI_RESET_ARGS(2,$_SERVER["argv"]);
+					return ___CLI_DHCP_CONFIG_SERVER_ADD($_SERVER["argv"]);
+				} elseif($_cmd=="set") {
+					_CLI_RESET_ARGS(2,$_SERVER["argv"]);
+					return ___CLI_DHCP_CONFIG_SERVER_SET($_SERVER["argv"]);
+				} elseif($_cmd=="delete") {
+					$_nums=$_SERVER["argv"][$_x+2];
+					return ___CLI_DHCP_CONFIG_SERVER_DELETE($_nums);
+				} elseif($_cmd=="apply") {
+					return _INIT_EXEC("dhcp_restart");
+				} elseif($_cmd=="find") {
+					$_find=$_SERVER["argv"][$_x+2];
+					_TRIM($_find);
+					return ___CLI_DHCP_CONFIG_SERVER_PRINT($_find);
+				}
+			} elseif($_options=="static") {
+				$_cmd=$_SERVER["argv"][$_x+1];
+				if($_cmd=="print") {
+					return ___CLI_DHCP_CONFIG_STATIC_PRINT();
+				} elseif($_cmd=="add") {
+					_CLI_RESET_ARGS(2,$_SERVER["argv"]);
+					return ___CLI_DHCP_CONFIG_STATIC_ADD($_SERVER["argv"]);
+				} elseif($_cmd=="set") {
+					_CLI_RESET_ARGS(2,$_SERVER["argv"]);
+					return ___CLI_DHCP_CONFIG_STATIC_SET($_SERVER["argv"]);
+				} elseif($_cmd=="delete") {
+					$_nums=$_SERVER["argv"][$_x+2];
+					return ___CLI_DHCP_CONFIG_STATIC_DELETE($_nums);
+				} elseif($_cmd=="apply") {
+					return _INIT_EXEC("dhcp_restart");
+				} elseif($_cmd=="find") {
+					$_find=$_SERVER["argv"][$_x+2];
+					_TRIM($_find);
+					return ___CLI_DHCP_CONFIG_STATIC_PRINT($_find);
+				}
+			} elseif($_options=="relay") {
+				$_cmd=$_SERVER["argv"][$_x+1];
+				if($_cmd=="print") {
+					return ___CLI_DHCP_CONFIG_RELAY_PRINT();
+				} elseif($_cmd=="set") {
+					_CLI_RESET_ARGS(2,$_SERVER["argv"]);
+					return ___CLI_DHCP_CONFIG_RELAY_SET($_SERVER["argv"]);
+				} elseif($_cmd=="apply") {
+					return _INIT_EXEC("dhcrelay_restart");
+				}
+			}
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+?>

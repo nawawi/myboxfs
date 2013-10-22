@@ -1,0 +1,92 @@
+#!/bin/bash -e
+trap "exit 1" 2;
+
+# checking
+if [ "x$_START" = "x" ]; then
+        echo "_START not set";
+	exit 1;
+fi
+if [ ! -f "$_START/MYBOX_VERSION" ]; then
+	echo "MYBOX_VERSION not set";
+	exit 1;
+fi
+if [ ! -f "$_FUNC/functions.sh" ]; then
+        echo "_FUNC not set";
+	exit 1;
+fi
+
+cd $_START;
+. $_FUNC/functions.sh
+
+_BUILD_MSG "Keymaps";
+
+# setting
+_LIB=/lib/kbd/keymaps/i386
+_INC=/lib/kbd/keymaps/include
+_BDIR=/tmp/keymap
+_KBASE=$_START/kernel_pkg
+_LOADKEYS="$_START/scripts/loadkeys -b";
+
+cd $_START;
+
+if [ -d "$_LIB" ]; then
+        rm -rf /tmp/kbd /tmp/keymap
+        mkdir -p /tmp/kbd/$_LIB
+        mkdir -p /tmp/kbd/$_INC
+        cp -av $_LIB/* /tmp/kbd/$_LIB
+        cp -av $_INC/* /tmp/kbd/$_INC
+        for f in $(find /tmp/kbd/lib/* -name '*.*map*');do
+        _dir=$(dirname $f)
+                case $f in *.gz)
+                        [ ! -L "$f" ] && gunzip -v $f
+                ;;
+                        *)
+                esac
+        done
+        for f in $(find /tmp/kbd/lib/* -name '*.*map*' |sort );do
+                _f=$(echo $f |sed -e 's/\.kmap//g' -e 's/\.map//g')
+                $_LOADKEYS $f > $_f.bmap
+        done
+        mkdir -p $_BDIR/usr/share
+        cp -av /tmp/kbd/lib/* $_BDIR/usr/share
+        echo "creating kbd map list"
+        rm -f $_BDIR/usr/share/kbd/KBDLIST.TXT /tmp/kbd/KBDLIST.TXT
+        for f in $(find $_BDIR/usr/share/kbd/* -name '*.bmap' |sort); do
+		_G=
+                _G=$(echo "$f" |sed -e 's/\.bmap//g' -e 's/\.gz//g') 
+		echo $(basename $_G) >> /tmp/kbd/KBDLIST.TXT
+		[ ! -L "$f" ] && _LZMA_COMPRESS $f $f.gz
+        done
+	# fix link
+	__st=$(pwd);
+        for f in $(find $_BDIR/usr/share/kbd/* -type l |sort );do
+		_b=$(basename $f)
+		_x=$(readlink $f);
+                _f=$(echo $f |sed -e 's/map\.gz/bmap\.gz/g')
+                _g=$(echo $_x |sed -e 's/map\.gz/bmap\.gz/g')
+		cd $_b;
+		mv -v $f $_f
+		ln -sf $_g $_f
+		cd $__st;
+        done
+	cd $__st;
+        mv -v /tmp/kbd/KBDLIST.TXT $_BDIR/usr/share/kbd/KBDLIST.TXT
+        chmod 600 $_BDIR/usr/share/kbd/KBDLIST.TXT
+        cd $_BDIR
+        sync
+        find $_BDIR/usr/share/kbd/* -name '*.kmap' |xargs rm -fv
+        find $_BDIR/usr/share/kbd/* -name '*.map' |xargs rm -fv
+
+        find $_BDIR/usr/share/kbd/* -name '*.doc' |xargs rm -fv
+        find $_BDIR/usr/share/kbd/* -name '*.inc' |xargs rm -fv
+	rm -rf $_BDIR/usr/share/kbd/keymaps/include
+        tar -cvf kmods_keymaps.tar usr |sort
+	_LZMA_COMPRESS kmods_keymaps.tar kmods_keymaps.mpk
+        if [ -f "kmods_keymaps.mpk" ]; then
+                mv -v kmods_keymaps.mpk $_KBASE
+        fi
+        rm -rf /tmp/kbd /tmp/keymap
+fi
+
+cd $_START;
+exit 0;

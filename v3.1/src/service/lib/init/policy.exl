@@ -1,0 +1,385 @@
+<?php
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+function policy_check() {
+	if(!_INIT_CHECK_BINARY(array("/bin/iptables","/bin/iptables-restore","/bin/iptables-save"))) {
+		_INIT_ECHO(1,_GETTEXT("Cannot execute %s. Internal error",_INIT_NAME()));
+		exit(1);
+	}
+}
+
+function _policy_normal_rules_data($_src,$_dst,$_service) {
+	$_src_a=array();
+	$_dst_a=array();
+	$_service_a=array();
+
+	if($_src!="any") {
+		_DEFINITIONS_GET_BYNAME_R("networks",$_src,$_DTOKEN);
+		if(!_ARRAY_NULL($_DTOKEN)) {
+			foreach($_DTOKEN as $_DID => $_DDATA) {
+				if(!_NULL($_DDATA['ADDR'])) {
+					if(!_NULL($_DDATA['PREF'])) $_DDATA['ADDR']="{$_DDATA['ADDR']}/{$_DDATA['PREF']}";
+					$_src_a["{$_DDATA['ADDR']}"]="-s {$_DDATA['ADDR']}";
+				}
+			}
+		}
+		unset($_DTOKEN,$_DID,$_DDATA);
+	}
+	if($_dst!="any") {
+		_DEFINITIONS_GET_BYNAME_R("networks",$_dst,$_DTOKEN);
+		if(!_ARRAY_NULL($_DTOKEN)) {
+			foreach($_DTOKEN as $_DID => $_DDATA) {
+				if(!_NULL($_DDATA['ADDR'])) {
+					if(!_NULL($_DDATA['PREF'])) $_DDATA['ADDR']="{$_DDATA['ADDR']}/{$_DDATA['PREF']}";
+					$_dst_a["{$_DDATA['ADDR']}"]="-d {$_DDATA['ADDR']}";
+				}
+			}
+		}
+		unset($_DTOKEN,$_DID,$_DDATA);
+	}
+	
+	if($_service!="any") {
+		_DEFINITIONS_GET_BYNAME_R("services",$_service,$_STOKEN);
+		if(!_ARRAY_NULL($_STOKEN)) {
+			foreach($_STOKEN as $_DID => $_DDATA) {
+				$_service_t="";
+				if(_NULL($_DDATA['__DATA_TYPE'])) continue;
+				if($_DDATA['__DATA_TYPE']=="tcp" || $_DDATA['__DATA_TYPE']=="udp") {
+					_LOWER($_DDATA['PROTO']);
+					$_service_t="-m {$_DDATA['PROTO']} -p {$_DDATA['PROTO']}";
+					if(!_NULL($_DDATA['SPORT'])) $_service_t .=" --sport {$_DDATA['SPORT']}";
+					if(!_NULL($_DDATA['DPORT'])) $_service_t .=" --dport {$_DDATA['DPORT']}";
+					$_service_a[]=$_service_t;
+				} elseif($_DDATA['__DATA_TYPE']=="tcpudp") {
+					$_service_t="-m tcp -p tcp";
+					if(!_NULL($_DDATA['SPORT'])) $_service_t .=" --sport {$_DDATA['SPORT']}";
+					if(!_NULL($_DDATA['DPORT'])) $_service_t .=" --dport {$_DDATA['DPORT']}";
+					$_service_a[]=$_service_t;
+					$_service_t="-m udp -p udp";
+					if(!_NULL($_DDATA['SPORT'])) $_service_t .=" --sport {$_DDATA['SPORT']}";
+					if(!_NULL($_DDATA['DPORT'])) $_service_t .=" --dport {$_DDATA['DPORT']}";
+					$_service_a[]=$_service_t;
+				} elseif($_DDATA['__DATA_TYPE']=="icmp") {
+					$_service_t="-m icmp -p icmp";
+					if(!_NULL($_DDATA['CODE'])) $_service_t .=" --icmp-type {$_DDATA['CODE']}";
+					$_service_a[]=$_service_t;
+				} elseif($_DDATA['__DATA_TYPE']=="ip") {
+					if(!_NULL($_DDATA['NUM'])) $_service_a[]="-p {$_DDATA['NUM']}";
+				} elseif($_DDATA['__DATA_TYPE']=="ah") {
+					if(!_NULL($_DDATA['SPI'])) $_service_a[]="-m ah --ahspi {$_DDATA['SPI']}";
+				} elseif($_DDATA['__DATA_TYPE']=="esp") {
+					if(!_NULL($_DDATA['SPI'])) $_service_a[]="-m esp --espspi {$_DDATA['SPI']}";
+				} 
+			}
+		}
+		unset($_STOKEN,$_DID,$_DDATA);
+	}
+	// list
+	if(!_ARRAY_NULL($_src_a)) {
+		foreach($_src_a as $_src_t) {
+			if(!_ARRAY_NULL($_dst_a)) {
+				foreach($_dst_a as $_dst_t) {
+					if(!_ARRAY_NULL($_service_a)) {
+						foreach($_service_a as $_service_t) {
+							$_rules_a[]="$_src_t $_dst_t $_service_t";
+						}
+					} else {
+						$_rules_a[]="$_src_t $_dst_t";
+					}
+				}
+			} else {
+				if(!_ARRAY_NULL($_service_a)) {
+					foreach($_service_a as $_service_t) {
+						$_rules_a[]="$_src_t $_service_t";
+					}
+				} else {
+					$_rules_a[]="$_src_t";
+				}
+			}
+		}
+	} else {
+		if(!_ARRAY_NULL($_dst_a)) {
+			foreach($_dst_a as $_dst_t) {
+				if(!_ARRAY_NULL($_service_a)) {
+					foreach($_service_a as $_service_t) {
+						$_rules_a[]="$_dst_t $_service_t";
+					}
+				} else {
+					$_rules_a[]="$_dst_t";
+				}
+			}
+		} else {
+			if(!_ARRAY_NULL($_service_a)) {
+				foreach($_service_a as $_service_t) {
+					$_rules_a[]="$_service_t";
+				}
+			}
+		}
+	}
+	return $_rules_a;
+}
+
+function _policy_debug_context($_func,$_opt=1) {
+	if(_INIT_DEBUG()) {
+		if($_opt==1) {
+			echo "# Start Function -> $_func\n";
+		} else {
+			echo "# Stop Function -> $_func\n";
+		}
+	}
+}
+
+function policy_debug() {
+	_INIT_DEBUG('1');
+}
+
+function _policy_open(&$_proc,$_flush=1) {
+	$_fl='';
+	if($_flush==0) $_fl="--noflush";
+	if(_INIT_DEBUG()) {
+		$_proc=popen("/bin/iptables-restore -t -v $_fl","w");
+	} else {
+		$_proc=popen("/bin/iptables-restore $_fl 2>/dev/null","w");
+	}
+	if(is_resource($_proc)) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+function _policy_close($_proc) {
+	if(is_resource($_proc)) {
+		if(!pclose($_proc)) {
+			//_policy_save();
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+function _policy_test($_data) {
+	if(_INIT_DEBUG()) {
+		// pass to policy_data
+		return TRUE;
+	}
+	$_proc=popen("/bin/iptables-restore -t --noflush","w");
+	if(is_resource($_proc)) {
+		@fwrite($_proc,"$_data\n");
+		if(!pclose($_proc)) {
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+function _policy_data($_data,$_flush=1) {
+	_TRIM($_data);
+	if(!_NULL($_data)) {
+		if(_policy_open($_proc,$_flush)) {
+			_policy_debug_context("policy_data",1);
+			@fwrite($_proc,"$_data\n");
+			if(_INIT_DEBUG()) {
+				echo "$_data\n";
+			}
+		}
+		if(_policy_close($_proc)) {
+			_policy_debug_context("policy_data",2);
+			return TRUE;
+		}
+	}
+	//_policy_restore();
+	return FALSE;
+}
+
+function _policy_save() {
+	$_objf=_OBJ_PATH."/_policy_save.obj";
+	if(_EXEC_CMD_OUTPUT("/bin/iptables-save",$_STDOUT,$_STDERR)==0) {
+		if(!_ARRAY_NULL($_STDOUT)) {
+			$_data=_ARRAY_STR($_STDOUT);
+			$_data=preg_replace("/confirmed ERROR: UNKNOWN CONNMARK MATCH MODE/","confirmed",$_data);
+			if(_NULL($_data) || !_FILE_SAVE($_objf,"$_data")) {
+				@unlink($_objf);
+				return FALSE;
+			}
+			return TRUE;
+		}
+	}
+	@unlink($_objf);
+	return FALSE;
+}
+
+function _policy_restore() {
+	$_objf=_OBJ_PATH."/_policy_save.obj";
+	$_data=_FILE_GET($_objf);
+	if(!_NULL($_data)) {
+		if(!_policy_data($_data,1)) {
+			@unlink($_objf);
+			return FALSE;
+		}
+		_INIT_ECHO(0,_GETTEXT("Reloading previous saved policy"));
+		return TRUE;
+	}
+	@unlink($_objf);
+	return FALSE;
+}
+
+
+function _policy_load_tpl() {
+	if(!is_dir(_SERVICE_PATH."/tpl")) {
+		return FALSE;
+	}
+	$_buff=_GLOB(_SERVICE_PATH."/tpl/pf_*.expl");
+	if(!_ARRAY_NULL($_buff)) {
+		_policy_debug_context("_policy_load_tpl",1);
+		foreach($_buff as $_file) {
+			$_nb=basename($_file,".expl");
+			$_np=preg_replace("/^pf_/","",$_nb);
+			$_data=_FILE_GET($_file);
+			if(!_policy_data($_data,1)) {
+				_INIT_ECHO(1,_GETTEXT("Loading policy %s failed","$_np"));
+				continue;
+			}
+			unset($_nb,$_np);
+		}
+		_policy_debug_context("_policy_load_tpl",2);
+	}
+}
+
+// single
+function _policy_exec($_table,$_rules) {
+	$_data="*$_table\n";
+	$_data .="$_rules\n";
+	$_data .="COMMIT\n";
+	return _policy_data($_data,0);
+}
+
+function policy_rmmods() {
+	$_modules=array("x_tables","ip_tables","ip6_tables","nf_conntrack","nfnetlink");
+	foreach($_modules as $_mods) {
+		_RMMOD($_mods);
+	}
+}
+
+function policy_mods() {
+	$_conntrack_hash=_FILE_GET(_PROC_PATH."/conntrack_hash");
+	$_conntrack_max=_FILE_GET(_PROC_PATH."/conntrack_max");
+	if(!_NULL($_conntrack_max)) {
+		_EXEC_CMD("sysctl -w net.netfilter.nf_conntrack_max=$_conntrack_max");
+		_EXEC_CMD("sysctl -w net.nf_conntrack_max=$_conntrack_max");
+	}
+	if(!_NULL($_conntrack_hash)) {
+		_EXEC_CMD("modprobe nf_conntrack hashsize=$_conntrack_hash");
+		if(is_writable("/sys/module/nf_conntrack/parameters/hashsize")) {
+			@_FILE_SAVE("/sys/module/nf_conntrack/parameters/hashsize","$_conntrack_hash\n");
+		}
+	}
+	_INI_TOKEN_GET("firewall","setting.cfg",$_TOKEN);
+	if(!_ARRAY_NULL($_TOKEN['conntrack'])) {
+		foreach($_TOKEN['conntrack'] as $_p => $_v) {
+			if(_NULL($_p) && _NULL($_v) || $_v==0) continue;
+			if($_p=="FTP") continue;
+			if(!_NULL($_TOKEN['conntrack_mods'][$_p])) {
+				$_lm=_STR_ARRAY($_TOKEN['conntrack_mods'][$_p],"\s+");
+				if(!_ARRAY_NULL($_lm)) {
+					foreach($_lm as $_llm) {
+						_EXEC_CMD("modprobe $_llm");
+					}
+				}
+				unset($_lm);
+			}
+		}
+	}
+	ftp_mods();
+	return TRUE;
+}
+
+
+function policy_quiet() {
+	_INIT_QUIET('1');
+}
+
+function policy_start($_nomods=0) {
+	_INIT_ECHO(0,_GETTEXT("Loading firewall rules"));
+	_policy_load_tpl();
+	if($_nomods==0) policy_rmmods();
+	policy_admin();
+	policy_sysinput();
+	policy_sysforward();
+	policy_routes();
+	if($_nomods==0) policy_mods();
+	return TRUE;
+}
+
+function policy_reload() {
+	return policy_start(1);
+}
+
+function policy_stop() {
+	return TRUE;
+}
+
+function policy_clear() {
+	$_buff=_FILE("/proc/net/ip_tables_names");
+	if(!_ARRAY_NULL($_buff)) {
+		foreach($_buff as $_table) {
+			_TRIM($_table);
+			_EXEC_CMD("/bin/iptables -t $_table -F");
+			_EXEC_CMD("/bin/iptables -t $_table -X");
+		}
+	}
+	unset($_buff,$_table);
+	$_buff=_FILE("/proc/net/ip6_tables_names");
+	if(!_ARRAY_NULL($_buff)) {
+		foreach($_buff as $_table) {
+			_TRIM($_table);
+			_EXEC_CMD("/bin/ip6tables -t $_table -F");
+			_EXEC_CMD("/bin/ip6tables -t $_table -X");
+		}
+	}
+	_EXEC_CMD("/bin/iptables -t filter -P INPUT ACCEPT");
+	_EXEC_CMD("/bin/iptables -t filter -P FORWARD ACCEPT");
+	_EXEC_CMD("/bin/ip6tables -t filter -P INPUT ACCEPT");
+	_EXEC_CMD("/bin/ip6tables -t filter -P FORWARD ACCEPT");
+	//policy_rmmods();
+	_EXEC_CMD("/bin/conntrack -F");
+}
+
+function policy_restart() {
+	_INIT_EXEC("policy_start");
+	return TRUE;
+}
+
+define('_POLICY_CODE','214162c595ce24bf9285f0a98cb0fbca');
+/**
+* Function library untuk policy admin
+*/
+include_once(_SERVICE_LIB_PATH.'/policy/_policy_admin.exl');
+/**
+* Function library untuk policy sysinput
+*/
+include_once(_SERVICE_LIB_PATH.'/policy/_policy_sysinput.exl');
+/**
+* Function library untuk policy sysinput named acl
+*/
+include_once(_SERVICE_LIB_PATH.'/policy/_policy_sysinput_named.exl');
+/**
+* Function library untuk policy sysinput ntp acl
+*/
+include_once(_SERVICE_LIB_PATH.'/policy/_policy_sysinput_ntp.exl');
+/**
+* Function library untuk policy sysinput dhcp
+*/
+include_once(_SERVICE_LIB_PATH.'/policy/_policy_sysinput_dhcp.exl');
+/**
+* Function library untuk policy sysinput dhcrelay
+*/
+include_once(_SERVICE_LIB_PATH.'/policy/_policy_sysinput_dhcrelay.exl');
+/**
+* Function library untuk policy sysforward
+*/
+include_once(_SERVICE_LIB_PATH.'/policy/_policy_sysforward.exl');
+/**
+* Function library untuk policy routes
+*/
+include_once(_SERVICE_LIB_PATH.'/policy/_policy_routes.exl');
+?>

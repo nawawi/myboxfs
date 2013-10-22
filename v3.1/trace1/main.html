@@ -1,0 +1,102 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>TraceAdmin</title>
+<link rel="stylesheet" href="tn_default.css" type="text/css">
+<link rel="stylesheet" href="accordion.css" type="text/css">
+<script type="text/javascript" src="jquery.js"></script>
+<script type="text/javascript" src="ui.core.js"></script>
+<script type="text/javascript" src="ui.accordion.js"></script>
+</head>
+<body scroll=auto>
+<div id='__msg'></div>
+<div id='__content'>
+<div id='top_box'>
+<div id='admin_info'></div>
+<div id='toolbox'>
+<div id='toolbox_a'>df</div>
+<div id='toolbox_b'></div>
+<div id='toolbox_c'></div>
+</div>
+<div id='loading'></div>
+<div id='dashboard'></div>
+<div id='box_title'></div>
+</div>
+<div id='main_box'>
+
+<div id='nav_box'>
+<ul id="menu" class="ui-accordion" style="width: 189px; display: none;"> 
+<li style='display: none;'><div class="menu_header"></div></li>
+    <li> 
+	<div class="menu_header">System</div>
+	<div class="menu_content">sss2</div>
+    </li>
+    <li> 
+	<div class="menu_header">Definitions</div>
+	<div class="menu_content">sss3</div>
+    </li>
+    <li> 
+	<div class="menu_header">Network</div>
+	<div class="menu_content">sss1</div>
+    </li>
+    <li> 
+	<div class="menu_header">Firewall</div>
+	<div class="menu_content">sss1</div>
+    </li>
+</ul>
+<script>
+var subject=[];
+subject[1]="System";
+subject[2]="Definitions Overview";
+function __topbartitle(index) {
+	if(subject[index]) {
+		$("#box_title").html(subject[index]);
+		return true;
+	}
+	$("#box_title").html("");
+	return false;
+}
+
+$(document).ready(function(){
+	$("#menu").show();
+	$("#menu").accordion({
+		alwaysOpen: true,
+		autoHeight: true,
+		active: false,
+		navigation: false,
+		animated: false,
+		header: "div.menu_header"
+	});
+	$("#box_title").html("Dashboard for");
+	$("#menu li div.menu_header").click(function () {
+		var index=$('#menu li div.menu_header').index(this);
+		$("#menu").accordion("activate", index);
+		__topbartitle(index);
+  	});
+	$("#dashboard").click(function () {
+		$("#menu").accordion("activate", 0);
+  	});
+
+$(".menu_header").hover(function () {
+      $(this).css({ backgroundImage:"menu_s1.png"});
+    }, function () {
+       $(this).css({ backgroundImage:"menu_s.png"});
+    });
+
+
+
+
+});
+</script>
+</div>
+
+<div id='content_box'>
+<div id='content_page'>
+dasdasdas
+
+</div>
+</div>
+</div>
+</div>
+</body>
+</html>

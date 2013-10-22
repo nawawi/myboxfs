@@ -1,0 +1,289 @@
+﻿<?xml version="1.0"?>
+<CLISH_MODULE>
+<VIEW name="acl" prompt="${SYSTEM_NAME}/system/access-control/&gt; ">
+        <COMMAND name=".."
+                help="Return to previous menu"
+                view="system"
+                viewid=""/>
+        <COMMAND name="."
+                help="Return to main menu"
+                view="main"
+                viewid=""/>
+<!-- start access control -->
+        <COMMAND name="acl"
+                help="Display or configure system access list">
+                <ACTION>exec /service/tools/access_control.exc acl print 2>/dev/null|more -dl</ACTION>
+        </COMMAND>
+	<COMMAND name="acl apply"
+                help="Apply changes">
+                <ACTION>exec /service/tools/access_control.exc acl apply 2>/dev/null|more -dl</ACTION>
+        </COMMAND>
+<!--- start print --->
+	<COMMAND name="acl print"
+                help="Display current config">
+                <ACTION>exec /service/tools/access_control.exc acl print 2>/dev/null|more -dl</ACTION>
+        </COMMAND>
+<!--- end print --->
+<!--- start add --->
+	<COMMAND name="acl add"
+                help="Add new system access list">
+ 		<PARAM name="host_id"
+                        help="Resource Id for definition network or any"
+                        ptype="NUM_ANY"/>
+ 		<PARAM name="access"
+                        help="Available type web,ssh,ftp,all"
+                        ptype="ACL_OPTION"
+			default="all"/>
+		<PARAM name="enable"
+			help="Set enable"
+			ptype="ONOFF" 
+			default="off"/>
+ 		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/access_control.exc acl add ${host_id} ${access} ${enable} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!--- end add --->
+<!--- start set --->
+	<COMMAND name="acl set"
+                help="Edit system access list"/>
+	<COMMAND name="acl set access"
+                help="Change access type">
+ 		<PARAM name="id"
+                        help="Resource Id for access list"
+                        ptype="NUM"/>
+ 		<PARAM name="access"
+                        help="Available type web,ssh,ftp,all"
+                        ptype="ACL_OPTION"
+			default="all"/>
+                <ACTION>exec /service/tools/access_control.exc acl set access ${id} ${access} 2>/dev/null</ACTION>
+        </COMMAND>
+	<COMMAND name="acl set enable"
+                help="Change enable">
+ 		<PARAM name="id"
+                        help="Resource Id for access list"
+                        ptype="NUM"/>
+		<PARAM name="enable"
+			help="Set enable"
+			ptype="ONOFF" 
+			default="off"/>
+                <ACTION>exec /service/tools/access_control.exc acl set enable ${id} ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+	<COMMAND name="acl set description"
+                help="Change description">
+ 		<PARAM name="id"
+                        help="Resource Id for access list"
+                        ptype="NUM"/>
+ 		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/access_control.exc acl set description ${id} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!--- end set --->
+<!--- start delete --->
+        <COMMAND name="acl delete"
+                help="Delete system access list">
+                <PARAM name="id"
+                        help="Resource Id '*' will delete all list"
+                        ptype="MULTI_NUM_ALL" />
+                <ACTION>exec /service/tools/access_control.exc acl delete "${id}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!--- end delete --->
+<!-- end access control -->
+
+<!-- start password -->
+        <COMMAND name="password"
+                help="Display or configure system access password">
+                <ACTION>exec /service/tools/access_control.exc password print 2>/dev/null|more -dl</ACTION>
+        </COMMAND>
+        <COMMAND name="password print"
+                help="Display current config">
+                <ACTION>exec /service/tools/access_control.exc password print 2>/dev/null|more -dl</ACTION>
+        </COMMAND>
+        <COMMAND name="password set"
+                help="Change password setting">
+        </COMMAND>
+        <COMMAND name="password set web"
+                help="Set Web access password">
+        </COMMAND>
+        <COMMAND name="password set web admin"
+                help="Set Web access password, access type admin">
+ 		<PARAM name="password"
+                        help="Password"
+                        ptype="STRING"/>
+                <ACTION>exec /service/tools/access_control.exc password web "${password}" admin 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="password set web look"
+                help="Set Web access password, access type look">
+ 		<PARAM name="password"
+                        help="Password"
+                        ptype="STRING"/>
+                <ACTION>exec /service/tools/access_control.exc password web "${password}" look 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="password set ssh"
+                help="Set SSH access password">
+ 		<PARAM name="password"
+                        help="Password"
+                        ptype="STRING"/>
+ 		<PARAM name="user"
+                        help="Set access user"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/access_control.exc password ssh "${password}" ${user} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="password set ftp"
+                help="Set FTP access password">
+ 		<PARAM name="password"
+                        help="Password"
+                        ptype="STRING"/>
+ 		<PARAM name="user"
+                        help="Set access user"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/access_control.exc password ftp "${password}" ${user} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="password set console"
+                help="Set Direct access password">
+ 		<PARAM name="password"
+                        help="Password"
+                        ptype="STRING"/>
+                <ACTION builtin="awie_exec_pass">/service/tools/access_control.exc "password console ${password} console"</ACTION>
+        </COMMAND>
+<!-- end password -->
+<!-- start config -->
+        <COMMAND name="config"
+                help="Display or change access configuration">
+                <ACTION>exec /service/tools/access_control.exc config print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+        <COMMAND name="config print"
+                help="Display current config">
+                <ACTION>exec /service/tools/access_control.exc config print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+        <COMMAND name="config web"
+                help="Web access configuration"/>
+        <COMMAND name="config web port"
+                help="Set TCP Port">
+ 		<PARAM name="port"
+                        help="TCP Port"
+                        ptype="NUM"/>
+                <ACTION>exec /service/tools/access_control.exc config web port ${port} 2>/dev/null</ACTION>
+	</COMMAND>
+        <COMMAND name="config web timeout"
+                help="Set session timeout">
+ 		<PARAM name="time"
+                        help="Timeout in second"
+                        ptype="NUM"/>
+                <ACTION>exec /service/tools/access_control.exc config web timeout ${time} 2>/dev/null</ACTION>
+	</COMMAND>
+        <COMMAND name="config web enable"
+                help="Set web enable">
+ 		<PARAM name="enable"
+                        help="Set enable"
+                        ptype="ONOFF"/>
+                <ACTION>exec /service/tools/access_control.exc config web stat ${enable} 2>/dev/null</ACTION>
+	</COMMAND>
+
+        <COMMAND name="config ssh"
+                help="SSH access configuration"/>
+        <COMMAND name="config ssh port"
+                help="Set TCP Port">
+ 		<PARAM name="port"
+                        help="TCP Port"
+                        ptype="NUM"/>
+                <ACTION>exec /service/tools/access_control.exc config ssh port ${port} 2>/dev/null</ACTION>
+	</COMMAND>
+        <COMMAND name="config ssh timeout"
+                help="Set session timeout">
+ 		<PARAM name="time"
+                        help="Timeout in second"
+                        ptype="NUM"/>
+                <ACTION>exec /service/tools/access_control.exc config ssh timeout ${time} 2>/dev/null</ACTION>
+	</COMMAND>
+        <COMMAND name="config ssh enable"
+                help="Set SSH enable">
+ 		<PARAM name="enable"
+                        help="Set enable"
+                        ptype="ONOFF"/>
+                <ACTION>exec /service/tools/access_control.exc config ssh stat ${enable} 2>/dev/null</ACTION>
+	</COMMAND>
+
+        <COMMAND name="config ftp"
+                help="FTP access configuration"/>
+        <COMMAND name="config ftp port"
+                help="Set TCP Port">
+ 		<PARAM name="port"
+                        help="TCP Port"
+                        ptype="NUM"/>
+                <ACTION>exec /service/tools/access_control.exc config ftp port ${port} 2>/dev/null</ACTION>
+	</COMMAND>
+        <COMMAND name="config ftp timeout"
+                help="Set session timeout">
+ 		<PARAM name="time"
+                        help="Timeout in seconds"
+                        ptype="NUM"/>
+                <ACTION>exec /service/tools/access_control.exc config ftp timeout ${time} 2>/dev/null</ACTION>
+	</COMMAND>
+        <COMMAND name="config ftp enable"
+                help="Set FTP enable">
+ 		<PARAM name="enable"
+                        help="Set enable"
+                        ptype="ONOFF"/>
+                <ACTION>exec /service/tools/access_control.exc config ftp stat ${enable} 2>/dev/null</ACTION>
+	</COMMAND>
+        <COMMAND name="config ftp ssl"
+                help="Enable FTP secure connection">
+ 		<PARAM name="ssl"
+                        help="Set enable secure connection"
+                        ptype="ONOFF"/>
+                <ACTION>exec /service/tools/access_control.exc config ftp ssl ${enable} 2>/dev/null</ACTION>
+	</COMMAND>
+        <COMMAND name="config security"
+                help="Security access configuration">
+                <ACTION>exec /service/tools/access_control.exc config security print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+        <COMMAND name="config security print"
+                help="Display current config">
+                <ACTION>exec /service/tools/access_control.exc config security print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+        <COMMAND name="config security access"
+                help="Block password guessing after attempt period">
+ 		<PARAM name="attempt"
+                        help="attempt period"
+                        ptype="NUM"/>
+                <ACTION>exec /service/tools/access_control.exc config security attempt ${attempt} 2>/dev/null</ACTION>
+	</COMMAND>
+        <COMMAND name="config security block"
+                help="Block access in seconds">
+ 		<PARAM name="block"
+                        help="Time in seconds"
+                        ptype="NUM"/>
+                <ACTION>exec /service/tools/access_control.exc config security block ${block} 2>/dev/null</ACTION>
+	</COMMAND>
+        <COMMAND name="config security exclude"
+                help="Security exclude list">
+                <ACTION>exec /service/tools/access_control.exc config security exclude print 2>/dev/null |more -dl</ACTION>
+	</COMMAND>
+        <COMMAND name="config security exclude print"
+                help="Display current list">
+                <ACTION>exec /service/tools/access_control.exc config security exclude print 2>/dev/null |more -dl</ACTION>
+	</COMMAND>
+	<COMMAND name="config security exclude add"
+                help="Add new exclude list">
+ 		<PARAM name="host_id"
+                        help="Resource Id for definition networks"
+                        ptype="MULTI_NUM"/>
+                <ACTION>exec /service/tools/access_control.exc config security exclude add ${host_id} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="config security exclude delete"
+                help="Delete exclude list">
+                <PARAM name="id"
+                        help="Resource Id '*' will delete all list"
+                        ptype="MULTI_NUM_ALL" />
+                <ACTION>exec /service/tools/access_control.exc config security exclude delete "${id}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!-- end config -->
+</VIEW>
+
+</CLISH_MODULE>

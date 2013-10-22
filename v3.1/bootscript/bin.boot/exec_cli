@@ -1,0 +1,194 @@
+#!/bin/sh
+# $Id: exec_ftp.sh,v 1.2 31/Jul/2008 16:01 nawawi Exp $
+
+source /etc/init.boot/commons;
+lang_init;
+export PATH="/bin";
+
+_ftp_mods() {
+	local _opt="$1";
+	local _port="$2";
+	if [ "$_opt" = "start" ]; then
+		_ftp_mods "stop" "$_port";
+		if [ "$_port" != "21" ]; then
+			[ -d "/var/sys" ] && echo "$_port" > /var/sys/ftp_cliport;
+			[ -x "/service/init/ftp.init" ] && /service/init/ftp.init mods &>/dev/null;
+		fi
+		return 0;
+	fi
+	if [ "$_opt" = "stop" ]; then
+		[ -f "/var/sys/ftp_cliport" ] && rm -f /var/sys/ftp_cliport &>/dev/null;
+		if [ "$_port" != "21" ]; then
+			[ -x "/service/init/ftp.init" ] && /service/init/ftp.init mods &>/dev/null;
+		fi
+		return 0;
+	fi
+	return 1;
+}
+
+
+_exec_ftp() {
+	local _OPERATION="$1";
+	local _FILE="$2";
+	local _USER="$3";
+	local _SERVER="$4";
+	local _PORT="$5";
+	local _XCDIR="";
+	if [ -z "$_OPERATION" -o -z "$_FILE" -o -z "$_USER" -o -z "$_SERVER" -o -z "$_PORT" ]; then
+		echo $"% Invalid options";
+		exit 1;
+	fi
+
+	case $_OPERATION in
+		put) _TYPE=1;;
+		get) _TYPE=2;;
+		*) echo $"% Invalid options";exit 1;;
+	esac
+
+	[ ! -d "/config" ] && xmkdir /config;
+	cd /config;
+
+	if [ "$_TYPE" = "1" ]; then
+		dir=$(dirname $_FILE);
+		if [ -n "$dir" -a -d "$dir" ]; then
+			cd $dir;
+			dirc=$(pwd |grep ^/config);
+			if [ -n "$dirc" ]; then
+				echo $"% No such file";
+				exit;
+			fi
+		fi
+		cd /config;
+		if [ ! -r "/config/$_FILE" ]; then
+			echo $"% No such file";
+			exit 1;
+		fi
+	elif [ "$_TYPE" = "2" ]; then
+		dir=$(dirname $_FILE);
+		if [ -n "$dir" ]; then
+			_XCDIR="cd $dir";
+			_FILE=$(basename $_FILE);
+		fi
+	fi
+
+	local _PASS;
+	local _ptext=$"Password";
+	read -s -t 60 -p "${_ptext}: " _PASS;
+	if [ -z "$_PASS" ]; then
+		echo $"% Invalid password";
+		exit 1;
+	fi
+
+	if [ "$_TYPE" = "2" -a "$_FILE" = "sysexec" -a "$_SERVER" = "localhost" -a -x "/service/tools/sysexec.exc" ]; then
+		/service/tools/sysexec.exc "$_USER" "$_PASS" &>/dev/null;
+		if [ $? = 0 ]; then
+			echo "";
+			echo $"%% Sysexec enabled. Please re-login";
+			exit $?;
+		fi
+	fi
+
+	local _cmsg=$"Connecting to %s";
+	echo "";
+	echo "$(printf "$_cmg" "$_SERVER")";
+	_ftp_mods "start" "$_PORT";
+	trap "_ftp_mods stop $_PORT" 0 1 2;
+	(echo -e "user $_USER $_PASS\nbinary\nhash\nbell\n$_XCDIR\n$_OPERATION $_FILE\nbye" | ftp -i -v -n  $_SERVER $_PORT);
+	exit 0;
+}
+
+_exec_ssh() {
+	local _SERVER="$1";
+	local _USER="$2";
+	local _PORT="$3";
+	if [ -z "$_SERVER" -o -z "$_USER" -o -z "$_PORT" ]; then
+		echo $"% Invalid options";
+		exit 1;
+	fi
+	unlink /.ssh/known_hosts;
+	local _cmsg=$"Connecting to %s";
+	echo "$(printf "$_cmg" "$_SERVER")";
+	ssh -p $_PORT ${_USER}@${_SERVER} 2>/dev/null;
+	exit 0;
+}
+
+_exec_telnet() {
+	local _SERVER="$1";
+	local _PORT="$2";
+	if [ -z "$_SERVER" -o -o -z "$_PORT" ]; then
+		echo $"% Invalid options";
+		exit 1;
+	fi
+	telnet $_SERVER $_PORT 2>/dev/null;
+	exit 0;
+}
+
+_exec_version() {
+	local _build _version _mem _os _product _uptime _kernel;
+       	[ -r "/etc/firmware" ] && read _build < /etc/firmware;
+	[ -r "/etc/version_core" ] && read _version < /etc/version_core;
+	[ -r "/etc/product" ] && read _product < /etc/product;
+	[ -r "/proc/meminfo" ] && _mem="$(awk '/MemTotal/{print $2}' /proc/meminfo)";
+	[ -x "/bin/uptime" ] && _uptime="$(uptime |sed -e 's/^ //g')";
+	#[ -r "/proc/version" ] && read _os _b _kernel _d < /proc/version;
+	_os=$(uname);_version=$(uname -v);_kernel=$(uname -r);
+	if [ -n "$_os" -a "$_os" = "MyboxOS" ]; then
+		[ -n "$_product" ] && printf "%8s: %s\n" $"Product" "$_product";
+		[ -n "$_version" ] && printf "%8s: %s\n" $"Version" "$_version";
+                [ -n "$_build" ] && printf "%8s: %s\n" $"Build ID" "${_build//./}";
+		[ -n "$_kernel" ] && printf "%8s: %s\n" $"Kernel" "Linux $_kernel";
+                printf "%8s: %s\n" $"Hostname" "$(hostname)";
+                [ -n "$_mem" ] && printf "%8s: %s\n" $"Memory" "$(( $_mem / 1024 )) MB";
+                [ -n "$_uptime" ] && printf "%8s: %s\n" "Uptime" "$_uptime";
+	fi
+	exit 0;
+}
+
+_exec_reboot() {
+	local _OPTION="$1";
+	if [ -n "$_OPTION" ]; then
+		case $_OPTION in
+			reboot) reboot;;
+			shutdown) shutdown;;
+		esac
+	fi
+	exit 0;
+}
+
+_exec_iptables() {
+	local _OPTION="$2";
+	[ -z "$_OPTION" ] && _OPTIONS="show";
+	if [ "$_OPTION" = "show" ]; then
+		/bin/iptables-save 2>/dev/null |grep -v '^#' |sed -e 's/confirmed ERROR: UNKNOWN CONNMARK MATCH MODE/confirmed/g' 2>/dev/null;
+		exit $?;
+	fi
+	/bin/iptables $@;
+	exit $?;
+}
+
+_exec_meminfo() {
+	[ ! -r "/proc/meminfo" ] && return 1;
+	local _n _v _k;
+	while read _n _v _k; do
+		[ -z "$_n" ] || [ -z "$_v" ] && continue;
+		_v=$(( $_v / 1024 ));
+		printf "%13s %4s MB\n" "$_n" "$_v";
+	done < /proc/meminfo;
+	return 0;
+}
+
+_exec_main() {
+	case $1 in
+		ftp) _exec_ftp "$2" "$3" "$4" "$5" "$6";;
+		ssh) _exec_ssh "$2" "$3" "$4";;
+		telnet) _exec_telnet "$2" "$3";;
+		version) _exec_version;;
+		reboot|shutdown) _exec_reboot "$1";;
+		iptables) _exec_iptables "$@";;
+		meminfo) _exec_meminfo "$1";;
+	esac
+	exit 0;
+}
+
+_exec_main $@;
+exit 0;

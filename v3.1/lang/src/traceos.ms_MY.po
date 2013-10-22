@@ -1,0 +1,3074 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid   ""
+msgstr  "Project-Id-Version: TraceOS Language\n"
+        "Report-Msgid-Bugs-To: jedi@tracenetworkcorporation.com\n"
+        "POT-Creation-Date: 2008-12-23 20:12+0800\n"
+        "PO-Revision-Date: 2008-12-23 20:12+0800\n"
+        "Last-Translator: mispit\n"
+        "Language-Team: jedi@tracenetworkcorporation.com\n"
+        "MIME-Version: 1.0\n"
+        "Content-Type: text/plain; charset=UTF-8\n"
+        "Content-Transfer-Encoding: 8bit\n"
+
+msgid   "monday"
+msgstr  "isnin"
+
+msgid   "tuesday"
+msgstr  "selasa"
+
+msgid   "wednesday"
+msgstr  "rabu"
+
+msgid   "thursday"
+msgstr  "khamis"
+
+msgid   "friday"
+msgstr  "jumaat"
+
+msgid   "saturday"
+msgstr  "sabtu"
+
+msgid   "sunday"
+msgstr  "ahad"
+
+# short day name
+msgid   "mon"
+msgstr  "isn"
+
+msgid   "tue"
+msgstr  "sel"
+
+msgid   "wed"
+msgstr  "rab"
+
+msgid   "thu"
+msgstr  "kha"
+
+msgid   "fri"
+msgstr  "jum"
+
+msgid   "sat"
+msgstr  "sab"
+
+msgid   "sun"
+msgstr  "aha"
+
+# minimum day name
+msgid   "mo"
+msgstr  "is"
+
+msgid   "tu"
+msgstr  "se"
+
+msgid   "we"
+msgstr  "ra"
+
+msgid   "th"
+msgstr  "kh"
+
+msgid   "fr"
+msgstr  "ju"
+
+msgid   "sa"
+msgstr  "sa"
+
+msgid   "su"
+msgstr  "ah"
+
+msgid   "january"
+msgstr  "januari"
+
+msgid   "February"
+msgstr  "Februari"
+
+msgid   "march"
+msgstr  "mac"
+
+msgid   "april"
+msgstr  "april"
+
+msgid   "may"
+msgstr  "mei"
+
+msgid   "june"
+msgstr  "jun"
+
+msgid   "july"
+msgstr  "julai"
+
+msgid   "august"
+msgstr  "ogos"
+
+msgid   "september"
+msgstr  "september"
+
+msgid   "october"
+msgstr  "oktober"
+
+msgid   "november"
+msgstr  "november"
+
+msgid   "december"
+msgstr  "disember"
+
+# short month name
+msgid   "jan"
+msgstr  "jan"
+
+msgid   "Feb"
+msgstr  "Feb"
+
+msgid   "mar"
+msgstr  "mac"
+
+msgid   "apr"
+msgstr  "apr"
+
+msgid   "jun"
+msgstr  "jun"
+
+msgid   "jul"
+msgstr  "jul"
+
+msgid   "aug"
+msgstr  "ogo"
+
+msgid   "sep"
+msgstr  "sep"
+
+msgid   "oct"
+msgstr  "okt"
+
+msgid   "nov"
+msgstr  "nov"
+
+msgid   "dec"
+msgstr  "dis"
+
+msgid   "monthly"
+msgstr  "bulanan"
+
+msgid   "weekly"
+msgstr  "mingguan"
+
+msgid   "daily"
+msgstr  "harian"
+
+msgid   "hour"
+msgstr  "jam"
+
+msgid   "minute"
+msgstr  "minit"
+
+msgid   "second"
+msgstr  "saat"
+
+# short time
+msgid   "hou"
+msgstr  "jam"
+
+msgid   "min"
+msgstr  "min"
+
+msgid   "sec"
+msgstr  "saat"
+
+#: iosh.c:97 iosh.c:98
+msgid   "Entering system shell"
+msgstr  "Memasuki sistem"
+
+#: iosh.c:107 sessions.exl:154 _cgi_page_system_preference_tab1.exl:126
+#: _cgi_session.exl:105 syslog.exc:46
+msgid   "Session logout"
+msgstr  "Log keluar sesi"
+
+#: iosh.c:131
+msgid   "Please enter console password.."
+msgstr  "Sila berikan kata laluan console.."
+
+#: iosh.c:134 login.c:108 _cgi_session.exl:54 _cgi_session.exl:55
+#: syslog.exc:39 syslog.exc:110
+msgid   "Password Accepted"
+msgstr  "Kata Laluan Diterima"
+
+#: iosh.c:138 login.c:113
+msgid   "Invalid access password"
+msgstr  "Kata laluan akses tidak sah"
+
+#: login.c:64 login.c:65
+msgid   "No password defined"
+msgstr  "Tiada kata laluan ditetapkan"
+
+#: login.c:72 _cgi_session.exl:79 _cgi_session.exl:80 syslog.exc:55
+msgid   "Password incorrect"
+msgstr  "Kata laluan salah"
+
+#: login.c:120
+msgid   "Console password disabled"
+msgstr  "Kata laluan konsol dinyah-aktifkan"
+
+#: commons:104 commons:117
+msgid   "Logged %s %s"
+msgstr  "Direkod %s %s"
+
+#: commons:143
+msgid   "Logout from system shell"
+msgstr  "Log keluar dari sistem"
+
+#: _policy_sysinput_dhcrelay.exl:9 _policy_sysinput_dhcp.exl:9
+#: _policy_sysinput_named.exl:56 _policy_sysinput_ntp.exl:52
+#, php-format
+msgid   "%s: rules failed"
+msgstr  "%s: aturan gagal"
+
+#: _policy_admin.exl:17 _policy_admin.exl:24 _policy_admin.exl:34
+#, php-format
+msgid   "ACL: invalid %s %s"
+msgstr  "ACL: %s %s tidak sah"
+
+#: _policy_admin.exl:43
+msgid   "ACL: function failed"
+msgstr  "ACL: fungsi gagal"
+
+#: _policy_admin.exl:55 _policy_sysinput.exl:48 _policy_sysforward.exl:48
+#: policy.exl:108
+msgid   "Reloading previous saved policy"
+msgstr  "Memuat semula dasar yang telah disimpan sebelumnya"
+
+#: _policy_admin.exl:140 _policy_sysinput.exl:75 _policy_sysforward.exl:71
+#, php-format
+msgid   "Loading %s failed"
+msgstr  "Gagal memuatkan %s"
+
+#: _policy_sysinput_named.exl:18 _policy_sysinput_named.exl:26
+#: _policy_sysinput_named.exl:37 _policy_sysinput_ntp.exl:17
+#: _policy_sysinput_ntp.exl:24 _policy_sysinput_ntp.exl:34
+#, php-format
+msgid   "%s ACL: invalid %s %s"
+msgstr  "%s ACL: %s %s tidak sah"
+
+#: _policy_sysinput_named.exl:47 _policy_sysinput_ntp.exl:43
+#, php-format
+msgid   "%s ACL: function failed"
+msgstr  "%s ACL: fungsi gagal"
+
+#: update.exl:37
+#, php-format
+msgid   "Firmware update file '%s' already installed"
+msgstr  "Fail update firmware '%s' sudah dipasang"
+
+#: update.exl:45
+#, php-format
+msgid   "Firmware update file '%s' corrupted"
+msgstr  "Fail update firmware '%s' korup"
+
+#: update.exl:62
+msgid   "No description available"
+msgstr  "Tiada huraian"
+
+#: update.exl:125
+#, php-format
+msgid   "Updating firmware to version '%s' released on %s"
+msgstr  "Mengemaskini firmware kepada versi '%s' yang dikeluarkan pada %s"
+
+#: update.exl:134
+#, php-format
+msgid   "Stopping firmware update installer. %d update(s) installed."
+msgstr  "Menghentikan pemasang update firmware. %d update telah "
+        "dipasang."
+
+#: update.exl:178
+msgid   "Firmware update disabled."
+msgstr  "Kemaskini firmware dinyah-aktifkan."
+
+#: update.exl:182
+msgid   "Starting firmware update checker."
+msgstr  "Memulakan semakan update firmware."
+
+#: update.exl:196
+#, php-format
+msgid   "Stopping firmware update checker. %d update(s) available"
+msgstr  "Menghentikan semakan update firmware. %d update didapati"
+
+#: update.exl:203
+msgid   "Stopping firmware update checker. No updates available"
+msgstr  "Menghentikan semakan update firmware. Tiada update didapati"
+
+#: update.exl:214
+msgid   "Starting firmware update downloader."
+msgstr  "Memulakan pemuatturun update firmware."
+
+#: update.exl:216
+msgid   "Stopping firmware update downloader. Internal error."
+msgstr  "Menghentikan pemuatturun update firmware. Masalah dalaman."
+
+#: update.exl:220
+msgid   "Another instance of this process is already running, exiting.."
+msgstr  "Proses ini sudah dijalankan, keluar.. "
+
+#: update.exl:233 update.exl:240
+#, php-format
+msgid   "Error while downloading file %s."
+msgstr  "Ralat semasa memuatturun fail %s."
+
+#: update.exl:263
+#, php-format
+msgid   "Stopping firmware update downloader. %d file(s) ready to install."
+msgstr  "Menghentikan pemuatturun update firmware. %d fail sedia untuk "
+        "dipasang."
+
+#: update.exl:266
+msgid   "Stopping firmware update downloader. No file need to install."
+msgstr  "Menghentikan pemuatturun update firmware. Tiada fail perlu "
+        "dipasang."
+
+#: _cli_access_control_password.exl:7 _cli_dns_config_dyndns.exl:9
+#: _cli_dns_config_dyndns.exl:45 _cli_route_config_static.exl:9
+#: _cli_route_config_static.exl:67 _cli_definitions_timeevents.exl:10
+#: _cli_definitions_timeevents.exl:94 _cli_definitions.exl:28
+#: _cli_definitions.exl:48 _cli_definitions.exl:55 _cli_definitions.exl:75
+#: _cli_static_arp.exl:9 _cli_static_arp.exl:37 _cli_log.exl:221
+#: _cli_timedate_config.exl:40 _cli_timedate_config.exl:58
+#: _cli_access_control.exl:9 _cli_access_control.exl:52 _cli_backup.exl:115
+#: _cli_interfaces.exl:9 _cli_interfaces.exl:141 _cli_interfaces.exl:221
+#: _cli_interfaces.exl:247 _cli_system_config.exl:15 _cli_system_config.exl:29
+#: _cli_system_config.exl:36 _cli_system_config.exl:59
+#: _cli_definitions_services.exl:9 _cli_definitions_services.exl:202
+#: _cli_definitions_networks.exl:9 _cli_definitions_networks.exl:237
+#: _cli_dhcp_config_relay.exl:7 _cli_ipwatch_config.exl:8
+#: _cli_access_control_service.exl:7 _cli_access_control_service.exl:28
+#: _cli_dhcp_config_server.exl:9 _cli_dhcp_config_server.exl:62
+#: _cli_access_control_security.exl:7 _cli_access_control_security.exl:31
+#: _cli_access_control_security.exl:51 _cli_dns_config.exl:8
+#: _cli_ntp_config_acl.exl:9 _cli_ntp_config_acl.exl:48
+#: _cli_dhcp_config_static.exl:9 _cli_dhcp_config_static.exl:41
+#: _cli_dns_config_routing.exl:9 _cli_dns_config_routing.exl:62
+#: _cli_dns_config_static.exl:9 _cli_dns_config_static.exl:39
+#: _cli_ntp_config.exl:8 _cli_dns_config_acl.exl:9 _cli_dns_config_acl.exl:48
+#: _cgi_page_auth.exl:65 _cgi_page_definitions_networks.exl:29
+#: _cgi_page_definitions_networks.exl:53
+#: _cgi_page_definitions_networks.exl:104
+#: _cgi_page_definitions_timeevents.exl:10
+#: _cgi_page_definitions_timeevents.exl:55 _cgi_page_definitions.exl:190
+#: _cgi_page_definitions.exl:208 _cgi_page_definitions_services.exl:9
+#: _cgi_page_definitions_services.exl:67
+msgid   "No data available"
+msgstr  "Tiada data"
+
+#: _cli_access_control_password.exl:33 _cli_access_control_password.exl:43
+#: _cli_access_control_password.exl:63
+msgid   "Password already exist"
+msgstr  "Kata laluan sudah ditetapkan"
+
+#: _cli_access_control_password.exl:37 _cli_access_control_password.exl:53
+#: _cli_access_control_password.exl:67 _cli_dns_config_dyndns.exl:80
+#: _cli_dns_config_dyndns.exl:108 _cli_dns_config_dyndns.exl:114
+#: _cli_dns_config_dyndns.exl:120 _cli_dns_config_dyndns.exl:128
+#: _cli_dns_config_dyndns.exl:135 _cli_dns_config_dyndns.exl:141
+#: _cli_route_config_static.exl:168 _cli_static_arp.exl:107 _cli_log.exl:243
+#: _cli_log.exl:267 _cli_log.exl:293 _cli_log.exl:315
+#: _cli_timedate_config.exl:149 _cli_access_control.exl:96
+#: _cli_access_control.exl:132 _cli_backup.exl:157 _cli_interfaces.exl:165
+#: _cli_system_config.exl:66 _cli_system_config.exl:91
+#: _cli_dhcp_config_relay.exl:69 _cli_ipwatch_config.exl:24
+#: _cli_access_control_service.exl:48 _cli_interfaces_vlan.exl:56
+#: _cli_interfaces_vlan.exl:101 _cli_interfaces_vlan.exl:109
+#: _cli_interfaces_vlan.exl:116 _cli_interfaces_vlan.exl:125
+#: _cli_interfaces_vlan.exl:134 _cli_interfaces_vlan.exl:146
+#: _cli_interfaces_vlan.exl:163 _cli_interfaces_vlan.exl:189
+#: _cli_interfaces_vlan.exl:200 _cli_interfaces_vlan.exl:208
+#: _cli_dhcp_config_server.exl:124 _cli_dhcp_config_server.exl:215
+#: _cli_access_control_security.exl:20 _cli_access_control_security.exl:95
+#: _cli_interfaces_vip.exl:51 _cli_interfaces_vip.exl:92
+#: _cli_interfaces_vip.exl:121 _cli_interfaces_vip.exl:132
+#: _cli_interfaces_vip.exl:140 _cli_interfaces_vip.exl:159
+#: _cli_interfaces_vip.exl:168 _cli_dns_config.exl:79 _cli_dns_config.exl:89
+#: _cli_ntp_config_acl.exl:98 _cli_dhcp_config_static.exl:102
+#: _cli_dhcp_config_static.exl:164 _cli_dns_config_routing.exl:118
+#: _cli_dns_config_routing.exl:146 _cli_dns_config_routing.exl:171
+#: _cli_dns_config_routing.exl:178 _cli_dns_config_routing.exl:184
+#: _cli_interfaces_static.exl:61 _cli_interfaces_static.exl:106
+#: _cli_interfaces_static.exl:114 _cli_interfaces_static.exl:123
+#: _cli_interfaces_static.exl:132 _cli_interfaces_static.exl:141
+#: _cli_interfaces_static.exl:153 _cli_interfaces_static.exl:170
+#: _cli_interfaces_static.exl:196 _cli_interfaces_static.exl:207
+#: _cli_interfaces_static.exl:215 _cli_dns_config_static.exl:78
+#: _cli_dns_config_static.exl:106 _cli_dns_config_static.exl:116
+#: _cli_dns_config_static.exl:123 _cli_dns_config_static.exl:129
+#: _cli_ntp_config.exl:44 _cli_dns_config_acl.exl:98
+msgid   "Configuration saved successfully"
+msgstr  "Konfigurasi berjaya disimpan"
+
+#: _cli_access_control_password.exl:46
+msgid   "User already exist"
+msgstr  "Pengguna sudah ditetapkan"
+
+#: _cli_access_control_password.exl:49
+msgid   "Invalid username"
+msgstr  "Nama pengguna tidak sah"
+
+#: _cli_dns_config_dyndns.exl:43 _cli_route_config_static.exl:65
+#: _cli_definitions_timeevents.exl:92 _cli_static_arp.exl:35 _cli_log.exl:80
+#: _cli_access_control.exl:50 _cli_definitions_services.exl:200
+#: _cli_definitions_networks.exl:235 _cli_dhcp_config_server.exl:60
+#: _cli_ntp_config_acl.exl:46 _cli_dhcp_config_static.exl:39
+#: _cli_dns_config_routing.exl:60 _cli_dns_config_static.exl:37
+#: _cli_dns_config_acl.exl:46
+msgid   "No results found"
+msgstr  "Tiada hasil ditemui"
+
+#: _cli_dns_config_dyndns.exl:53 _cli_route_config_static.exl:75
+#: _cli_definitions_timeevents.exl:102 _cli_static_arp.exl:45
+#: _cli_access_control.exl:60 _cli_definitions_services.exl:210
+#: _cli_definitions_networks.exl:245 _cli_dhcp_config_server.exl:70
+#: _cli_ntp_config_acl.exl:56 _cli_dhcp_config_static.exl:49
+#: _cli_dns_config_routing.exl:70 _cli_dns_config_static.exl:47
+#: _cli_dns_config_acl.exl:56
+#, php-format
+msgid   "Search results match for '%s':"
+msgstr  "Hasil carian yang padan dengan '%s':"
+
+#: _cli_dns_config_dyndns.exl:66 _cli_dns_config_dyndns.exl:103
+#: _cli_system_config.exl:87 _cli_dns_config_static.exl:60
+#: _cli_dns_config_static.exl:101 cgi.exl:56
+#, php-format
+msgid   "Invalid hostname %s"
+msgstr  "Nama host %s tidak sah"
+
+#: _cli_dns_config_dyndns.exl:95 _cli_dns_config_dyndns.exl:152
+#: _cli_route_config_static.exl:181 _cli_route_config_static.exl:195
+#: _cli_definitions_timeevents.exl:112 _cli_static_arp.exl:119
+#: _cli_access_control.exl:143 _cli_definitions_services.exl:220
+#: _cli_definitions_networks.exl:255 _cli_dhcp_config_server.exl:136
+#: _cli_dhcp_config_server.exl:226 _cli_access_control_security.exl:106
+#: _cli_interfaces_vip.exl:180 _cli_ntp_config_acl.exl:108
+#: _cli_dhcp_config_static.exl:60 _cli_dhcp_config_static.exl:114
+#: _cli_dhcp_config_static.exl:176 _cli_dns_config_routing.exl:133
+#: _cli_dns_config_routing.exl:195 _cli_dns_config_static.exl:93
+#: _cli_dns_config_static.exl:140 _cli_dns_config_acl.exl:108
+msgid   "No Resource Id available."
+msgstr  "Tiada Id Sumber didapati."
+
+#: _cli_dns_config_dyndns.exl:96 _cli_dns_config_dyndns.exl:153
+#: _cli_route_config_static.exl:90 _cli_route_config_static.exl:100
+#: _cli_route_config_static.exl:116 _cli_route_config_static.exl:126
+#: _cli_route_config_static.exl:133 _cli_route_config_static.exl:147
+#: _cli_route_config_static.exl:157 _cli_route_config_static.exl:182
+#: _cli_route_config_static.exl:196 _cli_definitions_timeevents.exl:113
+#: _cli_static_arp.exl:120 _cli_log.exl:39 _cli_log.exl:112 _cli_log.exl:253
+#: _cli_log.exl:279 _cli_log.exl:286 _cli_log.exl:301 _cli_log.exl:308
+#: _cli_timedate_config.exl:86 _cli_timedate_config.exl:126
+#: _cli_timedate_config.exl:139 _cli_access_control.exl:78
+#: _cli_access_control.exl:112 _cli_access_control.exl:144 _cli_backup.exl:70
+#: _cli_backup.exl:107 _cli_interfaces.exl:158
+#: _cli_definitions_services.exl:221 _cli_definitions_services.exl:268
+#: _cli_definitions_services.exl:340 _cli_definitions_networks.exl:256
+#: _cli_definitions_networks.exl:304 _cli_definitions_networks.exl:427
+#: _cli_session.exl:10 _cli_interfaces_vlan.exl:16 _cli_interfaces_vlan.exl:71
+#: _cli_dhcp_config_server.exl:227 _cli_access_control_security.exl:66
+#: _cli_access_control_security.exl:78 _cli_access_control_security.exl:107
+#: _cli_interfaces_vip.exl:15 _cli_interfaces_vip.exl:67
+#: _cli_interfaces_vip.exl:149 _cli_interfaces_vip.exl:181
+#: _cli_dns_config.exl:49 _cli_dns_config.exl:66 _cli_ntp_config_acl.exl:67
+#: _cli_ntp_config_acl.exl:77 _cli_ntp_config_acl.exl:109
+#: _cli_dhcp_config_static.exl:61 _cli_dhcp_config_static.exl:115
+#: _cli_dns_config_routing.exl:82 _cli_dns_config_routing.exl:99
+#: _cli_dns_config_routing.exl:134 _cli_dns_config_routing.exl:165
+#: _cli_dns_config_routing.exl:196 _cli_interfaces_static.exl:15
+#: _cli_interfaces_static.exl:76 _cli_dns_config_static.exl:94
+#: _cli_dns_config_static.exl:141 _cli_dns_config_acl.exl:67
+#: _cli_dns_config_acl.exl:77 _cli_dns_config_acl.exl:109
+#, php-format
+msgid   "Enter -> '%s' to view Resource Id."
+msgstr  "Tekan -> '%s' untuk melihat Id Sumber."
+
+#: _cli_dns_config_dyndns.exl:157 _cli_route_config_static.exl:200
+#: _cli_definitions_timeevents.exl:117 _cli_static_arp.exl:125 _cli_log.exl:96
+#: _cli_backup.exl:55 _cli_definitions_services.exl:225
+#: _cli_definitions_networks.exl:260 _cli_dhcp_config_server.exl:231
+#: _cli_interfaces_vip.exl:185 _cli_ntp_config_acl.exl:113
+#: _cli_dhcp_config_static.exl:181 _cli_dns_config_routing.exl:200
+#: _cli_dns_config_static.exl:145 _cli_dns_config_acl.exl:113
+#, php-format
+msgid   "This action will delete all %s.\n"
+        "Continue this action? %s"
+msgstr  "Aksi ini akan menghapus semua %s.\n"
+        "Teruskan aksi ini? %s"
+
+#: _cli_route_config_static.exl:89 _cli_route_config_static.exl:115
+#: _cli_route_config_static.exl:146 _cli_log.exl:38 _cli_log.exl:111
+#: _cli_log.exl:278 _cli_timedate_config.exl:125 _cli_backup.exl:69
+#: _cli_interfaces.exl:157 _cli_session.exl:9 _cli_dhcp_config_relay.exl:35
+#: _cli_access_control_security.exl:65 _cli_dns_config.exl:48
+#: _cli_dns_config.exl:65 _cli_ntp_config_acl.exl:66
+#: _cli_ntp_config_acl.exl:76 _cli_dns_config_routing.exl:81
+#: _cli_dns_config_routing.exl:98 _cli_dns_config_routing.exl:164
+#: _cli_dns_config_acl.exl:66 _cli_dns_config_acl.exl:76
+msgid   "Resource Id not available."
+msgstr  "Tiada Id Sumber didapati."
+
+#: _cli_route_config_static.exl:99 _cli_route_config_static.exl:125
+#: _cli_route_config_static.exl:132 _cli_route_config_static.exl:156
+#: _cli_log.exl:285 _cli_log.exl:300 _cli_log.exl:307
+#: _cli_timedate_config.exl:85 _cli_timedate_config.exl:138
+#: _cli_access_control.exl:77 _cli_access_control.exl:111 _cli_backup.exl:106
+#: _cli_definitions_services.exl:267 _cli_definitions_services.exl:339
+#: _cli_definitions_networks.exl:303 _cli_definitions_networks.exl:426
+#: _cli_interfaces_vlan.exl:15 _cli_interfaces_vlan.exl:70
+#: _cli_interfaces_vip.exl:14 _cli_interfaces_vip.exl:66
+#: _cli_interfaces_vip.exl:148 _cli_interfaces_static.exl:14
+#: _cli_interfaces_static.exl:75
+#, php-format
+msgid   "Resource Id '%s' not available."
+msgstr  "Id Sumber '%s' tidak didapati."
+
+#: _cli_definitions_timeevents.exl:159 _cli_definitions_timeevents.exl:172
+#: _cli_definitions_services.exl:289 _cli_definitions_services.exl:300
+#: _cli_definitions_services.exl:316 _cli_definitions_services.exl:328
+#: _cli_definitions_services.exl:347 _cli_definitions_networks.exl:333
+#: _cli_definitions_networks.exl:348 _cli_definitions_networks.exl:372
+#: _cli_definitions_networks.exl:389 _cli_definitions_networks.exl:414
+#: _cli_definitions_networks.exl:434
+#, php-format
+msgid   "Definition name '%s' already exist"
+msgstr  "Nama definasi '%s' sudah ada"
+
+#: _cli_definitions_timeevents.exl:162 _cli_definitions_timeevents.exl:175
+#: _cli_definitions_services.exl:292 _cli_definitions_services.exl:303
+#: _cli_definitions_services.exl:319 _cli_definitions_services.exl:331
+#: _cli_definitions_services.exl:350 _cli_definitions_networks.exl:336
+#: _cli_definitions_networks.exl:351 _cli_definitions_networks.exl:375
+#: _cli_definitions_networks.exl:392 _cli_definitions_networks.exl:418
+#: _cli_definitions_networks.exl:437
+msgid   "Definition saved"
+msgstr  "Definasi disimpan"
+
+#: _cli_static_arp.exl:55
+msgid   "No ARP cache available"
+msgstr  "Tiada cache ARP didapati"
+
+#: _cli_static_arp.exl:87 _cli_interfaces_vlan.exl:169
+#: _cli_dhcp_config_server.exl:163 _cli_dhcp_config_server.exl:167
+#: _cli_interfaces_vip.exl:20 _cli_interfaces_vip.exl:101
+#: _cli_dhcp_config_static.exl:72 _cli_dhcp_config_static.exl:144
+#: _cli_interfaces_static.exl:176 _cli_dns_config_static.exl:68
+#: _cli_dns_config_static.exl:111
+#, php-format
+msgid   "Invalid IP Address '%s'"
+msgstr  "Alamat IP '%s' tidak sah"
+
+#: _cli_static_arp.exl:91 _cli_dhcp_config_static.exl:76
+#: _cli_dhcp_config_static.exl:156
+#, php-format
+msgid   "Invalid MAC Address '%s'"
+msgstr  "Alamat MAC '%s' tidak sah"
+
+#: _cli_static_arp.exl:103 _cli_dhcp_config_static.exl:93
+#, php-format
+msgid   "IP Address '%s' already exist"
+msgstr  "Alamat IP '%s' sudah ada"
+
+#: _cli_log.exl:9 _cli_log.exl:25 _cli_log.exl:82 _cli_log.exl:93
+msgid   "No log available"
+msgstr  "Tiada rekod didapati"
+
+#: _cli_log.exl:104 _cli_dns_config.exl:73
+msgid   "Action aborted"
+msgstr  "Aksi dibatalkan"
+
+#: _cli_log.exl:140
+msgid   "Configuration file missing"
+msgstr  "Fail konfigurasi tidak ditemui"
+
+#: _cli_log.exl:252
+#, php-format
+msgid   "Resource Id '%s' for '%s' not available."
+msgstr  "Id Sumber '%s' untuk '%s' tidak didapati."
+
+#: _cli_timedate_config.exl:72
+#, php-format
+msgid   "Date set to %s"
+msgstr  "Tarikh ditetapkan pada %s"
+
+#: _cli_timedate_config.exl:77
+msgid   "Invalid date format"
+msgstr  "Format tarikh tidak sah"
+
+#: _cli_timedate_config.exl:94
+#, php-format
+msgid   "Timezone set to %s"
+msgstr  "Zon waktu ditetapkan pada %s"
+
+#: _cli_timedate_config.exl:111
+#, php-format
+msgid   "Time set to %s"
+msgstr  "Waktu ditetapkan pada %s"
+
+#: _cli_timedate_config.exl:116
+msgid   "Invalid time format"
+msgstr  "Format waktu tidak sah"
+
+#: _cli_access_control.exl:83 _cli_access_control_security.exl:87
+#, php-format
+msgid   "Host '%s' already exist"
+msgstr  "Host '%s' sudah ada"
+
+#: _cli_access_control.exl:187
+msgid   "System access list set successfully"
+msgstr  "Senarai akses sistem berjaya ditetapkan"
+
+#: _cli_backup.exl:32 _cli_backup.exl:41 _cli_backup.exl:51
+msgid   "No backup available"
+msgstr  "Tiada backup didapati"
+
+#: _cli_backup.exl:58
+#, php-format
+msgid   "-> Deleting %s"
+msgstr  "-> Menghapus %s"
+
+#: _cli_backup.exl:99 _cgi_page_system_backup_restore.exl:18
+msgid   "Configuration restored successfully"
+msgstr  "Konfigurasi berjaya dipulihkan"
+
+#: _cli_backup.exl:103
+msgid   "Invalid backup file"
+msgstr  "Fail backup tidak sah"
+
+#: _cli_backup.exl:128 _cli_backup.exl:134
+msgid   "Email recipients"
+msgstr  "Penerima emel"
+
+#: _cli_backup.exl:146 _cli_system_config.exl:109
+#, php-format
+msgid   "Invalid email format '%s'"
+msgstr  "Format emel '%s' tidak sah"
+
+#: _cli_backup.exl:182 _cgi_page_system_backup_restore.exl:23
+msgid   "Backup created successfully"
+msgstr  "Backup berjaya dicipta"
+
+#: _cli_backup.exl:191
+#, php-format
+msgid   "File '%s' not exist"
+msgstr  "Fail '%s' tidak ada"
+
+#: _cli_backup.exl:195
+msgid   "Configuration restored"
+msgstr  "Konfigurasi disimpan"
+
+#: _cli_interfaces.exl:163 _cli_dns_config.exl:72
+#, php-format
+msgid   "This action will remove %s.\n"
+        "Continue this action? %s"
+msgstr  "Aksi ini akan menghapus %s.\n"
+        "Teruskan aksi ini? %s"
+
+#: _cli_interfaces.exl:190 _cli_interfaces.exl:211
+msgid   "No free device available"
+msgstr  "Tiada peranti bebas didapati"
+
+#: _cli_system_config.exl:96
+msgid   "Short Country name not available."
+msgstr  "Singkatan nama Negara tidak didapati."
+
+#: _cli_system_config.exl:97
+#, php-format
+msgid   "Enter -> '%s' to view short country name"
+msgstr  "Tekan -> '%s' untuk melihat singkatan nama negara"
+
+#: _cli_definitions_services.exl:244
+msgid   "Cannot delete builtin type definitions"
+msgstr  "Tidak boleh menghapus definasi jenis terbinadalam"
+
+#: _cli_definitions_networks.exl:279
+msgid   "Cannot delete builtin or interface type definitions"
+msgstr  "Tidak boleh menghapus definasi jenis terbinadalam atau antaramuka"
+
+#: _cli_definitions_networks.exl:318
+msgid   "Invalid host"
+msgstr  "Host tidak sah"
+
+#: _cli_definitions_networks.exl:359
+#, php-format
+msgid   "Invalid range '%s'"
+msgstr  "Julat '%s' tidak sah"
+
+#: _cli_definitions_networks.exl:382
+msgid   "Invalid MAC Address"
+msgstr  "Alamat MAC tidak sah"
+
+#: _cli_session.exl:14
+#, php-format
+msgid   "This action will delete %s.\n"
+        "Continue this action? %s"
+msgstr  "Aksi ini akan menghapus %s.\n"
+        "Teruskan aksi ini? %s"
+
+#: _cli_dhcp_config_relay.exl:36 _cli_dhcp_config_relay.exl:43
+#: _cli_dhcp_config_server.exl:137 _cli_dhcp_config_static.exl:177
+#, php-format
+msgid   "Enter -> '%s' to view Resource Id"
+msgstr  "Tekan -> '%s' untuk melihat Id Sumber"
+
+#: _cli_dhcp_config_relay.exl:42
+msgid   "Resource Id for DHCP Server not available."
+msgstr  "Id Sumber untuk Pelayan DHCP tidak didapati."
+
+#: _cli_dhcp_config_relay.exl:53
+msgid   "DHCP Relay required at least two interfaces"
+msgstr  "Relay DHCP memerlukan sekurang-kurangnya dua antaramuka"
+
+#: _cli_interfaces_vlan.exl:21 _cli_interfaces_static.exl:20
+msgid   "Invalid IP Address"
+msgstr  "Alamat IP tidak sah"
+
+#: _cli_interfaces_vlan.exl:26 _cli_interfaces_vlan.exl:155
+#: _cli_interfaces_vip.exl:25 _cli_interfaces_vip.exl:84
+#: _cli_interfaces_static.exl:25 _cli_interfaces_static.exl:162
+#, php-format
+msgid   "Interface name '%s' already exist"
+msgstr  "Nama antaramuka '%s' sudah ada"
+
+#: _cli_interfaces_vlan.exl:31 _cli_interfaces_vlan.exl:176
+#: _cli_interfaces_vip.exl:30 _cli_interfaces_vip.exl:108
+#: _cli_interfaces_static.exl:30 _cli_interfaces_static.exl:183
+#, php-format
+msgid   "Interface address '%s' already exist"
+msgstr  "Alamat antaramuka '%s' sudah ada"
+
+#: _cli_interfaces_vlan.exl:36 _cli_interfaces_vlan.exl:182
+#: _cli_interfaces_vip.exl:35 _cli_interfaces_vip.exl:114
+#: _cli_interfaces_static.exl:35 _cli_interfaces_static.exl:189
+#, php-format
+msgid   "IP Address '%s' already in used. Continue this action? %s"
+msgstr  "Alamat IP '%s' sudah digunakan. Teruskan aksi ini? %s"
+
+#: _cli_interfaces_vlan.exl:78 _cli_interfaces_vip.exl:74
+#: _cli_interfaces_static.exl:83
+#, php-format
+msgid   "No data available for Resource Id '%s'"
+msgstr  "Tiada data didapati untuk Id Sumber '%s'"
+
+#: _cli_interfaces_vlan.exl:82
+#, php-format
+msgid   "Invalid interface type '%s'"
+msgstr  "Antaramuka jenis '%s' tidak sah"
+
+#: _cli_interfaces_vlan.exl:90 _cli_dhcp_config_server.exl:188
+#, php-format
+msgid   "Invalid gateway Address '%s'"
+msgstr  "Alamat gateway '%s' tidak sah"
+
+#: _cli_interfaces_vlan.exl:94 _cli_interfaces_static.exl:99
+msgid   "Default gateway already defined on other interface"
+msgstr  "Gateway default sudah ditetapkan pada antaramuka yang lain"
+
+#: _cli_interfaces_vlan.exl:140 _cli_interfaces_static.exl:147
+#, php-format
+msgid   "Invalid MTU size '%s'"
+msgstr  "Saiz MTU '%s' tidak sah"
+
+#: _cli_dhcp_config_server.exl:97
+#, php-format
+msgid   "No data available for interface '%s'"
+msgstr  "Tiada ada untuk antaramuka '%s'"
+
+#: _cli_dhcp_config_server.exl:101
+msgid   "Invalid interface type. DHCP Server only accept interface type "
+        "static and vlan"
+msgstr  "Jenis antaramuka tidak sah. Pelayan DHCP hanya menerima antaramuka "
+        "jenis static dan vlan"
+
+#: _cli_dhcp_config_server.exl:149 _cli_dhcp_config_server.exl:153
+#, php-format
+msgid   "Invalid DNS Server IP '%s'"
+msgstr  "Alamat Pelayan DNS '%s' tidak sah"
+
+#: _cli_dhcp_config_server.exl:171
+#, php-format
+msgid   "Invalid address range %s"
+msgstr  "Julat alamat '%s' tidak sah"
+
+#: _cli_dhcp_config_server.exl:179
+#, php-format
+msgid   "Invalid address range %s on interface %s"
+msgstr  "Julat alamat %s pada antaramuka %s tidak sah"
+
+#: _cli_dhcp_config_server.exl:195
+#, php-format
+msgid   "Invalid domain '%s'"
+msgstr  "Domain '%s' tidak sah"
+
+#: _cli_dhcp_config_server.exl:203
+#, php-format
+msgid   "Invalid WINS Server '%s'"
+msgstr  "Pelayan WINS '%s' tidak sah"
+
+#: _cli_access_control_security.exl:10
+msgid   "Block password guessing:"
+msgstr  "Halang meneka kata laluan:"
+
+#: _cli_access_control_security.exl:11
+#, php-format
+msgid   "After %s attempts."
+msgstr  "Selepas %s percubaan."
+
+#: _cli_access_control_security.exl:12
+#, php-format
+msgid   "Block access for %s seconds"
+msgstr  "Halang akses untuk %s saat"
+
+#: _cli_interfaces_vip.exl:199
+#, php-format
+msgid   "This action will delete additional interface Id '%s'.\n"
+        "Continue this action? %s"
+msgstr  "Aksi ini akan menghapus Id antaramuka tambahan '%s'.\n"
+        "Teruskan aksi ini? %s"
+
+#: _cli_ntp_config_acl.exl:88 _cli_dns_config_acl.exl:88
+#, php-format
+msgid   "Address '%s' already exist"
+msgstr  "Alamat '%s' sudah ada"
+
+#: _cli_dhcp_config_static.exl:84
+#, php-format
+msgid   "No data available for DHCP Server Id '%s'"
+msgstr  "Tiada data untuk Id Pelayan DHCP '%s'"
+
+#: _cli_dhcp_config_static.exl:89 _cli_dhcp_config_static.exl:149
+#, php-format
+msgid   "IP Address not in range %s"
+msgstr  "Alamat IP bukan dalam julat %s"
+
+#: _cli_dhcp_config_static.exl:128
+#, php-format
+msgid   "No data available for Static mapping Id '%s'"
+msgstr  "Tiada data untuk Id pemetaan Static '%s'"
+
+#: _cli_dhcp_config_static.exl:137
+#, php-format
+msgid   "No data available for DHCP Server '%s'"
+msgstr  "Tiada data untuk Pelayan DHCP '%s'"
+
+#: _cli_dns_config_routing.exl:104 _cli_dns_config_routing.exl:141
+#, php-format
+msgid   "Invalid domain %s"
+msgstr  "Domain %s tidak sah"
+
+#: _cli_dns_config_routing.exl:108
+#, php-format
+msgid   "Request routing for Domain '%s' already exist"
+msgstr  "Permintaan halaan untuk Domain '%s' sudah ada"
+
+#: _cli_interfaces_static.exl:87
+msgid   "Invalid interface type"
+msgstr  "Jenis antaramuka tidak sah"
+
+#: _cli_interfaces_static.exl:95
+msgid   "Invalid gateway Address"
+msgstr  "Alamat gateway tidak sah"
+
+#: _cli_dns_config_static.exl:64
+#, php-format
+msgid   "Static hostname '%s' already exist"
+msgstr  "Nama host static '%s' sudah ada"
+
+#: init.exl:225
+msgid   "No network device found"
+msgstr  "Tiada peranti rangkaian ditemui"
+
+#: init.exl:283
+#, php-format
+msgid   "%s Invalid command '%s'"
+msgstr  "%s Arahan '%s' tidak sah"
+
+#: init.exl:323
+#, php-format
+msgid   "%s (pid %s) is running..."
+msgstr  "%s (pid %s) sedang beraksi..."
+
+#: init.exl:393 network.exl:321
+#, php-format
+msgid   "Starting %s"
+msgstr  "Menjalankan %s"
+
+#: init.exl:399 xinet.exl:47 anyterm.exl:41 cron.exl:62 ntp.exl:93 ssh.exl:105
+#: inadyn.exl:91 name.exl:268 ftp.exl:160 syslog.exl:655 ulog.exl:72
+#: dhcp.exl:170 dhcrelay.exl:75 ipwatch.exl:90 network.exl:318 snmp.exl:31
+#: http.exl:266
+#, php-format
+msgid   "Starting %s failed"
+msgstr  "Gagal menjalankan %s"
+
+#: init.exl:426 init.exl:431 init.exl:437 network.exl:352
+#, php-format
+msgid   "Stopping %s"
+msgstr  "Menghentikan %s"
+
+#: init.exl:441
+#, php-format
+msgid   "Stopping %s failed"
+msgstr  "Gagal menghentikan %s"
+
+#: cgi.exl:28 tn_page.js:463
+msgid   "Permission denied"
+msgstr  "Kebenaran dinafikan"
+
+#: cgi.exl:40
+msgid   "Configuration applied successfully"
+msgstr  "Konfigurasi berjaya dilaksanakan"
+
+#: cgi.exl:68
+msgid   "Failed to set Date and Time"
+msgstr  "Gagal menetapkan Tarikh dan Waktu"
+
+#: xinet.exl:6 keymap.exl:6 anyterm.exl:6 cron.exl:6 ntp.exl:6 ssh.exl:6
+#: policy.exl:6 inadyn.exl:6 name.exl:6 ftp.exl:6 syslog.exl:6 clock.exl:6
+#: ulog.exl:6 dhcp.exl:6 dhcrelay.exl:6 ipwatch.exl:6 network.exl:7 snmp.exl:6
+#: http.exl:6 rng.exl:6
+#, php-format
+msgid   "Cannot execute %s. Internal error"
+msgstr  "Tidak boleh menjalankan %s. Masalah dalaman"
+
+#: xinet.exl:68 http.exl:288
+#, php-format
+msgid   "Reloading %s daemon"
+msgstr  "Memuat semula daemon %s"
+
+#: xinet.exl:72 http.exl:292
+#, php-format
+msgid   "Reloading %s daemon failed"
+msgstr  "Gagal memuat semua daemon %s"
+
+#: keymap.exl:25
+#, php-format
+msgid   "%s setting failed"
+msgstr  "Gagal menetapkan %s"
+
+#: keymap.exl:29
+#, php-format
+msgid   "Setting keymap to %s"
+msgstr  "Menetapkan keymap ke %s"
+
+#: anyterm.exl:19 ntp.exl:27 ntp.exl:72 ssh.exl:49 inadyn.exl:23 inadyn.exl:70
+#: ftp.exl:85 dhcp.exl:86 dhcp.exl:147 dhcrelay.exl:18 dhcrelay.exl:24
+#: ipwatch.exl:29 ipwatch.exl:71 http.exl:150
+#, php-format
+msgid   "%s daemon (%s) disabled"
+msgstr  "Menyah-aktifkan daemon %s (%s)"
+
+#: ssh.exl:35
+#, php-format
+msgid   "Generating %s RSA key"
+msgstr  "Menjana kunci RSA %s"
+
+#: ssh.exl:40
+#, php-format
+msgid   "Generating %s DSA key"
+msgstr  "Menjana kunci DSA %s"
+
+#: policy.exl:128
+#, php-format
+msgid   "Loading policy %s failed"
+msgstr  "Gagal memuat dasar %s"
+
+#: policy.exl:191
+msgid   "Loading firewall rules"
+msgstr  "Memuat aturan firewall"
+
+#: ftp.exl:77
+msgid   "Generating SSL certificate failed"
+msgstr  "Gagal menjana sijil SSL"
+
+#: clock.exl:42
+#, php-format
+msgid   "Setting timezone to %s"
+msgstr  "Menetapkan zon waktu kepada %s"
+
+#: clock.exl:46
+#, php-format
+msgid   "Setting system clock to %s"
+msgstr  "Menetapkan waktu sistem pada %s"
+
+#: dhcrelay.exl:70
+#, php-format
+msgid   "Cannot start %s while %s enabled."
+msgstr  "Tidak boleh menjalankan %s semasa %s diaktifkan."
+
+#: ipwatch.exl:22
+#, php-format
+msgid   "%s: no interfaces found"
+msgstr  "%s: tiada antaramuka ditemui"
+
+#: network.exl:15
+#, php-format
+msgid   "Some other machine (%s) already uses address %s"
+msgstr  "Ada mesin lain (%s) sudah menggunakan alamat %s"
+
+#: network.exl:128
+#, php-format
+msgid   "Setting additional address on interface %s"
+msgstr  "Menetapkan alamat tambahan pada antaramuka %s"
+
+#: network.exl:154
+#, php-format
+msgid   "Setting MAC Address %s"
+msgstr  "Menetapkan alamat MAC %s"
+
+#: network.exl:161
+#, php-format
+msgid   "Setting interface %s"
+msgstr  "Menetapkan antaramuka %s"
+
+#: network.exl:166 network.exl:224
+#, php-format
+msgid   "Setting default gateway: %s via %s"
+msgstr  "Menetapkan gateway default: %s melalui %s"
+
+#: network.exl:177
+#, php-format
+msgid   "Setting interface %s failed"
+msgstr  "Gagal menetapkan antaramuka %s"
+
+#: network.exl:205
+#, php-format
+msgid   "Setting interface %s MAC Address %s"
+msgstr  "Menetapkan antaramuka %s alamat MAC %s"
+
+#: network.exl:216
+#, php-format
+msgid   "Setting VLAN interface %s"
+msgstr  "Menetapkan antaramuka VLAN %s"
+
+#: network.exl:233
+#, php-format
+msgid   "Setting VLAN interface %s failed"
+msgstr  "Gagal menetapkan antaramuka %s"
+
+#: network.exl:273
+msgid   "Updating ARP cache"
+msgstr  "Mengemaskini cache ARP"
+
+#: http.exl:173 http.exl:198 http.exl:219
+#, php-format
+msgid   "%s daemon (%s) generating SSL certificate for host %s failed"
+msgstr  "%s daemon (%s) gagal menjana sijil SSL untuk host %s"
+
+#: hostname.exl:45
+#, php-format
+msgid   "Setting system hostname to %s"
+msgstr  "Menetapkan nama host sistem kepada %s"
+
+#: hostname.exl:48
+#, php-format
+msgid   "Setting %s Failed"
+msgstr  "Gagal menetapkan %s"
+
+#: definitions.exl:134
+#, php-format
+msgid   "Broadcast address of interface '%s'"
+msgstr  "Alamat Broadcast untuk antaramuka '%s'"
+
+#: definitions.exl:150
+#, php-format
+msgid   "Broadcast address of alias '%s' on interface '%s'"
+msgstr  "Alamat Broadcast untuk alias '%s' pada antaramuka '%s'"
+
+#: _cgi_page_system.exl:60
+msgid   "Access"
+msgstr  "Akses"
+
+#: _cgi_page_system.exl:61
+msgid   "Date"
+msgstr  "Tarikh"
+
+#: _cgi_page_system.exl:62
+msgid   "Time"
+msgstr  "Waktu"
+
+#: _cgi_page_system.exl:63
+msgid   "IP Address"
+msgstr  "Alamat IP"
+
+#: _cgi_page_system.exl:64
+msgid   "Status"
+msgstr  "Status"
+
+#: _cgi_page_system.exl:88
+#, php-format
+msgid   "Last %s Sessions"
+msgstr  "Sesi %s Terakhir"
+
+#: _cgi_page_system_preference_tab1.exl:11
+msgid   "System Hostname"
+msgstr  "Nama Host Sistem"
+
+#: _cgi_page_system_preference_tab1.exl:15
+msgid   "Hostname:"
+msgstr  "Nama Host:"
+
+#: _cgi_page_system_preference_tab1.exl:17
+msgid   "This is the hostname of the system. It should be a fully qualified "
+        "DNS hostname, including a domain."
+msgstr  "Ini ialah nama host sistem. Ia sepatutnya adalah nama host DNS yang "
+        "sah sepenuhnya, termasuklah domain."
+
+#: _cgi_page_system_preference_tab1.exl:26
+msgid   "Organizational Information"
+msgstr  "Maklumat Organisasi"
+
+#: _cgi_page_system_preference_tab1.exl:30
+msgid   "Organization Name:"
+msgstr  "Nama Organisasi:"
+
+#: _cgi_page_system_preference_tab1.exl:32
+msgid   "This is the name and location of your organization."
+msgstr  "Ini ialah nama dan lokasi organisasi anda."
+
+#: _cgi_page_system_preference_tab1.exl:35
+msgid   "City:"
+msgstr  "Bandar:"
+
+#: _cgi_page_system_preference_tab1.exl:39
+msgid   "State:"
+msgstr  "Negeri:"
+
+#: _cgi_page_system_preference_tab1.exl:43
+msgid   "Country:"
+msgstr  "Negara:"
+
+#: _cgi_page_system_preference_tab1.exl:50
+msgid   "Administrator's Email:"
+msgstr  "Emel Pentadbir:"
+
+#: _cgi_page_system_preference_tab1.exl:60
+msgid   "Language setting"
+msgstr  "Tetapan Bahasa"
+
+#: _cgi_page_system_preference_tab1.exl:64
+msgid   "Language:"
+msgstr  "Bahasa:"
+
+#: _cgi_page_system_preference_tab1.exl:73
+msgid   "This sets the language used in system. You will have to re-login "
+        "when you change this setting"
+msgstr  "Ini menetapkan bahasa yang digunakan pada sistem. Anda perlu log "
+        "masuk semula apabila anda mengubah tetapan ini"
+
+#: _cgi_page_system_preference_tab1.exl:110
+msgid   "Invalid Administrator's Email"
+msgstr  "Emel Pentadbir tidak sah"
+
+#: _cgi_page_system_backup_restore.exl:33
+msgid   "Backup imported successfully"
+msgstr  "Backup berjaya diimport"
+
+#: _cgi_page_system_backup_restore.exl:59
+#: _cgi_page_system_backup_restore.exl:63 _cgi_page_system_notification.exl:20
+#: _cgi_page_system_notification.exl:24 _cgi_page_system_preference.exl:22
+#: _cgi_page_system_preference.exl:26 _cgi_page_system_update.exl:20
+#: _cgi_page_system_update.exl:24 _cgi_page_system_acl.exl:189
+#: _cgi_page_system_acl.exl:193 _cgi_page_auth.exl:42
+#: _cgi_page_definitions.exl:255 tn_dialog.js:291
+msgid   "Reading data. Please wait.."
+msgstr  "Membaca data. Sila tunggu.."
+
+#: _cgi_page_system_antivirus.exl:16
+msgid   "Engine version:"
+msgstr  "Versi Enjin:"
+
+#: _cgi_page_system_antivirus.exl:18
+msgid   "This table display current Sophos Antivirus version that used by "
+        "system. The information will automatically update when new pattern "
+        "installed.<br />The system will connect to updates server and "
+        "download if newer version is available. For security reasons pattern "
+        "can only be updated automatically."
+msgstr  "Medan ini memaparkan versi Antivirus Sophos semasa yang digunakan "
+        "pada sistem. Maklumat ini akan diupdate secara automatik bila ada "
+        "pattern baru dipasang.<br />Sistem akan menyambung ke pelayan "
+        "update dan memuatturun bila terdapat versi baru. Atas sebab "
+        "keselamatan pattern hanya boleh diupdate secara automatik."
+
+#: _cgi_page_system_antivirus.exl:21
+msgid   "Pattern version:"
+msgstr  "Versi Pattern:"
+
+#: _cgi_page_system_antivirus.exl:25
+msgid   "Virus detection:"
+msgstr  "Pengesanan Virus:"
+
+#: _cgi_page_system_backup_restore_tab2.exl:161
+msgid   "Automatic backup"
+msgstr  "Backup secara automatik"
+
+#: _cgi_page_system_backup_restore_tab2.exl:177
+msgid   "When automatic backups are enabled, the system will create backups "
+        "in the specified interval. You can also specify how many backups "
+        "should be stored on the system. If this number is exceeded, the "
+        "oldest backups are automatically deleted."
+msgstr  "Apabila backup secara automatik diaktifkan. Sistem akan membuat "
+        "backup dalam jangka masa yang ditetapkan. Anda juga boleh menetapkan "
+        "jumlah backup yang patut disimpan pada sistem. Jika melebihi jumlah "
+        "ini, backup yang lama akan dihapus secara automatik."
+
+#: _cgi_page_system_backup_restore_tab2.exl:180
+msgid   "Maximum backup:"
+msgstr  "Backup maksimum:"
+
+#: _cgi_page_system_backup_restore_tab2.exl:181
+msgid   "backups."
+msgstr  "backups."
+
+#: _cgi_page_system_backup_restore_tab2.exl:192
+msgid   "In addition to be stored on the system, automatic backups can also "
+        "be mailed to email recipients. Specify the recipients that should "
+        "receive the backups."
+msgstr  "Sebagai tambahan simpanan pada sistem, backup secara automatik juga "
+        "boleh dikirimkan kepada penerima emel. Tetapkan penerima yang patut "
+        "menerima backups."
+
+#: _cgi_page_system_backup_restore_tab2.exl:222
+msgid   "Enabling Auto backup, please wait"
+msgstr  "Mengaktifkan Auto backup, sila tunggu"
+
+#: _cgi_page_system_backup_restore_tab2.exl:226
+msgid   "Disabling Auto backup, please wait"
+msgstr  "Menyah-aktifkan Auto backup, sila tunggu"
+
+#: _cgi_page_system_notification_tab1.exl:10
+msgid   "Recipients"
+msgstr  "Penerima"
+
+#: _cgi_page_system_notification_tab1.exl:158
+msgid   "Notifications"
+msgstr  "Pemberitahuan"
+
+#: _cgi_page_system_notification_tab1.exl:166
+msgid   "When notifications are enabled, the system will send all "
+        "notifications using this common sender."
+msgstr  "Apabila pemberitahuan diaktifkan, sistem akan menghantar semua "
+        "pemberitahuan menggunakan penghantar ini."
+
+#: _cgi_page_system_notification_tab1.exl:175
+msgid   "Specify the recipients that should receive the notifications."
+msgstr  "Tetapkan penerima yang patut menerima pemberitahuan."
+
+#: _cgi_page_dashboard.exl:206
+msgid   "Product Information"
+msgstr  "Maklumat Produk"
+
+#: _cgi_page_dashboard.exl:212
+msgid   "System Time"
+msgstr  "Waktu Sistem"
+
+#: _cgi_page_dashboard.exl:219
+msgid   "Active Sessions"
+msgstr  "Sesi Aktif"
+
+#: _cgi_page_dashboard.exl:227
+msgid   "Ethernet Port Usage"
+msgstr  "Penggunaan Port Ethernet"
+
+#: _cgi_page_dashboard.exl:241
+msgid   "Resource Usage"
+msgstr  "Penggunaan Sumber"
+
+#: _cgi_page_auth.exl:19
+msgid   "Add new user/group.."
+msgstr  "Tambah pengguna/group baru.."
+
+#: _cgi_page_auth.exl:25
+msgid   "Find"
+msgstr  "Cari"
+
+#: _cgi_session.exl:89 _cgi_page.exl:343
+msgid   "Session expired"
+msgstr  "Sesi luput"
+
+#: _cgi_page_system_acl_tab2.exl:217
+msgid   "Access list configuration"
+msgstr  "Konfigurasi senarai akses"
+
+#: _cgi_page_system_acl_tab2.exl:225
+#, php-format
+msgid   "In %s, specify the host that should have system access. In addition, "
+        "you can specify what type of access. If you want to explicitly log "
+        "such traffic in the packet filter log, activate the %s checkbox."
+msgstr  "Di %s, tetapkan host yang patut diberi akses sistem. Sebagai "
+        "tambahan, Anda boleh tetapkan jenis aksesnya. Jika anda mahu "
+        "merekodkan dengan jelas lalulintas tersebut pada log penapis peket, "
+        "aktifkan kotak penanda %s."
+
+#: _cgi_page_system_acl_tab3.exl:160
+msgid   "Security configuration"
+msgstr  "Konfigurasi keselamatan"
+
+#: _cgi_page_system_acl_tab3.exl:167
+msgid   "Maximum attempt:"
+msgstr  "Percubaan Maksimum:"
+
+#: _cgi_page_system_acl_tab3.exl:168
+msgid   "attempts"
+msgstr  "percubaan"
+
+#: _cgi_page_system_acl_tab3.exl:172
+msgid   "Blocking period:"
+msgstr  "Tempoh halangan:"
+
+#: _cgi_page_system_acl_tab3.exl:173
+msgid   "seconds"
+msgstr  "saat"
+
+#: _cgi_page_system_acl_tab3.exl:183
+#, php-format
+msgid   "These settings allow you to block System access from IP addresses "
+        "that have repeatedly failed authentication. This applies to all "
+        "access type authentication. The %s contains networks that should "
+        "never be subject to access blocking."
+msgstr  "Tetapan ini membenarkan anda menghalang alamat IP yang berulangkali "
+        "gagal disahkan dari mengakses sistem. Ini dilaksanakan pada semua "
+        "jenis pengesahan akses. %s mengandungi rangkaian yang tidak "
+        "sepatutnya menjadi masalah untuk menghalang akses."
+
+#: _cgi_page_system_acl_tab3.exl:215 _cgi_page_system_acl_tab1.exl:99
+#: _cgi_page_system_acl_tab1.exl:187 _cgi_page_system_acl_tab1.exl:311
+#: _cgi_page_system_acl_tab1.exl:411
+msgid   "Entered values is syntactically or logically incorrect"
+msgstr  "Nilai yang diberikan salah secara sintaks atau logikal"
+
+#: _cgi_page_system_notification_tab2.exl:20
+msgid   "This options will let you set which notification type you want "
+        "receive. The system will send each notification thru email "
+        "previously added on configuration tab."
+msgstr  "Pilihan ini membenarkan anda menetapkan jenis pemberitahuan yang "
+        "anda mahu terima. Sistem akan menghantar setiap pemberitahuan "
+        "melalui emel yang sebelumnya ditambah pada tab konfigurasi."
+
+#: _cgi_global_vars.exl:5 _cgi_global_vars.exl:6
+msgid   "The uploaded file exceeds the maximum file size"
+msgstr  "Fail yang dimuatnaik melebihi saiz fail maksimum"
+
+#: _cgi_global_vars.exl:7
+msgid   "The uploaded file was only partially uploaded"
+msgstr  "Fail yang dimuatnaik cuma sebahagiannya sahaja berjaya dimuatnaik"
+
+#: _cgi_global_vars.exl:8
+msgid   "No file was uploaded"
+msgstr  "Tiada fail yang telah dimuatnaik"
+
+#: _cgi_global_vars.exl:9
+msgid   "Missing a temporary folder"
+msgstr  "Tidak menemui folder sementara"
+
+#: _cgi_global_vars.exl:10
+msgid   "Failed to write file to disk"
+msgstr  "Gagal untuk menulis fail pada cakera"
+
+#: _cgi_global_vars.exl:11
+msgid   "File upload stopped by extension"
+msgstr  "Fail yang dimuatnaik dihentikan oleh extension"
+
+#: _cgi_page_system_acl_tab1.exl:29
+#, php-format
+msgid   "%s Access Password"
+msgstr  "Kata laluan akses %s"
+
+#: _cgi_page_system_acl_tab1.exl:33 _cgi_page_system_acl_tab1.exl:43
+#, php-format
+msgid   "Password for %s access:"
+msgstr  "Kata laluan untuk %s akses:"
+
+#: _cgi_page_system_acl_tab1.exl:35
+#, php-format
+msgid   "This is an access password for login to %s. Leaving a password's "
+        "fields empty will preserve the existing password."
+msgstr  "Ini ialah kata laluan untuk log masuk ke %s. Meninggalkan ruangan "
+        "kosong akan mengekalkan kata laluan yang asal."
+
+#: _cgi_page_system_acl_tab1.exl:38 _cgi_page_system_acl_tab1.exl:47
+#: _cgi_page_system_acl_tab1.exl:122 _cgi_page_system_acl_tab1.exl:236
+#: _cgi_page_system_acl_tab1.exl:356
+msgid   "Repeat:"
+msgstr  "Ulang:"
+
+#: _cgi_page_system_acl_tab1.exl:80 _cgi_page_system_acl_tab1.exl:84
+#: _cgi_page_system_acl_tab1.exl:183 _cgi_page_system_acl_tab1.exl:307
+#: _cgi_page_system_acl_tab1.exl:407
+#, php-format
+msgid   "Password for %s access not match"
+msgstr  "Kata laluan untuk %s akses tidak sepadan"
+
+#: _cgi_page_system_acl_tab1.exl:88
+msgid   "Password set successfully"
+msgstr  "Kata laluan berjaya ditetapkan"
+
+#: _cgi_page_system_acl_tab1.exl:108 _cgi_page_system_acl_tab1.exl:222
+#, php-format
+msgid   "%s Access Setting"
+msgstr  "Tetapan akses %s"
+
+#: _cgi_page_system_acl_tab1.exl:112 _cgi_page_system_acl_tab1.exl:226
+msgid   "Access User:"
+msgstr  "Pengguna Yang Mengakses:"
+
+#: _cgi_page_system_acl_tab1.exl:114 _cgi_page_system_acl_tab1.exl:228
+#, php-format
+msgid   "This is an access setting for %s. Default username set to '%s', you "
+        "can change it to your own with conditions: <ul><li>Maximum <b>8</b> "
+        "characters</li><li>Only accept <b>a-z A-Z 0-9 .-_@$</b> combination "
+        "characters</li><li>Only accept <b>$</b> as a last character</"
+        "li><li>Not accept <b>-</b> or <b>@</b> as a first character</li></ul>"
+msgstr  "Ini adalah tetapan akses bagi %s. Nama pengguna default ditetapkan "
+        "kepada '%s', andaboleh mengubahnya seperti yang anda mahu mengikut "
+        "keadaan:<ul><li>Maksimum <b>8</b> aksara</li><li>Hanya menerima "
+        "kombinasi aksara <b>a-z A-Z 0-9 .-_@$</b></li> <li>Hanya menerima <b>"
+        "$</b> sebagai aksara terakhir</li><li>Tidak menerima <b>-</b> atau "
+        "<b>@</b> sebagai aksara pertama</li></ul>"
+
+#: _cgi_page_system_acl_tab1.exl:118 _cgi_page_system_acl_tab1.exl:232
+msgid   "Access Password:"
+msgstr  "Kata laluan Akses:"
+
+#: _cgi_page_system_acl_tab1.exl:134 _cgi_page_system_acl_tab1.exl:250
+#, php-format
+msgid   "%s Daemon Setting"
+msgstr  "Tetapan Daemon %s"
+
+#: _cgi_page_system_acl_tab1.exl:138 _cgi_page_system_preference_tab2.exl:15
+msgid   "TCP Port:"
+msgstr  "Port TCP:"
+
+#: _cgi_page_system_acl_tab1.exl:140 _cgi_page_system_acl_tab1.exl:256
+#, php-format
+msgid   "This is the TCP port number used to access %s service. It defaults "
+        "to TCP port %d. You can change it to %d or any value between %d and %"
+        "d"
+msgstr  "Ini ialah nombor port TCP yang digunakan untuk mengakses servis %s. "
+        "Default ialah port TCP %d. Anda boleh mengubahnya kepada %d atau "
+        "sebarang nilai diantara %d dan %d"
+
+#: _cgi_page_system_acl_tab1.exl:144 _cgi_page_system_acl_tab1.exl:262
+#: _cgi_page_system_preference_tab2.exl:23
+msgid   "Session Idle Timeout:"
+msgstr  "Tamat jangka masa sesi:"
+
+#: _cgi_page_system_acl_tab1.exl:146 _cgi_page_system_acl_tab1.exl:264
+msgid   "This specifies the number of seconds after which an idle will "
+        "timeout."
+msgstr  "Ini menetapkan nilai saat selepas sesi yang terbiar akan tamat"
+
+#: _cgi_page_system_acl_tab1.exl:204 _cgi_page_system_acl_tab1.exl:329
+msgid   "Invalid TCP Port"
+msgstr  "Port TCP tidak sah"
+
+#: _cgi_page_system_acl_tab1.exl:208 _cgi_page_system_acl_tab1.exl:333
+msgid   "Invalid timeout"
+msgstr  "Jangka waktu tamat tidak sah"
+
+#: _cgi_page_system_acl_tab1.exl:270
+msgid   "When this option enabled. You can connect to FTP daemon using "
+        "explicit TLS/SSL connection."
+msgstr  "Selepas pilihan ini dibolehkan. Anda boleh menyambung ke daemon FTP "
+        "menggunakan sambungan TLS/SSL yang sah."
+
+#: _cgi_page_system_acl_tab1.exl:347
+msgid   "Console Access Password"
+msgstr  "Kata laluan Akses Konsol"
+
+#: _cgi_page_system_acl_tab1.exl:351
+msgid   "Console Password:"
+msgstr  "Kata laluan Konsol:"
+
+#: _cgi_page_system_acl_tab1.exl:353
+msgid   "This is an access setting for console access. Leaving a fields empty "
+        "will preserve the existing setting."
+msgstr  "Ini ialah tetapan akses untuk akses konsol. Meninggalkan ruangan "
+        "kosong akan mengekalkan tetapan yang asal."
+
+#: _cgi_page_system_acl_tab1.exl:369
+msgid   "Web Terminal Setting"
+msgstr  "Tetapan Terminal Web"
+
+#: _cgi_page_system_acl_tab1.exl:374
+msgid   "Enable Web Terminal"
+msgstr  "Aktifkan Terminal Web"
+
+#: _cgi_page_system_acl_tab1.exl:375
+#, php-format
+msgid   "When this option enabled. You can connect to console thru %s."
+msgstr  "Apabila pilihan ini diaktifkan. Anda boleh menyambung ke konsol "
+        "melalui %s."
+
+#: _cgi_page_system_acl_tab1.exl:436
+msgid   "Disable this daemon"
+msgstr  "Nyah-aktifkan daemon ini"
+
+#: _cgi_page_system_acl_tab1.exl:439
+msgid   "Enable this daemon"
+msgstr  "Aktifkan daemon ini"
+
+#: _cgi_page_system_acl_tab1.exl:461
+msgid   "Enabling daemon, please wait"
+msgstr  "Mengaktifkan daemon, sila tunggu"
+
+#: _cgi_page_system_acl_tab1.exl:467
+msgid   "Disabling daemon, please wait"
+msgstr  "Menyah-aktifkan daemon, sila tunggu"
+
+#: _cgi_page.exl:263
+msgid   "About"
+msgstr  "Tentang"
+
+#: _cgi_page.exl:264
+msgid   "Reload"
+msgstr  "Memuat semula"
+
+#: _cgi_page.exl:265
+msgid   "Logout"
+msgstr  "Log keluar"
+
+#: _cgi_page.exl:334
+#, php-format
+msgid   "For more information about %s products, and technical support, "
+        "please visit our <a style='color: blue; text-decoration: none;' "
+        "href='%s' target='_blank'>website</a>"
+msgstr  "Untuk maklumat lanjut mengenai produk %s, dan bantuan teknikal, Sila "
+        "lawat <a style='color: blue; text-decoration: none;' href='%s' "
+        "target='_blank'>laman web</a> kami"
+
+#: _cgi_page_system_backup_restore_tab1.exl:119
+msgid   "Available backups"
+msgstr  "Backup yang ada"
+
+#: _cgi_page_system_backup_restore_tab1.exl:120
+msgid   "Date/Time of creation"
+msgstr  "Tarikh/Waktu dibuat"
+
+#: _cgi_page_system_backup_restore_tab1.exl:130
+#: _cgi_page_system_update_tab1.exl:79
+msgid   "Options"
+msgstr  "Pilihan"
+
+#: _cgi_page_system_backup_restore_tab1.exl:134
+#: _cgi_page_system_backup_restore_tab1.exl:162
+msgid   "Create backup"
+msgstr  "Buat backup"
+
+#: _cgi_page_system_backup_restore_tab1.exl:135
+msgid   "This will backup current configuration and add it to the list of "
+        "available backups above."
+msgstr  "Ini akan backup konfigurasi semasa dan menambah ia pada senarai "
+        "backup sedia ada di atas."
+
+#: _cgi_page_system_backup_restore_tab1.exl:141
+msgid   "Import backup"
+msgstr  "Import backup"
+
+#: _cgi_page_system_backup_restore_tab1.exl:142
+msgid   "This will upload existing backup file and added to list above."
+msgstr  "Ini akan memuatnaik fail backup semasa dan menambah ia pada senarai "
+        "di atas."
+
+#: _cgi_page_system_backup_restore_tab1.exl:157
+msgid   "Description (optional)"
+msgstr  "Huraian (pilihan)"
+
+#: _cgi_page_system_backup_restore_tab1.exl:209
+msgid   "Invalid file"
+msgstr  "Fail tidak sah"
+
+#: _cgi_page_system_update_tab1.exl:70
+msgid   "Available firmware updates"
+msgstr  "Kemaskini firmware yang ada"
+
+#: _cgi_page_system_update_tab1.exl:83
+msgid   "Install updates"
+msgstr  "Pasang update"
+
+#: _cgi_page_system_update_tab1.exl:84
+msgid   "This will install all updates on list of available firmware updates "
+        "above."
+msgstr  "Ini akan memasang semua update pada senarai update firmware "
+        "yang ada di atas."
+
+#: _cgi_page_system_update_tab1.exl:90
+msgid   "Upload firmware"
+msgstr  "Muatnaik firmware"
+
+#: _cgi_page_system_update_tab1.exl:91
+#, php-format
+msgid   "This will upload update file manually and add it to the list of "
+        "available firmware updates above. Firmware file can be downloaded at "
+        "%s"
+msgstr  "Ini akan memuatnaik fail update secara manual dan menambah ia "
+        "pada senarai update firmware di atas. Fail firmware boleh "
+        "dimuatturun di %s"
+
+#: _cgi_page_system_update_tab1.exl:100
+msgid   "Download firmware"
+msgstr  "Muatturun firmware"
+
+#: _cgi_page_system_update_tab1.exl:101
+msgid   "This will download available update file and add it to the list of "
+        "available firmware updates above."
+msgstr  "Ini akan memuatturun fail update dan menambah ia pada senarai "
+        "update firmware yang ada di atas."
+
+#: _cgi_page_system_update_tab1.exl:126
+msgid   "Updates File"
+msgstr  "Fail Kemaskini"
+
+#: _cgi_page_system_update_tab1.exl:131
+msgid   "Start Upload"
+msgstr  "Mula Memuatnaik"
+
+#: _cgi_page_system_reboot.exl:16
+msgid   "Reboot the system now"
+msgstr  "Reboot sistem sekarang"
+
+#: _cgi_page_system_reboot.exl:17
+msgid   "Click this button to reboot the system."
+msgstr  "Tekan butang ini untuk reboot sistem."
+
+#: _cgi_page_system_reboot.exl:28
+msgid   "Shutdown the system now"
+msgstr  "Tutup sistem sekarang"
+
+#: _cgi_page_system_reboot.exl:29
+msgid   "Click this button to shutdown the system."
+msgstr  "Tekan butang ini untuk tutup sistem."
+
+#: _cgi_page_system_reboot.exl:46
+msgid   "This action will reboot the system. Are you really want to proceed?"
+msgstr  "Aksi ini akan reboot sistem. Adakah anda mahu teruskan?"
+
+#: _cgi_page_system_reboot.exl:54
+msgid   "This action will shutdown the system. Are you really want to proceed?"
+msgstr  "Aksi ini akan menutup sistem. Adakah anda mahu teruskan?"
+
+#: _cgi_page_system_reboot.exl:66
+msgid   "The system is rebooting now. The operation may take some time to "
+        "complete."
+msgstr  "Sistem akan reboot sekarang. Operasi ini mungkin mengambil masa "
+        "untuk siap."
+
+#: _cgi_page_system_reboot.exl:69
+msgid   "The system is shutting down now. The operation may take some time to "
+        "complete."
+msgstr  "Sistem akan tutup sekarang. Operasi ini mungkin mengambil masa untuk "
+        "siap."
+
+#: _cgi_page_system_preference_tab3.exl:19
+msgid   "System clock"
+msgstr  "Waktu Sistem"
+
+#: _cgi_page_system_preference_tab3.exl:23
+msgid   "Date:"
+msgstr  "Tarikh:"
+
+#: _cgi_page_system_preference_tab3.exl:25
+msgid   "This should be the date, time and time zone of the system's "
+        "location, which may be different from your local time."
+msgstr  "Ini sepatutnya adalah tarikh, waktu, dan zon waktu pada lokasi "
+        "sistem, di mana ia mungkin berbeza dengan waktu di tempat anda. "
+
+#: _cgi_page_system_preference_tab3.exl:28
+msgid   "Time:"
+msgstr  "Waktu:"
+
+#: _cgi_page_system_preference_tab3.exl:50
+msgid   "Timezone:"
+msgstr  "Zon Waktu:"
+
+#: _cgi_page_system_preference_tab3.exl:64
+msgid   "Time synchronization"
+msgstr  "Pengelenggaraan Waktu"
+
+#: _cgi_page_system_preference_tab3.exl:77
+msgid   "Select an NTP (Network Time Protocol) Server to synchronize the time "
+        "and date."
+msgstr  "Pilih Pelayan NTP (Protokol Waktu Rangkaian) untuk menyelenggara "
+        "waktu dan tarikh."
+
+#: _cgi_page_system_preference_tab3.exl:108
+msgid   "Date and time have been set successfully"
+msgstr  "Tarikh dan waktu telah berjaya ditetapkan"
+
+#: _cgi_page_system_preference_tab3.exl:118
+msgid   "NTP server configuration applied successfully"
+msgstr  "Konfigurasi pelayan NTP berjaya dilaksanakan"
+
+#: _cgi_page_system_preference_tab2.exl:11
+#, php-format
+msgid   "%s Setting"
+msgstr  "Tetapan %s"
+
+#: _cgi_page_system_preference_tab2.exl:17
+#, php-format
+msgid   "This is the TCP port number used to access %s. It defaults to TCP "
+        "port %d. You can change it to %d or any value between %d and %d."
+msgstr  "Ini ialah nombor port TCP yang digunakan untuk mengakses %s. Default "
+        "ialah pada port TCP %d. Anda boleh mengubahnya kepada %d atau "
+        "sebarang nilai di antara %d dan %d."
+
+#: _cgi_page_system_preference_tab2.exl:25
+#, php-format
+msgid   "This specifies the number of seconds after which an idle %s will "
+        "automatically be logout. Set '0' to disabled idle timeout."
+msgstr  "Ini menetapkan jumlah saat selepas jangka masa %s akan log keluar "
+        "secara automatik. Tetapkan '0' untuk menyah-aktif jangka tamat masa "
+        "terbiar."
+
+#: _cgi_page_system_preference_tab2.exl:34
+#, php-format
+msgid   "%s HTTPS Certificate"
+msgstr  "Sijil HTTPS %s"
+
+#: _cgi_page_system_preference_tab2.exl:39
+msgid   "Import CA Certificate"
+msgstr  "Import Sijil CA"
+
+#: _cgi_page_system_preference_tab2.exl:40
+#, php-format
+msgid   "By clicking this button will import %s Certificate Authority (CA) "
+        "into your browser."
+msgstr  "Dengan menekan butang ini akan mengimport Sijil Kuasa (CA) %s pada "
+        "browser anda."
+
+#: _cgi_page_system_preference_tab2.exl:46
+msgid   "Re-generate HTTPS certificate"
+msgstr  "Jana semula sijil HTTPS"
+
+#: _cgi_page_system_preference_tab2.exl:47
+#, php-format
+msgid   "By clicking this button %s Certificate Authority (CA) will be re-"
+        "generated. You need to remove any previous certificate's saved on "
+        "your browser and re-login to %s."
+msgstr  "Dengan menekan butang %s Sijil Kuasa (CA) akan di jana semula. Anda "
+        "perlu menghapus sebarang sijil yang sebelum ini disimpan di browser "
+        "anda dan login semua ke %s."
+
+#: _cgi_page_system_preference_tab2.exl:103
+msgid   "This action will re-generate Web SSL certificate. Are you really "
+        "want to proceed?"
+msgstr  "Aksi ini akan menjana semula sijil SSL Web. Adakah anda mahu "
+        "teruskan?"
+
+#: sophos-update.exc:29
+#, php-format
+msgid   "Stopping %s program."
+msgstr  "Menghentikan program %s."
+
+#: sophos-update.exc:38
+#, php-format
+msgid   "Cannot running %s. Internal error"
+msgstr  "Tidak boleh menjalankan %s. Masalah dalaman"
+
+#: sophos-update.exc:42
+#, php-format
+msgid   "%s already running.."
+msgstr  "%s duah dijalankan.."
+
+#: sophos-update.exc:61 sophos-update.exc:70
+#, php-format
+msgid   "%s: error while updating.."
+msgstr  "%s: ralat semasa mengemaskini.."
+
+#: sophos-update.exc:93
+#, php-format
+msgid   "Starting %s program."
+msgstr  "Memulakan program %s."
+
+#: syslog.exc:33 syslog.exc:67 syslog.exc:90
+msgid   "Invalid login request"
+msgstr  "Permintaan log masuk tidak sah"
+
+#: tools.exc:82
+#, php-format
+msgid   "%% File does not exist !!"
+msgstr  "%% Fail tidak wujud !!"
+
+#: cli.exc:107
+msgid   "Entered command is syntactically or logically incorrect"
+msgstr  "Arahan yang diberikan salah dari sintaks atau logikal"
+
+#: index.exh:53
+#, php-format
+msgid   "JavaScript must be enabled in order for you to use %s Web-based "
+        "interface.<br>However, it seems JavaScript is either disabled or not "
+        "supported by your browser."
+msgstr  "JavaScript mesti diaktifkan untuk anda menggunakan antaramuka "
+        "berasaskan Web %s.<br>Walau bagaimanapun, kelihatan seperti "
+        "JavaScript tidak diaktifkan atau tidak disokong oleh browser anda."
+
+#: index.exh:60
+msgid   "Page loading. Please wait.."
+msgstr  "Memuat halaman.. Sila tunggu.."
+
+#: index.exh:71
+msgid   "ERROR: Your browser's cookie functionality is turned off. Please "
+        "turn it on."
+msgstr  "RALAT: Fungsi cookie pada browser anda tidak diaktifkan. Sila "
+        "aktifkan."
+
+#: index.exh:78
+msgid   "ERROR: The page could not be loaded."
+msgstr  "RALAT: Halaman tidak dapat dimuatkan."
+
+#: tn_page.js:36
+msgid   "Unable to complete backend request. Please reload your browser."
+msgstr  "Gagal menyelesaikan permintaan backend. Sila muat semula browser "
+        "anda."
+
+msgid   "24-hour format of an hour and minutes with leading zeros, 00:00"
+msgstr  "Format waktu 24-jam, jam dan minit dengan awalan digit kosong, 00:00"
+
+msgid   "Additional hostname"
+msgstr  "Nama host tambahan"
+
+msgid   "Add new additional addresses"
+msgstr  "Tambah alamat baru"
+
+msgid   "Add new AH definition"
+msgstr  "Tambah definasi AH"
+
+msgid   "Add new DHCP Server"
+msgstr  "Tambah Pelayan DHCP"
+
+msgid   "Add new DHCP Static MAC/IP mappings"
+msgstr  "Tambah pemetaan statik MAC/IP DHCP"
+
+msgid   "Add new DNS access list"
+msgstr  "Tambah senarai akses DNS"
+
+msgid   "Add new dnshost definition"
+msgstr  "Tambah definasi dnshost"
+
+msgid   "Add new DNS request routing"
+msgstr  "Tambah permintaan laluan DNS"
+
+msgid   "Add new Dynamic DNS"
+msgstr  "Tambah DNS Dinamik"
+
+msgid   "Add new ESP definition"
+msgstr  "Tambah definasi ESP"
+
+msgid   "Add new exclude list"
+msgstr  "Tambah senarai yang dikecualikan"
+
+msgid   "Add new host definition"
+msgstr  "Tambah definasi host"
+
+msgid   "Add new hostmac definition"
+msgstr  "Tambah definasi hostmac"
+
+msgid   "Add new hostrange definition"
+msgstr  "Tambah definasi hostrange"
+
+msgid   "Add new ICMP definition"
+msgstr  "Tambah definasi ICMP"
+
+msgid   "Add new interface"
+msgstr  "Tambah antaramuka"
+
+msgid   "Add new IP definition"
+msgstr  "Tambah definasi IP"
+
+msgid   "Add new network definition"
+msgstr  "Tambah definasi rangkaian"
+
+msgid   "Add new network group"
+msgstr  "Tambah kumpulan rangkaian"
+
+msgid   "Add new NTP access list"
+msgstr  "Tambah senarai akses NTP"
+
+msgid   "Add new Recurring Event definition"
+msgstr  "Tambah definasi Acara Berulang"
+
+msgid   "Add new service definition"
+msgstr  "Tambah definasi servis"
+
+msgid   "Add new service group"
+msgstr  "Tambah kumpulan servis"
+
+msgid   "Add new Single Event definition"
+msgstr  "Tambah definasi Acara Tunggal"
+
+msgid   "Add new Static ARP"
+msgstr  "Tambah ARP Static"
+
+msgid   "Add new Static DNS mapping"
+msgstr  "Tambah pemetaan DNS Statik"
+
+msgid   "Add new Static route"
+msgstr  "Tambah laluan Statik"
+
+msgid   "Add new Static route blackhole route type"
+msgstr  "Tambah laluan statik jenis laluan blackhole"
+
+msgid   "Add new Static route gateway route type"
+msgstr  "Tambah laluan Statik jenis laluan gateway"
+
+msgid   "Add new Static route interface route type"
+msgstr  "Tambah laluan Statik jenis laluan antaramuka"
+
+msgid   "Add new Static route prohibit route type"
+msgstr  "Tambah laluan Statik jenis laluan yang dihalang"
+
+msgid   "Add new Static route unreachable route type"
+msgstr  "Tambah laluan Statik jenis laluan yang tidak dapat dicapai"
+
+msgid   "Add new system access list"
+msgstr  "Tambah senarai akses sistem"
+
+msgid   "Add new TCP definition"
+msgstr  "Tambah definasi TCP"
+
+msgid   "Add new TCP/UDP definition"
+msgstr  "Tambah definasi TCP/UDP"
+
+msgid   "Add new Time Event definition"
+msgstr  "Tambah definasi Acara Waktu"
+
+msgid   "Add new UDP definition"
+msgstr  "Tambah definasi UDP"
+
+msgid   "Add new vlan interface"
+msgstr  "Tambah antaramuka vlan"
+
+msgid   "Address"
+msgstr  "Alamat"
+
+msgid   "Address end"
+msgstr  "Alamat tamat"
+
+msgid   "Address range end"
+msgstr  "Julat alamat tamat"
+
+msgid   "Address range start"
+msgstr  "Julat alamat mula"
+
+msgid   "Address start"
+msgstr  "Alamat mula"
+
+msgid   "Admin email address"
+msgstr  "Alamat emel pentadbir"
+
+msgid   "Apply changes"
+msgstr  "Laksanakan Pengubahan"
+
+msgid   "ARPing options"
+msgstr  "Pilihan ARPing"
+
+msgid   "A textual representation of a day, three letters: (mon)day (tue)sday "
+        "(wed)nesday (thu)rsday (fri)day (sat)urday (sun)day. Each days "
+        "separate by punctuation mark comma (,)"
+msgstr  "Perwakilan teks untuk hari, tidak aksaa: (isn)in (sel)asa (rab)u "
+        "(kha)mis (jum)aat (sab)tu (aha)d. Setiap hari dipisahkan dengan "
+        "tanda baca koma (,)"
+
+msgid   "attempt period"
+msgstr  "Tempoh percubaan"
+
+msgid   "Auto backup interval"
+msgstr  "Tempoh selang Auto backup"
+
+msgid   "Available language"
+msgstr  "Pilihan Bahasa"
+
+msgid   "Available type web,ssh,ftp,all"
+msgstr  "Pilih jenis web/ssh/ftp/semua"
+
+msgid   "backup interval"
+msgstr  "tempoh selang backup"
+
+msgid   "Backup or restore configuration"
+msgstr  "Backup atau pulih konfigurasi"
+
+msgid   "Block access in seconds"
+msgstr  "Halang akses dalam saat"
+
+msgid   "Block password guessing after attempt period"
+msgstr  "Halang meneka kata laluan selepas tempoh percubaan"
+
+msgid   "Change access type"
+msgstr  "Ubah jenis akses"
+
+msgid   "Change additional addresses setting"
+msgstr  "Ubah tetapan alamat tambahan"
+
+msgid   "Change current config "
+msgstr  "Ubah konfigurasi semasa"
+
+msgid   "Change current configuration"
+msgstr  "Ubah konfigurasi semasa"
+
+msgid   "Change description"
+msgstr  "Ubah huraian"
+
+msgid   "Change DHCP Server configuration"
+msgstr  "Ubah konfigurasi Pelayan DHCP"
+
+msgid   "Change DHCP Static MAC/IP mappings"
+msgstr  "Ubah pemetaan Statik MAC/IP DHCP"
+
+msgid   "Change DNS configuration"
+msgstr  "Ubah konfigurasi DNS"
+
+msgid   "Change DNS request routing configuration"
+msgstr  "Ubah konfigurasi permintaan laluan DNS"
+
+msgid   "Change Dynamic DNS configuration"
+msgstr  "Ubah konfigurasi DNS Dinamik"
+
+msgid   "Change enable"
+msgstr  "Aktifkan"
+
+msgid   "Change interface"
+msgstr  "Ubah antaramuka"
+
+msgid   "Change interface address"
+msgstr  "Ubah alamat antaramuka"
+
+msgid   "Change interface name"
+msgstr  "Ubah nama antaramuka"
+
+msgid   "Change interface netmask"
+msgstr  "Ubat netmask antaramuka"
+
+msgid   "Change interface setting"
+msgstr  "Ubah tetapan antaramuka"
+
+msgid   "Change local logging setting"
+msgstr  "Ubah tetapan log local"
+
+msgid   "Change logging setting"
+msgstr  "Ubah tetapan log"
+
+msgid   "Change name"
+msgstr  "Ubah nama"
+
+msgid   "Change password setting"
+msgstr  "Ubah tetapan kata laluan"
+
+msgid   "Change remote logging setting"
+msgstr  "Ubah tetapan log remote"
+
+msgid   "Change remote server setting"
+msgstr  "Ubah tetapan pelayan remote"
+
+msgid   "Change Static DNS mapping configuration"
+msgstr  "Ubah konfigurasi pemetaan DNS Statik"
+
+msgid   "Change static interface setting"
+msgstr  "Ubah tetapan antaramuka statik"
+
+msgid   "Change time and date configuration"
+msgstr  "Ubah konfigurasi waktu dan tarikh"
+
+msgid   "Change vlan interface setting"
+msgstr  "Ubah tetapan antaramuka vlan"
+
+msgid   "city name"
+msgstr  "nama bandar"
+
+msgid   "Configure DHCP Relay "
+msgstr  "Mengkonfigurasi Relay DHCP"
+
+msgid   "Configure DHCP Relay interface"
+msgstr  "Mengkonfigurasi antaramuka Relay DHCP"
+
+msgid   "Configure DHCP Relay Server"
+msgstr  "Mengkonfigurasi Pelayan Relay DHCP"
+
+msgid   "country name"
+msgstr  "nama negara"
+
+msgid   "Create backup file"
+msgstr  "Buat fail backup"
+
+msgid   "Date format DAY:MONTH:YEAR, 00-00-0000"
+msgstr  "Format tarikh HARI:BULAN:TAHUN, 00-00-0000"
+
+msgid   "Day format YEAR-MONTH-DAY, 0000-00-00"
+msgstr  "Format hari TAHUN-BULAN-HARI, 0000-00-00"
+
+msgid   "Definition host"
+msgstr  "Host definasi"
+
+msgid   "Definitions configuration"
+msgstr  "Konfigurasi definasi"
+
+msgid   "Definition service"
+msgstr  "Servis definasi"
+
+msgid   "Delete additional interface"
+msgstr  "Hapus antaramuka tambahan"
+
+msgid   "Delete backup file"
+msgstr  "Hapus fail backup"
+
+msgid   "Delete current session"
+msgstr  "Hapus sesi semasa"
+
+msgid   "Delete DHCP server list"
+msgstr  "Hapus senarai pelayan DHCP"
+
+msgid   "Delete DNS access list"
+msgstr  "Hapus senarai akses DNS"
+
+msgid   "Delete DNS request routing"
+msgstr  "Hapus halaan permintaan DNS"
+
+msgid   "Delete exclude list"
+msgstr  "Hapus senarai yang dikecualikan"
+
+msgid   "Delete interface"
+msgstr  "Hapus antaramuka"
+
+msgid   "Delete log file"
+msgstr  "Hapus fail log"
+
+msgid   "Delete network definition"
+msgstr  "Hapus definasi rangkaian"
+
+msgid   "Delete NTP access list"
+msgstr  "Hapus senarai akses NTP"
+
+msgid   "Delete service definition"
+msgstr  "Hapus definasi servis"
+
+msgid   "Delete Static ARP list"
+msgstr  "Hapus senarai ARP Statik"
+
+msgid   "Delete Static DNS mapping "
+msgstr  "Hapus pemetaan DNS Statik"
+
+msgid   "Delete Static routes list"
+msgstr  "Hapus senarai laluan Statik"
+
+msgid   "Delete system access list"
+msgstr  "Hapus senarai akses sistem"
+
+msgid   "Delete Time Event definition"
+msgstr  "Hapus definasi Acara Waktu"
+
+msgid   "Description"
+msgstr  "Huraian"
+
+msgid   "Destination port"
+msgstr  "Port destinasi"
+
+msgid   "DHCP Server configuration"
+msgstr  "Konfigurasi Pelayan DHCP"
+
+msgid   "Diagnostics tool"
+msgstr  "Alatan diagnostik"
+
+msgid   "Dig options"
+msgstr  "Pilihan Dig"
+
+msgid   "Display ARP cache"
+msgstr  "Papar cache ARP"
+
+msgid   "Display a snapshot of the current processes"
+msgstr  "Papar petikan proses semasa"
+
+msgid   "Display backup directory"
+msgstr  "Papar direktori backup"
+
+msgid   "Display backup file"
+msgstr  "Papar fail backup"
+
+msgid   "Display country name"
+msgstr  "Papar nama negara"
+
+msgid   "Display current config"
+msgstr  "Papar konfigurasi semasa"
+
+msgid   "Display current list"
+msgstr  "Papar senarai semasa"
+
+msgid   "Display current session"
+msgstr  "Papar sesi semasa"
+
+msgid   "Display DHCP Relay"
+msgstr  "Papar Relay DHCP"
+
+msgid   "Display DHCP Server configuration"
+msgstr  "Papar konfigurasi Pelayan DHCP"
+
+msgid   "Display DHCP Static MAC/IP mappings"
+msgstr  "Papar pemetaan Statik MAC/IP DHCP"
+
+msgid   "Display DNS configuration"
+msgstr  "Papar konfigurasi DNS"
+
+msgid   "Display file"
+msgstr  "Papar fail"
+
+msgid   "Display ICMP type/code"
+msgstr  "Papar jenis/kod ICMP"
+
+msgid   "Display log file list"
+msgstr  "Papar senarai fail log"
+
+msgid   "Display network definition list"
+msgstr  "Papar senarai definasi rangkaian"
+
+msgid   "Display network device"
+msgstr  "Papar peranti rangkaian"
+
+msgid   "Display network interfaces"
+msgstr  "Papar antaramuka rangkaian"
+
+msgid   "Display NTP status"
+msgstr  "Papar status NTP"
+
+msgid   "Display option"
+msgstr  "Papar pilihan"
+
+msgid   "Display or change access configuration"
+msgstr  "Papar atau ubah konfigurasi akses"
+
+msgid   "Display or change additional addresses configuration"
+msgstr  "Papar atau ubah konfigurasi alamat tambahan"
+
+msgid   "Display or change backup configuration"
+msgstr  "Papar atau ubah konfigurasi backup"
+
+msgid   "Display or change DHCP Relay"
+msgstr  "Papar atau ubah Relay DHCP"
+
+msgid   "Display or change DHCP Server configuration"
+msgstr  "Papar atau ubah konfigurasi Pelayan DHCP"
+
+msgid   "Display or change DHCP Static MAC/IP mappings"
+msgstr  "Papar atau ubah pemetaan Statik MAC/IP"
+
+msgid   "Display or change DNS configuration"
+msgstr  "Papar atau ubah konfigurasi DNS"
+
+msgid   "Display or change general configuration"
+msgstr  "Papar atau ubah konfigurasi umum"
+
+msgid   "Display or change interface configuration"
+msgstr  "Papar atau ubah konfigurasi antaramuka"
+
+msgid   "Display or change IP conflict detector configuration"
+msgstr  "Papar atau ubah konfigurasi pengesan konflik IP"
+
+msgid   "Display or change NTP status"
+msgstr  "Papar atau ubah status NTP"
+
+msgid   "Display or change Static routes configuration"
+msgstr  "Papar atau ubah konfigurasi laluan Statik"
+
+msgid   "Display or configure DNS access list"
+msgstr  "Papar atau mengkonfigurasi senarai akses DNS"
+
+msgid   "Display or configure DNS request routing"
+msgstr  "Papar atau mengkonfigurasi laluan permintaan DNS"
+
+msgid   "Display or configure NTP access list"
+msgstr  "Papar atau mengkonfigurasi senarai akses NTP"
+
+msgid   "Display or configure Static DNS mapping "
+msgstr  "Papar atau mengkonfigurasi pemetaan DNS Statik"
+
+msgid   "Display or configure system access control"
+msgstr  "Papar atau mengkonfigurasi kawalan akses sistem"
+
+msgid   "Display or configure system access list"
+msgstr  "Papar atau mengkonfigurasi senarai akses sistem"
+
+msgid   "Display or configure system access password"
+msgstr  "Papar atau mengkonfigurasi kata laluan akses sistem"
+
+msgid   "Display service definition list"
+msgstr  "Papar senarai definasi servis"
+
+msgid   "Display Static ARP list"
+msgstr  "Papar senarai ARP Statik"
+
+msgid   "Display Static routes configuration"
+msgstr  "Papar konfigurasi laluan Statik"
+
+msgid   "Display system directory"
+msgstr  "Papar direktori sistem"
+
+msgid   "Display system tasks"
+msgstr  "Papar tugasan sistem"
+
+msgid   "Display Time Event definition list"
+msgstr  "Papar senarai definasi Acara Waktu"
+
+msgid   "Display time zone"
+msgstr  "Papar zon waktu"
+
+msgid   "Display update directory"
+msgstr  "Papar direktori update"
+
+msgid   "DNS lookup utility"
+msgstr  "Utiliti carian DNS"
+
+msgid   "DNS server 1"
+msgstr  "Pelayan DNS 1"
+
+msgid   "DNS server 2"
+msgstr  "Pelayan DNS 2"
+
+msgid   "DNS Server configuration"
+msgstr  "Konfigurasi Pelayan DNS"
+
+msgid   "Domain name"
+msgstr  "Nama domain"
+
+msgid   "Dynamic DNS configuration"
+msgstr  "Konfigurasi DNS Dinamik"
+
+msgid   "Dynamic DNS provider"
+msgstr  "Penyedia DNS Dinamik"
+
+msgid   "Edit system access list"
+msgstr  "Ubah senarai akses sistem"
+
+msgid   "Email address"
+msgstr  "Alamat emel"
+
+msgid   "Email recipient"
+msgstr  "Penerima emel"
+
+msgid   "Enable default gateway"
+msgstr  "Aktifkan gateway default"
+
+msgid   "Enable DHCP Relay"
+msgstr  "Aktifkan Relay DHCP"
+
+msgid   "Enable/Disable auto backup"
+msgstr  "Aktif/Nyah-aktif auto backup"
+
+msgid   "Enable DNS Server"
+msgstr  "Aktifkan Pelayan DNS"
+
+msgid   "Enable FTP secure connection"
+msgstr  "Aktifkan sambungan selamat FTP"
+
+msgid   "Enable NTP Server"
+msgstr  "Aktifkan Pelayan NTP"
+
+msgid   "Enable Proxy ARP"
+msgstr  "Aktifkan ARP Proxy"
+
+msgid   "Enable source NAT"
+msgstr  "Aktifkan NAT sumber"
+
+msgid   "Enable Uplink Failover"
+msgstr  "Aktifkan Uplink Failover"
+
+msgid   "End date"
+msgstr  "Tarikh tamat"
+
+msgid   "End time"
+msgstr  "Waktu tamat"
+
+msgid   "File"
+msgstr  "Fail"
+
+msgid   "filename"
+msgstr  "Nama fail"
+
+msgid   "FTP access configuration"
+msgstr  "Konfigurasi akses FTP"
+
+msgid   "FTP client"
+msgstr  "Pelanggan FTP"
+
+msgid   "Gateway address"
+msgstr  "Alamat gateway"
+
+msgid   "Host format hostname or IPv4 address"
+msgstr  "Format host nama host atau alamat IPv4"
+
+msgid   "Host lookup"
+msgstr  "Carian host"
+
+msgid   "hostname"
+msgstr  "Nama host"
+
+msgid   "Hostname"
+msgstr  "Nama host"
+
+msgid   "Interface address"
+msgstr  "Alamat antaramuka"
+
+msgid   "Interface name"
+msgstr  "Nama host"
+
+msgid   "Interval"
+msgstr  "Selang"
+
+msgid   "IPv4 address"
+msgstr  "Alamat IPv4"
+
+msgid   "IPv4 address or NULL"
+msgstr  "Alamat IPv4 atau NULL"
+
+msgid   "Logging configuration"
+msgstr  "Konfigurasi Log"
+
+msgid   "Logout from current session"
+msgstr  "Log keluar dari sesi semasa"
+
+msgid   "MAC Address"
+msgstr  "Alamat MAC"
+
+msgid   "Match string"
+msgstr  "Padanan string"
+
+msgid   "Maximum"
+msgstr  "Maksimum"
+
+msgid   "Maximum file backup"
+msgstr  "Fail backup maksimum"
+
+msgid   "MTU Size"
+msgstr  "Saiz MTU"
+
+msgid   "Multi Number 1,2,3 each number separate by punctuation mark comma (,)"
+msgstr  "Pelbagai Nombor 1,2,3 setiap nombor dipisahkan dengan tanda baca "
+        "koma (,)"
+
+msgid   "Multi Number 1,2,3 each number separate by punctuation mark comma "
+        "(,) or any"
+msgstr  "Pelbagai Nombor 1,2,3 setiap nombor dipisahkan dengan tanda baca "
+        "koma (,) atau sebarang"
+
+msgid   "Multi Number or *"
+msgstr  "Pelbagai Nombor atau *"
+
+msgid   "Multi Number or NULL"
+msgstr  "Pelbagai Nombor atau NULL"
+
+msgid   "Multi Number or NULL or *"
+msgstr  "Pelbagai Nombor atau NULL atau *"
+
+msgid   "Name"
+msgstr  "Nama"
+
+msgid   "Name server to query"
+msgstr  "Nama pelayan untuk ditanya"
+
+msgid   "Netmask or prefix"
+msgstr  "Netmask atau prefix"
+
+msgid   "Network configuration"
+msgstr  "Konfigurasi rangkaian"
+
+msgid   "Network definition"
+msgstr  "Definasi rangkaian"
+
+msgid   "Network Interface configuration"
+msgstr  "Konfigurasi antaramuka rangkaian"
+
+msgid   "Network mask or prefix"
+msgstr  "Network mask atau prefix"
+
+msgid   "NTP Server configuration"
+msgstr  "Konfigurasi Pelayan NTP"
+
+msgid   "Number"
+msgstr  "Nombor"
+
+msgid   "Number in the range 1-4095"
+msgstr  "Nombor dalam julat 1-4095"
+
+msgid   "Number or any"
+msgstr  "Nombor atau sebarang"
+
+msgid   "Number or NULL"
+msgstr  "Nombor atau NULL"
+
+msgid   "on/off"
+msgstr  "on/off"
+
+msgid   "Operation"
+msgstr  "Operasi"
+
+msgid   "Option"
+msgstr  "Pilihan"
+
+msgid   "organization name"
+msgstr  "nama organisasi"
+
+msgid   "Password"
+msgstr  "Kata laluan"
+
+msgid   "Ping hosts by ARP requests/replies"
+msgstr  "Ping host dengan permintaan/jawapan ARP"
+
+msgid   "Ping options"
+msgstr  "Pilihan Ping"
+
+msgid   "Port Number"
+msgstr  "Nombor Port"
+
+msgid   "Protocol number"
+msgstr  "Nombor Protokol"
+
+msgid   "Reboot the system"
+msgstr  "Reboot sistem"
+
+msgid   "Resource Id"
+msgstr  "Id Sumber"
+
+msgid   "Resource Id for access list"
+msgstr  "Id Sumber untuk senarai akses"
+
+msgid   "Resource Id for additional addresses"
+msgstr  "Id Sumber untuk alamat tambahan"
+
+msgid   "Resource Id '*' for all"
+msgstr  "Id Sumber '*' untuk semua"
+
+msgid   "Resource Id for definition host or dnshost"
+msgstr  "Id Sumber untuk host definasi atau dnshost"
+
+msgid   "Resource Id for definition network"
+msgstr  "Id Sumber untuk rangkaian definasi"
+
+msgid   "Resource Id for definition network host."
+msgstr  "Id Sumber untuk host rangkaian definasi"
+
+msgid   "Resource Id for definition network host"
+msgstr  "Id Sumber untuk host rangkaian definasi"
+
+msgid   "Resource Id for definition network. NULL for disable"
+msgstr  "Id Sumber untuk rangkaian definasi. NULL atau nyah-aktif"
+
+msgid   "Resource Id for definition network or any."
+msgstr  "Id Sumber untuk rangkaian definasi atau sebarang"
+
+msgid   "Resource Id for definition networks"
+msgstr  "Id Sumber untuk rangkaian definasi"
+
+msgid   "Resource Id for definition service"
+msgstr  "Id Sumber untuk servis definasi"
+
+msgid   "Resource Id for DHCP Server"
+msgstr  "Id Sumber untuk Pelayan DHCP"
+
+msgid   "Resource Id for ICMP Type/Code"
+msgstr  "Id Sumber untuk jenis/kod ICMP"
+
+msgid   "Resource Id for interface"
+msgstr  "Id Sumber untuk antaramuka"
+
+msgid   "Resource Id for Interface"
+msgstr  "Id Sumber untuk antaramuka"
+
+msgid   "Resource Id for Interfaces"
+msgstr  "Id Sumber untuk antaramuka"
+
+msgid   "Resource Id for network device"
+msgstr  "Id Sumber untuk peranti rangkaian"
+
+msgid   "Resource Id for network interfaceses"
+msgstr  "Id Sumber untuk antaramuka rangkaian"
+
+msgid   "Resource Id for static interface"
+msgstr  "Id Sumber untuk antaramuka statik"
+
+msgid   "Resource Id for timezone"
+msgstr  "Id Sumber untuk zon waktu"
+
+msgid   "Resource Id for vlan interface"
+msgstr  "Id Sumber untuk antaramuka vlan"
+
+msgid   "Resource Id '*' will delete all list"
+msgstr  "Id Sumber '*' akan hapus semua senarai"
+
+msgid   "Resource Id '*' will delete all log"
+msgstr  "Id Sumber '*' akan hapus semua log"
+
+msgid   "Restore backup file"
+msgstr  "Pulih fail backup"
+
+msgid   "Return to main menu"
+msgstr  "Kembali ke menu utama"
+
+msgid   "Return to previous menu"
+msgstr  "Kembali ke menu sebelumnya"
+
+msgid   "Routes configuration"
+msgstr  "Konfigurasi laluam"
+
+msgid   "Search DHCP Server"
+msgstr  "Cari Pelayan DHCP"
+
+msgid   "Search DHCP Static MAC/IP mappings"
+msgstr  "Cari pemetaan Statik DHCP MAC/IP"
+
+msgid   "Search DNS access list"
+msgstr  "Cari senarai akses DNS"
+
+msgid   "Search DNS request routing list"
+msgstr  "Cari senarai laluan permintaan DNS"
+
+msgid   "Search Dynamic DNS"
+msgstr  "Cari DNS Dinamik"
+
+msgid   "Search network definition"
+msgstr  "Cari definasi rangkaian"
+
+msgid   "Search NTP access list"
+msgstr  "Cari senarai akses NTP"
+
+msgid   "Search service definition"
+msgstr  "Cari definasi servis"
+
+msgid   "Search Static ARP list"
+msgstr  "Cari senarai ARP Statik"
+
+msgid   "Search Static DNS mapping list"
+msgstr  "Cari senarai pemetaan DNS Statik"
+
+msgid   "Search Static routes list"
+msgstr  "Cari senarai laluan Statik"
+
+msgid   "Search string in log file"
+msgstr  "Cari string dalam fail log"
+
+msgid   "Search time event definition"
+msgstr  "Cari definasi acara waktu"
+
+msgid   "Security access configuration"
+msgstr  "Konfigurasi akses keselamatan"
+
+msgid   "Security exclude list"
+msgstr  "Senarai keselamatan yang dikecualikan"
+
+msgid   "Security Parameters Index"
+msgstr  "Index Parameter Keselamatan"
+
+msgid   "Select"
+msgstr  "Pilih"
+
+msgid   "Send ICMP Echo packets"
+msgstr  "Hantar peket Echo ICMP"
+
+msgid   "Server Host"
+msgstr  "Host Pelayan"
+
+msgid   "Service definition"
+msgstr  "Definasi Servis"
+
+msgid   "service port to connect"
+msgstr  "Port servis untuk disambung"
+
+msgid   "Session control"
+msgstr  "Kawalan Sesi"
+
+msgid   "Set access user"
+msgstr  "Tetapkan pengguna yang mengakses"
+
+msgid   "Set admin email"
+msgstr  "Tetapkan emel pentandbir"
+
+msgid   "Set aliases"
+msgstr  "Tetapkan aliases"
+
+msgid   "Set city name"
+msgstr  "Tetapkan nama bandar"
+
+msgid   "Set country name, 2 first letter"
+msgstr  "Tetapkan nama negara, 2 aksara pertama"
+
+msgid   "Set date"
+msgstr  "Tetapkan tarikh"
+
+msgid   "Set Date and Time"
+msgstr  "Tetapkan Tarikh dan Waktu"
+
+msgid   "Set description"
+msgstr  "Tetapkan huraian"
+
+msgid   "Set DHCP Server address pool"
+msgstr  "Tetapkan kolam alamat Pelayan DHCP"
+
+msgid   "Set DHCP Server default-fateway"
+msgstr  "Tetapkan gateway-default Pelayan DHCP"
+
+msgid   "Set DHCP Server dns server"
+msgstr  "Tetapkan Pelayan DHCP pelayan dns"
+
+msgid   "Set DHCP Server domain"
+msgstr  "Tetapkan domain Pelayan DHCP"
+
+msgid   "Set DHCP Server WINS server"
+msgstr  "Tetapkan Pelayan DHCP pelayan WINS"
+
+msgid   "Set DHCP Static MAC/IP mappings IP Address"
+msgstr  "Tetapkan Alamat IP pemetaan Statik MAC/IP"
+
+msgid   "Set DHCP Static MAC/IP mappings MAC Address"
+msgstr  "Tetapkan Alamat MAC pemetaan Statik MAC/IP"
+
+msgid   "Set Direct access password"
+msgstr  "Tetapkan kata laluan akses terus"
+
+msgid   "Set DNS forwarder"
+msgstr  "Tetapkan forwarder DNS"
+
+msgid   "Set DNS rovider"
+msgstr  "Tetapkan penyedia DNS"
+
+msgid   "Set domain DNS request routing"
+msgstr  "Tetapkan domain laluan permintaan DNS"
+
+msgid   "Set enable"
+msgstr  "Aktifkan"
+
+msgid   "Set enable ipwatch"
+msgstr  "Aktifkan ipwatch"
+
+msgid   "Set enable secure connection"
+msgstr  "Aktifkan sambungan keselamatan"
+
+msgid   "Set FTP access password"
+msgstr  "Tetapkan kata laluan akses FTP"
+
+msgid   "Set FTP enable"
+msgstr  "Aktifkan FTP"
+
+msgid   "Set hostname"
+msgstr  "Tetapkan nama host"
+
+msgid   "Set hostname Static DNS mapping "
+msgstr  "Tetapkan pemetaan DNS Statik nama host"
+
+msgid   "Set interface description"
+msgstr  "Tetapkan huraian antaramuka"
+
+msgid   "Set IP Address Static DNS mapping "
+msgstr  "Tetapkan alamat IP pemetaan DNS Statik"
+
+msgid   "Set MTU size"
+msgstr  "Tetapkan saiz MTU"
+
+msgid   "Set NTP Server"
+msgstr  "Tetapkan Pelayan NTP"
+
+msgid   "Set organization name"
+msgstr  "Tetapkan nama organisasi"
+
+msgid   "Set password"
+msgstr  "Tetapkan kata laluan"
+
+msgid   "Set server host"
+msgstr  "Tetapkan host pelayan"
+
+msgid   "Set service"
+msgstr  "Tetapkan servis"
+
+msgid   "Set session timeout"
+msgstr  "Tetapkan jangka tamat sesi"
+
+msgid   "Set SSH access password"
+msgstr  "Tetapkan kata laluan akses SSH"
+
+msgid   "Set SSH enable"
+msgstr  "Tetapkan aktif SSH"
+
+msgid   "Set state name"
+msgstr  "Tetapkan nama negeri"
+
+msgid   "Set system language"
+msgstr  "Tetapkan bahasa sistem"
+
+msgid   "Set target servers DNS request routing"
+msgstr  "Tetapkan pelayan tujuan laluan permintaan DNS"
+
+msgid   "Set TCP Port"
+msgstr  "Tetapkan port TCP"
+
+msgid   "Set the size of history list"
+msgstr  "Tetapkan saiz senarai peristiwa"
+
+msgid   "Set time"
+msgstr  "Tetapkan waktu"
+
+msgid   "Set timezone"
+msgstr  "Tetapkan zon waktu"
+
+msgid   "Set username"
+msgstr  "Tetapkan nama pengguna"
+
+msgid   "Set VLAN Tag"
+msgstr  "Tetankan Tanda TAG"
+
+msgid   "Set Web access password"
+msgstr  "Tetapkan kata laluan akses Web"
+
+msgid   "Set Web access password, access type admin"
+msgstr  "Tetapkan kata laluan akses Web, jenis akses pentadbir"
+
+msgid   "Set Web access password, access type look"
+msgstr  "Tetapkan kata laluan akses Web, jenis akses lihat"
+
+msgid   "Set web enable"
+msgstr  "Aktifkan web"
+
+msgid   "Show command line history"
+msgstr  "Papar peristiwa baris arahan"
+
+msgid   "Show command line syntax"
+msgstr  "Papar sintaks baris arahan"
+
+msgid   "Show system information"
+msgstr  "Papar maklumat sistem"
+
+msgid   "Shutdown the system"
+msgstr  "Tutup sistem"
+
+msgid   "Single or multiple type: ssh,ftp,web. Each types separate by "
+        "punctuation mark comma (,)"
+msgstr  "Tunggal atau pelbagai jenis: ssh,ftp,web. Setiap jenis dipisahkan "
+        "dengan tanda baca koma (,)"
+
+msgid   "Source port"
+msgstr  "Port Sumber"
+
+msgid   "SSH access configuration"
+msgstr  "Konfigurasi akses SSH"
+
+msgid   "SSH client"
+msgstr  "Pelanggan SSH"
+
+msgid   "Start date"
+msgstr  "Tarikh mula"
+
+msgid   "Start time"
+msgstr  "Waktu mula"
+
+msgid   "state name"
+msgstr  "nama negeri"
+
+msgid   "Static ARP management"
+msgstr  "Pengurusan ARP Statik"
+
+msgid   "String"
+msgstr  "String"
+
+msgid   "String to find"
+msgstr  "String untuk dicari"
+
+msgid   "Synchronize time with internet server"
+msgstr  "Samakan waktu dengan pelayan internet"
+
+msgid   "System configuration"
+msgstr  "Konfigurasi sistem"
+
+msgid   "System logs"
+msgstr  "Log Sistem"
+
+msgid   "TCP Port"
+msgstr  "Port TCP"
+
+msgid   "Telnet client"
+msgstr  "Pelanggan Telnet"
+
+msgid   "Time Events definition"
+msgstr  "Definasi Acara Waktu"
+
+msgid   "Time in seconds"
+msgstr  "Waktu dalam saat"
+
+msgid   "Timeout in second"
+msgstr  "Waktu tamat dalam saat"
+
+msgid   "Timeout in seconds"
+msgstr  "Waktu tamat dalam saat"
+
+msgid   "Traceroute options"
+msgstr  "Pilihan Traceroute"
+
+msgid   "Trace the route to host"
+msgstr  "Kesan laluan ke host"
+
+msgid   "User"
+msgstr  "Pengguna"
+
+msgid   "User/Group definition"
+msgstr  "Definasi Pengguna/Kumpulan"
+
+msgid   "username"
+msgstr  "nama pengguna"
+
+msgid   "Username"
+msgstr  "Nama pengguna"
+
+msgid   "View log file"
+msgstr  "Lihat fail log"
+
+msgid   "VLAN Tag"
+msgstr  "Tanda VLAN"
+
+msgid   "Web access configuration"
+msgstr  "Konfigurasi akses Web"
+
+msgid   "Weekdays"
+msgstr  "Hari bekerja"
+
+msgid   "WINS Node type"
+msgstr  "Jenis Node WINS"
+
+msgid   "WINS server"
+msgstr  "Pelayan WINS"
+
+#: utils.exl:227
+msgid   "hours"
+msgstr  "jam"
+
+#: utils.exl:231
+msgid   "minutes"
+msgstr  "minit"
+
+msgid   "month"
+msgstr  "bulan"
+
+msgid   "months"
+msgstr  "bulan"
+
+msgid   "year"
+msgstr  "tahun"
+
+msgid   "years"
+msgstr  "tahun"
+
+#: utils.exl:222
+msgid   "day"
+msgstr  "hari"
+
+#: utils.exl:223
+msgid   "days"
+msgstr  "hari"
+
+#: utils.exl:212
+msgid   "unknown"
+msgstr  "tidak diketahui"
+
+msgid   "never"
+msgstr  "tidak pernah"
+
+#: _cgi_page_system_update_tab2.exl:7
+msgid   "Last checked:"
+msgstr  "Kali terakhir disemak:"
+
+#: _cgi_page_system_update_tab2.exl:13
+msgid   "Next check:"
+msgstr  "Semakan seterusnya:"
+
+#: _cgi_page_system_update_tab2.exl:18
+msgid   "Check Now"
+msgstr  "Semak Sekarang"
+
+#: _cgi_page_system_update_tab2.exl:33
+msgid   "Firmware updates"
+msgstr  "Update Firmware"
+
+#: _cgi_page_system_update_tab2.exl:37
+msgid   "Check for updates:"
+msgstr  "Semak update"
+
+#: _cgi_page_system_update_tab2.exl:47
+msgid   "The system will connect to updates server and check if newer version "
+        "is available. Select never to disable this operation."
+msgstr  "Sistem akan sambung ke pelayan "
+
+#: _cgi_page_system_update_tab2.exl:57
+msgid   "Firmware download"
+msgstr  "Muatturun firmware"
+
+#: _cgi_page_system_update_tab2.exl:62
+msgid   "Enable automatic firmware download"
+msgstr  "Membolehkan memuatturun firmware secara automatik"
+
+#: _cgi_page_system_update_tab2.exl:63
+msgid   "When this option is enabled and newer version is available, the "
+        "system will automatically download the updates. Make sure check for "
+        "updates is enabled."
+msgstr  "Apabila pilihan ini diaktifkan dan ada versi baru didapati, sistem "
+	"akan memuatturun update secara automatik. Pastikan semakan update "
+	"diaktifkan."
+
+#: _cgi_page_system_update_tab2.exl:68
+msgid   "Enable keep update files"
+msgstr  "Membolehkan simpan fail update"
+
+#: _cgi_page_system_update_tab2.exl:69
+msgid   "When this option is enabled, the system will never remove downloaded "
+        "updates."
+msgstr  "Apabila pilihan ini diaktifkan, sistem tidak akan menghapus update "
+	"yang dimuatturun."
+
+#: _cgi_page_system_update_tab2.exl:78
+msgid   "Parent Proxy"
+msgstr  "Proxy Induk"
+
+#: _cgi_page_system_update_tab2.exl:83
+msgid   "Enable a parent proxy"
+msgstr  "Aktifkan proxy induk"
+
+#: _cgi_page_system_update_tab2.exl:84
+msgid   "When this option is enabled, the system will use parent proxy to "
+        "fetch firmware updates.<br /><br />You can enable a proxy "
+        "authentication and specify username and password if your parent "
+        "proxy requires authentication. Leaving a password's fields empty "
+        "will preserve the existing password."
+msgstr  "Apabila pilihan ini diaktifkan, sistem akan menggunakan proxy induk untuk "
+	"mencapai update firmware.<br /><br />Anda boleh mengaktifkan pengesahan "
+	"proxy dan menetapkan nama pengguna dan kata laluan jika proxy induk anda memerlukan "
+	"pengesahan. Meninggalkan ruangan kata laluan kosong akan mengekalkan kata laluan asal "
+
+#: _cgi_page_system_update_tab2.exl:88
+msgid   "Proxy host:"
+msgstr  "Host Proxy:"
+
+#: _cgi_page_system_update_tab2.exl:100
+msgid   "Proxy port:"
+msgstr  "Port Proxy:"
+
+#: _cgi_page_system_update_tab2.exl:107
+msgid   "Enable a proxy authentication"
+msgstr  "Aktifkan pengesahan proxy"
+
+#: _cgi_page_system_update_tab2.exl:111
+msgid   "Username:"
+msgstr  "Nama Pengguna:"
+
+#: _cgi_page_system_update_tab2.exl:116
+msgid   "Password:"
+msgstr  "Kata Laluan:"
+
+#: _cgi_page_system_update_tab2.exl:142
+msgid   "Not checking yet"
+msgstr  "Belum disemak"
+
+#: _cgi_page_system_update_tab2.exl:147
+msgid   "updates available"
+msgstr  "update didapati"
+
+#: _cgi_page_system_update_tab2.exl:212
+msgid   "Entered values at Parent Proxy is syntactically or logically "
+        "incorrect"
+msgstr  "Nilai yang diberikan pada Proxy induk salah secara sintaks atau logik "
+
+#: _cgi_page_system_update_tab2.exl:223
+msgid   "No Proxy User defined"
+msgstr  "Tiada Pengguna Proxy ditetapkan"

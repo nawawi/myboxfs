@@ -1,0 +1,172 @@
+<?php
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+function _EXEC_CMD($_cmd,$_input='') {
+	if(_NULL($_cmd)) return 1;
+        $_spec = array(
+                0 => array("pipe", "r"),
+                1 => array("file", "/dev/null", "w"),
+                2 => array("file", "/dev/null", "w"),
+        );
+        $_proc=proc_open($_cmd,$_spec,$_pipes);
+        if(is_resource($_proc)) {
+		$_stdin=$_pipes[0];
+		$_stdout=$_pipes[1];
+		$_stderr=$_pipes[2];
+		if(!_NULL($_input)) {
+			fwrite($_stdin,"$_input\n");
+		}
+		@fclose($_stdin);
+		@fclose($_stdout);
+		@fclose($_stderr);
+                return proc_close($_proc);
+        }
+        return 1;
+}
+
+function _EXEC_CMD_OUTPUT($_cmd,&$_STDOUT,&$_STDERR,$_input='') {
+	if(_NULL($_cmd)) return 1;
+        $_spec = array(
+                0 => array("pipe", "r"),
+                1 => array("pipe", "w"),
+                2 => array("pipe", "w"),
+        );
+        $_proc=proc_open($_cmd,$_spec,$_pipes);
+        if(is_resource($_proc)) {
+		$_stdin=$_pipes[0];
+		$_stdout=$_pipes[1];
+		$_stderr=$_pipes[2];
+		if(!_NULL($_input)) {
+			fwrite($_stdin,"$_input\n");
+		}
+		if($_stdout) do {
+			$_STDOUT[]=trim(fgets($_stdout));
+		} while(!feof($_stdout));
+		if($_stderr) do {
+			$_STDERR[]=trim(fgets($_stderr));
+		} while(!feof($_stdout));
+		@fclose($_stdin);
+		@fclose($_stdout);
+		@fclose($_stderr);
+                return proc_close($_proc);
+        }
+        return 1;
+}
+
+function _EXEC_SHELL($_cmd) {
+	return shell_exec("$_cmd 2>/dev/null");
+}
+
+
+function _KILLMATCH($_prog,$_signal='') {
+	$_sig="9";
+	if(!_NULL($_signal)) $_sig="$_signal";
+	if(!_NULL($_prog)) {
+		$_pidf="/var/run/{$_prog}.pid";
+		// Match whole name
+		if(_EXEC_CMD("/bin/pkill -x -$_sig $_prog")==0) {
+			@unlink($_pidf);
+			return TRUE;
+		}
+		// Match against entire command line
+		if(_EXEC_CMD("/bin/pkill -f -$_sig $_prog")==0) {
+			@unlink($_pidf);
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+function _KILL($_pid,$_signal='') {
+	$_sig="9";
+	if(!_NULL($_signal)) $_sig="$_signal";
+	if(_ISNUM($_pid)) {
+		return posix_kill($_pid,$_sig);
+	}
+	return FALSE;
+}
+
+function _GET_PID($_prog,&$_pid) {
+	if(_NULL($_prog)) return array();
+	$_pid=array();
+	if(_EXEC_CMD_OUTPUT("/bin/pgrep -f '$_prog'",$_output,$_err)==0) {
+		if(!_ARRAY_NULL($_output)) {
+			$_pid=$_output;
+		}
+		unset($_output,$_err);
+	}
+	return $_pid;
+}
+
+
+// check if pid already running
+// return TRUE if running
+function _CHECK_PID($_pid) {
+	return _KILL($_pid,0);
+}
+
+function _DAEMON_UP($_prog) {
+	_GET_PID($_prog,$_pid);
+	if(!_ARRAY_NULL($_pid)) return TRUE;
+	return FALSE;
+}
+
+function _KILL_DAEMON($_prog) {
+	$_pidf="/var/run/{$_prog}.pid";
+	$_pid=_FILE_GET("$_pidf");
+	if(!_NULL($_pid)) {
+		if(_KILL($_pid)==TRUE) {
+			@unlink($_pidf);
+			return TRUE;
+		}
+	}
+	return _KILLMATCH($_prog,9);
+}
+
+// send SIGHUP signal (1)
+function _SIGHUP($_prog) {
+	$_pid=_FILE_GET("/var/run/$_prog.pid");
+	if(!_NULL($_pid)) {
+		if(_CHECK_PID($_pid)) {
+			return _KILL($_pid,"1");
+		}
+	}
+	return FALSE;
+}
+
+// rmmod
+function _RMMOD($_mod) {
+	if(!_NULL($_mod)) {
+		_EXEC_CMD_OUTPUT("lsmod",$_STDOUT,$_STDERR);
+		if(!_ARRAY_NULL($_STDOUT)) {
+			foreach($_STDOUT as $_ln) {
+				_TRIM($_ln);
+				if(_NULL($_ln)) continue;
+				if(preg_match("/^$_mod/",$_ln)) {
+					list(,,,$_m2)=preg_split("/\s+/",$_ln);
+					if(!_NULL($_m2)) {
+						$_mod_a=preg_split("/,/",$_m2);
+						if(!_ARRAY_NULL($_mod_a)) {
+							$_mod_a=array_reverse($_mod_a);
+							foreach($_mod_a as $_m) {
+								_TRIM($_m);
+								if(_NULL($_m)) continue;
+								_EXEC_CMD("modprobe -r $_m");
+							}
+							unset($_m);
+						}
+						unset($_mod_a);
+					} 
+					_EXEC_CMD("modprobe -r $_mod");
+					unset($_m2);
+				}
+				unset($_ln);
+			}
+		}
+		if(file_exists("/sys/module/$_mod")) {
+			_EXEC_CMD("modprobe -r $_mod");
+			clearstatcache();
+		}
+	}
+}
+?>

@@ -1,0 +1,42 @@
+#!/bin/sh
+_version() {
+	local _data="$(uname -a 2>/dev/null)";
+	local _buff _cnt _f _p;
+	((_cnt=0));
+	if [ -n "$_data" ]; then
+		for _f in $_data; do
+			_buff[$_cnt]=$_f;
+			((_cnt++));
+		done
+	fi
+        if [ $_cnt -gt 5 ]; then
+		local _release _kernel _mem _os;
+        	[ -r "/etc/firmware" ] && read _release < /etc/firmware;
+		[ -r "/proc/meminfo" ] && _mem="$(awk '/MemTotal/{print $2}' /proc/meminfo)";
+		[ -n "${_buff[2]}" ] && _kernel="$(echo ${_buff[2]} | sed -e 's/\.\S-.*//g')";
+		[ -n "${_buff[0]}" ] && _os="${_buff[2]}";
+		if [ -n "$_os" -a "$_os" != "TraceOS" ]; then
+			echo "";
+			echo "Product Information";
+			echo "---------------------------";
+			printf "%10s: %s\n" "Product" "${_buff[0]}";
+			printf "%10s: %s\n" "Version" "${_buff[3]}";
+			if [ -n "$_release" ]; then
+				printf "%10s: %s\n" "Build" "$_release";
+			fi
+			#if [ -n "$_kernel" ]; then
+			#	printf "%10s: %s\n" "Kernel" "Linux $_kernel";
+			#fi
+			echo "";
+			echo "Additional Information";
+			echo "---------------------------";
+			printf "%10s: %s\n" "Hostname" "${_buff[1]}";
+			if [ -n "$_mem" ]; then
+				printf "%10s: %s\n" "Memory" "$(( $_mem / 1024 )) MB";
+			fi
+		fi
+	fi
+	echo "";
+}
+_version;
+exit 0;

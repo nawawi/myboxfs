@@ -1,0 +1,49 @@
+<?php
+if(!defined('_CLI_CODE')||_CLI_CODE!="a098846421a09ab1cacd3b3a753cbe05") exit("\n\nERROR: _CLI_CODE not set\n\n");
+
+
+function ___CLI_IPWATCH_PRINT() {
+	_INI_TOKEN_GET("network","ipwatchd.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+		_CLI_ECHO(_GETTEXT("No data available"));
+		return FALSE;
+	}
+	$_DATA=$_TOKEN['ipwatchd'];
+	if(_NULL($_DATA['STAT'])) $_DATA['STAT']=0;
+	_STR_ONOFF($_stat,$_DATA['STAT']);
+	_CLI_ECHO_HEADER(_GETTEXT("IPWATCH configuration"));
+	echo _CLI_DATA_BODY(
+		array(_GETTEXT_U("ENABLE")=>$_stat)
+	);
+	return TRUE;
+}
+
+function ___CLI_IPWATCH_ENABLE($_status) {
+	_STR_ONOFF($_stat,$_status);
+	$_DATA['STAT']="$_stat";
+	if(_INI_TOKEN_UPDATE("network","ipwatchd.cfg","ipwatchd",$_DATA)) {
+		_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+		_INIT_TASKQ("ipwatch_restart");
+		return TRUE;
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function _cli_ipwatch_config() {
+	if($_SERVER["argc"] > 1 ) {
+		$_max=$_SERVER["argc"];
+		_CLI_TRIM_ARGS($_SERVER['argv']);
+		for($_x=1;$_x < $_max;$_x++) {
+			$_options=$_SERVER["argv"][$_x];
+			if($_options=="print") {
+				return ___CLI_IPWATCH_PRINT();
+			} elseif($_options=="enable") {
+				$_status=$_SERVER["argv"][$_x+1];
+				return ___CLI_IPWATCH_ENABLE($_status);
+			}
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+?>

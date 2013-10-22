@@ -1,0 +1,79 @@
+<?php
+if(!defined('_CLI_CODE')||_CLI_CODE!="a098846421a09ab1cacd3b3a753cbe05") exit("\n\nERROR: _CLI_CODE not set\n\n");
+
+function ___CLI_DHCP_CONFIG_RELAY_PRINT() {
+	_INI_TOKEN_GET("network","dhcp_relay.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+              	_CLI_ECHO(_GETTEXT("No data available"));
+                return FALSE;
+	}
+	$_DATA=$_TOKEN['dhcp_relay'];
+	if(_NULL($_DATA['STAT'])) $_DATA['STAT']=0;
+	if(!_NULL($_DATA['ADDR'])) {
+		_DEFINITIONS_GET_BYNAME("networks",$_DATA['ADDR'],$_DTOKEN,"host");
+		if(!_NULL($_DTOKEN['ADDR'])) $_DATA['ADDR']="{$_DATA['ADDR']} [{$_DTOKEN['ADDR']}]";
+	}
+	_TRIM($_DATA['DNAME'],",");
+	_STR_ONOFF($_stat,$_DATA['STAT']);
+	_CLI_ECHO_HEADER(_GETTEXT("DHCP Relay configuration"));
+	echo _CLI_DATA_BODY(
+		array(
+			_GETTEXT_U("DHCP SERVER")=>$_DATA['ADDR'],
+			_GETTEXT_U("INTERFACE")=>$_DATA['DNAME'],
+			_GETTEXT_U("ENABLE")=>$_stat
+		)
+	);
+	return TRUE;
+}
+
+function ___CLI_DHCP_CONFIG_RELAY_SET($_args) {
+	if(!_ARRAY_NULL($_args)) {
+		$_DATA=array();
+		$_param=$_args[0];
+		if($_param=="server") {
+			$_sid=$_args[1];
+			$_objf=_OBJ_PATH."/iosh_definitions_networks_print.obj";
+			$_obj=_FILE_ARRAY_GET($_objf);
+			if(_ARRAY_NULL($_obj) || _NULL($_obj[$_sid])) {
+				_CLI_ECHO(_GETTEXT("Resource Id not available."));
+				_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id","definitions networks print host"));
+				@unlink($_objf);
+				return FALSE;
+			}
+			$_server=___CLI_DEFINITIONS_OBJGETNAME($_obj,"networks",$_sid,"host");
+			if(_NULL($_server)) {
+				_CLI_ECHO(_GETTEXT("Resource Id for DHCP Server not available."));
+				_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id","definitions networks print host"));
+				@unlink($_objf);
+				return FALSE;
+			}
+			$_DATA['ADDR']="$_server";
+		} elseif($_param=="interface") {
+			$_int=$_args[1];
+			$_num_array=array();
+			_CLI_MULTINUM($_int,$_num_array);
+			if(count($_num_array) < 2) {
+				_CLI_ECHO(_GETTEXT("DHCP Relay required at least two interfaces"));
+				return FALSE;
+			}
+			foreach($_num_array as $_no) {
+				unset($_val);
+				if(___CLI_DEFINITIONS_NETWORKS_ADD_INT($_no,$_val)) {
+					$_DATA['DNAME'] .="$_val,";
+				}
+			}
+			_TRIM($_DATA['DNAME'],",");
+		} elseif($_param=="enable") {
+			_STR_ONOFF($_stat,$_args[1]);
+			$_DATA['STAT']="$_stat";
+		}
+		
+		if(!_ARRAY_NULL($_DATA) && _INI_TOKEN_UPDATE("network","dhcp_relay.cfg","dhcp_relay",$_DATA)) {
+			_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+?>

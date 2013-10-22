@@ -1,0 +1,48 @@
+<?php
+if(!defined('_POLICY_CODE')||_POLICY_CODE!="214162c595ce24bf9285f0a98cb0fbca") exit("\n\nERROR: _POLICY_CODE not set\n\n");
+
+function _policy_sysinput_dhcp_test($_rules) {
+	$_test="*filter\n";
+	$_test .="$_rules\n";
+	$_test .="COMMIT\n";
+	if(!_policy_test($_test)) {
+		_INIT_ECHO(1,_GETTEXT("%s: rules failed","DHCP INPUT POLICY"));
+		return FALSE;
+	}
+	return TRUE;
+}
+
+function _policy_sysinput_dhcp(&$_data) {
+	$_sport='68';
+	$_dport='67';
+	$_rules="";
+	$_rulesid="-m comment --comment dhcpd";
+	_INI_TOKEN_GET("network","dhcp_server.cfg",$_TOKEN);
+	foreach($_TOKEN as $_ID => $_DATA) {
+		if(_NULL($_DATA['DNAME'])
+			|| _NULL($_DATA['RANGE_START'])
+			|| _NULL($_DATA['RANGE_END'])) {
+			_INI_TOKEN_DELETE("network","dhcp_server.cfg",$_ID);
+			continue;
+		}
+		if(_NULL($_DATA['STAT']) || $_DATA['STAT']==0) continue;
+		$_dev=_DEFINITIONS_GET_INTERFACE_DEVICE($_DATA['DNAME']);
+		if(_NULL($_dev)) continue;
+		_INI_TOKEN_GET_BYPARAM("network","eth.cfg","NAME",$_DATA['DNAME'],$_NTOKEN);
+		if(_ARRAY_NULL($_NTOKEN)
+			|| _NULL($_NTOKEN['ADDR'])
+			|| _NULL($_NTOKEN['NETWORK'])
+			|| _NULL($_NTOKEN['PREF'])) continue;
+		$_rules .="-A SYS_INPUT $_rulesid -d 255.255.255.255 -i $_dev -p udp -m udp --sport $_sport --dport $_dport -j CONFIRMED\n";
+		$_rules .="-A SYS_INPUT $_rulesid -s {$_NTOKEN['NETWORK']}/{$_NTOKEN['PREF']} -d {$_NTOKEN['ADDR']} -i $_dev -p udp -m udp --sport $_sport --dport $_dport -j CONFIRMED\n"; 
+		unset($_dev,$_NTOKEN);
+	}
+	_TRIM($_rules);
+	if(!_NULL($_rules) && _policy_sysinput_dhcp_test($_rules)) {
+		$_data .="$_rules\n";
+		return TRUE;
+	}
+	return FALSE;
+}
+
+?>

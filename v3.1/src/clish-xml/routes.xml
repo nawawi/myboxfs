@@ -1,0 +1,612 @@
+﻿<?xml version="1.0"?>
+<CLISH_MODULE>
+<VIEW name="routes" prompt="${SYSTEM_NAME}/network/routing/&gt; ">
+        <COMMAND name="."
+                help="Return to main menu"
+                view="main"
+                viewid=""/>
+        <COMMAND name=".."
+                help="Return to previous menu"
+                view="network"
+                viewid=""/>
+<!-- static routes start -->
+        <COMMAND name="static-routes"
+                help="Display or change Static routes configuration">
+                <ACTION>exec /service/tools/route_config.exc static print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+        <COMMAND name="static-routes print"
+                help="Display Static routes configuration">
+                <ACTION>exec /service/tools/route_config.exc static print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+        <COMMAND name="static-routes find"
+                help="Search Static routes list">
+		<PARAM name="string"
+			help="String to find"
+			ptype="STRING_ANY" />
+                <ACTION>exec /service/tools/route_config.exc static find "${string}" 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+        <COMMAND name="static-routes apply"
+                help="Apply changes">
+                <ACTION>exec /service/tools/route_config.exc static apply 2>/dev/null</ACTION>
+        </COMMAND>
+<!--- start static route add --->
+        <COMMAND name="static-routes add"
+                help="Add new Static route"/>
+<!--- start static route add interface route --->
+        <COMMAND name="static-routes add interface-route"
+                help="Add new Static route interface route type">
+ 		<PARAM name="network"
+                        help="Resource Id for definition network"
+                        ptype="NUM"/>
+ 		<PARAM name="interface"
+                        help="Resource Id for Interface"
+                        ptype="NUM"/>
+		<PARAM name="enable"
+			help="Set enable"
+			ptype="ONOFF" 
+			default="off"/>
+		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/route_config.exc static add interface ${network} ${interface} ${enable} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!--- end static route add interface route --->
+<!--- start static route add gateway route --->
+        <COMMAND name="static-routes add gateway-route"
+                help="Add new Static route gateway route type">
+ 		<PARAM name="network"
+                        help="Resource Id for definition network"
+                        ptype="NUM"/>
+ 		<PARAM name="gateway_id"
+                        help="Resource Id for definition network host"
+                        ptype="NUM"/>
+		<PARAM name="enable"
+			help="Set enable"
+			ptype="ONOFF" 
+			default="off"/>
+		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/route_config.exc static add gateway ${network} ${gateway_id} ${enable} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!--- end static route add gateway route --->
+<!--- start static route add blackhole route --->
+        <COMMAND name="static-routes add blackhole-route"
+                help="Add new Static route blackhole route type">
+ 		<PARAM name="network"
+                        help="Resource Id for definition network"
+                        ptype="NUM"/>
+		<PARAM name="enable"
+			help="Set enable"
+			ptype="ONOFF" 
+			default="off"/>
+		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/route_config.exc static add blackhole ${network} ${enable} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!--- end static route add blackhole route --->
+<!--- start static route add prohibit route --->
+        <COMMAND name="static-routes add prohibit-route"
+                help="Add new Static route prohibit route type">
+ 		<PARAM name="network"
+                        help="Resource Id for definition network"
+                        ptype="NUM"/>
+		<PARAM name="enable"
+			help="Set enable"
+			ptype="ONOFF" 
+			default="off"/>
+		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/route_config.exc static add prohibit ${network} ${enable} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!--- end static route add prohibit route --->
+<!--- start static route add unreachable route --->
+        <COMMAND name="static-routes add unreachable-route"
+                help="Add new Static route unreachable route type">
+ 		<PARAM name="network"
+                        help="Resource Id for definition network"
+                        ptype="NUM"/>
+		<PARAM name="enable"
+			help="Set enable"
+			ptype="ONOFF" 
+			default="off"/>
+		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/route_config.exc static add unreachable ${network} ${enable} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!--- end static route add unreachable route --->
+<!--- end static route add --->
+       <COMMAND name="static-routes delete"
+                help="Delete Static routes list">
+                <PARAM name="id"
+                        help="Resource Id '*' will delete all list"
+                        ptype="MULTI_NUM_ALL" />
+                <ACTION>exec /service/tools/route_config.exc static delete "${id}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!--- start static route set --->
+        <COMMAND name="static-routes set"
+                help="Change Static route setting"/>
+<!--- start static route set interface route --->
+        <COMMAND name="static-routes set interface-route"
+                help="Change Static route interface-route"/>
+        <COMMAND name="static-routes set interface-route network"
+                help="Change interface-route network">
+		<PARAM name="id"
+	                help="Resource Id for interface route"
+	                ptype="NUM"/>
+ 		<PARAM name="network"
+                        help="Resource Id for definition network"
+                        ptype="NUM"/>
+                <ACTION>exec /service/tools/route_config.exc static set interface network ${id} ${network} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="static-routes set interface-route interface"
+                help="Change interface-route interface">
+		<PARAM name="id"
+	                help="Resource Id for interface route"
+	                ptype="NUM"/>
+ 		<PARAM name="interface"
+                        help="Resource Id for Interface"
+                        ptype="NUM"/>
+                <ACTION>exec /service/tools/route_config.exc static set interface interface ${id} ${interface} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="static-routes set interface-route enable"
+                help="Change interface-route enable">
+		<PARAM name="id"
+	                help="Resource Id for interface route"
+	                ptype="NUM"/>
+		<PARAM name="enable"
+			help="Set enable"
+			ptype="ONOFF" 
+			default="off"/>
+                <ACTION>exec /service/tools/route_config.exc static set interface enable ${id} ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="static-routes set interface-route description"
+                help="Change interface-route description">
+		<PARAM name="id"
+	                help="Resource Id for interface route"
+	                ptype="NUM"/>
+		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/route_config.exc static set interface note ${id} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!--- end static route set interface route --->
+<!--- start static route set gateway route --->
+        <COMMAND name="static-routes set gateway-route"
+                help="Change Static route gateway-route"/>
+        <COMMAND name="static-routes set gateway-route network"
+                help="Change gateway-route network">
+		<PARAM name="id"
+	                help="Resource Id for gateway route"
+	                ptype="NUM"/>
+ 		<PARAM name="network"
+                        help="Resource Id for definition network"
+                        ptype="NUM"/>
+                <ACTION>exec /service/tools/route_config.exc static set gateway network ${id} ${network} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="static-routes set gateway-route gateway"
+                help="Change gateway-route gateway">
+		<PARAM name="id"
+	                help="Resource Id for gateway route"
+	                ptype="NUM"/>
+ 		<PARAM name="gateway_id"
+                        help="Resource Id for definition network host"
+                        ptype="NUM"/>
+                <ACTION>exec /service/tools/route_config.exc static set gateway gateway ${id} ${gateway_id} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="static-routes set gateway-route enable"
+                help="Change gateway-route enable">
+		<PARAM name="id"
+	                help="Resource Id for gateway route"
+	                ptype="NUM"/>
+		<PARAM name="enable"
+			help="Set enable"
+			ptype="ONOFF" 
+			default="off"/>
+                <ACTION>exec /service/tools/route_config.exc static set gateway enable ${id} ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="static-routes set gateway-route description"
+                help="Change gateway-route description">
+		<PARAM name="id"
+	                help="Resource Id for gateway route"
+	                ptype="NUM"/>
+		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/route_config.exc static set gateway note ${id} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!--- end static route set gateway route --->
+<!--- start static route set blackhole route --->
+        <COMMAND name="static-routes set blackhole-route"
+                help="Change Static route blackhole-route"/>
+        <COMMAND name="static-routes set blackhole-route network"
+                help="Change blackhole-route network">
+		<PARAM name="id"
+	                help="Resource Id for blackhole route"
+	                ptype="NUM"/>
+ 		<PARAM name="network"
+                        help="Resource Id for definition network"
+                        ptype="NUM"/>
+                <ACTION>exec /service/tools/route_config.exc static set blackhole network ${id} ${network} 2>/dev/null</ACTION>
+        </COMMAND>
+    
+        <COMMAND name="static-routes set blackhole-route enable"
+                help="Change blackhole-route enable">
+		<PARAM name="id"
+	                help="Resource Id for blackhole route"
+	                ptype="NUM"/>
+		<PARAM name="enable"
+			help="Set enable"
+			ptype="ONOFF" 
+			default="off"/>
+                <ACTION>exec /service/tools/route_config.exc static set blackhole enable ${id} ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="static-routes set blackhole-route description"
+                help="Change blackhole-route description">
+		<PARAM name="id"
+	                help="Resource Id for blackhole route"
+	                ptype="NUM"/>
+		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/route_config.exc static set blackhole note ${id} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!--- end static route set blackhole route --->
+<!--- start static route set prohibit route --->
+        <COMMAND name="static-routes set prohibit-route"
+                help="Change Static route prohibit-route"/>
+        <COMMAND name="static-routes set prohibit-route network"
+                help="Change prohibit-route network">
+		<PARAM name="id"
+	                help="Resource Id for prohibit route"
+	                ptype="NUM"/>
+ 		<PARAM name="network"
+                        help="Resource Id for definition network"
+                        ptype="NUM"/>
+                <ACTION>exec /service/tools/route_config.exc static set prohibit network ${id} ${network} 2>/dev/null</ACTION>
+        </COMMAND>
+    
+        <COMMAND name="static-routes set prohibit-route enable"
+                help="Change prohibit-route enable">
+		<PARAM name="id"
+	                help="Resource Id for prohibit route"
+	                ptype="NUM"/>
+		<PARAM name="enable"
+			help="Set enable"
+			ptype="ONOFF" 
+			default="off"/>
+                <ACTION>exec /service/tools/route_config.exc static set prohibit enable ${id} ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="static-routes set prohibit-route description"
+                help="Change prohibit-route description">
+		<PARAM name="id"
+	                help="Resource Id for prohibit route"
+	                ptype="NUM"/>
+		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/route_config.exc static set prohibit note ${id} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!--- end static route set prohibit route --->
+<!--- start static route set unreachable route --->
+        <COMMAND name="static-routes set unreachable-route"
+                help="Change Static route unreachable-route"/>
+        <COMMAND name="static-routes set unreachable-route network"
+                help="Change unreachable-route network">
+		<PARAM name="id"
+	                help="Resource Id for unreachable route"
+	                ptype="NUM"/>
+ 		<PARAM name="network"
+                        help="Resource Id for definition network"
+                        ptype="NUM"/>
+                <ACTION>exec /service/tools/route_config.exc static set unreachable network ${id} ${network} 2>/dev/null</ACTION>
+        </COMMAND>
+    
+        <COMMAND name="static-routes set unreachable-route enable"
+                help="Change unreachable-route enable">
+		<PARAM name="id"
+	                help="Resource Id for unreachable route"
+	                ptype="NUM"/>
+		<PARAM name="enable"
+			help="Set enable"
+			ptype="ONOFF" 
+			default="off"/>
+                <ACTION>exec /service/tools/route_config.exc static set unreachable enable ${id} ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="static-routes set unreachable-route description"
+                help="Change unreachable-route description">
+		<PARAM name="id"
+	                help="Resource Id for unreachable route"
+	                ptype="NUM"/>
+		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/route_config.exc static set unreachable note ${id} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!--- end static route set unreachable route --->
+<!--- end static route set --->
+<!-- static routes end -->
+
+<!-- policy routes start -->
+        <COMMAND name="policy-routes"
+                help="Display or change Policy routes configuration">
+                <ACTION>exec /service/tools/route_config.exc policy print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+        <COMMAND name="policy-routes print"
+                help="Display Policy routes configuration">
+                <ACTION>exec /service/tools/route_config.exc policy print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+        <COMMAND name="policy-routes find"
+                help="Search Policy routes list">
+		<PARAM name="string"
+			help="String to find"
+			ptype="STRING_ANY" />
+                <ACTION>exec /service/tools/route_config.exc policy find "${string}" 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+        <COMMAND name="policy-routes apply"
+                help="Apply changes">
+                <ACTION>exec /service/tools/route_config.exc policy apply 2>/dev/null</ACTION>
+        </COMMAND>
+<!--- start policy route add --->
+        <COMMAND name="policy-routes add"
+                help="Add new Policy route"/>
+<!--- start policy route add interface route --->
+        <COMMAND name="policy-routes add interface-route"
+                help="Add new Policy route interface route type">
+ 		<PARAM name="position"
+                        help="Rule position"
+                        ptype="RULES_POSITION"
+			default="bottom"/>
+ 		<PARAM name="source_interface"
+                        help="Resource Id for Interface"
+                        ptype="NUM_ANY"/>
+ 		<PARAM name="source_network"
+                        help="Resource Id for definition network"
+                        ptype="NUM_ANY"/>
+ 		<PARAM name="service"
+                        help="Resource Id for definition service"
+                        ptype="NUM_ANY"/>
+ 		<PARAM name="destination_network"
+                        help="Resource Id for definition network"
+                        ptype="NUM_ANY"/>
+ 		<PARAM name="target_interface"
+                        help="Resource Id for Interface"
+                        ptype="NUM"/>
+		<PARAM name="enable"
+			help="Set enable"
+			ptype="ONOFF" 
+			default="off"/>
+		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/route_config.exc policy add interface ${position} ${source_interface} ${source_network} ${service} ${destination_network} ${target_interface} ${enable} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!--- end policy route add interface route --->
+<!--- start policy route add gateway route --->
+        <COMMAND name="policy-routes add gateway-route"
+                help="Add new Policy route gateway route type">
+ 		<PARAM name="position"
+                        help="Rule position"
+                        ptype="RULES_POSITION"
+			default="bottom"/>
+ 		<PARAM name="source_interface"
+                        help="Resource Id for Interface"
+                        ptype="NUM_ANY"/>
+ 		<PARAM name="source_network"
+                        help="Resource Id for definition network"
+                        ptype="NUM_ANY"/>
+ 		<PARAM name="service"
+                        help="Resource Id for definition service"
+                        ptype="NUM_ANY"/>
+ 		<PARAM name="destination_network"
+                        help="Resource Id for definition network"
+                        ptype="NUM_ANY"/>
+ 		<PARAM name="gateway"
+                        help="Resource Id for definition network host"
+                        ptype="NUM"/>
+		<PARAM name="enable"
+			help="Set enable"
+			ptype="ONOFF" 
+			default="off"/>
+		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/route_config.exc policy add gateway ${position} ${source_interface} ${source_network} ${service} ${destination_network} ${gateway} ${enable} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!--- end policy route add gateway route --->
+<!--- end policy route add --->
+       <COMMAND name="policy-routes delete"
+                help="Delete Policy routes list">
+                <PARAM name="id"
+                        help="Resource Id '*' will delete all list"
+                        ptype="MULTI_NUM_ALL" />
+                <ACTION>exec /service/tools/route_config.exc policy delete "${id}" 2>/dev/null</ACTION>
+        </COMMAND>
+
+<!--- start policy route set --->
+        <COMMAND name="policy-routes set"
+                help="Change Policy route setting"/>
+<!--- start policy route set interface route --->
+        <COMMAND name="policy-routes set interface-route"
+                help="Change Policy route interface-route"/>
+        <COMMAND name="policy-routes set interface-route source-interface"
+                help="Change interface-route source interface">
+		<PARAM name="id"
+	                help="Resource Id for interface route"
+	                ptype="NUM"/>
+		<PARAM name="source_interface"
+                        help="Resource Id for Interface"
+                        ptype="NUM_ANY"/>
+                <ACTION>exec /service/tools/route_config.exc policy set interface dname ${id} ${source_interface} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="policy-routes set interface-route source-network"
+                help="Change interface-route source network">
+		<PARAM name="id"
+	                help="Resource Id for interface route"
+	                ptype="NUM"/>
+ 		<PARAM name="source_network"
+                        help="Resource Id for definition network"
+                        ptype="NUM_ANY"/>
+                <ACTION>exec /service/tools/route_config.exc policy set interface src ${id} ${source_network} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="policy-routes set interface-route dest-network"
+                help="Change interface-route destination network">
+		<PARAM name="id"
+	                help="Resource Id for interface route"
+	                ptype="NUM"/>
+ 		<PARAM name="destination_network"
+                        help="Resource Id for definition network"
+                        ptype="NUM_ANY"/>
+                <ACTION>exec /service/tools/route_config.exc policy set interface dst ${id} ${destination_network} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="policy-routes set interface-route service"
+                help="Change interface-route source network">
+		<PARAM name="id"
+	                help="Resource Id for interface route"
+	                ptype="NUM"/>
+ 		<PARAM name="service"
+                        help="Resource Id for definition service"
+                        ptype="NUM_ANY"/>
+                <ACTION>exec /service/tools/route_config.exc policy set interface service ${id} ${service} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="policy-routes set interface-route target-interface"
+                help="Change interface-route target interface">
+		<PARAM name="id"
+	                help="Resource Id for interface route"
+	                ptype="NUM"/>
+ 		<PARAM name="target_interface"
+                        help="Resource Id for Interface"
+                        ptype="NUM"/>
+                <ACTION>exec /service/tools/route_config.exc policy set interface tname ${id} ${target_interface} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="policy-routes set interface-route enable"
+                help="Change interface-route enable">
+		<PARAM name="id"
+	                help="Resource Id for interface route"
+	                ptype="NUM"/>
+		<PARAM name="enable"
+			help="Set enable"
+			ptype="ONOFF" 
+			default="off"/>
+                <ACTION>exec /service/tools/route_config.exc policy set interface enable ${id} ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="policy-routes set interface-route description"
+                help="Change interface-route description">
+		<PARAM name="id"
+	                help="Resource Id for interface route"
+	                ptype="NUM"/>
+		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/route_config.exc policy set interface note ${id} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!--- end policy route set interface route --->
+<!--- start policy route set gateway route --->
+        <COMMAND name="policy-routes set gateway-route"
+                help="Change Policy route gateway-route"/>
+        <COMMAND name="policy-routes set gateway-route source-interface"
+                help="Change gateway-route source interface">
+		<PARAM name="id"
+	                help="Resource Id for gateway route"
+	                ptype="NUM"/>
+		<PARAM name="source_interface"
+                        help="Resource Id for Interface"
+                        ptype="NUM_ANY"/>
+                <ACTION>exec /service/tools/route_config.exc policy set gateway dname ${id} ${source_interface} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="policy-routes set gateway-route source-network"
+                help="Change gateway-route source network">
+		<PARAM name="id"
+	                help="Resource Id for gateway route"
+	                ptype="NUM"/>
+ 		<PARAM name="source_network"
+                        help="Resource Id for definition network"
+                        ptype="NUM_ANY"/>
+                <ACTION>exec /service/tools/route_config.exc policy set gateway src ${id} ${source_network} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="policy-routes set gateway-route dest-network"
+                help="Change gateway-route destination network">
+		<PARAM name="id"
+	                help="Resource Id for gateway route"
+	                ptype="NUM"/>
+ 		<PARAM name="destination_network"
+                        help="Resource Id for definition network"
+                        ptype="NUM_ANY"/>
+                <ACTION>exec /service/tools/route_config.exc policy set gateway dst ${id} ${destination_network} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="policy-routes set gateway-route service"
+                help="Change gateway-route source network">
+		<PARAM name="id"
+	                help="Resource Id for gateway route"
+	                ptype="NUM"/>
+ 		<PARAM name="service"
+                        help="Resource Id for definition service"
+                        ptype="NUM_ANY"/>
+                <ACTION>exec /service/tools/route_config.exc policy set gateway service ${id} ${service} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="policy-routes set gateway-route gateway"
+                help="Change gateway-route gateway">
+		<PARAM name="id"
+	                help="Resource Id for gateway route"
+	                ptype="NUM"/>
+ 		<PARAM name="gateway"
+                        help="Resource Id for definition network host"
+                        ptype="NUM"/>
+                <ACTION>exec /service/tools/route_config.exc policy set gateway gateway ${id} ${gateway} 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="policy-routes set gateway-route enable"
+                help="Change gateway-route enable">
+		<PARAM name="id"
+	                help="Resource Id for gateway route"
+	                ptype="NUM"/>
+		<PARAM name="enable"
+			help="Set enable"
+			ptype="ONOFF" 
+			default="off"/>
+                <ACTION>exec /service/tools/route_config.exc policy set gateway enable ${id} ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="policy-routes set gateway-route description"
+                help="Change gateway-route description">
+		<PARAM name="id"
+	                help="Resource Id for gateway route"
+	                ptype="NUM"/>
+		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/route_config.exc policy set gateway note ${id} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!--- end policy route set gateway route --->
+<!--- end policy route set --->
+<!-- policy routes end -->
+</VIEW>
+</CLISH_MODULE>

@@ -1,0 +1,300 @@
+#!/bin/sh
+# +-----------------------------------------------------------------------------+
+# | Copyright (c) 2002-2006 Tracenetwork Corporation Sdn. Bhd.           	|
+# +-----------------------------------------------------------------------------+
+# | This source file is belongs to nawawi, the author.                    	|
+# | Any changes/use of the source, please email to the author.           	|
+# +-----------------------------------------------------------------------------+
+# | Authors: nawawi, Mohd nawawi Mohamad Jamili <nawawi@tracenetwork.com.my 	|
+# +-----------------------------------------------------------------------------+
+#
+# boot parameter:
+#	1. dev_boot=<device>:<filesystem>
+
+trap : 1 2 3 15
+PATH="/bin"
+TERM=linux
+umask 077
+
+# we use grub now
+BOOT_DEV=/dev/hda1
+BOOT_FS=ext3
+STRG_DEV=/dev/hda3
+STRG_FS=ext3
+SWAP_DEV=/dev/hda2
+KEY_MAP=
+LCD_DEV=
+NUM_NET=
+
+cd /
+
+lcdd_msg() {
+	[ -f "/bin/lcdd" -a -c "/dev/lcd" ] && /bin/lcdd "$1" "$2"	
+}
+do_sleep() {
+        local spin="- \\ | / \\ | /";
+        local pt="0"
+        for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+        	let pt=pt+5
+        	for f in $spin; do
+        	usleep 0
+                	echo -n -e "$1 $pt% [$f]  \r"
+        	done
+        done
+        echo -n -e "$1 100% OK  \r"
+        echo ""
+}
+
+grepn() { echo ${1%%$2*};}
+grepv() { echo ${1##*$2};}
+
+read_cmdline() {
+        read p < /proc/cmdline
+        for f in $p; do
+                local name=$(grepn $f =) value=$(grepv $f =)
+		if [ "$name" = "dev_boot" ]; then
+			BOOT_DEV=$(grepn $value :);BOOT_FS=$(grepv $value :)
+		elif [ "$name" = "dev_strg" ]; then
+			STRG_DEV=$(grepn $value :);STRG_FS=$(grepv $value :)
+		elif [ "$name" = "dev_swap" ]; then
+			SWAP_DEV=$(grepn $value :)
+		elif [ "$name" = "dev_lcd" ]; then
+			LCD_DEV="$value";
+		elif [ "$name" = "numnet" ]; then
+			NUM_NET="$value";
+		else
+			if [ -n "$1" ]; then
+				[ "$name" = "$1" ] && echo $value
+			fi
+		fi
+        done
+}
+
+
+
+if [ -f "/etc/banner" ]; then
+	echo ""
+	while read b;do
+		echo "$b"
+	done < /etc/banner
+fi
+
+mount -t proc -o ro virtual /proc
+mount -t sysfs -o ro virtual /sys
+
+FOUNDMEM="$(awk '/MemTotal/{print $2}' /proc/meminfo)"
+TOTALMEM="$(awk 'BEGIN{m=0};/MemFree|Cached/{m+=$2};END{print m}' /proc/meminfo)"
+if [ -z "$FOUNDMEM" -o "$FOUNDMEM" = 0 ]; then
+	echo "**** MEMORY COUNTING FAILED! ****"
+	exit 1
+fi
+if [ -f "/proc/kcore" ]; then
+	PM="$(du /proc/kcore)"
+	PM=$(grepn $PM ' ')
+	echo "* Physical memory size: $PM kB"
+	if [ ! -z "$PM" -a "$PM" -lt "184324" ]; then
+		echo "**** NOT ENOUGH MEMORY ($PM kB) ****"
+		exit 1
+	fi
+fi
+echo "* Total memory found: $FOUNDMEM kB"
+do_sleep "* Initializing.."
+
+MINSIZE=2000
+MINLEFT=16000
+MAXSIZE="$(expr $TOTALMEM - $MINLEFT)"
+RAMSIZE="$(expr $TOTALMEM / 5)"
+
+if test -n "$TOTALMEM" -a "$TOTALMEM" -gt "$MINLEFT"; then
+	test -z "$RAMSIZE" && RAMSIZE=65536
+	RAMSIZE=$(expr $RAMSIZE \* 4)
+fi
+
+echo "* Creating Mybox filesystem ($RAMSIZE kB) on shared memory."
+mount -t tmpfs -o "rw,size=${RAMSIZE}k" virtual /ramd
+
+chmod 700 /ramd > /dev/null 2>&1
+cd /ramd
+for f in /*; do case $f in /lost+found|/ramd|/proc|/dev|/sys);; *) cp -dpR $f /ramd/ ;; esac done
+mkdir -p dev/pts initrd
+
+umount /proc >/dev/null 2>&1
+umount /sys >/dev/null 2>&1
+
+pivot_root . initrd
+
+cd /
+mkdir proc sys config
+mkdir -p config/download
+mkdir -p config/localsave
+mkdir -p config/logs
+
+mount -t proc -o rw virtual /proc
+mount -t sysfs -o rw virtual /sys
+
+echo "0 0 0 0" > /proc/sys/kernel/printk
+
+echo -n "-> Extracting base tools.."
+for f in /tmp/*.bz2;do
+	tar -C / -jxf $f
+	echo -n "."; usleep 0; wait
+done
+echo -e "                                  \r* Extracting base tools. Done."
+echo "/bin/modprobe" > /proc/sys/kernel/modprobe
+depmod -a >> /dev/null 2>&1
+[ $? = 0 ] && echo -e "* Searching modules dependency. Done."
+if [ -f "/lib/modules/drivers.txt" ]; then
+	while read mods;do
+		mods=$(basename $mods .ko)
+		echo -n -e "-> Scanning for $mods..                                \r"
+		[ "$mods" = "ne" ] && mods="ne io=0x300,0x340";
+		modprobe -q -k $mods >> /dev/null 2>&1
+		usleep 0
+	done < /lib/modules/drivers.txt
+
+fi
+echo -e "                                  \r* Scanning. Done."
+
+if [ -f "/preload" ]; then
+	while read c;do
+		readahead $c > /dev/null 2>&1
+	done < /preload
+	readahead /etc/rc.init/sh > /dev/null 2>&1
+	readahead /etc/rc.start/sh > /dev/null 2>&1
+	readahead /etc/rc.sysctl/sh > /dev/null 2>&1
+	readahead /etc/rc.shutdown/sh > /dev/null 2>&1
+fi
+rm /preload
+
+# read setting
+read_cmdline
+
+# hd detection
+mdev -s >/dev/null 2>&1
+mount -t devpts -o "rw,gid=0,mode=620" /dev/pts >/dev/null 2>&1
+mknod /dev/ppp c 108 0 >/dev/null 2>&1
+mv /dev/random /dev/random-block
+ln -s /dev/urandom /dev/random
+mkdir -p /strg >/dev/null 2>&1
+if [ -c "/dev/$LCD_DEV" ]; then
+	echo "/dev/$LCD_DEV" > /var/sys/lcd_dev
+	ln -s /dev/$LCD_DEV /dev/lcd >/dev/null 2>&1
+	lcdd_msg "SYSTEM LOADING.." "-> STORAGE ON"
+fi
+mount -t $STRG_FS -o "rw,noatime" $STRG_DEV /strg >/dev/null 2>&1
+if [ $? = 0 ]; then
+	if [ -f "/strg/.mount_strg" ]; then
+		rm -f /strg/.mount_strg >/dev/null 2>&1
+		echo "**** MYBOX SYSTEM APPEARS TO HAVE SHUT DOWN UNCLEANLY ****"
+		lcdd_msg "SYSTEM LOADING.." "-> FIX STORAGE"
+		umount /strg >/dev/null 2>&1
+		e2fsck -y $STRG_DEV
+	else
+		umount /strg >/dev/null 2>&1
+	fi
+else
+	touch /strg/.nostrg
+fi
+
+mount -t $STRG_FS -o "rw,noatime" $STRG_DEV /strg >/dev/null 2>&1
+if [ $? = 0 ]; then
+	echo "$STRG_DEV:$STRG_FS" > /strg/.mount_strg
+	echo "$STRG_DEV:$STRG_FS" > /var/sys/.mount_strg
+	echo "$BOOT_DEV:$BOOT_FS" > /var/sys/.mount_boot
+	for d in db download localsave logs;do
+		mkdir -p /strg/mybox/$d >/dev/null 2>&1
+	done
+else
+	echo "**** MOUNTING STORAGE DISK FAILED! ****"
+	lcdd_msg "SYSTEM LOADING.." "STORAGE FAILED !"
+	touch /strg/.nostrg
+	touch /var/sys/nolog
+fi
+
+swapon $SWAP_DEV >/dev/null 2>&1
+[ $? = 0 ] && echo "$SWAP_DEV:swap" > /var/sys/.mount_swap
+
+chmod 700 * >/dev/null 2>&1
+echo "
+::sysinit:/etc/rc.init/sh
+tty1::respawn:/bin/getty -h -n -L tty1 9600 linux
+ttyS0::respawn:/bin/getty -h -n -L ttyS0 9600 vt100
+null::respawn:/bin/chkprog
+::restart:/bin/init
+::ctrlaltdel:/etc/rc.shutdown/sh
+::ctrlaltdel:/bin/reset
+::ctrlaltdel:/bin/reboot
+::shutdown:/etc/rc.shutdown/sh
+" > /etc/inittab
+
+echo '
+xexit() {
+	if [ "$PPID" = "1" ]; then
+		local logname="/strg/mybox/logs/auth-$(date "+%Y%m%d").log"
+		local msg="[$(date "+%d/%m/%Y %H:%M:%S")] TYPE=console USER=console IP=$(basename $(tty)) MSG=Session logout."
+                echo "$msg" >> $logname
+		[ ! -z "$ME" -a -f "$ME" ] && rm -f /tmp/console.session/console_*
+        fi
+	exit
+}
+alias exit='xexit'
+export HISTFILE=/.consolehistory
+lcdd_msg() {
+	[ -f "/bin/lcdd" -a -c "/dev/lcd" ] && /bin/lcdd "$1" "$2"	
+}
+if [ -z $DO_SINGLE ]; then
+	if [ -f "/bin/iosh" ]; then
+		XTTY="SSL";
+		if [ -f "/var/sys/init_start" ]; then
+			trap : 1 2 3 15
+			echo "System loading in progress..please wait or login back in a minute"
+			while [ -f "/var/sys/init_start" ]; do sleep 1;done
+			trap 1 2 3 15
+		fi
+		if [ "$PPID" = "1" ]; then
+			export ME="/tmp/console.session/console_${PPID}_$(basename $(tty))_$(date "+%d:%m:%Y_%H:%M:%S")";
+			touch $ME
+			XTTY="console";
+		fi
+		/bin/iosh $XTTY
+		if [ $? != 5 ]; then
+			clear;reset
+			exit
+		fi
+	else
+		echo "** FAILED TO RUN IO SHELL **"
+		read io
+		exit
+	fi
+else 
+	echo "** MAINTENANCE MODE **"
+	lcdd_msg "SYSTEM LOADING.." "-> MAINTENANCE"
+	read io
+fi
+' >> /etc/profile
+rm -f /strg/mybox/debug.log >/dev/null 2>&1
+DDATE=$(date +"%d/%m/%Y %T")
+LOGNAME="system-$(date +%Y%m%d).log"
+[ ! -d "/strg/mybox/logs" ] && mkdir -p /strg/mybox/logs >/dev/null 2>&1
+echo "[$DDATE] TYPE=INFO MSG=****** SYSTEM LOADING ******" >> /strg/mybox/logs/$LOGNAME
+
+if [ -f "/bin/getkey" ]; then
+	if /bin/getkey -c 3 -m "-> Starting Init: %d" R ;then
+		echo -n -e  "\r*** BYPASS CONSOLE LOGIN ***\n"
+		lcdd_msg "SYSTEM LOADING.." "BYPASS CONSOLE !"
+		touch /etc/noconsole
+	else
+		echo -n -e  "\r* Starting Init. Done.\n"
+	fi
+fi
+# hotplug
+echo "/bin/mdev" > /proc/sys/kernel/hotplug
+# numnet
+[ "$NUM_NET" != "" ] && echo "$NUM_NET" >/var/sys/numnet_veto
+exec chroot . /bin/init < /dev/console > /dev/console 2>&1
+lcdd_msg "SYSTEM LOADING.." "ERROR !"
+echo "********** ERROR! **********"
+echo "You are not supposed to be here, something went wrong!"
+echo "calling chroot failed?"
+echo "Press Ctrl+Alt+Del or switch off/on for reboot."
+while [ 1 = 1 ]; do sh; done

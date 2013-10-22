@@ -1,0 +1,42 @@
+<?php
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+function keymap_check() {
+	if(!_INIT_CHECK_BINARY(array("/bin/loadkmap"))) {
+		_INIT_ECHO(1,_GETTEXT("Cannot execute %s. Internal error",_INIT_NAME()));
+		exit(1);
+	}
+}
+
+function keymap_quiet() {
+	_INIT_QUIET('1');
+}
+
+function keymap_start() {
+	_INI_TOKEN_GET("system","system.cfg",$_TOKEN);
+	$_KEYMAP=$_TOKEN['system']['KEYMAP'];
+	if(_NULL($_KEYMAP)) $_KEYMAP="us";
+	$_KEYMAP1="$_KEYMAP.bmap.gz";
+	$_KEY=_TRIM(_EXEC_SHELL("find /usr/share/kbd/ -name $_KEYMAP1"));
+	if(file_exists($_KEY)) {
+		$_TMPFILE="/tmp/keymap.".time();
+		@_EXEC_SHELL("lzmacat $_KEY > $_TMPFILE && loadkmap < $_TMPFILE && rm -f $_TMPFILE");
+		if(file_exists($_TMPFILE)) {
+			_INIT_ECHO(1,_GETTEXT("%s setting failed","Keymap"));
+			return FALSE;
+		}
+	}
+	_INIT_ECHO(0,_GETTEXT("Setting keymap to %s","$_KEYMAP"));
+	return TRUE;
+}
+function keymap_stop() {
+	return _INIT_EXEC("keymap_start");
+}
+function keymap_restart() {
+	return _INIT_EXEC("keymap_start");
+}
+function keymap_reload() {
+	return _INIT_EXEC("keymap_start");
+}
+
+?>

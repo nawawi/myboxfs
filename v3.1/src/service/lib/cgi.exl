@@ -1,0 +1,162 @@
+<?php
+if(!defined('_CGI_CODE')||_CGI_CODE!="90d45215e48dac81e802f17310ad0c1f") exit("\n\nERROR: _CGI_CODE not set\n\n");
+define('_AWIE_CODE','ef3802a1fce98f3985e6a9a1f7c1a024');
+include_once("lib.exl");
+if(!defined('_SERVICE_LIB_PATH')) exit("\n\nERROR: _SERVICE_LIB_PATH not set\n\n");
+include_once(_SERVICE_LIB_PATH.'/init.exl');
+
+if(!defined('_CGI_MAIN_PATH')) exit("\n\nERROR: _CGI_MAIN_PATH not set\n\n");
+define('_CGI_WEBGUI_PATH',_CGI_MAIN_PATH.'/core/');
+define('_CGI_WEBGUI_RESOURCE',_CGI_MAIN_PATH.'/core/__resource');
+
+function _CGI_UPDATE_DATA_EXEC($_cmd,$_opt='_ex') {
+	$_list=_STR_ARRAY($_cmd,",");
+	if(!_ARRAY_NULL($_list)) {
+		foreach($_list as $_func) {
+			if($_opt=='_ex') {
+				@_INIT_EXEC($_func,0);
+			} elseif($_opt=='_eq') {
+				@_INIT_TASKQ($_func,0);
+			}
+		}
+	}
+}
+
+function _CGI_UPDATE_DATA($_DATA_POST) {
+	if(!_ARRAY_NULL($_DATA_POST)) {
+		if(!_CGI_IS_ADMIN()) {
+			return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Permission denied")));
+		}
+
+		$_opt=$_DATA_POST['_update_data'];
+
+		if(!_NULL($_DATA_POST['_sec']) 
+			&& !_NULL($_DATA_POST['_secf'])
+			&& !_ARRAY_NULL($_DATA_POST['_data'])) {
+
+			$_msg="";
+			if(!_NULL($_DATA_POST['_msg'])) {
+				if($_msg!="none") {
+					$_msg=base64_decode($_DATA_POST['_msg']);
+				}
+			} else {
+				$_msg=_GETTEXT("Configuration applied successfully");
+			}	
+
+			if($_opt==1) {
+				if(_INI_TOKEN_SAVE($_DATA_POST['_sec'],"{$_DATA_POST['_secf']}.cfg",$_DATA_POST['_data'])) {
+					if(!_NULL($_DATA_POST['_ex'])) {
+						_CGI_UPDATE_DATA_EXEC($_DATA_POST['_ex'],'_ex');
+					}
+					if(!_NULL($_DATA_POST['_eq'])) {
+						_CGI_UPDATE_DATA_EXEC($_DATA_POST['_eq'],'_eq');
+					}
+					return _CGI_JSON(array("status"=>"OK","msg"=>"$_msg"));
+				}
+			} elseif($_opt==2 && !_NULL($_DATA_POST['_id'])) {
+				if(!_NULL($_DATA_POST['_data']['HOSTNAME'])) {
+					if(!_CHECK_DOMAIN_VAR($_DATA_POST['_data']['HOSTNAME'])) {
+						return _CGI_JSON(array("status"=>"KO",_GETTEXT("Invalid hostname %s","{$_DATA_POST['_data']['HOSTNAME']}")));
+					}
+				}
+				if(!_NULL($_DATA_POST['_data']['DATE_TIME'])) {
+					$_time=strtotime($_DATA_POST['_data']['DATE_TIME']);
+					$_day=date('d',$_time);
+					$_mon=date('m',$_time);
+					$_yer=date('Y',$_time);
+					$_hou=date('H',$_time);
+					$_min=date('i',$_time);
+					$_date="{$_mon}{$_day}{$_hou}{$_min}{$_yer}";
+					if(_EXEC_CMD("/bin/date $_date")!=0) {
+						return _CGI_JSON(array("status"=>"KO","msg"=>_GETTEXT("Failed to set Date and Time")));
+					}
+					unset($_DATA_POST['_data']['DATE_TIME']);
+				}
+				if(_INI_TOKEN_UPDATE($_DATA_POST['_sec'],"{$_DATA_POST['_secf']}.cfg",$_DATA_POST['_id'],$_DATA_POST['_data'])) {
+					if(!_NULL($_DATA_POST['_ex'])) {
+						_CGI_UPDATE_DATA_EXEC($_DATA_POST['_ex'],'_ex');
+					}
+					if(!_NULL($_DATA_POST['_eq'])) {
+						_CGI_UPDATE_DATA_EXEC($_DATA_POST['_eq'],'_eq');
+					}
+					if(!_NULL($_DATA_POST['_data']['LANG'])) {
+						_SET_LANG($_DATA_POST['_data']['LANG']);
+					}
+					return _CGI_JSON(array("status"=>"OK","msg"=>"$_msg"));
+				}
+			}
+		}
+		
+		if($_opt=='acl_passwd') {
+			if(($_rmsg=_CGI_PAGE_SYSTEM_ACL_SET_PASSWD($_DATA_POST))!==FALSE) {
+				return $_rmsg;
+			}
+		}
+		if($_opt=='acl_list') {
+			if(($_rmsg=_CGI_PAGE_SYSTEM_ACL_SET_LIST($_DATA_POST))!==FALSE) {
+				return $_rmsg;
+			}
+		}
+
+		if($_opt=='acl_security') {
+			if(($_rmsg=_CGI_PAGE_SYSTEM_ACL_SET_SECURITY($_DATA_POST))!==FALSE) {
+				return $_rmsg;
+			}
+		} 
+		
+		if($_opt=='backup_restore') {
+			if(($_rmsg=_CGI_PAGE_SYSTEM_BACKUP_RESTORE_UPDATE($_DATA_POST))!==FALSE) {
+				return $_rmsg;
+			}
+		}
+		if($_opt=='firmware_upload') {
+			if(($_rmsg=_CGI_PAGE_SYSTEM_UPDATE_UPLOAD($_DATA_POST))!==FALSE) {
+				return $_rmsg;
+			}
+		}
+		if($_opt=='definitions_save') {
+			if(($_rmsg=_CGI_PAGE_DEFINITIONS_SAVE($_DATA_POST))!==FALSE) {
+				return $_rmsg;
+			}
+		}
+		if($_opt=='definitions_delete') {
+			if(($_rmsg=_CGI_PAGE_DEFINITIONS_DELETE($_DATA_POST))!==FALSE) {
+				return $_rmsg;
+			}
+		}	
+	}
+	return _CGI_JSON(array("status"=>"KO","msg"=>"Operation failed"));
+}
+
+// load functions
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_global_vars.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_session.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_utils.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_page.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_page_dashboard.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_page_definitions.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_page_definitions_networks.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_page_definitions_services.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_page_definitions_timeevents.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_page_auth.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_page_system.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_page_system_preference.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_page_system_preference_tab1.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_page_system_preference_tab2.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_page_system_preference_tab3.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_page_system_acl.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_page_system_acl_tab1.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_page_system_acl_tab2.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_page_system_acl_tab3.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_page_system_backup_restore.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_page_system_backup_restore_tab1.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_page_system_backup_restore_tab2.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_page_system_update.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_page_system_update_tab1.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_page_system_update_tab2.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_page_system_notification.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_page_system_notification_tab1.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_page_system_notification_tab2.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_page_system_antivirus.exl');
+include_once(_SERVICE_LIB_PATH.'/cgi/_cgi_page_system_reboot.exl');
+?>

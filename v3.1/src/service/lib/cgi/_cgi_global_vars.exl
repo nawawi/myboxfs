@@ -1,0 +1,93 @@
+<?php
+if(!defined('_CGI_CODE')||_CGI_CODE!="90d45215e48dac81e802f17310ad0c1f") exit("\n\nERROR: _CGI_CODE not set\n\n");
+
+$GLOBALS['__UPLOADERRORS']=array(
+	UPLOAD_ERR_INI_SIZE =>_GETTEXT("The uploaded file exceeds the maximum file size"),
+	UPLOAD_ERR_FORM_SIZE =>_GETTEXT("The uploaded file exceeds the maximum file size"),
+	UPLOAD_ERR_PARTIAL =>_GETTEXT("The uploaded file was only partially uploaded"),
+	UPLOAD_ERR_NO_FILE =>_GETTEXT("No file was uploaded"),
+	UPLOAD_ERR_NO_TMP_DIR =>_GETTEXT("Missing a temporary folder"),
+	UPLOAD_ERR_CANT_WRITE =>_GETTEXT("Failed to write file to disk"),
+	UPLOAD_ERR_EXTENSION =>_GETTEXT("File upload stopped by extension"),
+);
+
+$GLOBALS['_IMG']['_ICON_LOGO']="/__resource/core/logo.png";
+$GLOBALS['_IMG']['_ICON_DELETE']="/__resource/definitions/delete.gif";
+$GLOBALS['_IMG']['_ICON_NOTE']="/__resource/core/note.gif";
+$GLOBALS['_IMG']['_ICON_APPLY']="/__resource/core/apply.gif";
+$GLOBALS['_IMG']['_ICON_CALENDAR']="/__resource/definitions/calendar.gif";
+$GLOBALS['_IMG']['_ICON_ERROR']="/__resource/status/error.gif";
+$GLOBALS['_IMG']['_ICON_WARNING']="/__resource/status/warning.gif";
+$GLOBALS['_IMG']['_ICON_SPINNER']="/__resource/core/spinner.gif";
+$GLOBALS['_IMG']['_ICON_CPU']="/__resource/core/cpu.gif";
+$GLOBALS['_IMG']['_ICON_MEMORY']="/__resource/core/memory.png";
+$GLOBALS['_IMG']['_ICON_SWAP']="/__resource/core/swap.png";
+$GLOBALS['_IMG']['_ICON_VDISK']="/__resource/core/vdisk.png";
+$GLOBALS['_IMG']['_ICON_DISK']="/__resource/core/disk.png";
+$GLOBALS['_IMG']['_ICON_SERVER']="/__resource/auth/auth_server.gif";
+$GLOBALS['_IMG']['_ICON_INFO']="/__resource/definitions/info.gif";
+$GLOBALS['_IMG']['_ICON_TERMINAL']="/__resource/core/terminal.gif";
+$GLOBALS['_IMG']['_ICON_REFRESH']="/__resource/core/refresh.gif";
+
+$GLOBALS['_IMG']['_ICON_ARROW']['previous']="/__resource/arrow/previous.gif";
+$GLOBALS['_IMG']['_ICON_ARROW']['next']="/__resource/arrow/next.gif";
+$GLOBALS['_IMG']['_ICON_ARROW']['top']="/__resource/arrow/top.gif";
+$GLOBALS['_IMG']['_ICON_ARROW']['bottom']="/__resource/arrow/bottom.gif";
+$GLOBALS['_IMG']['_ICON_ARROW']['up']="/__resource/arrow/up.gif";
+$GLOBALS['_IMG']['_ICON_ARROW']['down']="/__resource/arrow/down.gif";
+$GLOBALS['_IMG']['_ICON_ARROW']['first']="/__resource/arrow/first.gif";
+$GLOBALS['_IMG']['_ICON_ARROW']['last']="/__resource/arrow/last.gif";
+
+$GLOBALS['_IMG']['_ICON_USER']['user']="/__resource/auth/user.gif";
+$GLOBALS['_IMG']['_ICON_USER']['group']="/__resource/auth/group.gif";
+
+$GLOBALS['_IMG']['_ICON_ENABLE'][0]="/__resource/status/red.gif";
+$GLOBALS['_IMG']['_ICON_ENABLE'][1]="/__resource/status/green.gif";
+$GLOBALS['_IMG']['_ICON_ONOFF'][0]="/__resource/status/off.gif";
+$GLOBALS['_IMG']['_ICON_ONOFF'][1]="/__resource/status/on.gif";
+$GLOBALS['_IMG']['_ICON_YESNO'][0]="/__resource/status/no.gif";
+$GLOBALS['_IMG']['_ICON_YESNO'][1]="/__resource/status/yes.gif";
+$GLOBALS['_IMG']['_ICON_ETH'][0]="/__resource/core/eth_off.png";
+$GLOBALS['_IMG']['_ICON_ETH'][1]="/__resource/core/eth_on.png";
+
+$GLOBALS['_IMG']['_ICON_DEFNETWORK']['builtin']="/__resource/definitions/network/nany.gif";
+$GLOBALS['_IMG']['_ICON_DEFNETWORK']['host']="/__resource/definitions/network/host.gif";
+$GLOBALS['_IMG']['_ICON_DEFNETWORK']['hostrange']="/__resource/definitions/network/hostrange.gif";
+$GLOBALS['_IMG']['_ICON_DEFNETWORK']['dnshost']="/__resource/definitions/network/dnshost.gif";
+$GLOBALS['_IMG']['_ICON_DEFNETWORK']['hostmac']="/__resource/definitions/network/hostmac.gif";
+$GLOBALS['_IMG']['_ICON_DEFNETWORK']['network']="/__resource/definitions/network/network.gif";
+$GLOBALS['_IMG']['_ICON_DEFNETWORK']['group']="/__resource/definitions/network/ngroup.gif";
+$GLOBALS['_IMG']['_ICON_DEFNETWORK']['interface']="/__resource/definitions/network/eth.gif";
+$GLOBALS['_IMG']['_ICON_DEFNETWORK']['other']="/__resource/definitions/network/nother.gif";
+
+$GLOBALS['_IMG']['_ICON_DEFSERVICE']['builtin']="/__resource/definitions/service/sany.gif";
+$GLOBALS['_IMG']['_ICON_DEFSERVICE']['service']="/__resource/definitions/service/service.gif";
+$GLOBALS['_IMG']['_ICON_DEFSERVICE']['group']="/__resource/definitions/service/sgroup.gif";
+$GLOBALS['_IMG']['_ICON_DEFSERVICE']['other']="/__resource/definitions/service/sother.gif";
+
+
+$GLOBALS['_IMG']['_ICON_DEFTIMEEVENT']['single']="/__resource/definitions/timeevent/single.gif";
+$GLOBALS['_IMG']['_ICON_DEFTIMEEVENT']['recurring']="/__resource/definitions/timeevent/recurring.gif";
+
+$GLOBALS['_IMG']['_ICON_MENU_BAR'][0]="/__resource/core/menu_s.png";
+$GLOBALS['_IMG']['_ICON_MENU_BAR'][1]="/__resource/core/menu_u.png";
+$GLOBALS['_IMG']['_ICON_MENU_ARROW'][0]="/__resource/core/menu_b.png";
+$GLOBALS['_IMG']['_ICON_MENU_ARROW'][1]="/__resource/core/menu_a.png";
+
+$GLOBALS['_IMG']['_ICON_PAGE_LOGIN'][0]="/__resource/core/box_top.png";
+$GLOBALS['_IMG']['_ICON_PAGE_LOGIN'][1]="/__resource/core/box_login.png";
+$GLOBALS['_IMG']['_ICON_PAGE_LOGIN'][2]="/__resource/core/bg.png";
+$GLOBALS['_IMG']['_ICON_PAGE_LOGIN'][3]="/__resource/core/prosesbar.gif";
+$GLOBALS['_IMG']['_ICON_PAGE_LOGIN'][4]="/__resource/core/page_spinner.gif";
+$GLOBALS['_IMG']['_ICON_PAGE_LOGIN'][5]="/__resource/core/logo.png";
+
+$GLOBALS['_IMG']['_ICON_BUTTON'][0]="/__resource/core/btgm.gif";
+$GLOBALS['_IMG']['_ICON_BUTTON'][1]="/__resource/core/bthm.gif";
+$GLOBALS['_IMG']['_ICON_BUTTON_SMALL'][0]="/__resource/core/btgm_s.gif";
+$GLOBALS['_IMG']['_ICON_BUTTON_SMALL'][1]="/__resource/core/bthm_s.gif";
+
+// backup/restore
+$GLOBALS['_IMG']['_ICON_BACKUP']['restore']="/__resource/definitions/bak_restore.gif";
+$GLOBALS['_IMG']['_ICON_BACKUP']['delete']="/__resource/definitions/bak_delete.gif";
+$GLOBALS['_IMG']['_ICON_BACKUP']['download']="/__resource/definitions/bak_download.gif";
+?>

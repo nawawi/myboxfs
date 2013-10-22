@@ -1,0 +1,193 @@
+<?php
+if(!defined('_CLI_CODE')||_CLI_CODE!="a098846421a09ab1cacd3b3a753cbe05") exit("\n\nERROR: _CLI_CODE not set\n\n");
+
+function ___CLI_TIMEDATE_PRINT() {
+	_INI_TOKEN_GET("system","system.cfg",$_TOKEN);
+	$_TIMEZONE=$_TOKEN['system']['TIMEZONE'];
+	if(_NULL($_TIMEZONE)) $_TIMEZONE="UTC";
+	$_time=date('H:i');
+	$_date_d=date('d');
+	$_date_m=_GETTEXT(ucfirst(strtolower(date('M'))));
+	$_date_y=date('Y');
+	$_date="{$_date_d}-{$_date_m}-{$_date_y}";
+	_INI_TOKEN_GET("network","ntp.cfg",$_NTOKEN);
+	$_NTP=$_NTOKEN['ntpd'];
+	$_addr="";
+	if(_NULL($_NTP['SERVER'])) {
+		$_NTP['SERVER']="not set";
+	} else {
+		_DEFINITIONS_GET_BYNAME("networks",$_NTP['SERVER'],$_DTOKEN);
+		if(!_NULL($_DTOKEN['ADDR'])) {
+			if($_DTOKEN['__DATA_TYPE']=='dnshost') {
+				$_addr="[{$_DTOKEN['HOSTNAME']} - {$_DTOKEN['ADDR']}]";
+			} elseif($_DTOKEN['__DATA_TYPE']=='host') {
+				$_addr="{$_DATA['SERVER']} [{$_DTOKEN['ADDR']}]";
+			}
+		}
+	}
+	_CLI_ECHO_HEADER(_GETTEXT("Time and date configuration"));
+	echo _CLI_DATA_BODY(
+		array(
+			_GETTEXT_U("DATE")=>$_date,
+			_GETTEXT_U("TIME")=>$_time,
+			_GETTEXT_U("TIMEZONE")=>$_TIMEZONE,
+			_GETTEXT_U("NTP SERVER")=>"{$_NTP['SERVER']} $_addr"
+		)
+	);
+}
+
+function ___CLI_TIMEDATE_TIMEZONE_PRINT() {
+	$_objf=_OBJ_PATH."/iosh_timezone_print.obj";
+	@unlink($_objf);
+	$_BUFF=_FILE("/usr/share/zoneinfo/ZONELIST.TXT");
+	if(_ARRAY_NULL($_BUFF)) {
+              	_CLI_ECHO(_GETTEXT("No data available"));
+                return FALSE;
+	}
+	$_cnt=1;$_obj=array();
+	$_output="";$_DTL=array();
+	foreach($_BUFF as $_ID => $_ZONE) {
+		_TRIM($_ZONE);
+		if(_NULL($_ZONE)) continue;
+		$_DTL[]=array($_cnt,$_ZONE);
+		$_obj[$_cnt]="$_ZONE";
+		$_cnt++;
+	}
+	if(!_ARRAY_NULL($_DTL)) {
+		$_DTH=array(_GETTEXT_U("ID"),_GETTEXT_U("TIMEZONE"));
+		$_output .=_CLI_DATA_BODY_LINE($_DTH,$_DTL,array("","-"));
+		unset($_DTL,$_DTH);
+	}
+	if(!_NULL($_output) && !_ARRAY_NULL($_obj) && _FILE_ARRAY_SAVE($_objf,$_obj)) {
+		echo "$_output";
+		return TRUE;
+	}
+	_CLI_ECHO(_GETTEXT("No data available"));
+	return FALSE;
+}
+
+function ___CLI_TIMEDATE_DATE($_value) {
+	if(preg_match("/^(\d\d):(\d\d):(\d\d\d\d)$/",$_value,$_mm)) {
+		$_day=$_mm[1];
+		$_mon=$_mm[2];
+		$_yer=$_mm[3];
+		$_hou=date('H');
+		$_min=date('i');
+		$_date="{$_mon}{$_day}{$_hou}{$_min}{$_yer}";
+		if(_EXEC_CMD("/bin/date $_date")==0) {
+			$_dd=date('d-M-Y');
+			_CLI_ECHO(_GETTEXT("Date set to %s","$_dd"))."\n";
+			return TRUE;
+		}
+		return _CLI_DEFAULT_RETURN();
+	}
+	_CLI_ECHO(_GETTEXT("Invalid date format"));
+	return FALSE;
+}
+
+function ___CLI_TIMEDATE_TIMEZONE($_num) {
+	$_objf=_OBJ_PATH."/iosh_timezone_print.obj";
+	$_obj=_FILE_ARRAY_GET($_objf);
+	if(_NULL($_obj[$_num])) {
+		_CLI_ECHO(_GETTEXT("Resource Id '%s' not available.","$_num"));
+		_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","time_date timezone"));
+		@unlink($_objf);
+		return FALSE;
+	}
+	$_DATA=array();
+	$_DATA['TIMEZONE']="{$_obj[$_num]}";
+	if(_INI_TOKEN_UPDATE("system","system.cfg","system",$_DATA)) {
+		if(_clock_set_timezone($_DATA['TIMEZONE'])) {
+			_CLI_ECHO(_GETTEXT("Timezone set to %s","{$_DATA['TIMEZONE']}"));
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function ___CLI_TIMEDATE_TIME($_value) {
+	if(preg_match("/^(\d\d):(\d\d)$/",$_value,$_mm)) {
+		$_day=date('d');
+		$_mon=date('m');
+		$_yer=date('Y');
+		$_hou=$_mm[1];
+		$_min=$_mm[2];
+		$_date="{$_mon}{$_day}{$_hou}{$_min}{$_yer}";
+		if(_EXEC_CMD("/bin/date $_date")==0) {
+			$_ss=date('H:i');
+			_CLI_ECHO(_GETTEXT("Time set to %s","$_ss"))."\n";
+			return TRUE;
+		}
+		return _CLI_DEFAULT_RETURN();
+	}
+	_CLI_ECHO(_GETTEXT("Invalid time format"));
+	return FALSE;
+}
+
+function ___CLI_TIMEDATE_NTP($_num="") {
+	if(!_NULL($_num) && _ISNUM($_num)) {
+		$_objf=_OBJ_PATH."/iosh_definitions_networks_print.obj";
+		$_obj=_FILE_ARRAY_GET($_objf);
+		if(_ARRAY_NULL($_obj)) {
+			_CLI_ECHO(_GETTEXT("Resource Id not available."));
+			_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions networks print"));
+			@unlink($_objf);
+			return FALSE;
+		}
+		$_add=___CLI_DEFINITIONS_OBJGETNAME($_obj,"networks",$_num,"host");
+		if(_NULL($_add)) {
+			$_add=___CLI_DEFINITIONS_OBJGETNAME($_obj,"networks",$_num,"dnshost");
+		}
+		if(_NULL($_add)) {
+			$_add=___CLI_DEFINITIONS_OBJGETNAME($_obj,"networks",$_num,"group");
+		}
+		if(_NULL($_add)) {
+			_CLI_ECHO(_GETTEXT("Resource Id '%s' not available.","$_num"));
+			_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions networks print"));
+			@unlink($_objf);
+			return FALSE;
+		}
+	} else {
+		$_add="";
+	}
+	$_DATA=array();
+	$_DATA['SERVER']="$_add";
+	if(_INI_TOKEN_UPDATE("network","ntp.cfg","ntpd",$_DATA)) {
+		_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+		_INIT_TASKQ("ntp_restart");
+		return TRUE;
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function _cli_timedate_config() {
+        if($_SERVER["argc"] > 1 ) {
+                $_max=$_SERVER["argc"];
+		_CLI_TRIM_ARGS($_SERVER['argv']);
+                for($_x=1;$_x < $_max;$_x++) {
+                        $_options=$_SERVER["argv"][$_x];
+			if($_options=="print") {
+				return ___CLI_TIMEDATE_PRINT();
+			} elseif($_options=="show_timezone") {
+				return ___CLI_TIMEDATE_TIMEZONE_PRINT();
+			} elseif($_options=="date") {
+				$_value=$_SERVER["argv"][$_x+1];
+				return ___CLI_TIMEDATE_DATE($_value);
+			} elseif($_options=="time") {
+				$_value=$_SERVER["argv"][$_x+1];
+				return ___CLI_TIMEDATE_TIME($_value);
+			} elseif($_options=="timezone") {
+				$_num=$_SERVER["argv"][$_x+1];
+				if(_ISNUM($_num)) {
+					return ___CLI_TIMEDATE_TIMEZONE($_num);
+				}
+			} elseif($_options=="ntp") {
+				$_num=$_SERVER["argv"][$_x+1];
+				return ___CLI_TIMEDATE_NTP($_num);
+			}
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+?>

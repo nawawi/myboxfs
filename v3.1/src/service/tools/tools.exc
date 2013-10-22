@@ -1,0 +1,114 @@
+<?php
+class EXE {
+	private function update_nic_vendor() {
+		_UPDATE_NIC_DEVICE();
+		_UPDATE_NIC_HWADDR();
+		exit(0);
+	}
+
+	private function initlang() {
+		_INI_TOKEN_GET("system","system.cfg",$_TOKEN);
+		$_LANG=$_TOKEN['system']['LANG'] ? $_TOKEN['system']['LANG'] : "en_US";
+		if(!_NULL($_LANG)) {
+			_FILE_SAVE("/etc/lang/default","$_LANG");
+			exit(0);
+		}
+		exit(1);
+	}
+
+	private function sysexec() {
+		_SESSION_RESET_AUTH_PASSWORD();
+		if($_SERVER["argc"]==3) {
+			$_user=$_SERVER["argv"][1];
+			$_passwd=$_SERVER["argv"][2];
+			if(_SESSION_CHECK_PASSWORD("console",$_user,$_passwd)) {
+				$_file="<CLISH_MODULE>";
+				$_file .="<VIEW name=\"main\"><COMMAND name=\"sysexec\"";
+				$_file .="help=\"Execute system shell\">";
+				$_file .="<ACTION builtin=\"awie_shell\"/>";
+				$_file .="</COMMAND>";
+				$_file .="</VIEW></CLISH_MODULE>";
+				if(_FILE_SAVE("/etc/clish/sysexec.cli","$_file")) {
+					exit(0);
+				}
+			}
+		}
+		exit(1);
+	}
+
+	private function fileread() {
+		if($_SERVER["argc"] > 0) {
+			$_file=$_SERVER["argv"][1];
+			if(!_NULL($_file)) {
+				if(($_file{0}=="/") || ($_file{0}=="." && $_file{1}==".") 
+					|| ($_file{0}=="." && $_file{1}=="/" && $_file{2}==".")
+					|| (!file_exists("/config/$_file"))) {
+					echo _GETTEXT("%% File does not exist !!")."\n";
+					exit(1);
+				}
+				echo _FILE_GET("/config/$_file");
+				exit(0);
+			}
+		}
+		exit(1);
+	}
+
+	private function firmware_version() {
+		_VERSION_RR($_build,$_build_c,$_build_s);
+		if(!_NULL($_build) && !_NULL($_build_c)) {
+			// TRUE if firmware version in /etc/firmware is lower than
+			// version in _ROOT_PATH/info-cache/update/FIRMWARE_VERSION
+			if(_VERSION_COMPARE($_build,$_build_c) && !_NULL($_build_s)) {
+				_FILE_SAVE("/etc/firmware","$_build_s");
+				exit(0);
+			}
+		}
+		exit(1);
+	}
+
+	private function dhcpc_check() {
+		$_dev=$_SERVER["argv"][1];
+		if(!_NULL($_dev)) {
+			if(_DAEMON_UP("/bin/dhcpcd $_dev")==FALSE) {
+				_LOG_CHKPROG(_GETTEXT("Service %s down","dhcpcd"));
+				if(_EXEC_CMD("/bin/dhcpcd $_dev")==0) {
+					_LOG_CHKPROG(_GETTEXT("Restarting '%s'","dhcpcd $_dev"));
+					exit(0);
+				}
+			}
+		}
+		exit(1);
+	}
+
+	private function taskq_exec() {
+		define('_AWIE_CODE','ef3802a1fce98f3985e6a9a1f7c1a024');
+		include_once("init.exl");
+		$_BUFF=_GLOB(_TASKQ_PATH."/*");
+		if(!_ARRAY_NULL($_BUFF)) {
+			foreach($_BUFF as $_fl) {
+				if(_NULL($_fl)) continue;
+				@unlink($_fl);
+				$_func=basename($_fl);
+				_INIT_EXEC($_func);
+				unset($_func,$_fl);
+			}
+		}
+		unset($_BUFF);
+		_SESSION_ATTEMPT_CHECK();
+		exit(0);
+	}
+
+	private function proc($_func) {
+		if(method_exists("EXE",$_func)) {
+			self::$_func();
+		}
+	}
+
+	public static function MAIN() {
+		define('_AWIE_CODE','ef3802a1fce98f3985e6a9a1f7c1a024');
+		include_once("lib.exl");
+		self::proc(basename($_SERVER["argv"][0],".exc"));
+		exit(0);
+	}
+}
+?>

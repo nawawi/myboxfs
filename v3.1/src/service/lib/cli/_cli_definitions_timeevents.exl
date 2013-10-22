@@ -1,0 +1,215 @@
+<?php
+if(!defined('_CLI_CODE')||_CLI_CODE!="a098846421a09ab1cacd3b3a753cbe05") exit("\n\nERROR: _CLI_CODE not set\n\n");
+
+
+function ___CLI_DEFINITIONS_TIMEEVENT_PRINT($_opt="all",$_find='') {
+	$_objf=_OBJ_PATH."/iosh_definitions_timeevents_print.obj";
+	@unlink($_objf);
+	_DEFINITIONS_GET("timeevents",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+              	_CLI_ECHO(_GETTEXT("No data available"));
+                return FALSE;
+        }
+
+	$_recurring=0;$_single=0;
+	if($_opt=="recurring") {
+		$_recurring=1;$_single=0;
+	} elseif($_opt=="single") {
+		$_recurring=0;$_single=1;
+	} else {
+		$_recurring=1;$_single=1;
+	}
+	$_cnt=1;$_obj=array();
+	$_output="";$_DTX=array();
+	foreach($_TOKEN as $_type => $_id_array) {
+		if($_type=="recurring" && $_recurring==1) {
+			foreach($_id_array as $_id => $_set_a) {
+				if(_NULL($_set_a['NAME'])) {
+					_DEFINITIONS_DELETE("timeevents",$_type,$_id);
+					continue;
+				}
+				if(!_NULL($_set_a['WDAYS'])) {
+					_CLI_MULTIVALUE($_set_a['WDAYS'],$_wdays);
+					$_wdd="";
+					foreach($_wdays as $_wd) {
+						$_wdd .=_DEFINITIONS_TIMEEVENT_WEEKDAYS($_wd).",";
+					}
+					_TRIM($_wdd,",");
+					unset($_wd);
+					$_set_a['WDAYS']="$_wdd";
+				}
+				if(!_NULL($_find)) {
+					$_set_a['TYPE']=$_type;
+					if(!_ARRAY_FIND($_find,$_set_a)) {
+						continue;
+					}
+				}
+				if($_cnt > 1) $_DTX[$_cnt][__CLI_DATA_NL]=1;
+				$_DTX[$_cnt][_GETTEXT_U("ID")]=$_cnt;
+				$_DTX[$_cnt][_GETTEXT_U("TYPE")]=$_type;
+				$_DTX[$_cnt][_GETTEXT_U("NAME")]=$_set_a['NAME'];
+				$_DTX[$_cnt][_GETTEXT_U("START TIME")]=$_set_a['STIME'];
+				$_DTX[$_cnt][_GETTEXT_U("END TIME")]=$_set_a['ETIME'];
+				$_DTX[$_cnt][_GETTEXT_U("WEEKDAYS")]=$_wdd ? $_wdd : __CLI_BODY_SKIP_DATA_TAG;
+				$_DTX[$_cnt][_GETTEXT_U("DESCRIPTION")]=$_set_a['NOTE'];
+				$_obj[$_cnt][$_type]=$_id;
+				$_cnt++;
+			}
+			unset($_id,$_set_a);
+		}
+		if($_type=="single" && $_single==1) {
+			foreach($_id_array as $_id => $_set_a) {
+				if(_NULL($_set_a['NAME'])) {
+					_DEFINITIONS_DELETE("timeevents",$_type,$_id);
+					continue;
+				}
+				if(!_NULL($_find)) {
+					$_set_a['TYPE']=$_type;
+					if(!_ARRAY_FIND($_find,$_set_a)) {
+						continue;
+					}
+				}
+				if($_cnt > 1) $_DTX[$_cnt][__CLI_DATA_NL]=1;
+				$_DTX[$_cnt][_GETTEXT_U("ID")]=$_cnt;
+				$_DTX[$_cnt][_GETTEXT_U("TYPE")]=$_type;
+				$_DTX[$_cnt][_GETTEXT_U("NAME")]=$_set_a['NAME'];
+				$_DTX[$_cnt][_GETTEXT_U("START DATE")]=$_set_a['SDATE'];
+				$_DTX[$_cnt][_GETTEXT_U("END DATE")]=$_set_a['EDATE'];
+				$_DTX[$_cnt][_GETTEXT_U("START TIME")]=$_set_a['STIME'];
+				$_DTX[$_cnt][_GETTEXT_U("END TIME")]=$_set_a['ETIME'];
+				$_DTX[$_cnt][_GETTEXT_U("DESCRIPTION")]=$_set_a['NOTE'];
+				$_obj[$_cnt][$_type]=$_id;
+				$_cnt++;
+			}
+			unset($_id,$_set_a);
+		}
+	}
+	if(!_ARRAY_NULL($_DTX)) {
+		$_output .=_CLI_DATA_BODY_R($_DTX);
+		unset($_DTX);
+	}
+	if(_ARRAY_NULL($_obj) || !_FILE_ARRAY_SAVE($_objf,$_obj) || _NULL($_output)) {
+		if(!_NULL($_find)) {
+			_CLI_ECHO(_GETTEXT("No results found"));
+		} else {
+			_CLI_ECHO(_GETTEXT("No data available"));
+		}
+		@unlink($_objf);
+                return FALSE;	
+	}
+	_CLI_ECHO_HEADER(_GETTEXT("Definitions time events configuration"));
+	if(!_NULL($_find)) {
+		echo _GETTEXT("Search results match for '%s':","$_find")."\n\n";
+	}
+	echo "$_output";
+	return TRUE;
+}
+
+function ___CLI_DEFINITIONS_TIMEEVENT_DELETE($_num) {
+	$_objf=_OBJ_PATH."/iosh_definitions_timeevents_print.obj";
+	$_obj=_FILE_ARRAY_GET($_objf);
+	if(_ARRAY_NULL($_obj)) {
+		_CLI_ECHO(_GETTEXT("No Resource Id available."));
+		_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions time_events print"));
+		@unlink($_objf);
+		return FALSE;
+	}
+	if($_num=='*' && _CLI_YESNO(_GETTEXT("This action will delete all %s.\nContinue this action? %s","time events definitions","[yes/no]: "))==TRUE) {
+		foreach($_obj as $_cnt => $_array) {
+			foreach($_array as $_type => $_id) {
+				if(_DEFINITIONS_DELETE("timeevents",$_type,$_id)) {
+					unset($_obj[$_cnt]);
+				}
+			}
+		}
+		if(_FILE_ARRAY_SAVE($_objf,$_obj)) {
+			return TRUE;
+		}
+	} else {
+		$_num_array=array();
+		_CLI_MULTINUM($_num,$_num_array);
+		foreach($_num_array as $_no) {
+			if(!_ARRAY_NULL($_obj[$_no])) {
+				foreach($_obj[$_no] as $_type => $_id) {
+					if(_DEFINITIONS_DELETE("timeevents",$_type,$_id)) {
+						unset($_obj[$_no]);
+					}
+				}
+			}
+		}
+		if(_FILE_ARRAY_SAVE($_objf,$_obj)) {
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function ___CLI_DEFINITIONS_TIMEEVENT_ADD($_args) {
+	$_objf=_OBJ_PATH."/iosh_definitions_timeevents_print.obj";
+	if(!_ARRAY_NULL($_args)) {
+		$_option=$_args[0];
+		if($_option=="recurring") {
+			$_DATA['NAME']="{$_args[1]}";
+			$_DATA['STIME']="{$_args[2]}";
+			$_DATA['ETIME']="{$_args[3]}";
+			$_DATA['WDAYS']="{$_args[4]}";
+			$_DATA['NOTE']="{$_args[5]}";
+			if(!_DEFINITIONS_SAVE("timeevents",$_option,$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}"));
+				return FALSE;
+			}
+			_CLI_ECHO(_GETTEXT("Definition saved"));
+			return TRUE;
+		} elseif($_option=="single") {
+			$_DATA['NAME']="{$_args[1]}";
+			$_DATA['SDATE']="{$_args[2]}";
+			$_DATA['EDATE']="{$_args[3]}";
+			$_DATA['STIME']="{$_args[4]}";
+			$_DATA['ETIME']="{$_args[5]}";
+			$_DATA['NOTE']="{$_args[6]}";
+			if(!_DEFINITIONS_SAVE("timeevents",$_option,$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}"));
+				return FALSE;
+			}
+			_CLI_ECHO(_GETTEXT("Definition saved"));
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function ___CLI_DEFINITIONS_TIMEEVENT_SET($_args) {
+	$_objf=_OBJ_PATH."/iosh_definitions_timeevents_print.obj";
+	$_obj=_FILE_ARRAY_GET($_objf);
+
+	if(!_ARRAY_NULL($_args)) {
+		$_option=$_args[0];
+		$_sparm=$_args[1];
+		$_sid=$_args[2];
+		$_sval=$_args[3];
+		if(_ARRAY_NULL($_obj) || _NULL($_obj[$_sid][$_option])) {
+			_CLI_ECHO(_GETTEXT("Resource Id '%s' not available.","$_sid"));
+			_CLI_ECHO(_GETTEXT("Enter -> '%s %s' to view Resource Id.","definitions time_events print","$_option"));
+			@unlink($_objf);
+			return FALSE;
+		}
+		$_ID=$_obj[$_sid][$_option];
+		$_DATA=array();
+		$_DATA[strtoupper($_sparm)]="$_sval";
+		if(!_ARRAY_NULL($_DATA)) {
+			$_ret=_DEFINITIONS_UPDATE("timeevents",$_option,$_ID,$_DATA);
+			if($_ret===TRUE) {
+				_CLI_ECHO(_GETTEXT("Definition updated"));
+				return TRUE;
+			} elseif($_ret===FALSE) {
+				_CLI_ECHO(_GETTEXT("Failed to updating definitions time events %s","$_option"));
+				return FALSE;	
+			} elseif($_ret===-1) {
+				_CLI_ECHO(_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}"));
+				return FALSE;
+			}
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+?>

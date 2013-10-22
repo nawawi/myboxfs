@@ -1,0 +1,86 @@
+This file is xmkdir.def, from which is created xmkdir.c.
+It implements the builtin "xmkdir" in Bash.
+xmkdir - make directories and parent directories and set mode to 700
+
+$PRODUCES xmkdir.c
+#include "../shell.h"
+#include "../builtins.h"
+#include "bashgetopt.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <config.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <errno.h>
+
+$BUILTIN xmkdir
+$FUNCTION xmkdir_builtin
+$SHORT_DOC xmkdir [directory/directory...]
+make directories and parent directories and set mode to 700
+$END
+
+int xmkdir(char *p) {
+	long mode=0700;
+        mode_t mask;
+        char *s=xmalloc(strlen(p) * sizeof(char)); 
+        char *path=xmalloc(strlen(p) * sizeof(char)); 
+        char c;
+        struct stat st;
+        path=strdup(p);
+        s=path;
+        mask=umask(0);
+	umask(mask & ~0300);
+
+        do {
+		c=0;
+		while(*s) {
+ 			if (*s=='/') {
+ 				do {
+ 					++s;
+ 				} while (*s == '/');
+				c = *s;
+				*s = 0;
+				break;
+			}
+			++s;
+		}
+                if(mkdir(path, 0700) < 0) {
+                        if(errno != EEXIST || (stat(path, &st) < 0 || !S_ISDIR(st.st_mode))) {
+				umask(mask);
+                                break;
+                        }
+                        if(!c) {
+				umask(mask);
+ 				return 0;
+ 			}
+                }
+
+                if(!c) {
+			umask(mask);
+                        if(chmod(path, mode) < 0) {
+				break;
+			}
+			return 0;
+                }
+                *s=c;
+        } while (1);
+        return -1;
+}
+
+int xmkdir_builtin(WORD_LIST *list) {
+	if(no_options(list)) return (EX_BADUSAGE);
+	list=loptend;
+
+	int ok=0;
+	if(list==0) {
+		builtin_usage();
+		return(EX_USAGE);
+	}
+	for ( ; list; list = list->next) {
+                if(xmkdir(list->word->word)!=0) ok++;
+	}
+	if(ok > 0) {
+		return(ok);
+	}
+        return (EXECUTION_SUCCESS);
+}

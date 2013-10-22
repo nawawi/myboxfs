@@ -1,0 +1,3 @@
+# policy routes
+-A POLICY_ROUTES_OUTPUT -m mark ! --mark 0 -j ACCEPT
+-A POLICY_ROUTES_PREROUTING -m mark ! --mark 0 -j ACCEPT

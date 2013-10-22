@@ -1,0 +1,582 @@
+<?php
+if(!defined('_CLI_CODE')||_CLI_CODE!="a098846421a09ab1cacd3b3a753cbe05") exit("\n\nERROR: _CLI_CODE not set\n\n");
+
+// return value for name; eg: awie [192.168.0.2]
+// display all
+function ___CLI_DEFINITIONS_NETWORKS_OBJ_LOOKUP($_name) {
+	_DEFINITIONS_GET_BYNAME_R("networks",$_name,$_DTOKEN);
+	if(!_ARRAY_NULL($_DTOKEN)) {
+		foreach($_DTOKEN as $_DID => $_DDATA) {
+			if(!_NULL($_DDATA['ADDR'])) {
+				$_DATA['ADDR'] .="{$_DDATA['ADDR']},";
+			}
+		}
+		_TRIM($_DATA['ADDR'],",");
+		if(!_NULL($_DATA['ADDR'])) return $_DATA['ADDR'];
+	}
+	return _GETTEXT("unresolved");
+}
+
+function ___CLI_DEFINITIONS_NETWORKS_PRINT($_opt="all",$_find='') {
+	$_objf=_OBJ_PATH."/iosh_definitions_networks_print.obj";
+	@unlink($_objf);
+	_DEFINITIONS_GET("networks",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+              	_CLI_ECHO(_GETTEXT("No data available"));
+                return FALSE;
+        }
+
+	$_builtin=0;$_interface=0;
+	$_host=0;$_dnshost=0;$_hostrange=0;
+	$_hostmac=0;$_network=1;$_group=0;
+
+	if($_opt=="host") {
+		$_builtin=0;$_interface=0;
+		$_host=1;$_dnshost=0;$_hostrange=0;
+		$_hostmac=0;$_network=0;$_group=0;
+	} elseif($_opt=="dnshost") {
+		$_builtin=0;$_interface=0;
+		$_host=0;$_dnshost=1;$_hostrange=0;
+		$_hostmac=0;$_network=0;$_group=0;
+	} elseif($_opt=="hostrange") {
+		$_builtin=0;$_interface=0;
+		$_host=0;$_dnshost=0;$_hostrange=1;
+		$_hostmac=0;$_network=0;$_group=0;
+	} elseif($_opt=="hostmac") {
+		$_builtin=0;$_interface=0;
+		$_host=0;$_dnshost=0;$_hostrange=0;
+		$_hostmac=1;$_network=0;$_group=0;
+	} elseif($_opt=="network") {
+		$_builtin=0;$_interface=0;
+		$_host=0;$_dnshost=0;$_hostrange=0;
+		$_hostmac=0;$_network=1;$_group=0;
+	} elseif($_opt=="group") {
+		$_builtin=0;$_interface=0;
+		$_host=0;$_dnshost=0;$_hostrange=0;
+		$_hostmac=0;$_network=0;$_group=1;
+	} elseif($_opt=="builtin") {
+		$_builtin=1;$_interface=0;
+		$_host=0;$_dnshost=0;$_hostrange=0;
+		$_hostmac=0;$_network=0;$_group=0;
+	} elseif($_opt=="interface") {
+		$_builtin=0;$_interface=1;
+		$_host=0;$_dnshost=0;$_hostrange=0;
+		$_hostmac=0;$_network=0;$_group=0;
+	} else {
+		$_builtin=1;$_interface=1;
+		$_host=1;$_dnshost=1;$_hostrange=1;
+		$_hostmac=1;$_network=1;$_group=1;
+	}
+
+	$_cnt=1;$_obj=array();
+	$_output="";$_DTX=array();
+	foreach($_TOKEN as $_type => $_id_array) {
+		if($_type=="builtin" && $_builtin==1) {
+			foreach($_id_array as $_id => $_set_a) {
+				if(_NULL($_set_a['NAME'])) {
+					_DEFINITIONS_DELETE("networks",$_type,$_id);
+					continue;
+				}
+				if(!_NULL($_find)) {
+					$_set_a['TYPE']=$_type;
+					if(!_ARRAY_FIND($_find,$_set_a)) {
+						continue;
+					}
+				}
+				if($_cnt > 1) $_DTX[$_cnt][__CLI_DATA_NL]=1;
+				$_DTX[$_cnt][_GETTEXT_U("ID")]=$_cnt;
+				$_DTX[$_cnt][_GETTEXT_U("TYPE")]=$_type;
+				$_DTX[$_cnt][_GETTEXT_U("NAME")]=$_set_a['NAME'];
+				$_DTX[$_cnt][_GETTEXT_U("ADDRESS")]=$_set_a['ADDR'];
+				$_DTX[$_cnt][_GETTEXT_U("DESCRIPTION")]=$_set_a['NOTE'];
+				$_obj[$_cnt][$_type]=$_id;
+				$_cnt++;
+			}
+			unset($_id,$_set_a);
+		}
+		if((stripos($_type,"interface addresses")!==FALSE ||
+			stripos($_type,"interface network")!==FALSE ||
+			stripos($_type,"interface broadcast")!==FALSE) && $_interface==1) {
+	
+			foreach($_id_array as $_id => $_set_a) {
+				if(_NULL($_set_a['NAME'])) {
+					continue;
+				}
+				if(!_NULL($_find)) {
+					$_set_a['TYPE']=$_type;
+					if(!_ARRAY_FIND($_find,$_set_a)) {
+						continue;
+					}
+				}
+				if($_cnt > 1) $_DTX[$_cnt][__CLI_DATA_NL]=1;
+				$_DTX[$_cnt][_GETTEXT_U("ID")]=$_cnt;
+				$_DTX[$_cnt][_GETTEXT_U("TYPE")]=$_type;
+				$_DTX[$_cnt][_GETTEXT_U("NAME")]=$_set_a['NAME'];
+				$_DTX[$_cnt][_GETTEXT_U("ADDRESS")]=$_set_a['ADDR'];
+				$_DTX[$_cnt][_GETTEXT_U("DESCRIPTION")]=$_set_a['NOTE'];
+				$_obj[][$_cnt][$_type]=$_id;
+				$_cnt++;
+			}
+			unset($_id,$_set_a);
+		}
+	
+		if($_type=="host" && $_host==1) {
+			foreach($_id_array as $_id => $_set_a) {
+				if(_NULL($_set_a['DNAME'])) $_set_a['DNAME']="any";
+				if(!_NULL($_find)) {
+					$_set_a['TYPE']=$_type;
+					if(!_ARRAY_FIND($_find,$_set_a)) {
+						continue;
+					}
+				}
+				if(!_NULL($_set_a['ADDR'])) {
+					$_lst_a=_STR_ARRAY($_set_a['ADDR'],",");
+					if(!_ARRAY_NULL($_lst_a)) {
+						$_set_a['ADDR']=$_lst_a;
+					}
+					unset($_lst_a);
+				}
+				if($_cnt > 1) $_DTX[$_cnt][__CLI_DATA_NL]=1;
+				$_DTX[$_cnt][_GETTEXT_U("ID")]=$_cnt;
+				$_DTX[$_cnt][_GETTEXT_U("TYPE")]=$_type;
+				$_DTX[$_cnt][_GETTEXT_U("NAME")]=$_set_a['NAME'];
+				$_DTX[$_cnt][_GETTEXT_U("ADDRESS")]=$_set_a['ADDR'];
+				$_DTX[$_cnt][_GETTEXT_U("INTERFACE")]=$_set_a['DNAME'];
+				$_DTX[$_cnt][_GETTEXT_U("DESCRIPTION")]=$_set_a['NOTE'];
+				$_obj[$_cnt][$_type]=$_id;
+				$_cnt++;
+			}
+			unset($_id,$_set_a);
+		}
+		if($_type=="dnshost" && $_dnshost==1) {
+			foreach($_id_array as $_id => $_set_a) {
+				if(_NULL($_set_a['NAME'])) {
+					_DEFINITIONS_DELETE("networks",$_type,$_id);
+					continue;
+				}
+				if(_NULL($_set_a['DNAME'])) $_set_a['DNAME']="any";
+				if(!_NULL($_find)) {
+					$_set_a['TYPE']=$_type;
+					if(!_ARRAY_FIND($_find,$_set_a)) {
+						continue;
+					}
+				}
+				if(!_NULL($_set_a['ADDR']) && $_set_a['ADDR']!=_GETTEXT("unresolved")) {
+					$_lst_a=_STR_ARRAY($_set_a['ADDR'],",");
+					if(!_ARRAY_NULL($_lst_a)) {
+						$_set_a['ADDR']=$_lst_a;
+					}
+					unset($_lst_a);
+				}
+				if($_cnt > 1) $_DTX[$_cnt][__CLI_DATA_NL]=1;
+				if($_set_a['ADDR']==_GETTEXT("unresolved")) $_set_a['ADDR']="["._GETTEXT("unresolved")."]";
+				$_DTX[$_cnt][_GETTEXT_U("ID")]=$_cnt;
+				$_DTX[$_cnt][_GETTEXT_U("TYPE")]=$_type;
+				$_DTX[$_cnt][_GETTEXT_U("NAME")]=$_set_a['NAME'];
+				$_DTX[$_cnt][_GETTEXT_U("HOSTNAME")]=$_set_a['HOSTNAME'];
+				$_DTX[$_cnt][_GETTEXT_U("ADDRESS")]=$_set_a['ADDR'];
+				$_DTX[$_cnt][_GETTEXT_U("INTERFACE")]=$_set_a['DNAME'];
+				$_DTX[$_cnt][_GETTEXT_U("DESCRIPTION")]=$_set_a['NOTE'];
+				$_obj[$_cnt][$_type]=$_id;
+				$_cnt++;
+			}
+			unset($_id,$_set_a);
+		}
+		if($_type=="hostrange" && $_hostrange==1) {
+			foreach($_id_array as $_id => $_set_a) {
+				if(_NULL($_set_a['NAME'])) {
+					_DEFINITIONS_DELETE("networks",$_type,$_id);
+					continue;
+				}
+				if(_NULL($_set_a['DNAME'])) $_set_a['DNAME']="any";
+				if(!_NULL($_find)) {
+					$_set_a['TYPE']=$_type;
+					if(!_ARRAY_FIND($_find,$_set_a)) {
+						continue;
+					}
+				}
+				if($_cnt > 1) $_DTX[$_cnt][__CLI_DATA_NL]=1;
+				$_DTX[$_cnt][_GETTEXT_U("ID")]=$_cnt;
+				$_DTX[$_cnt][_GETTEXT_U("TYPE")]=$_type;
+				$_DTX[$_cnt][_GETTEXT_U("NAME")]=$_set_a['NAME'];
+				$_DTX[$_cnt][_GETTEXT_U("ADDRESS")]=$_set_a['ADDR'];
+				$_DTX[$_cnt][_GETTEXT_U("RANGE ADDRESS")]=$_set_a['ADDR'];
+				$_DTX[$_cnt][_GETTEXT_U("INTERFACE")]=$_set_a['DNAME'];
+				$_DTX[$_cnt][_GETTEXT_U("DESCRIPTION")]=$_set_a['NOTE'];
+				$_obj[$_cnt][$_type]=$_id;
+				$_cnt++;
+			}
+			unset($_id,$_set_a);
+		}
+		if($_type=="hostmac" && $_hostmac==1) {
+			foreach($_id_array as $_id => $_set_a) {
+				if(_NULL($_set_a['NAME'])) {
+					_DEFINITIONS_DELETE("networks",$_type,$_id);
+					continue;
+				}
+				if(_NULL($_set_a['DNAME'])) $_set_a['DNAME']="any";
+				if(!_NULL($_find)) {
+					$_set_a['TYPE']=$_type;
+					if(!_ARRAY_FIND($_find,$_set_a)) {
+						continue;
+					}
+				}
+				if($_cnt > 1) $_DTX[$_cnt][__CLI_DATA_NL]=1;
+				$_DTX[$_cnt][_GETTEXT_U("ID")]=$_cnt;
+				$_DTX[$_cnt][_GETTEXT_U("TYPE")]=$_type;
+				$_DTX[$_cnt][_GETTEXT_U("NAME")]=$_set_a['NAME'];
+				$_DTX[$_cnt][_GETTEXT_U("MAC ADDRESS")]=$_set_a['ADDR'];
+				$_DTX[$_cnt][_GETTEXT_U("INTERFACE")]=$_set_a['DNAME'];
+				$_DTX[$_cnt][_GETTEXT_U("DESCRIPTION")]=$_set_a['NOTE'];
+				$_obj[$_cnt][$_type]=$_id;
+				$_cnt++;
+			}
+			unset($_id,$_set_a);
+		}
+		if($_type=="network" && $_network==1) {
+			foreach($_id_array as $_id => $_set_a) {
+				if(_NULL($_set_a['NAME'])) {
+					_DEFINITIONS_DELETE("networks",$_type,$_id);
+					continue;
+				}
+				if(_NULL($_set_a['DNAME'])) $_set_a['DNAME']="any";
+				if(!_NULL($_find)) {
+					$_set_a['TYPE']=$_type;
+					if(!_ARRAY_FIND($_find,$_set_a)) {
+						continue;
+					}
+				}
+				if($_cnt > 1) $_DTX[$_cnt][__CLI_DATA_NL]=1;
+				$_DTX[$_cnt][_GETTEXT_U("ID")]=$_cnt;
+				$_DTX[$_cnt][_GETTEXT_U("TYPE")]=$_type;
+				$_DTX[$_cnt][_GETTEXT_U("NAME")]=$_set_a['NAME'];
+				$_DTX[$_cnt][_GETTEXT_U("ADDRESS")]=$_set_a['ADDR'];
+				$_DTX[$_cnt][_GETTEXT_U("NETMASK")]="{$_set_a['PREF']} ({$_set_a['MASK']})";
+				$_DTX[$_cnt][_GETTEXT_U("INTERFACE")]=$_set_a['DNAME'];
+				$_DTX[$_cnt][_GETTEXT_U("DESCRIPTION")]=$_set_a['NOTE'];
+				$_obj[$_cnt][$_type]=$_id;
+				$_cnt++;
+			}
+			unset($_id,$_set_a);
+		}
+		if($_type=="group" && $_group==1) {
+			foreach($_id_array as $_id => $_set_a) {
+				if(_NULL($_set_a['NAME'])) {
+					_DEFINITIONS_DELETE("networks",$_type,$_id);
+					continue;
+				}
+				if(!_NULL($_find)) {
+					$_set_a['TYPE']=$_type;
+					if(!_ARRAY_FIND($_find,$_set_a)) {
+						continue;
+					}
+				}
+				if(!_NULL($_set_a['ADDR'])) {
+					$_lst_a=_STR_ARRAY($_set_a['ADDR'],",");
+					if(!_ARRAY_NULL($_lst_a)) {
+						$_set_a['ADDR']=$_lst_a;
+					}
+					unset($_lst_a);
+				}
+				if($_cnt > 1) $_DTX[$_cnt][__CLI_DATA_NL]=1;
+				$_DTX[$_cnt][_GETTEXT_U("ID")]=$_cnt;
+				$_DTX[$_cnt][_GETTEXT_U("TYPE")]=$_type;
+				$_DTX[$_cnt][_GETTEXT_U("NAME")]=$_set_a['NAME'];
+				$_DTX[$_cnt][_GETTEXT_U("MEMBERS")]=$_set_a['ADDR'];
+				$_DTX[$_cnt][_GETTEXT_U("DESCRIPTION")]=$_set_a['NOTE'];
+				$_obj[$_cnt][$_type]=$_id;
+				$_cnt++;
+			}
+			unset($_id,$_set_a);
+		}	
+	}
+	if(!_ARRAY_NULL($_DTX)) {
+		$_output .=_CLI_DATA_BODY_R($_DTX);
+		unset($_DTX);
+	}
+	if(_ARRAY_NULL($_obj) || !_FILE_ARRAY_SAVE($_objf,$_obj) || _NULL($_output)) {
+		if(!_NULL($_find)) {
+			_CLI_ECHO(_GETTEXT("No results found"));
+		} else {
+			_CLI_ECHO(_GETTEXT("No data available"));
+		}
+		@unlink($_objf);
+                return FALSE;	
+	}
+	_CLI_ECHO_HEADER(_GETTEXT("Definitions networks configuration"));
+	if(!_NULL($_find)) {
+		echo _GETTEXT("Search results match for '%s':","$_find")."\n\n";
+	}
+	echo "$_output";
+	return TRUE;
+}
+
+function ___CLI_DEFINITIONS_NETWORKS_DELETE($_num) {
+	$_objf=_OBJ_PATH."/iosh_definitions_networks_print.obj";
+	$_obj=_FILE_ARRAY_GET($_objf);
+	if(_ARRAY_NULL($_obj)) {
+		_CLI_ECHO(_GETTEXT("No Resource Id available."));
+		_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions networks print"));
+		@unlink($_objf);
+		return FALSE;
+	}
+	if($_num=='*' && _CLI_YESNO(_GETTEXT("This action will delete all %s.\nContinue this action? %s","networks definitions","[yes/no]: "))==TRUE) {
+		foreach($_obj as $_cnt => $_array) {
+			foreach($_array as $_type => $_id) {
+				if($_type=="builtin" || $_type=="interface") continue;
+				if(_DEFINITIONS_DELETE("networks",$_type,$_id)) {
+					unset($_obj[$_cnt]);
+				}
+			}
+		}
+		if(_FILE_ARRAY_SAVE($_objf,$_obj)) {
+			return TRUE;
+		}
+	} else {
+		$_num_array=array();
+		_CLI_MULTINUM($_num,$_num_array);
+		foreach($_num_array as $_no) {
+			if(!_ARRAY_NULL($_obj[$_no])) {
+				foreach($_obj[$_no] as $_type => $_id) {
+					if($_type=="builtin" || $_type=="interface") {
+						_CLI_ECHO(_GETTEXT("Cannot delete builtin or interface type definitions"));
+						return FALSE;
+					}
+					if(_DEFINITIONS_DELETE("networks",$_type,$_id)) {
+						unset($_obj[$_no]);
+					}
+				}
+			}
+		}
+		if(_FILE_ARRAY_SAVE($_objf,$_obj)) {
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+
+function ___CLI_DEFINITIONS_NETWORKS_ADD_INT($_num,&$_val) {
+	$_objf=_OBJ_PATH."/iosh_definitions_networks_interface.obj";
+	if(!_NULL($_num)) {
+		$_obj=_FILE_ARRAY_GET($_objf);
+		if(!_NULL($_obj[$_num])) {
+			$_val=_DEFINITIONS_GET_INTERFACE_NAME($_obj[$_num]);
+		} else {
+			_CLI_ECHO(_GETTEXT("Resource Id '%s' not available.","$_num"));
+			_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions networks interface"));
+			@unlink($_objf);
+			return FALSE;
+		}
+	}
+	return TRUE;
+}
+
+function ___CLI_DEFINITIONS_NETWORKS_ADD($_args) {
+	$_objf=_OBJ_PATH."/iosh_definitions_networks_print.obj";
+	if(!_ARRAY_NULL($_args)) {
+		$_option=$_args[0];
+		if($_option=="host") {
+			if(!_CHECK_IP($_args[2])) {
+				_CLI_ECHO(_GETTEXT("Invalid host"));
+				return FALSE;
+			}
+			$_DATA['NAME']="{$_args[1]}";
+			$_DATA['ADDR']="{$_args[2]}";
+			$_DATA['NOTE']="{$_args[3]}";
+			if(___CLI_DEFINITIONS_NETWORKS_ADD_INT($_args[4],$_val)) {
+				$_DATA['DNAME']="$_val";
+			}
+			if(_IS_IPV4($_args[2])) {
+				$_DATA['INET']="4";
+			} elseif(_IS_IPV6($_args[2])) {
+				$_DATA['INET']="6";
+			}
+			if(!_DEFINITIONS_SAVE("networks",$_option,$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}"));
+				return FALSE;
+			}
+			_CLI_ECHO(_GETTEXT("Definition saved"));
+			return TRUE;
+		} elseif($_option=="dnshost") {
+			$_DATA['NAME']="{$_args[1]}";
+			$_DATA['HOSTNAME']="{$_args[2]}";
+			$_DATA['ADDR']=_DEFINITIONS_DNSHOST_RESOLVE($_DATA['HOSTNAME']);
+			$_DATA['NOTE']="{$_args[3]}";
+
+			if(___CLI_DEFINITIONS_NETWORKS_ADD_INT($_args[4],$_val)) {
+				$_DATA['DNAME']="$_val";
+			}
+			if(!_DEFINITIONS_SAVE("networks",$_option,$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}"));
+				return FALSE;
+			}
+			_CLI_ECHO(_GETTEXT("Definition saved"));
+			return TRUE;
+		} elseif($_option=="hostrange") {
+			$_DATA['NAME']="{$_args[1]}";
+			$_DATA['ADDR']="{$_args[2]}";
+			$_DATA['NOTE']="{$_args[3]}";
+			list($_start,$_end)=preg_split("/-/",$_args[2]);
+			if(!_CHK_HOSTRANGE($_start,$_end)) {
+				_CLI_ECHO(_GETTEXT("Invalid range '%s'","{$_start}-{$_end}"));
+				return FALSE;
+			}
+			if(___CLI_DEFINITIONS_NETWORKS_ADD_INT($_args[4],$_val)) {
+				$_DATA['DNAME']="$_val";
+			}
+			if(_IS_IPV4($_start) && _IS_IPV4($_end)) {
+				$_DATA['INET']="4";
+			} elseif(_IS_IPV6($_start) && _IS_IPV6($_end)) {
+				$_DATA['INET']="6";
+			}
+			unset($_start,$_end);
+			if(!_DEFINITIONS_SAVE("networks",$_option,$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}"));
+				return FALSE;
+			}
+			_CLI_ECHO(_GETTEXT("Definition saved"));
+			return TRUE;
+		} elseif($_option=="hostmac") {
+			$_DATA['NAME']="{$_args[1]}";
+			$_DATA['ADDR']="{$_args[2]}";
+			$_DATA['NOTE']="{$_args[3]}";
+			if(!_CHECK_MACADDR($_args[2])) {
+				_CLI_ECHO(_GETTEXT("Invalid MAC Address"));
+				return FALSE;
+			}
+			if(___CLI_DEFINITIONS_NETWORKS_ADD_INT($_args[4],$_val)) {
+				$_DATA['DNAME']="$_val";
+			}
+			if(!_DEFINITIONS_SAVE("networks",$_option,$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}"));
+				return FALSE;
+			}
+			_CLI_ECHO(_GETTEXT("Definition saved"));
+			return TRUE;
+		} elseif($_option=="network") {
+			$_DATA['NAME']="{$_args[1]}";
+			$_DATA['ADDR']="{$_args[2]}";
+			$_DATA['MASK']="{$_args[3]}";
+
+			_IPCALC::IP($_RESULT,$_DATA['ADDR'],$_DATA['MASK']);
+			$_DATA['MASK']=$_RESULT['netmask'];
+			$_DATA['PREF']=$_RESULT['prefix'];
+			$_DATA['INET']=$_RESULT['inet'];
+			$_DATA['NOTE']="{$_args[4]}";
+
+			if(___CLI_DEFINITIONS_NETWORKS_ADD_INT($_args[5],$_val)) {
+				$_DATA['DNAME']="$_val";
+			}
+
+			if(!_DEFINITIONS_SAVE("networks",$_option,$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}"));
+				return FALSE;
+			}
+			@unlink($_objf);
+			_CLI_ECHO(_GETTEXT("Definition saved"));
+			return TRUE;
+		} elseif($_option=="group") {
+			$_DATA['NAME']="{$_args[1]}";
+			$_DATA['NOTE']="{$_args[3]}";
+			$_options=$_args[2];
+			$_obj=_FILE_ARRAY_GET($_objf);
+			if(_ARRAY_NULL($_obj)) {
+				_CLI_ECHO(_GETTEXT("Resource Id '%s' not available.","$_options"));
+				_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions networks print"));
+				@unlink($_objf);
+				return FALSE;
+			}
+			$_add=___CLI_DEFINITIONS_OBJGETNAME($_obj,"networks",$_options,"");
+			$_DATA['ADDR']="$_add";
+			if(!_DEFINITIONS_SAVE("networks",$_option,$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}"));
+				return FALSE;
+			}
+			_CLI_ECHO(_GETTEXT("Definition saved"));
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function ___CLI_DEFINITIONS_NETWORKS_SET($_args) {
+	$_objf=_OBJ_PATH."/iosh_definitions_networks_print.obj";
+	$_obj=_FILE_ARRAY_GET($_objf);
+
+	if(!_ARRAY_NULL($_args)) {
+		$_option=$_args[0];
+		$_sparm=$_args[1];
+		$_sid=$_args[2];
+		$_sval=$_args[3];
+		if(_ARRAY_NULL($_obj) || _NULL($_obj[$_sid][$_option])) {
+			_CLI_ECHO(_GETTEXT("Resource Id '%s' not available.","$_sid"));
+			_CLI_ECHO(_GETTEXT("Enter -> '%s %s' to view Resource Id.","definitions networks print","$_option"));
+			@unlink($_objf);
+			return FALSE;
+		}
+		$_ID=$_obj[$_sid][$_option];
+		$_DATA=array();
+		if($_sparm=="addr") {
+			if($_option=="host") {
+				if(!_CHECK_IP($_sval)) {
+					_CLI_ECHO(_GETTEXT("Invalid host"));
+					return FALSE;
+				}
+				if(_IS_IPV4($_sval)) {
+					$_DATA['INET']="4";
+				} elseif(_IS_IPV6($_sval)) {
+					$_DATA['INET']="6";
+				}
+			} elseif($_option=="dnshost") {
+				$_sval=_DEFINITIONS_DNSHOST_RESOLVE($_sval);
+			} elseif($_option=="hostrange") {
+				list($_start,$_end)=preg_split("/-/",$_sval);
+				if(!_CHK_HOSTRANGE($_start,$_end)) {
+					_CLI_ECHO(_GETTEXT("Invalid range '%s'","{$_start}-{$_end}"));
+					return FALSE;
+				}
+				if(_IS_IPV4($_start) && _IS_IPV4($_end)) {
+					$_DATA['INET']="4";
+				} elseif(_IS_IPV6($_start) && _IS_IPV6($_end)) {
+					$_DATA['INET']="6";
+				}
+				unset($_start,$_end);
+			} elseif($_option=="hostmac") {
+				if(!_CHECK_MACADDR($_sval)) {
+					_CLI_ECHO(_GETTEXT("Invalid MAC Address"));
+					return FALSE;
+				}
+			} elseif($_option=="network") {
+				$_sval2=$_args[4];
+				_IPCALC::IP($_RESULT,$_sval,$_sval2);
+				$_DATA['MASK']=$_RESULT['netmask'];
+				$_DATA['PREF']=$_RESULT['prefix'];
+				$_DATA['INET']=$_RESULT['inet'];
+			} elseif($_option=="group") {
+				$_add=___CLI_DEFINITIONS_OBJGETNAME($_obj,"networks",$_sval,"");
+				$_sval="$_add";
+			}
+		} elseif($_sparm=="dname") {
+			if(___CLI_DEFINITIONS_NETWORKS_ADD_INT($_sval,$_val)) {
+				$_sval="$_val";
+			}
+		}
+		$_DATA[strtoupper($_sparm)]="$_sval";
+		if(!_ARRAY_NULL($_DATA)) {
+			$_ret=_DEFINITIONS_UPDATE("networks",$_option,$_ID,$_DATA);
+			if($_ret===TRUE) {
+				_CLI_ECHO(_GETTEXT("Definition updated"));
+				return TRUE;
+			} elseif($_ret===FALSE) {
+				_CLI_ECHO(_GETTEXT("Failed to updating definitions networks %s","$_option"));
+				return FALSE;	
+			} elseif($_ret===-1) {
+				_CLI_ECHO(_GETTEXT("Definition name '%s' already exist","{$_DATA['NAME']}"));
+				return FALSE;
+			}
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+?>

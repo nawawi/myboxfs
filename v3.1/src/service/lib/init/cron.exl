@@ -1,0 +1,102 @@
+<?php
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+function cron_check() {
+	if(!_INIT_CHECK_BINARY(array("/bin/crond"))) {
+		_INIT_ECHO(1,_GETTEXT("Cannot execute %s. Internal error",_INIT_NAME()));
+		exit(1);
+	}
+}
+
+function cron_quiet() {
+	_INIT_QUIET('1');
+}
+
+function cron_config($_scriptdata='') {
+	if(!_NULL($_scriptdata)) {
+		return _FILE_SAVE("/var/spool/cron/crontabs/console","$_scriptdata\n");
+	}
+	$_lcdcheck="";
+	if(file_exists("/etc/cron/1m/lcdcheck")) {
+		$_lcdcheck=_FILE_GET("/etc/cron/1m/lcdcheck");
+	}
+	if(_INIT_BOOTUP()==FALSE) {
+		_CLEARDIR("/etc/cron/");
+	}
+	foreach(array("1m","3m","5m","h","d","w","m") as $_dir) {
+		_MKDIR("/etc/cron/$_dir");
+	}
+        $_config="# crontab\n";
+        $_config .="* * * * * run-parts /etc/cron/1m\n";
+        $_config .="*/3 * * * * run-parts /etc/cron/3m\n";
+        $_config .="*/5 * * * * run-parts /etc/cron/5m\n";
+        $_config .="01 * * * * run-parts /etc/cron/h\n";
+        $_config .="02 4 * * * run-parts /etc/cron/d\n";
+        $_config .="22 4 * * 0 run-parts /etc/cron/w\n";
+        $_config .="42 4 1 * * run-parts /etc/cron/m\n";
+	if(file_exists("/service/tools/session.exc")) {
+		_SAVE_BASH_FILE("/etc/cron/h/session","/bin/ionice -c2 -n5 /service/tools/session.exc check");
+		_SAVE_BASH_FILE("/etc/cron/1m/session_block","/bin/ionice -c2 -n4 /service/tools/session.exc check_block");
+	}
+	if(file_exists("/service/tools/log.exc")) {
+		_SAVE_BASH_FILE("/etc/cron/d/compress_log","/bin/ionice -c3 /service/tools/log.exc compress");
+	}
+	_BACKUP_CRONTAB();
+	_UPDATE_CRONTAB();
+	_INIT_EXEC("network_cron_dhcp");
+	if(file_exists("/service/tools/definitions.exc")) {
+		_SAVE_BASH_FILE("/etc/cron/5m/update_dnshost","/bin/ionice -c3 /service/tools/definitions.exc update_dnshost");
+	}
+	if(file_exists("/service/tools/pool_cgi_resource_usage.exc")) {
+		_SAVE_BASH_FILE("/etc/cron/3m/pool_cgi_resource_usage","/bin/ionice -c2 -n7 /service/tools/pool_cgi_resource_usage.exc");
+	}
+	if(!_NULL($_lcdcheck)) {
+		_FILE_SAVE("/etc/cron/1m/lcdcheck","/bin/ionice -c2 -n7 $_lcdcheck\n",0700);
+	}
+        return _FILE_SAVE("/var/spool/cron/crontabs/console",$_config);
+}
+
+
+function cron_up() {
+	@unlink(_TASKQ_PATH."/cron_up");
+	if(_EXEC_CMD("/bin/crond")==0) {
+		_INIT_CHKPROG_LOG("crond");
+		return TRUE;
+	}
+	return cron_restart();
+}
+
+
+function cron_start() {
+	_INIT_CHECK_DAEMON_STATUS("crond");
+	if(!cron_config()) {
+		_INIT_ECHO(1,_GETTEXT("Starting %s failed","crond"));
+		return FALSE;
+	}
+	_INIT_START_DAEMON("/bin/crond","cron_up");
+	return TRUE;
+}
+
+function cron_stop() {
+	_INIT_STOP_DAEMON("crond","cron_up");
+	return TRUE;
+}
+
+function cron_restart() {
+	_INIT_EXEC("cron_stop");
+	_INIT_EXEC("cron_start");
+	return TRUE;
+}
+
+function cron_reload() {
+	if(cron_config()) {
+		if(_SIGHUP("crond")) {
+			_INIT_ECHO(0,_GETTEXT("Reloading %s daemon","crond"));
+			return TRUE;
+		}
+	}
+	_INIT_ECHO(1,_GETTEXT("Reloading %s daemon failed","crond"));
+	return FALSE;
+}
+
+?>

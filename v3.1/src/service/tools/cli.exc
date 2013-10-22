@@ -1,0 +1,57 @@
+<?php
+class EXE {
+	private function _CLI_MAIN() {
+		define('_AWIE_CODE','ef3802a1fce98f3985e6a9a1f7c1a024');
+		include_once("lib.exl");
+		if(!defined('_SERVICE_LIB_PATH')) exit("\n\nERROR: _SERVICE_LIB_PATH not set\n\n");
+		include_once(_SERVICE_LIB_PATH.'/init.exl');
+		// cli core function
+		include_once(_SERVICE_LIB_PATH.'/cli.exl');
+
+		// load functions
+		define('_CLI_CODE','a098846421a09ab1cacd3b3a753cbe05');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_session.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_system_config.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_log.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_definitions.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_definitions_networks.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_definitions_services.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_definitions_timeevents.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_access_control.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_access_control_security.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_access_control_password.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_access_control_service.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_backup.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_interfaces.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_interfaces_static.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_interfaces_vlan.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_interfaces_dhcp.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_interfaces_pppoe.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_interfaces_vip.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_dns_config.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_dns_config_routing.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_dns_config_acl.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_dns_config_static.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_dns_config_dyndns.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_ipwatch_config.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_timedate_config.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_ntp_config.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_ntp_config_acl.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_static_arp.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_dhcp_config.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_dhcp_config_server.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_dhcp_config_static.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_dhcp_config_relay.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_route_config.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_route_config_static.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_route_config_policy.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_update.exl');
+		include_once(_SERVICE_LIB_PATH.'/cli/_cli_vstorage.exl');
+		_CLI_PROC(basename($_SERVER["argv"][0],".exc"));
+		exit(0);
+	}
+	public static function MAIN() {
+		self::_CLI_MAIN();
+	}
+}
+?>

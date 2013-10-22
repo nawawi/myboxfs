@@ -1,0 +1,49 @@
+﻿<?xml version="1.0"?>
+<CLISH_MODULE>
+<VIEW name="support" prompt="${SYSTEM_NAME}/support/&gt; ">
+        <COMMAND name="."
+                help="Return to previous menu"
+                view="main"
+                viewid=""/>
+
+	<COMMAND name="storage/"
+		help="Storage"
+		view="storage">
+		<ACTION builtin="awie_confirm">"Entering storage mode..."</ACTION>
+	 </COMMAND>
+
+	<COMMAND name="debug/"
+		help="Change to the debug mode"
+		view="debug">
+		<ACTION builtin="awie_confirm">"Entering debug mode..."</ACTION>
+	 </COMMAND>
+
+	<COMMAND name="ssh"
+		help="SSH client">
+		<PARAM name="server"
+			help="Server Host"
+			ptype="HOST" />
+		<PARAM name="user"
+			help="username"
+			ptype="STRING"/>
+		<PARAM name="port"
+			help="service port to connect"
+			ptype="NUM"
+			default="22"/>
+		<ACTION>exec /bin/exec_cli ssh {server} ${user} ${port}</ACTION>
+	</COMMAND>
+
+	<COMMAND name="telnet"
+		help="Telnet client">
+		<PARAM name="server"
+			help="Server Host"
+			ptype="HOST" />
+		<PARAM name="port"
+			help="service port to connect"
+			ptype="NUM"
+			default="23"/>
+		<ACTION>exec /bin/exec_cli telnet ${server} ${port}</ACTION>
+	</COMMAND>
+
+</VIEW>
+</CLISH_MODULE>

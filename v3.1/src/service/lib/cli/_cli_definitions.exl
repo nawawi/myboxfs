@@ -1,0 +1,219 @@
+<?php
+if(!defined('_CLI_CODE')||_CLI_CODE!="a098846421a09ab1cacd3b3a753cbe05") exit("\n\nERROR: _CLI_CODE not set\n\n");
+
+function ___CLI_DEFINITIONS_OBJGETNAME($_obj,$_section,$_data,$_type='') {
+	$_num_array=array();
+	$_add="";
+	_CLI_MULTINUM($_data,$_num_array);
+	foreach($_num_array as $_no) {
+		if(!_ARRAY_NULL($_obj[$_no])) {
+			foreach($_obj[$_no] as $_objnum => $_data_array) {
+				if(_ARRAY($_data_array)) {
+					if(!_ARRAY_NULL($_data_array)) {
+						foreach($_data_array as $_ttype => $_id) {
+							if(!_NULL($_type) && ($_ttype!="$_type")) continue;
+							_DEFINITIONS_GET_BYID("$_section",$_id,$_ITOKEN,$_ttype);
+							if(!_NULL($_ITOKEN['NAME'])) {
+								$_add .="{$_ITOKEN['NAME']},";
+							}
+							unset($_id,$_ITOKEN);
+						}
+					}
+				} else {
+					$_ttype=$_objnum;
+					$_id=$_data_array;
+					if(!_NULL($_type) && ($_ttype!="$_type")) continue;
+					_DEFINITIONS_GET_BYID("$_section",$_id,$_ITOKEN,$_ttype);
+					if(!_NULL($_ITOKEN['NAME'])) {
+						$_add .="{$_ITOKEN['NAME']},";
+					}
+					unset($_id,$_ITOKEN);
+				}
+			}
+		}
+	}
+	_TRIM($_add,",");
+	return "$_add";
+}
+
+function ___CLI_DEFINITIONS_INTERFACE_PRINT() {
+	_INI_TOKEN_GET("network","eth.cfg",$_ETOKEN);
+	if(_ARRAY_NULL($_ETOKEN)) {
+              	_CLI_ECHO(_GETTEXT("No data available"));
+                return FALSE;
+	}
+	$_cnt=1;$_obj=array();
+	$_DTL=array();
+	foreach($_ETOKEN as $_ID => $_DATA) {
+		if(_NULL($_DATA['NAME']) || _NULL($_DATA['DEVICE'])) continue;
+		if($_DATA['TYPE']=="vlan") {
+			$_DATA['DEVICE']="{$_DATA['DEVICE']}.{$_DATA['TAG']}";
+		}
+		$_DTL[]=array($_cnt,$_DATA['NAME'],$_DATA['TYPE'],$_DATA['DEVICE']);
+		$_obj[$_cnt]=$_ID;
+		$_cnt++;
+	}
+	if(!_ARRAY_NULL($_DTL) && !_ARRAY_NULL($_obj)) {
+		$_DTH=array(_GETTEXT_U("ID"),_GETTEXT_U("NAME"),_GETTEXT_U("TYPE"),_GETTEXT_U("DEVICE"));
+		echo _CLI_DATA_BODY_LINE($_DTH,$_DTL,array("-","-","-","-"));
+		return _FILE_ARRAY_SAVE(_OBJ_PATH."/iosh_definitions_networks_interface.obj",$_obj);
+	}
+	_CLI_ECHO(_GETTEXT("No data available"));
+	return FALSE;
+}
+
+function ___CLI_DEFINITIONS_ICMPTYPE_PRINT() {
+	_INI_TOKEN_GET("definitions","icmptype.cfg",$_ETOKEN);
+	if(_ARRAY_NULL($_ETOKEN)) {
+              	_CLI_ECHO(_GETTEXT("No data available"));
+                return FALSE;
+	}
+	$_cnt=1;$_obj=array();
+	$_DTL=array();
+	unset($_ETOKEN['icmptype']['__DATA_ID']);
+	foreach($_ETOKEN as $_ID => $_DATA) {
+		if($_ID!="icmptype") continue;
+		foreach($_DATA as $_code => $_val) {
+			$_DTL[]=array($_cnt,$_val);
+			$_obj[$_cnt]=$_code;
+			$_cnt++;
+		}
+	}
+	if(!_ARRAY_NULL($_DTL) && !_ARRAY_NULL($_obj)) {
+		$_DTH=array(_GETTEXT_U("ID"),_GETTEXT_U("TYPE/CODE"));
+		echo _CLI_DATA_BODY_LINE($_DTH,$_DTL,array("","-"));
+		return _FILE_ARRAY_SAVE(_OBJ_PATH."/iosh_definitions_icmptype.obj",$_obj);
+	}
+	_CLI_ECHO(_GETTEXT("No data available"));
+	return FALSE;
+}
+
+function ___CLI_DEFINITIONS_UPDATE_DNSHOST() {
+	_INI_TOKEN_GET("definitions","network_dnshost.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+		return FALSE;
+	}
+	$_update=0;
+	foreach($_TOKEN as $_ID => $_DATA) {
+		if(_NULL($_DATA['HOSTNAME'])) continue;
+		if(_NULL($_DATA['ADDR']) || $_DATA['ADDR']==_GETTEXT("unresolved")) {
+			$_host=_DEFINITIONS_DNSHOST_RESOLVE($_DATA['HOSTNAME']);
+			if(!_NULL($_host) && $_host!=_GETTEXT("unresolved")) {
+				$_DATA['ADDR']="$_host";
+				_INI_TOKEN_UPDATE("definitions","network_dnshost.cfg",$_ID,$_DATA);
+				$_update=1;
+				continue;
+			}
+		}
+		unset($_host);
+		$_host=_DEFINITIONS_DNSHOST_RESOLVE($_DATA['HOSTNAME']);
+		if(!_NULL($_host) && $_host!=_GETTEXT("unresolved")) {
+			$_dn=_STR_ARRAY($_host,",");
+			$_do=_STR_ARRAY($_DATA['ADDR'],",");
+			$_narray=array();
+			if(!_ARRAY_NULL($_dn) && !_ARRAY_NULL($_do)) {
+				$_carray=array_diff($_dn,$_do);
+				if(!_ARRAY_NULL($_carray)) {
+					$_narray=$_dn;
+				}
+			}
+			if(!_ARRAY_NULL($_narray)) {
+				foreach($_narray as $_val) {
+					if(_NULL($_val)) continue;
+					$_hval .="$_val,";
+				}
+				_TRIM($_hval,",");
+				if(!_NULL($_hval)) {
+					$_DATA['ADDR']="$_hval";
+					_INI_TOKEN_UPDATE("definitions","network_dnshost.cfg",$_ID,$_DATA);
+					$_update=1;
+				}
+			}
+			unset($_hval,$_val,$_dn,$_do,$_narray);
+		}
+	}
+	if($_update==1) {
+		_INIT_TASKQ("policy_restart");
+	}
+	return TRUE;
+}
+
+function _cli_definitions() {
+        if($_SERVER["argc"] > 1 ) {
+                $_max=$_SERVER["argc"];
+		_CLI_TRIM_ARGS($_SERVER['argv']);
+                for($_x=1;$_x < $_max;$_x++) {
+                        $_options=$_SERVER["argv"][$_x];
+                        if($_options=="update_dnshost") {
+				return ___CLI_DEFINITIONS_UPDATE_DNSHOST();
+			} elseif($_options=="show_interface") {
+				return ___CLI_DEFINITIONS_INTERFACE_PRINT();
+			} elseif($_options=="show_icmptype") {
+				return ___CLI_DEFINITIONS_ICMPTYPE_PRINT();
+			} elseif($_options=="networks") {
+                        	$_cmd=$_SERVER["argv"][$_x+1];
+                        	if($_cmd=="print") {
+					$_opt=$_SERVER["argv"][$_x+2];
+					return ___CLI_DEFINITIONS_NETWORKS_PRINT($_opt);
+				} elseif($_cmd=="delete") {
+					$_num=$_SERVER["argv"][$_x+2];
+					return ___CLI_DEFINITIONS_NETWORKS_DELETE($_num);
+				} elseif($_cmd=="add") {
+					_CLI_RESET_ARGS(2,$_SERVER["argv"]);
+					return ___CLI_DEFINITIONS_NETWORKS_ADD($_SERVER["argv"]);
+				} elseif($_cmd=="set") {
+					_CLI_RESET_ARGS(2,$_SERVER["argv"]);
+					return ___CLI_DEFINITIONS_NETWORKS_SET($_SERVER["argv"]);
+				} elseif($_cmd=="find") {
+					$_string=$_SERVER["argv"][$_x+2];
+					$_opt=$_SERVER["argv"][$_x+3];
+					if(_NULL($_opt)) $_opt='all';
+					return ___CLI_DEFINITIONS_NETWORKS_PRINT($_opt,$_string);
+				}
+			} elseif($_options=="services") {
+                        	$_cmd=$_SERVER["argv"][$_x+1];
+                        	if($_cmd=="print") {
+					$_opt=$_SERVER["argv"][$_x+2];
+					return ___CLI_DEFINITIONS_SERVICES_PRINT($_opt);
+				} elseif($_cmd=="delete") {
+					$_num=$_SERVER["argv"][$_x+2];
+					return ___CLI_DEFINITIONS_SERVICES_DELETE($_num);
+				} elseif($_cmd=="add") {
+					_CLI_RESET_ARGS(2,$_SERVER["argv"]);
+					return ___CLI_DEFINITIONS_SERVICES_ADD($_SERVER["argv"]);
+				} elseif($_cmd=="set") {
+					_CLI_RESET_ARGS(2,$_SERVER["argv"]);
+					return ___CLI_DEFINITIONS_SERVICES_SET($_SERVER["argv"]);
+				} elseif($_cmd=="find") {
+					$_string=$_SERVER["argv"][$_x+2];
+					$_opt=$_SERVER["argv"][$_x+3];
+					if(_NULL($_opt)) $_opt='all';
+					return ___CLI_DEFINITIONS_SERVICES_PRINT($_opt,$_string);
+				}
+			} elseif($_options=="time_events") {
+                        	$_cmd=$_SERVER["argv"][$_x+1];
+                        	if($_cmd=="print") {
+					$_opt=$_SERVER["argv"][$_x+2];
+					return ___CLI_DEFINITIONS_TIMEEVENT_PRINT($_opt);
+				} elseif($_cmd=="delete") {
+					$_num=$_SERVER["argv"][$_x+2];
+					return ___CLI_DEFINITIONS_TIMEEVENT_DELETE($_num);
+				} elseif($_cmd=="add") {
+					_CLI_RESET_ARGS(2,$_SERVER["argv"]);
+					return ___CLI_DEFINITIONS_TIMEEVENT_ADD($_SERVER["argv"]);
+				} elseif($_cmd=="set") {
+					_CLI_RESET_ARGS(2,$_SERVER["argv"]);
+					return ___CLI_DEFINITIONS_TIMEEVENT_SET($_SERVER["argv"]);
+				} elseif($_cmd=="find") {
+					$_string=$_SERVER["argv"][$_x+2];
+					$_opt=$_SERVER["argv"][$_x+3];
+					if(_NULL($_opt)) $_opt='all';
+					return ___CLI_DEFINITIONS_TIMEEVENT_PRINT($_opt,$_string);
+				}
+			}
+                }
+        }
+	return _CLI_DEFAULT_RETURN();
+}
+
+?>

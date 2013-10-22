@@ -1,0 +1,63 @@
+<?php
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+function hostname_quiet() {
+	_INIT_QUIET('1');
+}
+
+function _hostname_set($_hostname) {
+	_INIT_QUIET('2');
+	$_DATA['HOSTNAME']="$_hostname";
+	if(_INI_TOKEN_UPDATE("system","system.cfg","system",$_DATA)) {
+		_INIT_EXEC("hostname_start");
+		return TRUE;
+	}
+	return FALSE;
+}
+	
+function _hostname_config(&$_hostname) {
+	_INI_TOKEN_GET("system","system.cfg",$_TOKEN);
+	_INI_TOKEN_GET("network","eth.cfg",$_NTOKEN);
+	$_hostname=$_TOKEN['system']['HOSTNAME'];
+	if($_hostname=='') $_hostname='mybox.traceos.local';
+	if(file_exists("/proc/sys/kernel/hostname")) {
+		_FILE_SAVE("/proc/sys/kernel/hostname","$_hostname\n");
+		list($_host,)=preg_split("/\./",$_hostname);
+		if(!_ARRAY_NULL($_NTOKEN)) {
+			foreach($_NTOKEN as $_ID => $_DATA) {
+				if(_NULL($_DATA['STAT'])||$_DATA['STAT']==0) continue;
+				if(_NULL($_DATA['ADDR'])) continue;
+				$_config .="{$_DATA['ADDR']}\t\t$_hostname $_host\n";
+			}
+			if(!_NULL($_config)) {
+				_FILE_SAVE("/etc/hosts","127.0.0.1\t\tlocalhost.localdomain localhost\n$_config");
+				return TRUE;
+			} 
+		}
+		_FILE_SAVE("/etc/hosts","127.0.0.1\t\t$_hostname $_host localhost.localdomain localhost\n");
+		return TRUE;
+	}
+	return FALSE;
+}
+
+function hostname_start() {
+	if(_hostname_config($_hostname)) {
+		_INIT_ECHO(0,_GETTEXT("Setting system hostname to %s","$_hostname"));
+		return TRUE;
+	}
+	_INIT_ECHO(1,_GETTEXT("Setting %s Failed","Hostname"));
+	return FALSE;
+}
+
+function hostname_stop() {
+	return _INIT_EXEC("hostname_start");
+}
+
+function hostname_restart() {
+	return _INIT_EXEC("hostname_start");
+}
+
+function hostname_reload() {
+	return _INIT_EXEC("hostname_start");
+}
+?>

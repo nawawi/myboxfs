@@ -1,0 +1,248 @@
+<?php
+if(!defined('_CLI_CODE')||_CLI_CODE!="a098846421a09ab1cacd3b3a753cbe05") exit("\n\nERROR: _CLI_CODE not set\n\n");
+
+function ___CLI_ACCESS_CONTROL_PRINT($_find='') {
+	$_objf=_OBJ_PATH."/iosh_access_control_print.obj";
+	@unlink($_objf);
+	_INI_TOKEN_GET("system","acl.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+              	_CLI_ECHO(_GETTEXT("No data available"));
+                return FALSE;
+	}
+	$_cnt=1;$_obj=array();
+	$_output="";
+	foreach($_TOKEN as $_ID => $_DATA) {
+		if(_NULL($_DATA['HOST'])) {
+			_INI_TOKEN_DELETE("system","acl.cfg",$_ID);
+			continue;
+		}
+		if(_NULL($_DATA['STAT'])) $_DATA['STAT']=0;
+		_STR_ONOFF($_stat,$_DATA['STAT']);
+		$_DATA['STAT']=$_stat;
+		_DEFINITIONS_GET_BYNAME_R("networks",$_DATA['HOST'],$_DTOKEN);
+		if(!_ARRAY_NULL($_DTOKEN)) {
+			foreach($_DTOKEN as $_DID => $_DDATA) {
+				if(!_NULL($_DDATA['ADDR'])) {
+					if(!_NULL($_DDATA['PREF'])) $_DDATA['ADDR']="{$_DDATA['ADDR']}/{$_DDATA['PREF']}";
+					$_DATA['ADDR'] .="{$_DDATA['ADDR']},";
+				}
+			}
+			_TRIM($_DATA['ADDR'],",");
+		}
+		if(!_NULL($_find)) {
+			if(!_ARRAY_FIND($_find,$_DATA)) {
+				continue;
+			}
+		}
+		if($_cnt > 1) $_output .="\n";
+		$_output .=_CLI_DATA_BODY(
+			array(
+				_GETTEXT_U("ID")=>$_cnt,
+				_GETTEXT_U("HOST")=>$_DATA['HOST'],
+				_GETTEXT_U("ADDRESS")=>$_DATA['ADDR'] ? $_DATA['ADDR'] : __CLI_BODY_SKIP_DATA_TAG,
+				_GETTEXT_U("TYPE")=>$_DATA['TYPE'],
+				_GETTEXT_U("ENABLE")=>$_DATA['STAT'],
+				_GETTEXT_U("DESCRIPTION")=>$_DATA['NOTE']
+			)
+		);
+		$_obj[$_cnt]=$_ID;
+		unset($_DTOKEN);
+		$_cnt++;
+	}
+	if(_ARRAY_NULL($_obj) || !_FILE_ARRAY_SAVE($_objf,$_obj) || _NULL($_output)) {
+		if(!_NULL($_find)) {
+			_CLI_ECHO(_GETTEXT("No results found"));
+		} else {
+			_CLI_ECHO(_GETTEXT("No data available"));
+		}
+		@unlink($_objf);
+                return FALSE;
+	}
+	_CLI_ECHO_HEADER(_GETTEXT("Access Control List configuration"));
+	if(!_NULL($_find)) {
+		echo _GETTEXT("Search results match for '%s':","$_find")."\n\n";
+	}
+	echo "$_output";
+	return TRUE;
+}
+
+function ___CLI_ACCESS_CONTROL_ADD($_args) {
+	if(!_ARRAY_NULL($_args)) {
+		$_objf=_OBJ_PATH."/iosh_definitions_networks_print.obj";
+		$_obj=_FILE_ARRAY_GET($_objf);
+		$_sval=$_args[0];
+		if($_sval=="any") {
+			$_add="$_sval";
+		} else {
+			$_add=___CLI_DEFINITIONS_OBJGETNAME($_obj,"networks",$_sval);
+		}
+		if(_NULL($_add)) {
+			_CLI_ECHO(_GETTEXT("Resource Id '%s' not available.","$_sval"));
+			_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions networks print"));
+			@unlink($_objf);
+			return FALSE;
+		}
+		if(!_INI_TOKEN_CHECK("system","acl.cfg","HOST","$_add")) {
+			_CLI_ECHO(_GETTEXT("Host '%s' already exist","$_add"));
+			return FALSE;
+		}
+		$_DATA['HOST']="$_add";
+		if(stripos($_args[1],"all")!==FALSE) {
+			$_DATA['TYPE']="web,ssh,ftp";	
+		} else {
+			$_DATA['TYPE']="{$_args[1]}";
+		}
+		_STR_ONOFF($_onoff,$_args[2]);
+		$_DATA['STAT']="$_onoff";
+		$_DATA['NOTE']="{$_args[3]}";
+		if(_INI_TOKEN_SAVE("system","acl.cfg",$_DATA)) {
+			_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function ___CLI_ACCESS_CONTROL_SET($_args) {
+	if(!_ARRAY_NULL($_args)) {
+		$_objf=_OBJ_PATH."/iosh_access_control_print.obj";
+		$_obj=_FILE_ARRAY_GET($_objf);
+		$_opt=$_args[0];
+		$_sid=$_args[1];
+		$_sval=$_args[2];
+		if(_NULL($_obj[$_sid])) {
+			_CLI_ECHO(_GETTEXT("Resource Id '%s' not available.","$_sid"));
+			_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","acl print"));
+			@unlink($_objf);
+			return FALSE;
+		}
+		$_xid=$_obj[$_sid];
+		$_DATA=array();
+		if($_opt=="access") {
+			if(stripos($_sval,"all")!==FALSE) {
+				$_DATA['TYPE']="web,ssh,ftp";	
+			} else {
+				$_DATA['TYPE']="$_sval";
+			}
+		} elseif($_opt=="enable") {
+			_STR_ONOFF($_onoff,$_sval);
+			$_DATA['STAT']="$_onoff";
+		} elseif($_opt=="description") {
+			$_DATA['NOTE']="$_sval";
+		}
+		
+		if(!_ARRAY_NULL($_DATA) && _INI_TOKEN_UPDATE("system","acl.cfg",$_xid,$_DATA)) {
+			_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function ___CLI_ACCESS_CONTROL_DELETE($_num) {
+	$_objf=_OBJ_PATH."/iosh_access_control_print.obj";
+	$_obj=_FILE_ARRAY_GET($_objf);
+	if(_ARRAY_NULL($_obj)) {
+		_CLI_ECHO(_GETTEXT("No Resource Id available."));
+		_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","acl print"));
+		@unlink($_objf);
+		return FALSE;
+	}
+	if($_num=='*' && _CLI_YESNO("This action will delete all access list.\nContinue this action? [yes/no]: ")==TRUE) {
+		foreach($_obj as $_cnt => $_id) {
+			if(_INI_TOKEN_DELETE("system","acl.cfg",$_id)) {
+				unset($_obj[$_cnt]);
+			}
+		}
+		if(_FILE_ARRAY_SAVE($_objf,$_obj)) {
+			return TRUE;
+		}
+	} else {
+		$_num_array=array();
+		_CLI_MULTINUM($_num,$_num_array);
+		foreach($_num_array as $_no) {
+			if(!_NULL($_obj[$_no])) {
+				if(_INI_TOKEN_DELETE("system","acl.cfg",$_obj[$_no])) {
+					unset($_obj[$_no]);
+				}
+			}
+		}
+		if(_FILE_ARRAY_SAVE($_objf,$_obj)) {
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+
+function _cli_access_control() {
+        if($_SERVER["argc"] > 1 ) {
+                $_max=$_SERVER["argc"];
+		_CLI_TRIM_ARGS($_SERVER['argv']);
+                for($_x=1;$_x < $_max;$_x++) {
+                        $_options=$_SERVER["argv"][$_x];
+			if($_options=="acl") {
+                        	$_cmd=$_SERVER["argv"][$_x+1];
+                        	if($_cmd=="print") {
+					return ___CLI_ACCESS_CONTROL_PRINT();
+				} elseif($_cmd=="apply") {
+					if(_INIT_EXEC("policy_admin")) {
+						echo _CLI_ECHO(_GETTEXT("System access list set successfully"));
+						return TRUE;
+					}
+					return FALSE;
+				} elseif($_cmd=="delete") {
+					$_num=$_SERVER["argv"][$_x+2];
+					return ___CLI_ACCESS_CONTROL_DELETE($_num);
+				} elseif($_cmd=="add") {
+					_CLI_RESET_ARGS(2,$_SERVER["argv"]);
+					return ___CLI_ACCESS_CONTROL_ADD($_SERVER["argv"]);
+				} elseif($_cmd=="set") {
+					_CLI_RESET_ARGS(2,$_SERVER["argv"]);
+					return ___CLI_ACCESS_CONTROL_SET($_SERVER["argv"]);
+				} elseif($_cmd=="find") {
+					$_find=$_SERVER["argv"][$_x+2];
+					_TRIM($_find);
+					return ___CLI_ACCESS_CONTROL_PRINT($_find);
+				}
+			} elseif($_options=="password") {
+                        	$_cmd=$_SERVER["argv"][$_x+1];
+                        	if($_cmd=="print") {
+					return ___CLI_ACCESS_CONTROL_PASSWORD_PRINT();
+				} elseif($_cmd=="web" || $_cmd=="ssh" || $_cmd=="ftp" || $_cmd=="console") {
+					$_passwd=$_SERVER["argv"][$_x+2];
+					$_access=$_SERVER["argv"][$_x+3];
+					return ___CLI_ACCESS_CONTROL_PASSWORD_SET($_cmd,$_passwd,$_access);
+				}
+			} elseif($_options=="config") {
+                        	$_cmd=$_SERVER["argv"][$_x+1];
+                        	if($_cmd=="print") {
+					return ___CLI_ACCESS_CONTROL_SERVICE_PRINT();
+				} elseif($_cmd=="web" || $_cmd=="ssh" || $_cmd=="ftp") {
+					$_param=$_SERVER["argv"][$_x+2];
+					$_value=$_SERVER["argv"][$_x+3];
+					if($_param=="stat" || $_param=="ssl") {
+						_STR_ONOFF($_str,$_value);
+						$_value="$_str";
+						unset($_str);
+					}
+					return ___CLI_ACCESS_CONTROL_SERVICE_SET($_cmd,$_param,$_value);
+				} elseif($_cmd=="security") {
+					$_param=$_SERVER["argv"][$_x+2];
+					$_value=$_SERVER["argv"][$_x+3];
+					if($_param=="print") {
+						return ___CLI_ACCESS_CONTROL_SECURITY_PRINT();
+					} elseif($_param=="exclude") {
+						_CLI_RESET_ARGS(3,$_SERVER["argv"]);
+						return ___CLI_ACCESS_CONTROL_SECURITY_EXCLUDE($_SERVER["argv"]);						
+					} else {
+						return ___CLI_ACCESS_CONTROL_SECURITY_SET($_param,$_value);
+					}
+				}
+			}
+                }
+        }
+	return _CLI_DEFAULT_RETURN();
+}
+
+?>

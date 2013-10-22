@@ -1,0 +1,63 @@
+This file is lccase.def, from which is created lccase.c.
+It implements the builtin "lcfirst, strtolower" in Bash.
+
+$PRODUCES lccase.c
+#include <config.h>
+#include <stdio.h>
+#include <ctype.h>
+#include "../builtins.h"
+#include "../shell.h"
+
+$BUILTIN strtolower
+$FUNCTION strtolower_builtin
+$SHORT_DOC strtolower [string]
+strtolower - convert letter to uppercase
+$END
+
+int strtolower_builtin(WORD_LIST *list) {
+        int n = 0;
+        int ch;
+        char *string;
+
+        if(list== 0 || list->next) {
+                builtin_usage();
+                return(EX_USAGE);
+        }
+
+        string=list->word->word;
+
+        while(string[n]) {
+                string[n] = tolower(string[n]);
+                n++;
+        }
+        printf("%s\n", string);
+        return (EXECUTION_SUCCESS);
+}
+
+$BUILTIN lcfirst
+$FUNCTION lcfirst_builtin
+$SHORT_DOC lcfirst [string]
+Make a string's first character lowercase
+$END
+
+int lcfirst_builtin(WORD_LIST *list) {
+	int n = 0, firstletter = 1;
+	char *string;
+
+	if(list==0 || list->next) {
+		builtin_usage();
+		return(EX_USAGE);
+	}
+
+	string=list->word->word;
+	while(string[n]) {
+		if(isalpha(string[n]) && firstletter==1) {
+			firstletter=0;
+			string[n]=tolower(string[n]);
+		}
+		n++;
+	}
+	printf("%s\n", string);
+	return(EXECUTION_SUCCESS);
+}
+

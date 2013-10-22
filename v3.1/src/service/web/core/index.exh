@@ -1,0 +1,82 @@
+<?php
+define('_CGI_CODE','90d45215e48dac81e802f17310ad0c1f');
+include_once("cgi.exl");
+_CGI_PAGE_NOCACHE();
+_CGI_PAGE_RESPONSE();
+$_nocache=_RAND_TEXT(5)."=".time();
+if(_CGI_IF_MSIE()) {
+	$_favicon="/favicon.ico";
+} else {
+	$_favicon="/favicon-moz.ico";
+}
+?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>WebGUI</title>
+<meta name="pragma" content="no-cache" />
+<meta http-equiv="Cache-Control" content="no-cache" />
+<link rel="icon" type="image/x-icon" href="<?php echo $_favicon;?>" />
+<style type='text/css'>
+body {
+	font-family: Arial, Verdana,  Helvetia, Sans-Serif;
+	font-size: 12px;
+	background-color: #a7a7a7;
+	color: #000000;
+}
+.fpage {
+	text-align: center;
+	color: #ffffff;
+	font-size: 12px;
+	font-weight: bold;
+	font-family: Arial, Verdana,  Helvetia, Sans-Serif;
+}
+/* overlib fix */
+#olfix {
+        border: 1px;
+}
+#olfix table, #olfix td {
+        padding: 1px;
+}
+</style>
+<?php 
+if(!_NULL($GLOBALS['__LANG']) && file_exists(_CGI_WEBGUI_RESOURCE."/lang/{$GLOBALS['__LANG']}.js")) {
+	echo "<script type='text/javascript'>"._FILE_GET(_CGI_WEBGUI_RESOURCE."/lang/{$GLOBALS['__LANG']}.js")."</script>";
+}?>
+<script type="text/javascript" src="/core.js?<?php echo $_nocache;?>"></script>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+</head>
+<body scroll=auto>
+<div id='__content'>
+<noscript>
+<div class='fpage'>
+<?php echo _GETTEXT("JavaScript must be enabled in order for you to use %s Web-based interface.<br>However, it seems JavaScript is either disabled or not supported by your browser.","MYBOX");?>
+</div>
+</noscript>
+</div>
+<script type="text/javascript">
+try {
+	var __write=function(str) {document.getElementById("__content").innerHTML="<div class='fpage'>"+str+"</div>";};
+	__write("<?php echo _GETTEXT("Page loading. Please wait..");?> <img src='/__resource/core/page_spinner.gif'>");
+	var __testcookies=function() {
+		var test_cookie=(navigator.cookieEnabled)? true : false;
+		if(typeof navigator.cookieEnabled=="undefined" && !cookieEnabled) {
+			document.cookie="twebtest";
+			test_cookie=(document.cookie.indexOf("twebtest")!=-1)? true : false;
+    		}
+		return test_cookie;
+	};
+
+	if(!__testcookies()) {
+		__write("<?php echo _GETTEXT("ERROR: Your browser's cookie functionality is turned off. Please turn it on.");?>");	
+	} else {
+		var _dashboard_interval=null;
+		var _session_interval=null;
+		__tnpage.init();
+	}
+} catch(e) {
+	__write("<?php echo _GETTEXT("ERROR: The page could not be loaded.");?>");
+}
+</script>
+</body>
+</html>

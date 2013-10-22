@@ -1,0 +1,104 @@
+<?php
+class EXE {
+
+	private function _ECHO($_str) {
+		if(!_NULL($GLOBALS['_sophos_update_verbose']) && $GLOBALS['_sophos_update_verbose']==1) {
+			echo "[*] $_str\n";
+		}
+		_LOG_SOPHOSAV($_str);
+	}
+
+	private function _CLEAN() {
+		@unlink(_SOPHOS_UPDATE_LOCK);
+	}
+
+	private function _EXIT() {
+		self::_CLEAN();
+		self::_ECHO(_GETTEXT("Stopping %s program.","sophos_update.exc"));
+		if(!_NULL($GLOBALS['_sophos_update_error'])&&$GLOBALS['_sophos_update_error']==0) {
+			//sophie_restart();
+		}
+		exit(0);
+	}
+
+	private function _CHECK() {
+		if(!file_exists(_SOPHOS_UPDATE_RSYNC)) {
+			self::_ECHO(_GETTEXT("Cannot running %s. Internal error","sophos_update.exc"));
+			self::_EXIT();
+		}
+		if(file_exists(_SOPHOS_UPDATE_LOCK)) {
+			self::_ECHO(_GETTEXT("%s already running..","sophos_update.exc"));
+			exit(1);
+		}
+		if(!file_exists(_SOPHOSAV_PATH)) {
+			@_MKDIR(_SOPHOSAV_PATH);
+		}
+		@_MKDIR("/usr/local");
+		@symlink(_SOPHOSAV_PATH."/sav","/usr/local/sav");
+	}
+
+	private function _SYNC() {
+		@touch(_SOPHOS_UPDATE_LOCK);
+		putenv('RSYNC_PASSWORD='._SOPHOS_UPDATE_KEY);
+		putenv('USER='._SOPHOS_UPDATE_USER);
+		$_cmd=_SOPHOS_UPDATE_RSYNC.' '._SOPHOS_UPDATE_EXEC;
+		if(!_NULL($GLOBALS['_sophos_update_verbose'])&&$GLOBALS['_sophos_update_verbose']==1) {
+			$_cmd=_SOPHOS_UPDATE_RSYNC.' -v --progress '._SOPHOS_UPDATE_EXEC;
+			system($_cmd,$_ret);
+			if($_ret!=0) {
+				self::_ECHO(_GETTEXT("%s: error while updating..","sophos_update.exc"));
+				$GLOBALS['_sophos_update_error']=1;
+			}
+		} else {
+			if(_EXEC_CMD_OUTPUT(_SOPHOS_UPDATE_EXEC,$_STDOUT,$_STDERR)!=0) {
+				$_error=_ARRAY_STR($_STDERR);
+				if(!_NULL($_error)) {
+					self::_ECHO("sophos_update.exc: $_error");
+				} else {
+					self::_ECHO(_GETTEXT("%s: error while updating..","sophos_update.exc"));
+				}
+				$GLOBALS['_sophos_update_error']=1;
+			}
+		}	
+
+		putenv('RSYNC_PASSWORD');
+		putenv('USER');
+		$GLOBALS['_sophos_update_error']=0;
+		self::_EXIT();
+	}
+
+	private function _SOPHOS_UPDATE_MAIN() {
+		define('_AWIE_CODE','ef3802a1fce98f3985e6a9a1f7c1a024');
+		include_once("lib.exl");
+		include_once("init.exl");
+
+		// internal use
+		define('_SOPHOS_UPDATE_LOCK',_PROC_PATH."/sophos_update.lck");
+		define('_SOPHOS_UPDATE_HOST','updates.tracenetworkcorporation.com');
+		define('_SOPHOS_UPDATE_USER','sav_sync');
+		define('_SOPHOS_UPDATE_KEY','f1f531b1a21645b2eeadf63d8967e2e5');
+		define('_SOPHOS_UPDATE_CHANNEL',_SOPHOS_UPDATE_HOST.'::sophos_update');
+		define('_SOPHOS_UPDATE_RSYNC','/bin/rsync');
+		define('_SOPHOS_UPDATE_EXEC','--temp-dir='._SOPHOSAV_PATH.' --delete-after -azu '._SOPHOS_UPDATE_CHANNEL.' '._SOPHOSAV_PATH);
+		declare(ticks = 1);
+		@pcntl_signal(SIGHUP,'self::_CLEAN');
+		@pcntl_signal(SIGINT,'self::_CLEAN');
+		@pcntl_signal(SIGQUIT,'self::_CLEAN');
+		@pcntl_signal(SIGKILL,'self::_CLEAN');
+		@pcntl_signal(SIGTERM,'self::_CLEAN');
+		@pcntl_signal(SIGTSTP,'self::_CLEAN');
+		if(!_NULL($_SERVER["argv"][1]) && $_SERVER["argv"][1]=="-v") {
+			$GLOBALS['_sophos_update_verbose']=1;
+		}
+		self::_ECHO(_GETTEXT("Starting %s program.","sophos_update.exc"));
+		self::_CHECK();
+		self::_SYNC();
+		self::_EXIT();
+		exit(0);
+	}
+
+	public static function MAIN() {
+		self::_SOPHOS_UPDATE_MAIN();
+	}
+}
+?>

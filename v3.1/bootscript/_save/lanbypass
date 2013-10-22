@@ -1,0 +1,36 @@
+#!/bin/sh
+# $Id: lanbypass.sh,v 1.1 2007/12/22 12:13:20 nawawi Exp $
+# updated: 2008/04/04
+# lanbypass for advantech appliance (hwa-3140, hwa-6280A)
+
+
+[ ! -e "/etc/hwapp" ] && exit 1;
+
+_HW=$(cat /etc/hwapp);
+_CMD="/bin/lanbypass$_HW";
+_OPT="$1";
+
+[ -z "$_HW" -a -z "$_OPT" -a ! -x "$_CMD" ] && exit 1;
+if [ "$_HW" = "3140" ]; then
+	_CMD_ON="$_CMD on";
+	_CMD_OFF="$_CMD off";
+elif [ "$_HW" = "6280A" ]; then
+	_CMD_ON="$_CMD -e 0; $_CMD -e 1";
+	_CMD_OFF="$_CMD -d 0; $_CMD -d 1";
+fi
+
+case $_OPT in
+        on|On|ON|1)
+                $_CMD_ON >/dev/null 2>&1;
+		exit $?;
+        ;;
+        off|Off|OFF|0)
+                $_CMD_OFF >/dev/null 2>&1;
+		exit $?;
+        ;;
+        *)
+                echo "Usage: $0 <on/off>";
+		exit 1;
+        ;;
+esac
+exit 1;

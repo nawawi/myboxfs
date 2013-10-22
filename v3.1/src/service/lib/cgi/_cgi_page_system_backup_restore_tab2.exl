@@ -1,0 +1,268 @@
+<?php
+if(!defined('_CGI_CODE')||_CGI_CODE!="90d45215e48dac81e802f17310ad0c1f") exit("\n\nERROR: _CGI_CODE not set\n\n");
+
+function _CGI_PAGE_SYSTEM_BACKUP_EMAIL($_THRU_EMAIL) {
+	extract($GLOBALS['_IMG']);
+	_INI_TOKEN_GET("system","system.cfg",$_TOKEN);
+	$_DATA=$_TOKEN['backup'];
+	$_page="
+		<div id='tbox_acl' style='width: 250px; height: 220px;'>
+			<div id='tbox_acl_title'>
+				<div id='tbox_acl_title_t'>Recipients</div>
+				<div id='tbox_acl_title_r'></div>
+			</div>
+			<div id='tbox_acl_content'>
+				<table class='tbox_acl_tb'><tbody><tr>
+				<td class='tbox_acl_td_it'><input type='text' class='tbox_acl_it'></td>
+				</tr>
+	";
+	$_did=0;
+	if(!_NULL($_THRU_EMAIL)) {
+		$_em_a=_STR_ARRAY($_THRU_EMAIL,",");
+		if(!_ARRAY_NULL($_em_a)) {
+			foreach($_em_a as $_em) {
+				$_page .="
+					<tr id='del$_did'>
+					<td class='tbox_acl_td_it tbox_acl_itt'><img id='del$_did' style='padding-right: 2px; float: left; height: 14px;' src='$_ICON_DELETE'><div class='def_ibox1_ii'>$_em</div></td>
+					</tr>
+				";
+				$_did++;
+			}
+			if($_did!=0) $_did--;
+		}
+	}
+
+	$_page .="
+		</tbody></table>
+			</div>
+		</div>
+		<script type='text/javascript'>
+			\$(document).ready(function() {
+				__tndefinitions.rowcolor('table.tbox_acl_tb tr[id*=del] td','','',true);
+
+				var _accept=__defa_n['all'];
+				var _delcnt=$_did;
+				var _click_action=function() {
+					\$('table.tbox_acl_tb img').hover(
+						function() {
+							\$(this).css({'cursor':'pointer'});
+						},
+						function() {
+							\$(this).css({'cursor':'default'});
+						}
+					).click(function() {
+						var _attr=basename($(this).attr('src'));
+						if(_attr==='".basename($_ICON_DELETE)."') {
+							var _delid=$(this).attr('id');
+							\$('tr#'+_delid).remove();
+							__tndefinitions.rowcolor('table.tbox_acl_tb tr[id*=del] td','','',true);
+						}
+					});
+				};
+
+				var _search_action=function() {
+					var _search_hide=function(opt) {
+						\$('table.tbox_acl_tb tr').each(function(i) {
+							var _tid=\$(this).attr('id');
+							if(_tid && _tid.match(/del\d+/)) {
+								if(opt===1) {
+									\$(this).hide();
+								} else {
+									\$(this).show();
+								}
+							}
+						});
+					};
+					\$('div#tbox_acl_content input.tbox_acl_it').keyup(function(event) {
+						var _str=$(this).val();
+						if(_str.length===0) {
+							_search_hide(0);
+						} else {
+							_search_hide(1);
+							\$('table.tbox_acl_tb tr').each(function(i) {
+								var _tid=\$(this).attr('id');
+								if(_tid && _tid.match(/del\d+/)) {
+									var _p=\$.trim(\$(this).text());
+									var _regex=new RegExp(_str, 'i');
+									if(_regex.exec(_p)) {
+										\$(this).show().filter(function() {
+											__tndefinitions.rowcolor('table.tbox_acl_tb tr[id*=del] td','','',true);
+										});
+									}
+								}
+							});
+						}
+					});
+				};
+
+				_click_action();
+				_search_action();
+
+				var _pclean=function() {
+					\$('table.tbox_acl_tb tbody input[id*=del]').each(function(i) {
+						var _tid=\$(this).attr('id');
+						\$('tr#'+_tid).remove();
+					});
+					__tndefinitions.rowcolor('table.tbox_acl_tb tr[id*=del] td','','',true);
+				};
+
+				var _pinsert=function(pid) {
+					var _tid=\$(pid).attr('id');
+					var _val=\$.trim(\$(pid).val());
+					if(_val==='' || is_email(_val)===false || __tndefinitions.checklist('table.tbox_acl_tb td',_val)!==0) {
+						\$('tr#'+_tid).remove();
+					} else {
+						\$('tr#'+_tid).remove();
+						var _page=\$('table.tbox_acl_tb tbody').html()+\"<tr id=\"+_tid+\">\";
+						_page +=\"<td class='tbox_acl_td_it tbox_acl_itt'><img id=\"+_tid+\" style='padding-right: 2px; float: left; height: 14px;' src='$_ICON_DELETE'><div class='def_ibox1_ii'>\"+_val+\"</div></td>\";
+						_page +=\"</tr>\";
+						\$('table.tbox_acl_tb tbody').html(_page);
+					}
+					_click_action();
+					_search_action();
+					__tndefinitions.rowcolor('table.tbox_acl_tb tr[id*=del] td','','',true);
+				};
+
+				\$('div#tbox_acl_title_r').click(function(evt) {
+					var e=evt || window.event;
+					e.preventDefault();
+					_pclean();
+					_delcnt++;
+					var _page=\$('table.tbox_acl_tb tbody').html()+\"<tr id='dummy'>\";
+					_page +=\"<td class='tbox_acl_td_it tbox_acl_itt'><img id='dummy' style='padding-right: 2px; float: left; height: 14px;' src='$_ICON_DELETE'><div class='def_ibox1_ii'><input id='dummy' type='text' class='tbox_i' style='height: 14px;'></div></td>\";
+					_page +=\"</tr>\";
+					\$('table.tbox_acl_tb tbody').html(_page);
+					\$('tr#dummy').attr({'id':'del'+_delcnt});
+					\$('img#dummy').attr({'id':'del'+_delcnt});
+					\$('input#dummy').attr({'id':'del'+_delcnt}).focus();
+					_click_action();
+					_search_action();
+					\$('table.tbox_acl_tb tbody input').blur(function() {
+						_pinsert(\$(this));
+					});
+				});
+				
+
+			});
+		</script>
+	";
+	return trim($_page);
+}
+
+
+function _CGI_PAGE_SYSTEM_BACKUP_TAB_2() {
+	extract($GLOBALS['_IMG']);
+	_INI_TOKEN_GET("system","system.cfg",$_TOKEN);
+	$_DATA=$_TOKEN['backup'];
+	$_bid=_CGI_ATTR_KEY();
+	$_page="
+		<div class='fbox_c'>
+		<fieldset>
+		<legend>"._GETTEXT("Automatic backup")."</legend>
+		<div style='margin: 5px;'>
+		"._CGI_BUTTON_ENABLE(array('img_id'=>'ab_stat'))."
+		<hr />
+		<table class='tbox_t' style='width: 100%;'>
+		<tr>
+		<td class='tbox_tdl'>Interval:</td>
+		<td class='tbox_tdc'>
+			<select id='interval' class='tbox_s' size='1'>
+	";
+	foreach(array("daily","weekly","monthly") as $_d) {
+		$_page .="<option value='$_d' "._CGI_DROPDOWNBOX_VAL($_d,$_DATA['AUTO_INTERVAL']).">".ucfirst(_GETTEXT($_d))."</option>";
+	}
+	$_page .="
+		</select>
+		</td>
+		<th rowspan=3 class='tbox_tdr'>"._GETTEXT("When automatic backups are enabled, the system will create backups in the specified interval. You can also specify how many backups should be stored on the system. If this number is exceeded, the oldest backups are automatically deleted.")."</th>
+		</tr>
+		<tr>
+		<td class='tbox_tdl'>"._GETTEXT("Maximum backup:")."</td>
+		<td class='tbox_tdc'><input id='max_backup' type='text' style='width: 50px;' class='tbox_i' value='{$_DATA['AUTO_COUNT']}' /> "._GETTEXT("backups.")."</td>
+		</tr>
+		</table>
+		<hr />
+		"._CGI_BUTTON_APPLY("button_{$_bid}1")."
+		<hr />
+		<table class='tbox_t'>
+		<tr>
+		<td class='tbox_tdc' style='width: 300px;'>
+		"._CGI_PAGE_SYSTEM_BACKUP_EMAIL($_DATA['THRU_EMAIL'])."
+		</td>
+		<td class='tbox_tdr' style='padding-left: 30px;'>"._GETTEXT("In addition to be stored on the system, automatic backups can also be mailed to email recipients. Specify the recipients that should receive the backups.")."</td>
+		</tr>
+		</table>
+		<hr />
+		"._CGI_BUTTON_APPLY("button_{$_bid}2")."
+		</div>
+		</fieldset>
+		</div>
+		<script type='text/javascript'>
+			\$(document).ready(function() {
+				var _imgoff='{$_ICON_ONOFF[0]}';
+				var _imgon='{$_ICON_ONOFF[1]}';
+				var _stat_onoff=function(stat) {
+					if(stat==1) {
+						\$('div.fbox_c img#ab_stat').attr({'src': _imgon});
+						\$('div.fbox_c div#button_stat').text('Disable').attr('title','Disable');
+					} else {
+						\$('div.fbox_c img#ab_stat').attr({'src': _imgoff});
+						\$('div.fbox_c div#button_stat').text('Enable').attr('title','Enable');
+					}
+				};
+				_stat_onoff({$_DATA['AUTO_STAT']});
+				\$('div.fbox_c div#button_stat').click(function() {
+					if(!__tnpage.is_admin()) {
+						return false;
+					}
+					var _cstat=\$.trim(\$(this).text());
+					var _data='_update_data=2&_sec=system&_secf=system&_id=backup&_eq=cron_restart';
+					if(_cstat==='Enable') {
+						_stat_onoff(1);
+						_data +='&_data[AUTO_STAT]=1&_msg='+base64_encode('"._GETTEXT("Enabling Auto backup, please wait")."');
+						__tnpage.data_update(_data);
+					} else {
+						_stat_onoff(0);
+						_data +='&_data[AUTO_STAT]=0&_msg='+base64_encode('"._GETTEXT("Disabling Auto backup, please wait")."');
+						__tnpage.data_update(_data);
+					}
+					return true;
+				});
+				\$('#button_{$_bid}1').click(function() {
+					if(!__tnpage.is_admin()) {
+						return false;
+					}
+					var _interval=\$('#interval').attr('value');
+					var _max_backup=\$.trim(\$('#max_backup').val());
+					var _data='_update_data=2&_sec=system&_secf=system&_id=backup&_eq=cron_restart&_data[AUTO_INTERVAL]='+_interval+'&_data[AUTO_COUNT]='+_max_backup;
+					__tnpage.data_update(_data);
+					return true;
+				});
+				\$('#button_{$_bid}2').click(function() {
+					if(!__tnpage.is_admin()) {
+						return false;
+					}
+					var _data='_update_data=2&_sec=system&_secf=system&_id=backup&_eq=cron_restart';
+					var _list='';
+					\$('table.tbox_acl_tb tr').each(function(i) {
+						var _tid=\$(this).attr('id');
+						if(_tid && _tid.match(/del\d+/)) {
+							var _p=\$.trim(\$(this).text());
+							if(is_email(_p)) {
+								_list +=_p+',';
+							}
+						}
+					});
+					if(!is_null(_list)) {
+						_list=_list.replace(/,\$/,'');
+					}
+					_data +='&_data[THRU_EMAIL]='+_list;
+					__tnpage.data_update(_data);
+					return true;
+				});
+			});
+		</script>
+	";
+	return trim($_page);
+}
+?>

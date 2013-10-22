@@ -1,0 +1,45 @@
+# table filter default policy
+*filter
+:INPUT DROP [0:0]
+:FORWARD DROP [0:0]
+:OUTPUT ACCEPT [0:0]
+:ADMIN - [0:0]
+:BLACKLIST - [0:0]
+:SYS_FORWARD - [0:0]
+:SYS_INPUT - [0:0]
+:HA - [0:0]
+:LOG_ACCEPT - [0:0]
+:LOG_DROP - [0:0]
+:LOG_REJECT - [0:0]
+:PSCAN_DROP - [0:0]
+:PSCAN_CATCH - [0:0]
+:PF_FORWARD - [0:0]
+:PF_INPUT - [0:0]
+-A INPUT -i lo -j ACCEPT
+-A INPUT -m confirmed -j ACCEPT
+-A INPUT -m state --state RELATED -j CONFIRMED
+-A INPUT -j HA
+-A INPUT -j PSCAN_CATCH
+-A INPUT -j ADMIN
+-A INPUT -j BLACKLIST
+-A INPUT -j SYS_INPUT
+-A INPUT -j PF_INPUT
+-A FORWARD -m confirmed -j ACCEPT
+-A FORWARD -m state --state RELATED -j CONFIRMED
+-A FORWARD -j PSCAN_CATCH
+-A FORWARD -j BLACKLIST
+-A FORWARD -j SYS_FORWARD
+-A FORWARD -j PF_FORWARD
+-A LOG_ACCEPT -m addrtype --src-type BROADCAST -j ACCEPT
+-A LOG_ACCEPT -m addrtype --dst-type BROADCAST -j ACCEPT
+-A LOG_ACCEPT -j NFLOG --nflog-prefix "__UID=101 ACTION=pass"
+-A LOG_ACCEPT -j CONFIRMED
+-A LOG_DROP -m addrtype --src-type BROADCAST -j DROP
+-A LOG_DROP -m addrtype --dst-type BROADCAST -j DROP
+-A LOG_DROP -j NFLOG --nflog-prefix "__UID=101 ACTION=drop" 
+-A LOG_DROP -j DROP
+-A LOG_REJECT -m addrtype --src-type BROADCAST -j REJECT --reject-with icmp-port-unreachable
+-A LOG_REJECT -m addrtype --dst-type BROADCAST -j REJECT --reject-with icmp-port-unreachable
+-A LOG_REJECT -j NFLOG --nflog-prefix "__UID=101 ACTION=reject"
+-A LOG_REJECT -j REJECT --reject-with icmp-port-unreachable
+COMMIT

@@ -1,0 +1,94 @@
+<?php
+if(!defined('_CLI_CODE')||_CLI_CODE!="a098846421a09ab1cacd3b3a753cbe05") exit("\n\nERROR: _CLI_CODE not set\n\n");
+
+
+function ___CLI_NTP_CONFIG_PRINT() {
+	_INI_TOKEN_GET("network","ntp.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+		_CLI_ECHO(_GETTEXT("No data available"));
+		return FALSE;
+	}
+	$_DATA=$_TOKEN['ntpd'];
+	if(_NULL($_DATA['STAT'])) $_DATA['STAT']=0;
+	if(!_NULL($_DATA['SERVER'])) {
+		_DEFINITIONS_GET_BYNAME("networks",$_DATA['SERVER'],$_DTOKEN);
+		if(!_NULL($_DTOKEN['ADDR'])) {
+			if($_DTOKEN['__DATA_TYPE']=='dnshost') {
+				$_DATA['SERVER']="{$_DATA['SERVER']} [{$_DTOKEN['HOSTNAME']} - {$_DTOKEN['ADDR']}]";
+			} elseif($_DTOKEN['__DATA_TYPE']=='host') {
+				$_DATA['SERVER']="{$_DATA['SERVER']} [{$_DTOKEN['ADDR']}]";
+			}
+		}
+	}
+	_STR_ONOFF($_stat,$_DATA['STAT']);
+	$_DTS=array();
+	_CLI_ECHO_HEADER(_GETTEXT("NTP Server status"));
+	$_DTS[_GETTEXT_U("ENABLE")]=$_stat;
+	if(!_NULL($_DATA['SERVER'])) {
+		$_DTS[_GETTEXT_U("SERVER")]=$_DATA['SERVER'];
+	}
+	echo _CLI_DATA_BODY($_DTS);
+	unset($_DTS);
+	return TRUE;
+}
+
+function ___CLI_NTP_CONFIG_SET($_param,$_value) {
+	if($_param=="enable") {
+		if(!_NULL($_value)) {
+			$_DATA=array();
+			_STR_ONOFF($_stat,$_value);
+			$_DATA=array();
+			$_DATA['STAT']="$_stat";
+			if(_INI_TOKEN_UPDATE("network","ntp.cfg","ntpd",$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+				return TRUE;
+			}
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function _cli_ntp_config() {
+	if($_SERVER["argc"] > 1 ) {
+		$_max=$_SERVER["argc"];
+		_CLI_TRIM_ARGS($_SERVER['argv']);
+		for($_x=1;$_x < $_max;$_x++) {
+			$_options=$_SERVER["argv"][$_x];
+			if($_options=="config") {
+				$_cmd=$_SERVER["argv"][$_x+1];
+				if($_cmd=="print") {
+					return ___CLI_NTP_CONFIG_PRINT();
+				} elseif($_cmd=="set") {
+					$_param=$_SERVER["argv"][$_x+2];
+					$_value=$_SERVER["argv"][$_x+3];
+					return ___CLI_NTP_CONFIG_SET($_param,$_value);
+				}
+			} elseif($_options=="acl") {
+				$_cmd=$_SERVER["argv"][$_x+1];
+				if($_cmd=="print") {
+					return ___CLI_NTP_ACL_PRINT();
+				} elseif($_cmd=="find") {
+					$_string=$_SERVER["argv"][$_x+2];
+					if(!_NULL($_string)) {
+						return ___CLI_NTP_ACL_PRINT($_string);
+					}
+				} elseif($_cmd=="add") {
+					$_nums=$_SERVER["argv"][$_x+2];
+					if(!_NULL($_nums)) {
+						return ___CLI_NTP_ACL_ADD($_nums);
+					}
+				} elseif($_cmd=="delete") {
+					$_nums=$_SERVER["argv"][$_x+2];
+					if(!_NULL($_nums)) {
+						return ___CLI_NTP_ACL_DELETE($_nums);
+					}
+				}
+			} elseif($_options=="apply") {
+				return _INIT_EXEC("ntp_restart");
+			}
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+?>

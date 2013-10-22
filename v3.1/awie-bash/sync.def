@@ -1,0 +1,20 @@
+This file is sync.def, from which is created sync.c.
+It implements the builtin "sync" in Bash.
+sync - sync the disks by forcing pending filesystem writes to complete
+
+$PRODUCES sync.c
+#include <config.h>
+#include <unistd.h>
+#include "../builtins.h"
+#include "../shell.h"
+
+$BUILTIN sync
+$FUNCTION sync_builtin
+$SHORT_DOC sync
+force completion of pending disk writes
+$END
+
+int sync_builtin(WORD_LIST *list) {
+	sync();
+	return(EXECUTION_SUCCESS);
+}

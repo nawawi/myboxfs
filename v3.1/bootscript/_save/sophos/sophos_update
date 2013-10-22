@@ -1,0 +1,80 @@
+#!/bin/sh
+# $Id: sophos_update,v 1.1 2008/03/05 23:50:56 nawawi Exp $
+# Copyright (c) 2008 Tracenetwork Corporation Sdn. Bhd.
+
+trap "sophos_clean" 0 1 2 3 15;
+
+_VERBOSE=0;
+_HOME_DIR="/strg/mybox/sophos";
+_IDE_DIR="/usr/local/sav";
+_URL="http://www.sophos.com/downloads/ide";
+_WGET="/bin/wget -q";
+_UNZIP="/bin/unzip -n";
+sophos_log() {
+	local msg="$1";
+	logger -t sophos "$msg";
+	if [ "$_VERBOSE" = "1" ]; then
+		echo "$msg";
+	fi
+}
+
+sophos_clean() {
+	rm -f $_IDE_DIR/$_VERSION /tmp/sophos.tmp /tmp/sophos_update.lck &>/dev/null;
+	sophos_log "Stopping SOPHOS update service";
+}
+
+sophos_chk() {
+	if [ -f "/tmp/sophos_update.lck" ]; then
+		echo "SOPHOS update service alreading running..";
+		exit 1;
+	fi
+	sophos_log "Starting SOPHOS update service";
+	if [ ! -f "$_HOME_DIR/IDEUPDATE" ]; then
+		sophos_info &>/dev/null;
+	fi
+	if [ ! -f "$_HOME_DIR/IDEUPDATE" ]; then
+		sophos_log "Failed to update IDEs file";
+		exit 1;
+	fi
+	read _VERSION < $_HOME_DIR/IDEUPDATE;
+	if [ "x$_VERSION" = "x" ]; then
+		sophos_log "Failed to update IDEs file";
+		exit 1;
+	fi
+	_FILE="$_URL/$_VERSION";
+	:> /tmp/sophos_update.lck;
+}
+
+sophos_update() {
+	sophos_log "Fetching IDEs file ($_VERSION)";
+	if ! cd $_IDE_DIR &>/dev/null; then
+		sophos_log "Failed to fetch SOPHOS updates ($_VERSION)";
+	fi	
+	if ! $_WGET $_FILE -O $_IDE_DIR/$_VERSION &>/dev/null; then
+		sophos_log "Failed to fetch SOPHOS updates ($_VERSION)";
+		exit 1;
+	fi
+	if $_UNZIP $_VERSION &>/tmp/sophos.tmp; then
+		local _CNT=$(expr $(wc -l /tmp/sophos.tmp |awk '{print $1}') - 1);
+		sophos_log "$_CNT virus IDEs added";
+		if [ ! -z "$_CNT" -a "$_CNT" != "0" ]; then
+			sophos_info &>/dev/null;
+			:> /var/sys/taskq/sophie_restart;
+		fi
+		exit 0;
+	else
+		sophos_log "Updating SOPHOS IDEs failed";
+		exit 1;
+	fi
+	
+}
+
+for x in "$@"; do
+        if [ "$x" = "-v" ]; then
+                _VERBOSE=1;
+        fi
+done
+
+sophos_chk;
+sophos_update;
+exit 0;

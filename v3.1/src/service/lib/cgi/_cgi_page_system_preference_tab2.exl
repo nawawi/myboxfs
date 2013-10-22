@@ -1,0 +1,157 @@
+<?php
+if(!defined('_CGI_CODE')||_CGI_CODE!="90d45215e48dac81e802f17310ad0c1f") exit("\n\nERROR: _CGI_CODE not set\n\n");
+
+function _CGI_PAGE_SYSTEM_PREFERENCE_TAB_2() {
+	_INI_TOKEN_GET("system","system.cfg",$_TOKEN);
+	$_DATA=$_TOKEN['service_http'];
+	$_bid=_CGI_ATTR_KEY();
+	$_page="
+		<div class='fbox_c'>
+		<fieldset>
+		<legend>"._GETTEXT("%s Setting","WebGui")."</legend>
+		<div style='margin: 5px;'>
+		<table class='tbox_t'>
+		<tr>
+		<td class='tbox_tdl'>"._GETTEXT("TCP Port:")."</td>
+		<td class='tbox_tdc'><input id='port' type='text' class='tbox_i' style='width: 100px;' value='{$_DATA['PORT']}' /></td>
+		<td class='tbox_tdr'>"._GETTEXT("This is the TCP port number used to access %s. It defaults to TCP port %d. You can change it to %d or any value between %d and %d.","WebGui",5051,443,1024,65535)."</td>
+		</tr>
+		<tr>
+		<td colspan='3'>&nbsp;</td>
+		</tr>
+		<tr>
+		<td class='tbox_tdl'>"._GETTEXT("Session Idle Timeout:")."</td>
+		<td class='tbox_tdc'><input id='timeout' type='text' class='tbox_i' style='width: 100px;' value='{$_DATA['TIMEOUT']}' /></td>
+		<td class='tbox_tdr'>"._GETTEXT("This specifies the number of seconds after which an idle %s will automatically be logout. Set '0' to disabled idle timeout.","WebGui")."</td>
+		</tr>
+		</table>
+		<hr />
+		"._CGI_BUTTON_APPLY("button_{$_bid}1")."
+		</div>
+		</fieldset>
+
+		<fieldset style='margin-top: 20px;'>
+		<legend>"._GETTEXT("%s HTTPS Certificate","WebGui")."</legend>
+		<div style='margin: 5px;'>
+		<table class='tbox_t'>
+		<tr>
+		<td class='tbox_tdl' colspan='2'>"
+		._CGI_BUTTON(array('id'=>"button_{$_bid}2",'text'=>_GETTEXT("Import CA Certificate"),'css'=>'width: 180px;'))."</td>
+		<td class='tbox_tdr'>"._GETTEXT("By clicking this button will import %s Certificate Authority (CA) into your browser.","WebGui")."</td>
+		</tr>
+		<tr>
+		<td colspan='3'>&nbsp;</td>
+		</tr>
+		<tr>
+		<td class='tbox_tdl' colspan='2'>"._CGI_BUTTON(array('id'=>"button_{$_bid}3",'text'=>_GETTEXT("Re-generate HTTPS certificate"),'css'=>'width: 180px;'))."</td>
+		<td class='tbox_tdr'>"._GETTEXT("By clicking this button %s Certificate Authority (CA) will be re-generated. You need to remove any previous certificate's saved on your browser and re-login to %s.","WebGui","WebGui")."</td>
+		</tr>
+		</table>
+		</div>
+		</fieldset>
+
+		<fieldset style='margin-top: 20px;'>
+		<legend>"._GETTEXT("Gears: Speed up %s","WebGui")."</legend>
+		<div style='margin: 5px;'>
+		<div id='gears-msg1' style='display: none;'>
+			"._GETTEXT("%s now has support for google Gears, which adds new features to your web browser.","Mybox WebGui")."
+			"._GETTEXT("<a href='%s' target='_blank'>More information...</a>","http://gears.google.com/")."
+			<br />"._GETTEXT("After you install and enable Gears, most of %s images, scripts, and CSS files will be stored locally on your computer. This speeds up page load time.","Mybox WebGui")."
+			<hr />"._CGI_BUTTON(array('id'=>"button_{$_bid}4",'text'=>_GETTEXT("Install now")))."
+		</div>
+		<div id='gears-msg2' style='display: none;'>
+			"._GETTEXT("Gears is installed on this computer, but is not enabled for use with %s.","WebGui")."
+			"._GETTEXT("To enable it click the button below.")."
+			<hr />"._CGI_BUTTON(array('id'=>"button_{$_bid}5",'text'=>_GETTEXT("Enable Gears")))."
+		</div>
+		<div id='gears-msg3' style='display: none;'>
+			"._GETTEXT("Gears is installed and enabled on this computer. You can disable it from your browser's Tools menu..")."
+			"._GETTEXT("If there are any errors try disabling Gears, reloading the page, and re-enabling Gears.")."
+			<br /><br />"._GETTEXT("Local storage status: ")."
+			<span id='gears-wait'><span style='color:#f00000;'>Updating files:</span> <span id='gears-upd-number'></span></span>
+		</div>
+		<div id='gears-msg4' style='display: none;'>
+			"._GETTEXT("Gears is installed and enabled on this computer. You can disable it from your browser's Tools menu.")."
+			"._GETTEXT("If there are any errors try disabling Gears, reloading the page, and re-enabling Gears.")."
+		</div>
+		</fieldset>
+		</div>
+	";
+	$_page .="
+		<script type='text/javascript'>
+			\$(document).ready(function() {
+				var _oldport=\$.trim(\$('input#port').val());
+				\$('#button_{$_bid}1').click(function() {
+					if(!__tnpage.is_admin()) {
+						return false;
+					}
+					var _port=\$.trim(\$('input#port').val()) || 5053;
+					var _timeout=\$.trim(\$('input#timeout').val()) || 0;
+					if(!is_num(_port) || (_port!=443 && _port < 1024) || _port > 65535) {
+						__tndialog.sbox('Invalid TCP Port '+_port);
+						return false;
+					}
+					if(!is_num(_timeout)) {
+						__tndialog.sbox('Invalid value '+_timeout);
+						return false;
+					}
+					var _data='_update_data=2&_sec=system&_secf=system&_id=service_http&_eq=http_reload,policy_admin&_data[PORT]='+_port+'&_data[TIMEOUT]='+_timeout;
+					__tnpage.data_update(_data,function() {
+						if(_oldport!==_port) {
+							var _loc=location.href;
+							var _nloc=_loc.replace(_oldport,_port);
+							setTimeout('top.location.href=\"'+_nloc+'\"',4000);
+						}
+					});
+				});
+				\$('#button_{$_bid}2').click(function(evt) {
+					if(!__tnpage.is_admin()) {
+						return false;
+					}
+					var e=evt || window.event;
+					e.preventDefault();
+
+					var _xport=\$.trim(\$('input#port').val());
+					if(_xport!=='') {
+						_xport=':'+_xport;
+					}
+					var _xloc=location.host;
+					_xloc=_xloc.replace(_xport,'');
+					__tnpage.redirect('/?import_web_ssl='+_xloc);
+				});
+
+				\$('#button_{$_bid}3').click(function(evt) {
+					if(!__tnpage.is_admin()) {
+						return false;
+					}
+					var e=evt || window.event;
+					e.preventDefault();
+					__tndialog.confirm_box('"._GETTEXT("This action will re-generate Web SSL certificate. Are you really want to proceed?")."',function() {
+						\$.ajaxSetup({async: false});
+						var _ex={'init_eo':'_eq','init_ex':'http_regenerated_cert'};
+						\$.post('index.exh',_ex,function() {
+							__tnpage.logout();
+						});
+					});
+				});
+
+				myboxgears.init();
+				\$('#button_{$_bid}4').click(function(evt) {
+					var e=evt || window.event;
+					e.preventDefault();
+					var _host=window.location.protocol + window.location.host;
+					location.href='http://gears.google.com/?action=install&return='+_host;
+					return false;
+				});
+				\$('#button_{$_bid}5').click(function(evt) {
+					var e=evt || window.event;
+					e.preventDefault();
+					myboxgears.getpermission();
+					return false;
+				});
+			});
+		</script>
+	";
+	return trim($_page);
+}
+?>

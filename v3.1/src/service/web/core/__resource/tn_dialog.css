@@ -1,0 +1,204 @@
+/* error / notice */
+.ebox {
+	display: none;
+	z-index: 600;
+	position: absolute;
+	border: none;
+	width: 300px;
+	background-color: #ffffff;
+}
+
+div#ebox_title {
+	background-image: url(/__resource/definitions/tbe.gif);
+	background-repeat: repeat-x;
+	background-position:left;
+	background-attachment: scroll;
+	border:1px solid #924949;
+	border-bottom: none;
+	padding: 0px 4px 0px 4px;
+	height: 23px;
+}
+
+
+div#ebox_title_l {
+	font-weight: bold;
+	color: #6f2c2c;
+	float: left;
+	margin-top: 4px;
+	border: none;
+}
+
+div#ebox_title_r {
+	background: url(/__resource/definitions/tclose.gif) no-repeat;
+	float: right; 
+	cursor:pointer;
+	width:11px;
+	height: 11px;
+	margin: 5px 1px 0 0;
+	border: none;
+}
+
+div#ebox_content {
+	background-color: #ffffff;
+	border: 1px solid #924949;
+	color: #000000;
+	overflow: hidden;
+}
+
+hr.ebox_hr {
+	border: none;
+	color: #924949;
+	background-color: #924949;
+	height: 1px;
+	width: 100%;
+	text-align: center;
+	margin: 0px;
+}
+/* confirm box */
+.ecbox {
+	display: none;
+	z-index: 600;
+	position: absolute;
+	border: none;
+	width: 300px;
+	background-color: #ffffff;
+}
+
+div#ecbox_title {
+	background-image: url(/__resource/definitions/tbe.gif);
+	background-repeat: repeat-x;
+	background-position:left;
+	background-attachment: scroll;
+	border:1px solid #924949;
+	border-bottom: none;
+	padding: 0px 4px 0px 4px;
+	height: 23px;
+}
+
+
+div#ecbox_title_l {
+	font-weight: bold;
+	color: #6f2c2c;
+	float: left;
+	margin-top: 4px;
+	border: none;
+}
+
+div#ecbox_title_r {
+	background: url(/__resource/definitions/tclose.gif) no-repeat;
+	float: right; 
+	cursor:pointer;
+	width:11px;
+	height: 11px;
+	margin: 5px 1px 0 0;
+	border: none;
+}
+
+div#ecbox_content {
+	background-color: #ffffff;
+	border: 1px solid #924949;
+	color: #000000;
+	overflow: hidden;
+}
+
+hr.ecbox_hr {
+	border: none;
+	color: #924949;
+	background-color: #924949;
+	height: 1px;
+	width: 100%;
+	text-align: center;
+	margin: 0px;
+}
+
+/* info box */
+.ibox {
+	display: none;
+	z-index: 199;
+	position: absolute;
+	border: none;
+	width: 300px;
+}
+
+div#ibox_title {
+	background-image: url(/__resource/definitions/tbg.gif);
+	background-repeat: repeat-x;
+	background-position:left;
+	background-attachment: scroll;
+	border:1px solid #4f6d81;
+	border-bottom: none;
+	padding: 0px 4px 0px 4px;
+	height: 23px;
+}
+
+
+div#ibox_title_l {
+	font-weight: bold;
+	color: #355468;
+	float: left;
+	margin-top: 4px;
+	border: none;
+}
+
+div#ibox_title_r {
+	background: url(/__resource/definitions/tclose.gif) no-repeat;
+	float: right; 
+	cursor:pointer;
+	width:11px;
+	height: 11px;
+	margin: 5px 1px 0 0;
+	border: none;
+}
+
+div#ibox_content {
+	background-color: #ffffff;
+	border: 1px solid #4f6d81;
+	color: #000000;
+	overflow: hidden;
+}
+
+/* general box */
+.gbox {
+	display: none;
+	z-index: 199;
+	position: absolute;
+	border: none;
+	width: 298px;
+}
+
+div#gbox_title {
+	background-image: url(/__resource/definitions/tbg.gif);
+	background-repeat: repeat-x;
+	background-position:left;
+	background-attachment: scroll;
+	border:1px solid #4f6d81;
+	border-bottom: none;
+	padding: 0px 4px 0px 4px;
+	height: 23px;
+}
+
+
+div#gbox_title_l {
+	font-weight: bold;
+	color: #355468;
+	float: left;
+	margin-top: 4px;
+	border: none;
+}
+
+div#gbox_title_r {
+	background: url(/__resource/definitions/tclose.gif) no-repeat;
+	float: right; 
+	cursor:pointer;
+	width:11px;
+	height: 11px;
+	margin: 5px 1px 0 0;
+	border: none;
+}
+
+div#gbox_content {
+	background-color: #ffffff;
+	border: 1px solid #4f6d81;
+	color: #000000;
+	overflow: hidden;
+}

@@ -1,0 +1,533 @@
+<?php
+if(!defined('_CGI_CODE')||_CGI_CODE!="90d45215e48dac81e802f17310ad0c1f") exit("\n\nERROR: _CGI_CODE not set\n\n");
+
+function _CGI_PAGE_NOCACHE() {
+        if(!headers_sent()) {
+                header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
+                header("Last-Modified: " . gmdate("D, d M Y H:i:s") . " GMT");
+                header("Cache-Control: no-store, no-cache, must-revalidate");
+                header("Cache-Control: post-check=0, pre-check=0",false);
+                header("Pragma: no-cache");
+        }
+}
+
+
+function _CGI_BUTTON($_data=array()) {
+	$_css="";$_class="button";
+	$_direction=1;
+	if(!_NULL($_data['css'])) $_css="style='{$_data['css']}'";
+	if(!_NULL($_data['class'])) $_class=$_data['class'];
+	if(!_NULL($_data['direction'])) $_direction=0;
+	$_page="";
+	if($_direction==1) {
+		$_page .="<div align='right'>";
+	}
+	$_page .="<div class='$_class' id='{$_data['id']}' $_css>{$_data['text']}</div>";
+	if($_direction==1) {
+		$_page .="</div>";
+	}
+	return trim($_page);
+}
+
+function _CGI_BUTTON_ENABLE($_data=array()) {
+	extract($GLOBALS['_IMG']);
+
+	$_config=array(
+			'id'=>"button_stat",
+			'text'=>'Enable',
+			'class'=>'button_s',
+			'direction'=>'none',
+			'css'=>'margin-left: 25px; width: 60px;'
+		);
+	if(_NULL($_data['img_id'])) $_data['img_id']='img_id';
+	if(_NULL($_data['mleft'])) $_data['mleft']='20px';
+	$_page="<div style='margin-left: {$_data['mleft']};'>
+			<img id='{$_data['img_id']}' style='margin-top: 1px; float: left;' src='{$_ICON_ONOFF[0]}'/> 
+			"._CGI_BUTTON($_config)."
+		</div>
+		";
+	return trim($_page);
+}
+
+function _CGI_BUTTON_APPLY($_id) {
+	extract($GLOBALS['_IMG']);
+	$_img="<img src='$_ICON_APPLY' style='float: left; margin-top: 2px; width: 14px;'>";
+	$_page=_CGI_BUTTON(array('id'=>"$_id",'text'=>"<center><div style='width: 55px;'>$_img Apply</div></center>"));
+	return trim($_page);
+}
+
+function _CGI_BUTTON_APPLY_OTHER($_id) {
+	extract($GLOBALS['_IMG']);
+	$_img="<img src='$_ICON_APPLY' style='float: left;'>";
+	$_page=_CGI_BUTTON(array('id'=>"$_id",'text'=>"<center><div style='width: 55px;'>$_img Apply</div></center>"));
+	return trim($_page);
+}
+
+function _CGI_PAGE_CONTENT_BOX($_data=array("title"=>"","data"=>"","width"=>"250","top"=>"10","left"=>"10")) {
+	$_css="";$_content_css="";$_title_css="";
+	if(!_NULL($_data['css'])) $_css="{$_data['css']}";
+	if(!_NULL($_data['title_css'])) $_title_css="style='{$_data['title_css']}'";
+	if(!_NULL($_data['content_css'])) $_content_css="style='{$_data['content_css']}'";
+	$_page="";
+	$_page .="<div style='position: absolute; top: {$_data['top']}px; left: {$_data['left']}px; width: {$_data['width']}px;$_css;'>";
+	$_page .="<div class='winbox_title' $_title_css>";
+	$_page .=$_data['title'];
+	$_page .="</div>";
+	$_page .="<div class='winbox_content' $_content_css>";
+	$_page .=$_data['data'];
+	$_page .="</div>";
+	$_page .="</div>";
+	return trim($_page);
+}
+
+function _CGI_PAGE_MENU(&$_page) {
+	$_menu_array=array();
+	$_menu_array[1]['title']="System";
+	$_menu_array[1]['desc']="System Overview";
+	$_menu_array[1]['link']="p_system";
+	$_menu_array[1]['menu'][0]['title']="Preference";
+	$_menu_array[1]['menu'][0]['link']="p_system_preference";
+	$_menu_array[1]['menu'][1]['title']="Access Control";
+	$_menu_array[1]['menu'][1]['link']="p_system_access_control";
+	$_menu_array[1]['menu'][2]['title']="Backup / Restore";
+	$_menu_array[1]['menu'][2]['link']="p_system_backup_restore";
+	$_menu_array[1]['menu'][3]['title']="System Update";
+	$_menu_array[1]['menu'][3]['link']="p_system_update";
+	$_menu_array[1]['menu'][4]['title']="Notifications";
+	$_menu_array[1]['menu'][4]['link']="p_system_notification";
+	$_menu_array[1]['menu'][5]['title']="AntiVirus";
+	$_menu_array[1]['menu'][5]['link']="p_system_antivirus";
+	$_menu_array[1]['menu'][6]['title']="Reboot / Shutdown";
+	$_menu_array[1]['menu'][6]['link']="p_system_reboot";
+
+	$_menu_array[2]['title']="Definitions";
+	$_menu_array[2]['desc']="Definitions Overview";
+	$_menu_array[2]['link']="p_definitions";
+	$_menu_array[2]['menu'][0]['title']="Networks";
+	$_menu_array[2]['menu'][0]['link']="p_definitions_networks";
+	$_menu_array[2]['menu'][1]['title']="Services";
+	$_menu_array[2]['menu'][1]['link']="p_definitions_services";
+	$_menu_array[2]['menu'][2]['title']="Time Events";
+	$_menu_array[2]['menu'][2]['link']="p_definitions_timeevents";
+
+	$_menu_array[3]['title']="Authentication";
+	$_menu_array[3]['desc']="Authentication Overview";
+	$_menu_array[3]['link']="p_auth";
+	$_menu_array[3]['menu'][0]['title']="Local auth";
+	$_menu_array[3]['menu'][0]['link']="p_auth_local";
+	$_menu_array[3]['menu'][1]['title']="Auth Server";
+	$_menu_array[3]['menu'][1]['link']="p_auth_server";
+
+	$_menu_array[4]['title']="Network";
+	$_menu_array[4]['desc']="Network Overview";
+	$_menu_array[4]['link']="p_network";
+	$_menu_array[4]['menu'][0]['title']="Interfaces";
+	$_menu_array[4]['menu'][0]['link']="p_network_interfaces";
+	$_menu_array[4]['menu'][1]['title']="Bridging";
+	$_menu_array[4]['menu'][1]['link']="p_network_bridging";
+	$_menu_array[4]['menu'][2]['title']="Routing";
+	$_menu_array[4]['menu'][2]['link']="p_network_routing";
+	$_menu_array[4]['menu'][3]['title']="Static ARP";
+	$_menu_array[4]['menu'][3]['link']="p_network_arp";
+	$_menu_array[4]['menu'][4]['title']="DNS";
+	$_menu_array[4]['menu'][4]['link']="p_network_dns";
+	$_menu_array[4]['menu'][5]['title']="DHCP";
+	$_menu_array[4]['menu'][5]['link']="p_network_dhcp";
+	$_menu_array[4]['menu'][6]['title']="NTP";
+	$_menu_array[4]['menu'][6]['link']="p_network_ntp";
+	$_menu_array[4]['menu'][7]['title']="OSPF";
+	$_menu_array[4]['menu'][7]['link']="p_network_ospf";
+
+	$_menu_array[5]['title']="Network Filter";
+	$_menu_array[5]['desc']="Network Filter Overview";
+	$_menu_array[5]['link']="p_networkfilter";
+	$_menu_array[5]['menu'][0]['title']="Packet Filter";
+	$_menu_array[5]['menu'][0]['link']="p_networkfilter_pf";
+	$_menu_array[5]['menu'][1]['title']="NAT Policy";
+	$_menu_array[5]['menu'][1]['link']="p_networkfilter_nat";
+	$_menu_array[5]['menu'][2]['title']="Intrusion Protection";
+	$_menu_array[5]['menu'][2]['link']="p_networkfilter_ips";
+	$_menu_array[5]['menu'][3]['title']="Server Load Balancing";
+	$_menu_array[5]['menu'][3]['link']="p_networkfilter_slb";
+	$_menu_array[5]['menu'][4]['title']="Quality of Service";
+	$_menu_array[5]['menu'][4]['link']="p_networkfilter_qos";
+	$_menu_array[5]['menu'][5]['title']="Blacklist";
+	$_menu_array[5]['menu'][5]['link']="p_networkfilter_blacklist";
+
+	$_menu_array[6]['title']="Web Filter";
+	$_menu_array[6]['desc']="Web Filter Overview";
+	$_menu_array[6]['link']="p_webfilter";
+	$_menu_array[6]['menu'][0]['title']="HTTP";
+	$_menu_array[6]['menu'][0]['link']="p_webfilter_http";
+	$_menu_array[6]['menu'][1]['title']="FTP";
+	$_menu_array[6]['menu'][1]['link']="p_webfilter_ftp";
+
+	$_menu_array[7]['title']="Email Protection";
+	$_menu_array[7]['desc']="Email Protection Overview";
+	$_menu_array[7]['link']="p_emailprotection";
+	$_menu_array[7]['menu'][0]['title']="SMTP";
+	$_menu_array[7]['menu'][0]['link']="p_emailprotection_smtp";
+	$_menu_array[7]['menu'][1]['title']="POP3";
+	$_menu_array[7]['menu'][1]['link']="p_emailprotection_pop3";
+	$_menu_array[7]['menu'][2]['title']="IMAP";
+	$_menu_array[7]['menu'][2]['link']="p_emailprotection_imap";
+	$_menu_array[7]['menu'][3]['title']="AntiSpam";
+	$_menu_array[7]['menu'][3]['link']="p_emailprotection_antispam";
+
+	$_menu_array[8]['title']="IM/P2P Control";
+	$_menu_array[8]['desc']="IM/P2P Control Overview";
+	$_menu_array[8]['link']="p_imp2p";
+	$_menu_array[8]['menu'][0]['title']="Instant Messaging";
+	$_menu_array[8]['menu'][0]['link']="p_imp2p_im";
+	$_menu_array[8]['menu'][1]['title']="Peer to Peer";
+	$_menu_array[8]['menu'][1]['link']="p_imp2p_p2p";
+
+	$_menu_array[9]['title']="VPN Access";
+	$_menu_array[9]['desc']="VPN Access Overview";
+	$_menu_array[9]['link']="p_vpn";
+	$_menu_array[9]['menu'][0]['title']="IPSec site-to-site";
+	$_menu_array[9]['menu'][0]['link']="p_vpn_pptp";
+	$_menu_array[9]['menu'][1]['title']="PPTP";
+	$_menu_array[9]['menu'][1]['link']="p_vpn_pptp";
+	$_menu_array[9]['menu'][2]['title']="SSL";
+	$_menu_array[9]['menu'][2]['link']="p_vpn_ssl";
+	$_menu_array[9]['menu'][3]['title']="L2TP over IPSec";
+	$_menu_array[9]['menu'][3]['link']="p_vpn_lt2p";
+	$_menu_array[9]['menu'][4]['title']="IPSec";
+	$_menu_array[9]['menu'][4]['link']="p_vpn_ipsec";
+
+	$_menu_array[10]['title']="Logging";
+	$_menu_array[10]['desc']="Logging";
+	$_menu_array[10]['link']="p_log";
+	$_menu_array[10]['menu'][0]['title']="Setting";
+	$_menu_array[10]['menu'][0]['link']="p_log_set";
+	$_menu_array[10]['menu'][1]['title']="View log files";
+	$_menu_array[10]['menu'][1]['link']="p_log_view";
+
+	$_menu_array[11]['title']="Reporting";
+	$_menu_array[11]['desc']="";
+	$_menu_array[11]['link']="";
+	$_menu_array[11]['menu'][0]['title']="Network traffic";
+	$_menu_array[11]['menu'][0]['link']="p_report_networktraffic";
+	$_menu_array[11]['menu'][1]['title']="Network filter";
+	$_menu_array[11]['menu'][1]['link']="p_report_networkfilter";
+	$_menu_array[11]['menu'][2]['title']="Intrusion Protection";
+	$_menu_array[11]['menu'][2]['link']="p_report_ips";
+	$_menu_array[11]['menu'][3]['title']="Web FIlter";
+	$_menu_array[11]['menu'][3]['link']="p_report_webfilter";
+	$_menu_array[11]['menu'][4]['title']="Email Protection";
+	$_menu_array[11]['menu'][4]['link']="p_report_email";
+	$_menu_array[11]['menu'][5]['title']="IM/P2P Control";
+	$_menu_array[11]['menu'][5]['link']="p_report_imp2p";
+	$_menu_array[11]['menu'][6]['title']="Executive Report";
+	$_menu_array[11]['menu'][6]['link']="p_report_executive";
+
+	$_page .="<ul id=\"menu\" class=\"ui-accordion\" style=\"width: 189px; display: none;\">";
+	$_page .="<li style='display: none;'><div class=\"menu_header\"></div></li>";
+	foreach($_menu_array as $_id => $_data_array) {
+		if(_NULL($_data_array['title'])) continue;
+		$_page .="<li>";
+		$_page .="<div class=\"menu_header\"";
+		if(!_NULL($_data_array['link'])) {
+			$_page .=" id='{$_id}|{$_data_array['desc']}|{$_data_array['link']}'";
+		}
+		$_page .=">".ucwords($_data_array['title'])."</div>";
+		if(!_ARRAY_NULL($_data_array['menu'])) {
+			$_page .="<div class=\"menu_content\">";
+			foreach($_data_array['menu'] as $_mid => $_m_array) {
+				if(_NULL($_m_array['title']) || _NULL($_m_array['link'])) continue;
+				$_page .="<div class=\"menu_list\" id='{$_id}|{$_data_array['title']}|{$_m_array['title']}|{$_m_array['link']}'>{$_m_array['title']}</div>";
+			}
+			$_page .="</div>";
+		}
+		$_page .="</li>";
+	}
+	$_page .="</ul>";
+}
+
+function _CGI_PAGE_CONTENT($_type) {
+	$_page="";
+	if($_type=="page_content") {
+		_INI_TOKEN_GET("system","system.cfg",$_TOKEN);
+		if(!_NULL($_TOKEN['service_http']['TIMEOUT'])) {
+			$_idle_interval=$_TOKEN['service_http']['TIMEOUT'];
+		}
+		$_hostname=$_TOKEN['system']['HOSTNAME'];
+		if($_hostname=='') $_hostname='mybox.traceos.local';
+		$_anyterm=$_TOKEN['system']['ANYTERM'] ? $_TOKEN['system']['ANYTERM'] : 0;
+		unset($_TOKEN);
+		$_dashboard_title=_CGI_PAGE_DASHBOARD_TITLE();
+
+		$_page .="<div id='top_box'>";
+		$_page .="<div id='admin_info'>".ucfirst($_SESSION['traceos_login']['id'])." / {$_SESSION['traceos_login']['ip']}</div>";
+		$_page .="<div id='toolbox'>";
+		$_page .="<div id='toolbox_a' "._CGI_TOOLTIPS(_GETTEXT("About"))."></div>";
+		$_page .="<div id='toolbox_b' "._CGI_TOOLTIPS(_GETTEXT("Reload"))."></div>";
+		$_page .="<div id='toolbox_c' "._CGI_TOOLTIPS(_GETTEXT("Logout"))."></div>";
+		$_page .="</div>";
+		$_page .="<div id='loading'></div>";
+		$_page .="<div id='dashboard'></div>";
+		$_page .="<div id='box_title'>$_dashboard_title</div>";
+		$_page .="<div id='box_title_l'></div>";
+		$_page .="</div>";
+		$_page .="<div id='main_box' style='margin-bottom: 10px;'>";
+		$_page .="<div id='nav_box'>";
+		_CGI_PAGE_MENU($_page);
+		$_page .="</div>";
+		$_page .="<div id='content_box'><div id='content_page'>";
+		$_page .=_CGI_PAGE_DASHBOARD_CONTENT(1);
+		$_page .="</div></div>";
+		$_page .="</div>";
+		$_page .="<script type='text/javascript'>
+				\$(document).ready(function() {
+					__tnpage.toolbox();
+					__tnpage.accordion();
+					__tndefinitions.keybind();
+					document.title=\"WebGUI: {$_SESSION['traceos_login']['id']}@$_hostname\";
+					__login_id='{$_SESSION['traceos_login']['id']}';
+					__service_depend_status['anyterm']=$_anyterm;
+					\$('div#dashboard').click(function(evt) {
+						var e=evt || window.event;
+						e.preventDefault();
+						__tnpage.dashboard();
+						__tndefinitions.navclose();
+					});
+				});
+			</script>
+		";
+		if(!_NULL($_idle_interval) && _ISNUM($_idle_interval) && $_idle_interval!=0) {
+			$_idle_interval *=1000; /* 1 minute = 60 second = 60x1000 = 60000 miliseconds */
+			$_page .="
+				<script type='text/javascript'>
+				var tn_session=$_idle_interval;
+				_session_interval=setInterval('__tnpage.sessionping()',tn_session);
+				</script>
+			";
+		}
+
+	} else {
+		$_page .="<div id='top_box'></div>";
+		$_page .="<div id='loading'></div>";
+		$_page .="<div id='login_box'>";
+		$_page .="<div id='login_input'>";
+		$_page .="<form id='login_form'><input type='password' name='userpass' id='login_pass'></form></div>";
+		$_page .="<div id='login_submit'>&nbsp;</div>";
+		$_page .="</div>";
+	}
+	return trim($_page);
+}
+
+function _CGI_PAGE_LOGOUT($_msg) {
+	exit("<script type='text/javascript'>__tnpage.logout('$_msg');</script>");
+}
+
+function _CGI_PAGE_ABOUT() {
+	extract($GLOBALS['_IMG']);
+	$_logo="<img src='$_ICON_LOGO'>";
+	if(_CGI_IF_MSIE6()) {
+		$_logo="<span style=\"display:inline-block; width: 196px; height: 39px; filter:progid:DXImageTransform.Microsoft.AlphaImageLoader(src='$_ICON_LOGO', sizingMethod='scale');\"></span>";
+	}
+	$_page="
+		<div style='text-align: center; padding: 10px 0px 10px 0px;'>
+			<table class='table_fixed'>
+			<tr>
+			<td style='text-align: center;'>$_logo</td>
+			</tr>
+			<tr>
+			<td style='font-weight: bold; color: #666666; font-size: 11px; background-color: #d8e4f1; padding: 2px;'>INTERNET SECURITY INTEGRATION</td>
+			</tr>
+			<tr><td style='color: #666666; font-size: 11px; padding-top: 2px;'>
+				&copy Tracenetwork Corporation Sdn. Bhd.
+			</td></tr>
+			<tr><td style='color: #666666; font-size: 11px; padding-top: 2px;'>
+			"._GETTEXT("For more information about %s products, and technical support, please visit our <a style='color: blue; text-decoration: none;' href='%s' target='_blank'>website</a>","Tracenetwork","http://www.tracenetworkcorporation.com")."
+			</td></tr></table>
+		</div>
+	";
+	return trim($_page);
+}
+
+function _CGI_PAGE_SESSION() {
+	if(!_CGI_SESSION_CHECK()) {
+		_CGI_PAGE_LOGOUT(_GETTEXT('Session expired'));
+	}
+	_CGI_SESSION_UPDATE_SESSION();
+}
+
+
+function _CGI_PAGE_RESPONSE() {
+	$_DATA_POST=$_POST;
+	$_DATA_GET=$_GET;
+
+	// _GET
+	if(!_NULL($_DATA_GET['icon'])) {
+		exit(_CGI_JS_DATA("icon"));
+	}
+	if(!_NULL($_DATA_GET['js_var'])) {
+		if($_DATA_GET['js_var']=="icon") {
+			exit(_CGI_JS_DATA_ICON());
+		}
+		_CGI_PAGE_SESSION();
+		exit(_CGI_JS_DATA());
+	}
+
+	if(!_NULL($_DATA_GET['import_web_ssl'])) {
+		$_file=$_DATA_GET['import_web_ssl'];
+		if(file_exists(_REG_PATH."/ssl_certs/web/$_file/{$_file}_ca.crt")) {
+			@header("Content-Type: application/x-x509-ca-cert");
+			echo _FILE_GET(_REG_PATH."/ssl_certs/web/$_file/{$_file}_ca.crt");
+			exit;
+		}
+	}
+
+	// invalid request
+	if(!_NULL($_DATA_GET['page_error'])) {
+		header("Location: /");
+		exit;
+	}
+	if(!_NULL($_DATA_GET['userpass'])) {
+		header("Location: /");
+		exit;
+	}
+
+	// _POST
+	if(!_NULL($_DATA_POST['userpass'])) {
+		exit(_CGI_SESSION_AUTH($_DATA_POST['userpass']));
+	}
+	
+	if(!_NULL($_DATA_POST['definitions_nav'])) {
+		_CGI_PAGE_SESSION();
+		_CGI_PAGE_DEFINITIONS_NAV($_DATA_POST['definitions_nav']);
+	}
+
+	if(!_NULL($_DATA_POST['definitions_get_data'])) {
+		_CGI_PAGE_SESSION();
+		$_definitions_nav=$_DATA_POST['definitions_nav'];
+		_CGI_PAGE_DEFINITIONS_DATA($_DATA_POST['__sec'],$_DATA_POST['__id'],$_DATA_POST['__type']);
+	}
+
+	if(!_NULL($_DATA_POST['update_check_next_time'])) {
+		_CGI_PAGE_SESSION();
+		$_update_check_next_time=$_DATA_POST['update_check_next_time'];
+		$_time=_UPDATE_NEXT_CHECK($_update_check_next_time);
+		exit(date('D d-M-Y H:i',$_time));
+	}
+
+	if(!_NULL($_DATA_POST['firmware_update_check'])&&$_DATA_POST['firmware_update_check']==1) {
+		_CGI_PAGE_SESSION();
+		$_ucnt=0;
+		if(($_list=_UPDATE_CHECK_LIST())!=FALSE) {
+			$_ucnt=count($_list);
+		}
+		$_ldate=_UPDATE_LAST_CHECK(0);
+		exit(_CGI_JSON(array("cnt"=>"$_ucnt","check"=>"$_ldate")));
+	}
+
+	if(!_NULL($_DATA_POST['php_func']) && !_NULL($_DATA_POST['php_arg'])) {
+		_CGI_PAGE_SESSION();
+		if(function_exists($_DATA_POST['php_func'])) {
+			$_func=$_DATA_POST['php_func'];
+			$_args=$_DATA_POST['php_arg'];
+			exit($_func($_args));
+		}
+		exit;
+	}
+
+	if(!_NULL($_DATA_POST['init_ex']) && !_NULL($_DATA_POST['init_eo'])) {
+		_CGI_PAGE_SESSION();
+		_CGI_UPDATE_DATA_EXEC($_DATA_POST['init_ex'],$_DATA_POST['init_eo']);
+		exit;
+	}
+
+	if(!_NULL($_DATA_POST['_update_data'])) {
+		exit(_CGI_UPDATE_DATA($_DATA_POST));
+	}
+
+	if(!_NULL($_DATA_POST['req_data'])) {
+		$_req_data=$_DATA_POST['req_data'];
+		if($_req_data=="page_login") {
+			exit(_CGI_PAGE_CONTENT("page_login"));
+		} elseif($_req_data=="session_check") {
+			if(!_CGI_SESSION_CHECK()) {
+				exit("expired");
+			}
+			exit("ok");
+		} elseif($_req_data=="p_about") {
+			_CGI_PAGE_SESSION();
+			exit(_CGI_PAGE_ABOUT());
+		} else {
+			_CGI_PAGE_SESSION();
+			if($_req_data=="dashboard_title") {
+				exit(_CGI_PAGE_DASHBOARD_TITLE());
+			} elseif($_req_data=="dashboard") {
+				exit(_CGI_PAGE_DASHBOARD_CONTENT());
+			} elseif($_req_data=="page_login") {
+				exit(_CGI_PAGE_CONTENT("page_login"));
+			} elseif($_req_data=="page_content") {
+				exit(_CGI_PAGE_CONTENT("page_content"));
+			/*** SYSTEM ***/
+			} elseif($_req_data=="p_system") {
+				exit(_CGI_PAGE_SYSTEM_OVERVIEW());
+			} elseif($_req_data=="p_system_preference") {
+				$_sub_data=$_DATA_POST['sub_data'];
+				exit(_CGI_PAGE_SYSTEM_PREFERENCE_TABS($_sub_data));
+			} elseif($_req_data=="p_system_access_control") {
+				$_sub_data=$_DATA_POST['sub_data'];
+				exit(_CGI_PAGE_SYSTEM_ACL_TABS($_sub_data));
+			} elseif($_req_data=="p_system_backup_restore") {
+				$_sub_data=$_DATA_POST['sub_data'];
+				exit(_CGI_PAGE_SYSTEM_BACKUP_TABS($_sub_data));
+			} elseif($_req_data=="p_system_update") {
+				$_sub_data=$_DATA_POST['sub_data'];
+				exit(_CGI_PAGE_SYSTEM_UPDATE_TABS($_sub_data));
+			} elseif($_req_data=="p_system_notification") {
+				$_sub_data=$_DATA_POST['sub_data'];
+				exit(_CGI_PAGE_SYSTEM_NOTIFICATION_TABS($_sub_data));
+			} elseif($_req_data=="p_system_antivirus") {
+				exit(_CGI_PAGE_SYSTEM_ANTIVIRUS_SOPHOS());
+			} elseif($_req_data=="p_system_reboot") {
+				$_sub_data=$_DATA_POST['sub_data'];
+				exit(_CGI_PAGE_SYSTEM_REBOOT($_sub_data));
+			} elseif($_req_data=="p_logout") {
+				_CGI_PAGE_LOGOUT('Session logout');
+			/*** DEFINITIONS ***/
+			} elseif($_req_data=="p_definitions") {
+				exit(_CGI_PAGE_DEFINITIONS_OVERVIEW());
+			} elseif($_req_data=="p_definitions_networks") {
+				$_sub_data=$_DATA_POST['sub_data'];
+				if($_sub_data=='pbox') {
+					exit(_CGI_PAGE_DEFINITIONS_PBOX($_DATA_POST));
+				} else {
+					exit(_CGI_PAGE_DEFINITIONS_PBOX_TABLE($_req_data,'networks'));
+				}
+			} elseif($_req_data=="p_definitions_services") {
+				$_sub_data=$_DATA_POST['sub_data'];
+				if($_sub_data=='pbox') {
+					exit(_CGI_PAGE_DEFINITIONS_PBOX($_DATA_POST));
+				} else {
+					exit(_CGI_PAGE_DEFINITIONS_PBOX_TABLE($_req_data,'services'));
+				}
+			} elseif($_req_data=="p_definitions_timeevents") {
+				$_sub_data=$_DATA_POST['sub_data'];
+				if($_sub_data=='pbox') {
+					exit(_CGI_PAGE_DEFINITIONS_PBOX($_DATA_POST));
+				} else {
+					exit(_CGI_PAGE_DEFINITIONS_PBOX_TABLE($_req_data,'timeevents'));
+				}
+			/*** AUTHENTICATION ***/
+			} elseif($_req_data=="p_auth") {
+				exit(_CGI_PAGE_AUTH_OVERVIEW());
+			} elseif($_req_data=="p_auth_local") {
+				$_sub_data=$_DATA_POST['sub_data'];
+				if($_sub_data=='pbox') {
+					exit(_CGI_PAGE_AUTH_LOCAL_PBOX($_DATA_POST));
+				} else {
+					exit(_CGI_PAGE_AUTH_LOCAL_PBOX_TABLE($_req_data));
+				}
+			}
+		}
+		exit("No function available for req_data -> $_req_data");
+	}
+}
+
+?>

@@ -1,0 +1,75 @@
+#!/bin/bash -e
+trap "exit 1" 2;
+# checking
+if [ "x$_START" = "x" ]; then
+        echo "_START not set";
+        exit 1;
+fi
+if [ ! -f "$_START/MYBOX_VERSION" ]; then
+        echo "MYBOX_VERSION not set";
+        exit 1;
+fi
+if [ "x$_MK" = "x" ]; then
+        echo "_MK not set";
+        exit 1;
+fi
+if [ "x$_MSRC" = "x" ]; then
+        echo "_MSRC not set";
+        exit 1;
+fi
+if [ ! -f "$_FUNC/functions.sh" ]; then
+        echo "_FUNC not set";
+        exit 1;
+fi
+
+cd $_START;
+
+. $_FUNC/functions.sh
+
+_BUILD_MSG "image";
+
+_FS="$_START/rootfs";
+_KERNEL="mybox-kernel.bin";
+_KERNEL_PATH="$_START/kernel_pkg/$_KERNEL";
+_BDIR="/tmp/image";
+_RELDIR="$_START/OS";
+_IREL="$_RELDIR/mybox-boot.bin";
+
+. $_START/MYBOX_VERSION
+
+[ -z "$_VER" ] && _ERROR "_VER not set";
+[ -z "$_FIRM" ] && _ERROR "_FIRM not set";
+[ ! -e "$_KERNEL_PATH" ] && _ERROR "$_KERNEL not found";
+
+rm -rfv $_BDIR;
+if ! mkdir -p $_BDIR >/dev/null 2>&1; then
+	echo "mkdir $_BDIR failed";
+	exit 1;
+fi
+
+rm -rf $_RELDIR;
+mkdir -p $_RELDIR;
+
+cp -vfa $_FS/* $_BDIR/
+echo "$_FIRM" > $_BDIR/etc/firmware
+echo "$_VER" > $_BDIR/etc/version_core
+sync
+[ -f "$_IREL" ] && rm -f $_IREL;
+
+if cd $_BDIR 2>/dev/null; then
+	echo "[*] Creating initramfs image: $_IREL";
+	find . | cpio -o -H newc | gzip > $_IREL
+	if [ -e "$_IREL" ]; then
+		echo "[*] Recompressing $_IREL";
+		$_FUNC/advdef -z4 $_IREL
+	fi
+fi
+
+_MECHO "rm -rf $_BDIR";
+_MECHO "cp -v $_KERNEL_PATH $_RELDIR";
+#if [ -e "$_RELDIR/$_KERNEL" ]; then
+#	_UPX_COMPRESS "$_RELDIR/$_KERNEL" 0;
+#fi
+
+_MECHO "cd $_START";
+exit 0;

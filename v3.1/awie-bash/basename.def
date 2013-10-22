@@ -1,0 +1,68 @@
+This file is basename.def, from which is created basename.c.
+It implements the builtin "basename" in Bash.
+basename - return nondirectory portion of pathname
+
+$PRODUCES basename.c
+/*
+  modified from examples/loadables/basename.c
+*/
+#include <config.h>
+#include <stdio.h>
+#include "../builtins.h"
+#include "../shell.h"
+
+$BUILTIN basename
+$FUNCTION basename_builtin
+$SHORT_DOC basename NAME [SUFFIX]
+The STRING is converted to a filename corresponding to the last
+pathname component in STRING.  If the suffix string SUFFIX is
+supplied, it is removed.
+$END
+
+int basename_builtin(WORD_LIST *list) {
+	int slen, sufflen, off;
+	char *string, *suffix, *fn;
+
+	if(list==0) {
+		builtin_usage();
+		return(EX_USAGE);
+	}
+
+	if(no_options(list)) return(EX_USAGE);
+
+	string=list->word->word;
+	suffix=(char *)NULL;
+	if(list->next) {
+		list=list->next;
+		suffix=list->word->word;
+	}
+
+	if(list->next) {
+		builtin_usage();
+		return (EX_USAGE);
+	}
+
+	slen=strlen (string);
+	while(slen > 0 && string[slen - 1] == '/') slen--;
+  	if(slen == 0) {
+		fputs("/\n", stdout);
+		return(EXECUTION_SUCCESS);
+	}
+	string[slen]='\0';
+	while(--slen >= 0) {
+    		if(string[slen] == '/') break;
+	}
+	fn=string + slen + 1;  
+	if(suffix) {
+		sufflen = strlen (suffix);
+      		slen = strlen (fn);
+		if(sufflen < slen) {
+			off = slen - sufflen;
+			if(strcmp (fn + off, suffix) == 0) {
+				fn[off] = '\0';
+			}
+		}
+	}
+	printf("%s\n", fn);
+	return(EXECUTION_SUCCESS);
+}

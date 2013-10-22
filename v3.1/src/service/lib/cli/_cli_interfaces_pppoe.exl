@@ -1,0 +1,171 @@
+<?php
+if(!defined('_CLI_CODE')||_CLI_CODE!="a098846421a09ab1cacd3b3a753cbe05") exit("\n\nERROR: _CLI_CODE not set\n\n");
+
+function ___CLI_INTERFACES_ADD_PPPOE($_args) {
+	if(!_ARRAY_NULL($_args)) {
+		$_objf=_OBJ_PATH."/iosh_definitions_networks_interface.obj";
+		$_obj=_FILE_ARRAY_GET($_objf);
+		$_name=$_args[0];
+		$_did=$_args[1];
+		$_note=$_args[2];
+		if(_ARRAY_NULL($_obj) || _NULL($_obj[$_did])) {
+			_CLI_ECHO(_GETTEXT("Resource Id '%s' not available.","$_did"));
+			_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","ip device"));
+			@unlink($_objf);
+			return FALSE;
+		}
+		if(!_INI_TOKEN_CHECK("network","eth.cfg","NAME","$_name")&&
+			!_INI_TOKEN_CHECK("network","additional.cfg","NAME","$_name")) {
+			_CLI_ECHO(_GETTEXT("Interface name '%s' already exist","$_name"));
+			return FALSE;
+		}
+		$_ID=$_obj[$_did];
+		$_DATA=array();
+		$_DATA['NAME']="$_name";
+		$_DATA['TYPE']="pppoe";
+		$_DATA['STAT']=0;
+		$_DATA['ADDR']="";
+		$_DATA['MASK']="";
+		$_DATA['PREF']="";
+		$_DATA['BCAST']="";
+		$_DATA['NETWORK']="";
+		$_DATA['HOST_TOTAL']="";
+		$_DATA['HOST_MIN']="";
+		$_DATA['HOST_MAX']="";
+		$_DATA['HOST_TYPE']="";
+		$_DATA['MTU']=1492;
+		$_DATA['DEFAULT']=0;
+		$_DATA['GATEWAY']="";
+		$_DATA['ARP']=0;
+		$_DATA['UPLINK']=0;
+		$_DATA['NAT']=0;
+		$_DATA['NOTE']="$_note";
+		$_DATA['USERNAME']="";
+		$_DATA['PASSWORD']="";
+		$_DATA['RETRY']=5;
+		$_DATA['RECONNECT']="";
+		if(!_ARRAY_NULL($_DATA) && _INI_TOKEN_UPDATE("network","eth.cfg",$_ID,$_DATA)) {
+			_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function ___CLI_INTERFACES_SET_PPPOE($_args) {
+	if(!_ARRAY_NULL($_args)) {
+		$_objf=_OBJ_PATH."/iosh_interfaces_ip_print.obj";
+		$_obj=_FILE_ARRAY_GET($_objf);
+		$_param=$_args[0];
+		$_sid=$_args[1];
+		if(_ARRAY_NULL($_obj) || _NULL($_obj[$_sid])) {
+			_CLI_ECHO(_GETTEXT("Resource Id '%s' not available.","$_sid"));
+			_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","ip print"));
+			@unlink($_objf);
+			return FALSE;
+		}
+		$_ID=$_obj[$_sid];
+		_INI_TOKEN_GET_BYPARAM("network","eth.cfg","ID","$_ID",$_ITOKEN);
+		if(_ARRAY_NULL($_ITOKEN)) {
+			_CLI_ECHO(_GETTEXT("No data available for Resource Id '%s'","$_sid"));
+			return FALSE;
+		}
+		if(!_NULL($_ITOKEN['TYPE'])&&$_ITOKEN['TYPE']!="pppoe") {
+			_CLI_ECHO(_GETTEXT("Invalid interface type"));
+			return FALSE;
+		}
+		if($_param=="enable") {
+			_STR_ONOFF($_enab,$_args[2]);
+			$_DATA=array();
+			$_DATA['STAT']=$_enab;
+			if(!_ARRAY_NULL($_DATA) && _INI_TOKEN_UPDATE("network","eth.cfg",$_ID,$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+				return TRUE;
+			}
+		} elseif($_param=="uplink") {
+			$_enab=$_args[2];
+			_STR_ONOFF($_uplink,$_enab);
+			$_DATA=array();
+			$_DATA['UPLINK']=$_uplink;
+			if(!_ARRAY_NULL($_DATA) && _INI_TOKEN_UPDATE("network","eth.cfg",$_ID,$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+				return TRUE;
+			}
+		} elseif($_param=="nat") {
+			$_enab=$_args[2];
+			_STR_ONOFF($_nat,$_enab);
+			$_DATA=array();
+			$_DATA['NAT']=$_nat;
+			if(!_ARRAY_NULL($_DATA) && _INI_TOKEN_UPDATE("network","eth.cfg",$_ID,$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+				return TRUE;
+			}
+		} elseif($_param=="mtu") {
+			$_mtu=$_args[2];
+			if(!_ISNUM($_mtu)) {
+				_CLI_ECHO(_GETTEXT("Invalid MTU size '%s'","$_mtu"));
+				return FALSE;
+			}
+			$_DATA=array();
+			$_DATA['MTU']=$_mtu;
+			if(!_ARRAY_NULL($_DATA) && _INI_TOKEN_UPDATE("network","eth.cfg",$_ID,$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+				return TRUE;
+			}
+		} elseif($_param=="name") {
+			$_name=$_args[2];
+			if(!_NULL($_ITOKEN['NAME'])) {
+				if($_name!=$_ITOKEN['NAME']) {
+					if(!_INI_TOKEN_CHECK("network","eth.cfg","NAME","$_name") &&
+						!_INI_TOKEN_CHECK("network","additional.cfg","NAME","$_name")) {
+						_CLI_ECHO(_GETTEXT("Interface name '%s' already exist","$_name"));
+						return FALSE;
+					}
+				}
+			}
+			$_DATA=array();
+			$_DATA['NAME']=$_name;
+			if(!_ARRAY_NULL($_DATA) && _INI_TOKEN_UPDATE("network","eth.cfg",$_ID,$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+				return TRUE;
+			}
+		} elseif($_param=="description") {
+			$_DATA=array();
+			$_DATA['NOTE']=$_args[2];
+			if(!_ARRAY_NULL($_DATA) && _INI_TOKEN_UPDATE("network","eth.cfg",$_ID,$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+				return TRUE;
+			}
+		} elseif($_param=="account") {
+			$_DATA=array();
+			$_DATA['USERNAME']=$_args[2];
+			$_DATA['PASSWORD']=$_args[3];
+			if(_NULL($_DATA['USERNAME']) || _NULL($_DATA['PASSWORD'])) {
+				_CLI_ECHO(_GETTEXT("Invalid account username or password"));
+				return FALSE;
+			}
+			$_DATA['PASSWORD']=_BASE64_CRYPT($_DATA['PASSWORD']);
+			if(!_ARRAY_NULL($_DATA) && _INI_TOKEN_UPDATE("network","eth.cfg",$_ID,$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+				return TRUE;
+			}
+		} elseif($_param=="retry") {
+			$_DATA=array();
+			$_DATA['RETRY']=$_args[2];
+			if(!_ARRAY_NULL($_DATA) && _INI_TOKEN_UPDATE("network","eth.cfg",$_ID,$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+				return TRUE;
+			}
+		} elseif($_param=="reconnect") {
+			$_DATA=array();
+			$_DATA['RECONNECT']=$_args[2];
+			if(!_ARRAY_NULL($_DATA) && _INI_TOKEN_UPDATE("network","eth.cfg",$_ID,$_DATA)) {
+				_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+				return TRUE;
+			}
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+?>

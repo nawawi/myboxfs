@@ -1,0 +1,25 @@
+#!/bin/sh
+source /etc/init.boot/commons;
+_dest="/strg/mybox/ext";
+_name="$1";
+_dir="$2";
+if [ -z "$_name" -o ! -d "$_dir" ]; then
+	echo "Usage: $0 <pkg_name> <directory>";
+	exit 1;
+fi
+if [ ! -d "$_dest" ]; then
+	mkdir -p $_dest &>/dev/null;
+fi
+tar -cf ${_name}.tar $_dir &>/dev/null;
+if [ $? = 0 ]; then
+	rm -f  $_dest/${_name}.mpk &>/dev/null;
+	lzma -9 -z -c ${_name}.tar > $_dest/${_name}.mpk;
+	if [ $? = 0 ]; then
+		rm -f ${_name}.tar;
+		echo "external package created successfully";
+		exit 0;
+	fi
+fi
+echo "creating external package failed";
+rm -f ${_name}.tar;
+exit 1;

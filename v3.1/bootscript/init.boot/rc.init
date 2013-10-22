@@ -1,0 +1,1196 @@
+#!/bin/sh
+# +-------------------------------------------------------------------------------------+
+# | Copyright (c) 2003-2009 Tracenetwork Corporation Sdn. Bhd.           		|
+# +-------------------------------------------------------------------------------------+
+# | This source file is belongs to nawawi, the author.                    		|
+# | Any changes/use of the source, please email to the author.           		|
+# +-------------------------------------------------------------------------------------+
+# | Authors: nawawi, Mohd nawawi Mohamad Jamili <nawawi@tracenetworkcorporation.com	|
+# +-------------------------------------------------------------------------------------+
+#
+# $Id: rc.init.sh,v 7.0 2008/01/21 03:29:00 nawawi Exp $
+# $Id: rc.init.sh,v 8.0 2008/10/31 11:38:00 nawawi Exp $
+# $Id: rc.init.sh,v 9.0 2009/03/31 09:54:00 nawawi Exp $
+
+trap : 1 2 3 15;
+PATH="/bin";
+[ -z "${TERM:-}" ] && TERM="linux";
+[ -z "${CONSOLETYPE:-}" ] && CONSOLETYPE="$(consoletype)";
+[ -z "${COLUMNS:-}" ] && COLUMNS="$(ttysize w)";
+[ -z "${COLUMNS:-}" ] && COLUMNS=80;
+export PATH TERM;
+umask 006;
+cd /;
+
+source /etc/init.boot/commons;
+__SPACE="                                       ";
+__GRUBCONF="/boot/grub/grub.conf";
+__LOOPFS="/strg/mybox/loopfs";
+__FSCKCNT=30;
+__FALLBACK=0;
+__TECHO="echo -ne";
+__EECHO="echo -e";
+__NECHO="echo -n";
+
+# ansi colour
+__COLOR=0;
+if [ "$CONSOLETYPE" != "serial" ]; then
+	_COL=$(( ${COLUMNS} - 16 ));
+	_COL_TAB="\e[${_COL}G";
+	_GREEN="\e[0;32m";
+	_RED="\e[0;31m";
+	_BLUE="\e[0;34m";
+	_YELLOW="\e[0;33m";
+	_WHITE="\e[0;37m";
+	_NORMAL="\e[0;39m";
+	_BGREEN="\e[01;32m";
+	_BRED="\e[01;31m";
+	_BBLUE="\e[01;34m";
+	_BYELLOW="\e[01;33m";
+	_BWHITE="\e[01;37m";
+	__COLOR=1;
+fi
+
+_COL_RESET() {
+	[ "$__COLOR" = "0" ] && return 1;
+	local _c;
+	for _c in _GREEN _BLUE _YELLOW _RED _WHITE _NORMAL; do
+		unset $_c;
+		[ "$_c" != "_NORMAL" ] && unset "_B${_c//_/}";
+	done
+	return 0;
+}
+
+_EDONE() {
+	if [ "$__COLOR" = "1" ]; then
+		$__TECHO "${__SPACE}${_COL_TAB}[  ${_GREEN}DONE${_NORMAL}  ]";
+	else
+		$__TECHO ". Done.${__SPACE}";
+	fi
+	return 1;
+}
+
+_EFAILED() {
+	if [ "$__COLOR" = "1" ]; then
+		$__TECHO "${__SPACE}${_COL_TAB}[ ${_RED}FAILED${_NORMAL} ]";
+	else
+		$__TECHO ". Failed.${__SPACE}";
+	fi
+}
+
+_EERROR() {
+	if [ "$__COLOR" = "1" ]; then
+		$__TECHO "${__SPACE}${_COL_TAB}[  ${_RED}ERROR${_NORMAL} ]";
+	else
+		$__TECHO ". Error.${__SPACE}";
+	fi
+}
+
+_ETIMEOUT() {
+	if [ "$__COLOR" = "1" ]; then
+		$__TECHO "${__SPACE}${_COL_TAB}[ ${_RED}TIMEOUT${_NORMAL}]";
+	else
+		$__TECHO ". Timeout.${__SPACE}";
+	fi
+}
+
+_EDISABLED() {
+	if [ "$__COLOR" = "1" ]; then
+		$__TECHO "${__SPACE}${_COL_TAB}[${_YELLOW}DISABLED${_NORMAL}]";
+	else
+		$__TECHO ". Disabled.${__SPACE}";
+	fi
+}
+
+_EWARNING() {
+	if [ "$__COLOR" = "1" ]; then
+		$__TECHO "${__SPACE}${_COL_TAB}[ ${_YELLOW}WARNING${_NORMAL}]";
+	else
+		$__TECHO ". Warning.${__SPACE}";
+	fi
+}
+
+_EWALL() {
+	[ $# -eq 2 ] || return 1;
+	local _opt="$1";
+        local _msg="$2";
+	local _TITLE;
+	_TITLE[0]="INFO";
+	_TITLE[1]="ERROR";
+	_TITLE[2]="WARNING";
+        $__EECHO "\r[[ ${_BRED}${_TITLE[$_opt]}${_NORMAL} ]]";
+	$__EECHO "${_BWHITE}${_msg}${_NORMAL}";
+}
+
+_RC_RANDOM_SEED() {
+	local _opt="$1";
+	if [ -n "$_opt" -a "$_opt" = "start" ]; then
+		if [ -r "/strg/mybox/random-seed" -a -w "/dev/urandom" ]; then
+        		iocat /strg/mybox/random-seed > /dev/urandom;
+		fi
+	else
+		$__TECHO "\n${_BBLUE}<>${_BWHITE} Saving random seed${_NORMAL}";
+		if [ ! -f "/strg/mybox/random-seed" ]; then
+			touch /strg/mybox/random-seed;
+			chmod 600 /strg/mybox/random-seed;
+		fi
+		dd if=/dev/urandom of=/strg/mybox/random-seed count=1 bs=512 2>/dev/null;
+		$__EECHO "$(_EDONE)";
+	fi
+}
+
+_RC_READAHEAD() {
+	if [ -f "/tmp/readahead.list" ] && [ -x "/bin/readahead" ]; then
+		#echo "* Starting background readahead";
+		/bin/readahead /tmp/readahead.list &>/dev/null &
+	fi
+}
+
+_RC_SPIN() {
+	local msg="$1";
+	local spin="- \\ | / \\ | / - \\ | / \\ | /";
+	for x in $spin; do
+		usleep 10000;
+		if [ "$__COLOR" = "1" ]; then
+			$__TECHO "\r${_BGREEN}>>${_BWHITE} $msg${_COL_TAB}${_NORMAL}[${_BYELLOW}   $x    ${_NORMAL}]";
+		else
+			$__TECHO "\r>> $msg $x";
+		fi
+	done
+}
+
+_RC_PROGRESS_BAR() {
+	local msg="$1";
+	local ok=0 _info_p _info_t;
+	while read buff; do
+		_RC_SPIN "$msg";
+		[ -z "${buff:-}" ] && continue;
+		if [[ $buff =~ "\[(ERROR|WARNING)\]\s(.*)" ]]; then
+			_info_p=$(strtolower ${BASH_REMATCH[1]});
+			_info_t=${BASH_REMATCH[2]};
+			$__TECHO "\r${_BBLUE}<>${_BWHITE} $msg${_NORMAL}";
+			if [ "$_info_p" = "error" ]; then
+				$__EECHO "$(_EERROR)";
+			else
+				$__EECHO "$(_EWARNING)";
+			fi
+			ok=1;
+			break;
+		fi
+		unset _info_p _info_t;
+		if stristr "$buff" "failed"; then
+			$__TECHO "\r${_BBLUE}<>${_BWHITE} $msg${_NORMAL}$(_EFAILED)\n";
+			ok=1;
+			break;
+		elif stristr "$buff" "disabled"; then
+			$__TECHO "\r${_BBLUE}<>${_BWHITE} $msg${_NORMAL}$(_EDISABLED)\n";
+			ok=1;
+			break;
+		elif stristr "$buff" "Timeout" || stristr "$buff" "CPU time limit exceeded"; then
+			$__TECHO "\r${_BBLUE}<>${_BWHITE} $msg${_NORMAL}$(_ETIMEOUT)\n";
+			ok=1;
+			break;
+		elif stristr "$buff" "Done" ; then
+			ok=0;
+			break;
+		fi
+    	done
+	[ "$ok" = "0" ] && $__TECHO "\r${_BBLUE}<>${_BWHITE} $msg${_NORMAL}$(_EDONE)\n";
+}
+
+_RC_WAIT_PROG() {
+	local _cprog="$1";
+	local _cmsg="$2";
+	local _ltitle="$3";
+	lcdd_msg "$_ltitle" "$_cmsg";
+	ionice -c2 -n0 softlimit -t 60 $_cprog 2>/dev/null | _RC_PROGRESS_BAR "$_cmsg";
+}
+
+_RC_SERVICE() {
+	local _opt _list _x _p _v;
+	_opt="$1";
+	if [ -n "$_opt" ] && [ -f "/etc/init.boot/rc.${_opt}" ]; then
+		_list="/etc/init.boot/rc.${_opt}";
+		if [ -z "${_list:-}" ]; then
+			_EWALL "1" "no startup config";
+		fi
+		if [ "$_opt" = "start" ]; then
+			[ -x "/service/tools/update_nic_vendor.exc" ] && _EXECQ "/service/tools/update_nic_vendor.exc";
+			while read _x; do
+				_p=${_x//|*/};
+				_v=${_x//*|/};
+				[ ! -x "$_v" ] && continue;
+				_RC_WAIT_PROG "$_v start" "$_p" "BOOTUP";
+			done < $_list;
+		fi
+		if [ "$_opt" = "stop" ]; then
+			[ -f "/.network_ok" ] && export _NETWORK_OK=1;
+			[ -f "/.nocolor" ] && _COL_RESET;
+			while read _x; do
+				_p=${_x//|*/};
+				_v=${_x//*|/};
+				if [ -x "$_v" ] && [ -f "/var/sys/fastdown/$(basename $_v .init)" ]; then
+					_RC_WAIT_PROG "$_v stop" "$_p" "BOOTDOWN";
+				fi
+			done < $_list;
+			unlink /var/sys/lcd_msg;
+		fi
+	fi
+}
+
+_RC_SETTING() {
+	if [ ! -r "/proc/cmdline" ]; then
+		_EWALL "1" "/proc/ is not present -- aborted";
+		exit 1;
+	fi
+	read CMDLINE < /proc/cmdline;
+	for cmd in $CMDLINE; do
+		 case "$cmd" in
+			\#*) break;;
+			hwapp=*) export "$cmd";;
+			mods=*) export "$cmd";;
+			modsf=*) export "$cmd";;
+			lcdtype=*) export "$cmd";;
+			forcefsck=*) export "$cmd";;
+			resetpasswd) export "$cmd=1";;
+			resetinit) export "$cmd=1";;
+			nofsck) export "$cmd=1";;
+			checkfsck=*) export "$cmd";;
+			fsckcnt=*) export "$cmd";;
+			nocolor) export "$cmd=1";;
+			_debug=*) export "$cmd";;
+			_fallback) export "$cmd=1";;
+		esac
+	done
+	[ -n "$mods" ] && mods=$(rmstr "$mods");
+	[ -n "$modsf" ] && modsf=$(rmstr "$modsf");
+	if [ -n "$checkfsck" ]; then
+		checkfsck=$(rmstr "$checkfsck");
+	else
+		export checkfsck=0;
+	fi
+	if [ -n "$fsckcnt" -a "$fsckcnt" != "$__FSCKCNT" ]; then
+		__FSCKCNT="$fsckcnt";
+	fi
+
+	if [ -n "$hwapp" ]; then
+		hwapp=$(rmstr "$hwapp");
+		echo "$hwapp" > /.hwapp;
+	fi
+	if [ -n "$nocolor" ]; then
+		_COL_RESET;
+		:>/.nocolor;
+	fi
+	[ -n "$lcdtype" ] && lcdtype=$(rmstr "$lcdtype");
+	[ -n "$forcefsck" ] && forcefsck=$(rmstr "$forcefsck");
+	[ -n "$_debug" ] && set -x;
+}
+
+####################################################################
+# RC.BOOTUP START
+####################################################################
+
+_PRINT_BANNER() {
+	if [ -x "/bin/banner" ]; then
+		$__EECHO "${_BWHITE}$(/bin/banner)${_NORMAL}\n";
+	fi
+}
+# ramdisk space
+# 128M
+_MINMEM_A=131072;
+_MINMEM_T=102400;
+
+_CHECK_MEM() {
+	local _FOUNDMEM ;
+	if [ -r "/proc/meminfo" ]; then
+		_FOUNDMEM="$(awk '/MemTotal/{print $2}' /proc/meminfo)";
+	fi
+	if [ -z "${_FOUNDMEM:-}" -o "$_FOUNDMEM" = 0 ]; then
+		_EWALL "1" "MEMORY COUNTING FAILED";
+		exit 1;
+	fi
+
+	if [ "$_FOUNDMEM" -lt "$_MINMEM_T" ]; then
+		_EWALL "1" "NOT ENOUGH MEMORY $_FOUNDMEM kB ($(( $_FOUNDMEM / 1024 )) MB), YOU NEED AT LEAST $(( $_MINMEM_A / 1024 ))MB";
+		exit 1;
+	fi
+        $__EECHO "${_BBLUE}<>${_BWHITE} Total memory found: $_FOUNDMEM kB ($(( $_FOUNDMEM / 1024 )) MB)${_NORMAL}$(_EDONE)";
+}
+
+_INITRAMFS_BOOTUP() {
+	local _PKG _DATA _SERIAL_PORT _SERIAL_SPEED _RESETPASS="";
+	_EXECQ "mount -oremount,rw /";
+	_EXECQ "mount -t proc -o rw,noexec,nosuid,nodev virtual /proc";
+	_EXECQ "mount -t sysfs -o rw,noexec,nosuid,nodev virtual /sys";
+	_RC_SETTING;
+	_CHECK_MEM;
+	_RC_READAHEAD;
+	[ -w "/proc/sys/kernel/printk" ] && echo "0 0 0 0" > /proc/sys/kernel/printk;
+	[ -w "/proc/sys/kernel/hotplug" ] && echo "/bin/mdev" > /proc/sys/kernel/hotplug;
+	[ -w "/proc/sys/kernel/modprobe" ] && echo "/bin/modprobe" > /proc/sys/kernel/modprobe;
+	$__TECHO "${_BGREEN}>>${_BWHITE} Extracting base files:${_NORMAL} ";
+	for _PKG in /tmp/*.mpk;do
+		if _EXECQ "tar -C / -axf $_PKG"; then
+			$__NECHO "#"; usleep 10000; wait;
+			remove $_PKG;
+		else
+			echo "$(basename $_PKG)" >> /base_pkg_error;
+		fi
+	done
+	$__TECHO "\r${_BBLUE}<>${_BWHITE} Extracting base files${_NORMAL}$(_EDONE)\n";
+	_EXECQ "depmod -a";wait;
+	_EXECQ "mdev -s";wait;
+	xmkdir /dev/pts /dev/shm;
+	_EXECQ "mount -t tmpfs -o rw virtual /dev/shm";
+	_EXECQ "mount -t devpts -o \"rw,gid=0,mode=620\" virtual /dev/pts";
+
+	if [ -r "/proc/cmdline" ]; then
+		_DATA="$(grep console=ttyS /proc/cmdline)";
+		if [ -n "$_DATA" ]; then
+			_SERIAL_PORT="$(echo $_DATA |sed -e 's/.*console=ttyS//g' -e 's/,.*//g')";
+			[ -n "$_SERIAL_PORT" ] && _SERIAL_PORT="ttyS$_SERIAL_PORT";
+			_SERIAL_SPEED="$(echo $_DATA |sed -e 's/.*console=ttyS//g' -e 's/\s.*//g' -e 's/.*,//g' -e 's/n.*//g')";
+		fi
+	fi
+	echo "::sysinit:/bin/rcstart" >/etc/inittab;
+	if [ -n "$_SERIAL_PORT" ] && [ -n "$_SERIAL_SPEED" ]; then
+		echo "${_SERIAL_PORT}::respawn:/bin/getty -h -n -L ${_SERIAL_PORT} ${_SERIAL_SPEED} vt100" >>/etc/inittab;
+	fi
+	echo "tty1::respawn:/bin/getty -h -n -L tty1 115200 linux" >>/etc/inittab;
+	echo "tty7::respawn:/bin/chkprog" >>/etc/inittab;
+	echo "::restart:/bin/init" >>/etc/inittab;
+	echo "::ctrlaltdel:/bin/bootdown" >>/etc/inittab;
+	echo "::ctrlaltdel:/bin/reset" >>/etc/inittab;
+	echo "::ctrlaltdel:/bin/reboot" >>/etc/inittab;
+	echo "::shutdown:/bin/bootdown" >>/etc/inittab;
+
+	if bool "$resetpasswd"; then
+		_EWALL 0 "CHANGE PASSWORD";
+		while read -t 10 -s -p "Enter password: " _RESETPASS && [ -z "${_RESETPASS:-}" ]; do
+			echo "";
+		done
+		if [ -n "$_RESETPASS" ]; then
+			echo "";
+			_EWALL "0" "PASSWORD CHANGED";
+			echo "$_RESETPASS" >/.resetpasswd;
+		else
+			_EWALL "0" "PASSWORD NOT CHANGE";
+		fi
+	fi
+	exec /bin/init < /dev/console > /dev/console 2>&1;
+	_EWALL "1" "Failed to boot file system.\nPress Ctrl+Alt+Del or switch off/on for reboot.";
+	read _PRESS;
+	exit 1;
+}
+
+_MAIN_BOOTUP() {
+	local _v;
+	_v="$(uname)";
+	_PRINT_BANNER;
+	if [ -n "$_v" ] && [ "$_v" != "MyboxOS" ]; then
+		_EWALL "1" "Invalid kernel";
+		read _PRESS;
+		exit 1;
+	fi
+	_INITRAMFS_BOOTUP;
+}
+
+####################################################################
+# RC.BOOTUP END
+# RC.BOOTDOWN START
+####################################################################
+_BOOTDOWN_POLICY_CLEAR() {
+	local _p _buf;
+	if [ -r "/proc/net/ip_tables_names" ]; then
+		_buf="$(iocat /proc/net/ip_tables_names)";
+		for _p in $_buf; do
+			_EXECQ "iptables -t $_p -F";
+			_EXECQ "iptables -t $_p -X"; 
+		done
+	fi
+	_EXECQ "iptables -F";
+	_EXECQ "iptables -P INPUT DROP";
+	_EXECQ "iptables -P FORWARD DROP";
+	_EXECQ "iptables -P OUTPUT ACCEPT";
+}
+
+_BOOTDOWN_LOG() {
+	[ -f "/var/sys/log_setting/nolog" ] || [ -f "/.nolog" ] || [ ! -d "/logfs" ] || [ ! -w "/logfs" ] && return 1;
+	local _dt=$(strftime %Y%m%d);
+	local _flog="/logfs/system-$_dt.log";
+	local _log="[$(strftime "%d-%b-%Y %T")] TYPE=INFO MSG=****** SYSTEM SHUTDOWN ******";
+	if [ -f "$_flog" ]; then
+		echo "$_log" >> $_flog;
+	else
+		echo "$_log" > $_flog;
+	fi
+	_EXECQ "chmod 700 $_flog";
+	return 0;
+}
+
+_BOOTDOWN_UMOUNT() {
+	local _DIR _M;
+	lcdd_msg "SYSTEM SHUTDOWN." ">> STORAGE OFF";
+	for _DIR in logs backup update; do
+		_EXECQ "umount /config/$_DIR";
+	done
+	if [ -f "/var/sys/strg_mount" ]; then
+		for _M in $(iocat /var/sys/strg_mount); do
+			_EXECQ "umount -r $_M";
+		done
+	fi
+	lcdd_msg "SYSTEM SHUTDOWN." ">> SWAP OFF";
+	_EXECQ "swapoff -a";
+	lcdd_msg "SYSTEM SHUTDOWN." ">> POWEROFF/REBOOT";
+}
+
+_BOOTDOWN_LAST() {
+	if [ -w "${__GRUBCONF}" ]; then
+		local _cnt=1 _mark=0 _BUF;
+		[ -n "__mods" ] && unset __mods;
+		[ -r "/var/sys/moduleslist" ] && source /var/sys/moduleslist;
+		if [ -r "/.checkfsck" ]; then
+			read _cnt < /.checkfsck;
+			_cnt=${_cnt//[a-zA-Z]/};
+			if [ -n "$_cnt" ]; then
+				_cnt=${_cnt//[a-zA-Z]/};
+				((_cnt++));
+			else
+				_cnt=1;
+			fi
+		fi
+		while read _BUF; do
+			if [[ "$_BUF" =~ "^title\s(.+)" ]]; then
+				_mark=0;
+				[ "${BASH_REMATCH[1]}" = "MYBOXOS" ] && _mark=1;
+			fi
+			if [ "$_mark" = "1" ] && [[ "$_BUF" =~ "^kernel" ]]; then
+				if [ -n "$__mods" ]; then
+					if [[ "$_BUF" =~ "(mods=\".+\")" ]]; then
+						_BUF=${_BUF//${BASH_REMATCH[1]}/mods=\"$__mods\"};
+					else
+						_BUF=${_BUF//root=\/dev\/ram0/mods=\"$__mods\" root=\/dev\/ram0};
+					fi
+				fi
+				if [ -n "$_cnt" ]; then
+					if [[ "$_BUF" =~ "(checkfsck=[0-9]+)" ]]; then
+						_BUF=${_BUF//${BASH_REMATCH[1]}/checkfsck=$_cnt};
+					else
+						_BUF=${_BUF//root=\/dev\/ram0/checkfsck=$_cnt root=\/dev\/ram0};
+					fi
+				fi
+				# remove resetpasswd resetinit
+				if [[ "$_BUF" = *resetpasswd* ]]; then
+					_BUF=${_BUF//resetpasswd/};
+				fi
+				if [[ "$_BUF" = *resetinit* ]]; then
+					_BUF=${_BUF//resetinit/};
+				fi
+			fi
+			[ -n "$_BUF" ] && echo "$_BUF" >> ${__GRUBCONF}.bb;
+		done < ${__GRUBCONF};
+		if [ -w "${__GRUBCONF}" ]; then
+			iocat ${__GRUBCONF}.bb > ${__GRUBCONF} && remove ${__GRUBCONF}.bb;
+		fi
+	fi
+}
+
+_MAIN_BOOTDOWN() {
+	cd /;
+	:>/var/sys/init_no_restart;
+	:>/var/sys/init_down;
+	:>/etc/resolv.conf;
+	[ -r "/.lcdtype" ] && source /.lcdtype;
+	if [ "$_LCD_PROG" != "-1" -a -x "/bin/lcd-reset" ]; then
+		_EXECQ "/bin/lcd-reset bootdown ${_LCD_PROG}";
+	fi
+	_BOOTDOWN_POLICY_CLEAR;
+	[ -w "/proc/sys/kernel/printk" ] && echo "0 0 0 0" > /proc/sys/kernel/printk;
+	_RC_RANDOM_SEED "stop";
+	_RC_SERVICE "stop";
+	_EXECQ "/bin/hwclock -w";
+	_BOOTDOWN_LOG;
+	_BOOTDOWN_LAST;
+        if [ -r "/etc/firmware" ]; then
+                local __VER="$(iocat /etc/firmware)";
+		[ ! -d "/strg/mybox/info-cache/update" ] && xmkdir /strg/mybox/info-cache/update;
+                [ -n "$__VER" -a ! -f "/strg/mybox/info-cache/update/FIRMWARE_VERSION" ] && echo "$__VER" > /strg/mybox/info-cache/update/FIRMWARE_VERSION;
+        fi
+	_BOOTDOWN_UMOUNT;
+}
+
+####################################################################
+# RC.BOOTDOWN END
+# RC.INIT START
+####################################################################
+
+_NETWORK_OK=0;
+_MOUNT_OK=0;
+_LCD_PROG=-1;
+_INITDIR="/etc/init.boot";
+export _NETWORK_OK _MOUNT_OK _LCD_PROG _INITDIR;
+
+_RC_BANNER() {
+	$__EECHO "$(/bin/banner)\n\n" > /etc/banner;
+}
+
+_RC_SETPASSWD() {
+	local _fd="/strg/mybox/registry/system";
+	# set console password first, incase php failed
+	if [ -r "$_fd/system.cfg" ] && [ -x "/bin/chpasswd" ]; then
+		local _BUF _ID _SID;
+		while read _BUF; do
+			[ -z "${_BUF:-}" ] || [[ $x =~ ^# ]] && continue;
+			if [[ "$_BUF" =~ "^ID=" ]]; then
+				_ID=${_BUF//ID=/};
+			fi
+			if [ -n "$_ID" ]; then
+				_SID=$(strtoupper $_ID);
+				[ -n "$_SID" ] && export "${_SID}_${_BUF}";
+				unset _SID;
+			fi
+			[ -n "$SYSTEM_CONSOLE_PASSWD" ] && break;
+		done < $_fd/system.cfg;
+		if [ -n "$SYSTEM_CONSOLE_PASSWD" ]; then
+			echo "console:$SYSTEM_CONSOLE_PASSWD" | chpasswd -e &>/dev/null;
+		fi
+	fi
+	[ -x "/service/tools/session.exc" ] && _EXECQ "/service/tools/session.exc check_password";
+	# reset console password
+	if [ -r "/.resetpasswd" ]; then
+		read -r _RESETPASS < /.resetpasswd;
+		unlink /.resetpasswd;
+		if [ -n "$_RESETPASS" ] && [ -x "/service/tools/session.exc" ]; then
+			_EXECQ "/service/tools/session.exc reset_password console $_RESETPASS console";
+		fi
+	fi
+}
+
+_RC_NIC_VENDOR() {
+	local _CNT _BUF _DEV;
+	[ ! -x "/bin/lspci" ] && return 1;
+	_CNT=0;
+	( /bin/lspci 2>/dev/null | grep -i "Ethernet controller" |sed -e 's/.*Ethernet controller:\s//g' -e 's/.*:\s//g' -e 's/(.*//g'  |while read _BUF;do
+		[ -z "{$_BUF:-}" ] && continue;	
+		echo "eth${_CNT}=$_BUF" >> /var/sys/___nic_info;
+		((_CNT++));
+		done
+	);
+	return 0;
+}
+ 
+
+_RC_LCD() {
+	if [ "$_LCD_PROG" != "-1" ]; then
+		if [ "$_LCD_PROG" = "0" -a -x "/bin/lcdd" ]; then
+			symlink /dev/ttyS1 /dev/lcd;
+			wait;
+			if [ -c "/dev/lcd" ] && [ -x "/bin/lcdd" ]; then
+				$__TECHO "\r${_BBLUE}<>${_BWHITE} Starting LCD server${_NORMAL}";
+				_EXECQ "/bin/lcdd";
+				if [ $? = 0 ]; then
+					$__EECHO "$(_EDONE)";
+				else
+					$__EECHO "$(_EFAILED)";
+				fi
+			fi
+		fi
+		if [ "$_LCD_PROG" = "1" ]; then
+			_EXECQ "mknod /dev/parport0 c 99 0";
+			_EXECQ "/dev/lp0 c 6 0";
+			symlink /dev/parport0 /dev/lcd;
+			wait;
+			if [ -c "/dev/lcd" ] && [ -x "/bin/LCDd" ]; then
+				$__TECHO "${_BBLUE}<>${_BWHITE} Starting LCD server${_NORMAL}";
+				_EXECQ "/bin/LCDd";
+				if [ $? = 0 ]; then
+					$__EECHO "$(_EDONE)";
+					echo "Starting up.." > /var/sys/lcd_msg;
+				else
+					$__EECHO "$(_EFAILED)";
+				fi
+			fi
+		fi
+	fi
+}
+
+
+_RC_INIT() {
+	_RC_BANNER;
+	echo "0 0 0 0" > /proc/sys/kernel/printk;
+	echo "fw.tracenetwork.lo" > /proc/sys/kernel/hostname;
+	remove /init /bootup;
+	if bool "$fallback"; then
+		_EWALL "0" "Running Fallback Image";
+	fi
+	if [ -n "$hwapp" -a -f "$_INITDIR/rc.conf/${hwapp}.conf" ]; then
+		source $_INITDIR/rc.conf/${hwapp}.conf;
+		if [ -n "$__DRIVERS" ]; then
+			if [ -n "$mods" ]; then 
+				local _xmods="${__DRIVERS},${mods}";
+				mods="$($__EECHO ${_xmods//,/\\n}|sort -u)";
+			else
+				export mods="$__DRIVERS";
+			fi
+		fi
+		if [ -z "${lcdtype:-}" -a -n "$__LCDTYPE" ]; then
+			export lcdtype="$__LCDTYPE";
+		fi
+		if [ -n "$__MODPROBE" -a -f "$__MODPROBE" ]; then
+			$__TECHO "$(iocat $__MODPROBE)" >> /etc/modprobe.conf;
+		fi
+	fi
+	if [ -n "$lcdtype" ]; then
+		echo "_LCD_PROG=$lcdtype" > /.lcdtype;
+		_LCD_PROG=$lcdtype;
+	fi
+	if [ -n "$modsf" ]; then
+		$__TECHO "$modsf" >> /etc/modprobe.conf;
+	fi
+}
+
+_RC_COMPV() {
+        local a=${1//./};
+        local b=${2//./};
+        [ "$a" -gt "$b" ] && return 0;
+        return 1;
+}
+
+_RC_FIRMWARE_VERSION() {
+	if [ -x "/service/tools/firmware_version.exc" ]; then
+		_EXECQ "/service/tools/firmware_version.exc";
+	fi
+}
+
+_RC_GET_HWADDR() {
+	local _D=$1;
+	[ -z "${_D:-}" ] && return;
+	if [[ "$(ifconfig $_ID)" =~ "HWaddr\s(\S\S:\S\S:\S\S:\S\S:\S\S:\S\S)" ]]; then 
+		[ -n "${BASH_REMATCH[1]}" ] && echo "${_D}=${BASH_REMATCH[1]}" >> /var/sys/___nic_hwaddr;
+	fi
+}
+
+_RC_CHECK_NETWORK() {
+	local NET_DEVICE="" _buf x;
+	local _msg="Detecting network interfaces";
+	if [ -r "/proc/net/dev" ]; then
+		while read _buf; do
+			if [[ "$_buf" =~ "eth([0-9]+)\:" ]]; then
+		        	NET_DEVICE+="eth${BASH_REMATCH[1]} ";
+			fi
+		done < /proc/net/dev;
+		if [ -n "$NET_DEVICE" ]; then
+			local _eth="" _cnt=0;
+		        $__TECHO "\r${_BGREEN}>>${_BWHITE} $_msg: ${_NORMAL}";
+		        lcdd_msg "SYSTEM LOADING.." ">> CHECKING NIC";
+		        for x in $NET_DEVICE; do
+		                _EXECQ "ip link set $x up";
+		                if [ $? = 0 ]; then
+					[ "${#_eth}" -gt "$COLUMNS" ] && _eth="";
+					_eth+="$x ";
+					$__TECHO "\r${_BGREEN}>>${_BWHITE} $_msg: ${_NORMAL}$_eth";
+					_RC_GET_HWADDR "$x";
+		                        _EXECQ "ip link set $x down";
+					((_cnt++));
+		                fi
+		        done
+		        _EXECQ "ip route flush cache";
+		        _EXECQ "ip route flush table main";
+			_RC_NIC_VENDOR;
+		        $__TECHO "\r${_BBLUE}<>${_BWHITE} $_msg: $_cnt${_NORMAL}$(_EDONE)\n";
+			_NETWORK_OK=1;
+		fi
+        else
+		$__TECHO "\r${_BBLUE}<>${_BWHITE} $_msg (No network device found)${_NORMAL}$(_EFAILED)\n";
+                lcdd_msg "SYSTEM LOADING.." ">> NO NIC FOUND";
+		_NETWORK_OK=0;
+        fi
+}
+
+
+_RC_EXEC_SCRIPT() {
+	[ ! -d "/strg/mybox/scripts" ] && return 1;
+	local opt="$1";
+	if [ -n "$opt" -a -x "/strg/mybox/scripts/$opt-init" ]; then
+		$__TECHO "${_BBLUE}<>${_BWHITE} Executing $opt-init${_NORMAL}";
+		_EXECQ "/strg/mybox/scripts/$opt-init";
+		$__EECHO "$(_EDONE)";
+		return $?;
+	fi
+	return 1;
+}
+
+_RC_MOUNT_LOCAL() {
+	local _DIR;
+	for _DIR in backup update; do
+		xmkdir /config/$_DIR;
+		xmkdir /strg/mybox/$_DIR;
+		_EXECQ "mount --bind /strg/mybox/$_DIR /config/$_DIR";
+	done
+	xmkdir /config/logs;
+	_EXECQ "mount --bind /logfs /config/logs";
+}
+
+_RC_MICROCODE() {
+	[ ! -x "/bin/microcode_ctl" ] && [ ! -f "/lib/firmware/microcode.dat" ] || [ ! -r "/proc/cpuinfo" ] && return 1;
+	local _cpuvendor _cpufamily _buff;
+	while read _buf; do
+		if [[ "$_buf" =~ "vendor_id\s:\s(.+)" ]]; then 
+			_cpuvendor=${BASH_REMATCH[1]};
+		elif [[ "$_buf" =~ "cpu family\s:\s(.+)" ]]; then 
+			_cpufamily=${BASH_REMATCH[1]};
+		fi
+		[ -n "$_cpuvendor" ] && [ "$_cpufamily" ] && break;
+	done < /proc/cpuinfo;
+	if [ "$_cpuvendor" = "GenuineIntel" ] && [ "$_cpufamily" = "6" ] || [ "$_cpufamily" -gt "6" ]; then
+		xmkdir /dev/cpu;
+		_EXECQ "mknod /dev/cpu/microcode c 10 184";
+		_EXECQ "/bin/microcode_ctl -Qui";
+	fi
+}
+
+_RC_HWDETECT_USB_STORAGE() {
+	[ ! -x "/bin/lspci" ] && return 1;
+	local _lspci _x _mods="";
+	_lspci="$(/bin/lspci -v | grep -i prog-if 2>/dev/null | egrep -i [eou]hci 2>/dev/null)";
+	[ -z "${_lspci:-}" ] && return 1;
+	_lspci="$(strtolower "$_lspci")";
+	[[ $_lspci = *ehci* ]] && _mods+="ehci-hcd ";
+	[[ $_lspci = *ohci* ]] && _mods+="ohci-hcd ";
+	[[ $_lspci = *uhci* ]] && _mods+="uhci-hcd ";
+	for _x in $_mods; do
+		_EXECQ "modprobe -q $_x";
+	done
+	_EXECQ "modprobe -q usb-storage";
+}
+
+_RC_HWDETECT() {
+	if [ -n "$mods" ]; then
+		$__TECHO "${_BGREEN}>>${_BWHITE} Loading hardware drivers${_NORMAL}.";
+		for f in ${mods//,/ };do
+			_EXECQ "modprobe -q $f";
+			$__NECHO ".";
+			usleep 10000; wait;
+		done
+		$__TECHO "\r${_BBLUE}<>${_BWHITE} Loading hardware drivers${_NORMAL}$(_EDONE)\n";
+	else 
+		$__TECHO "${_BGREEN}>>${_BWHITE} Checking hardware drivers${_YELLOW}.";
+		/etc/init.boot/rc.hwdetect;
+		# earlier probe
+		if [ -f "/var/spool/modules/moduleslist" ]; then
+			for f in $(iocat /var/spool/modules/moduleslist); do
+				_EXECQ "modprobe -q $f";
+				$__NECHO ".";
+				usleep 10000; wait;
+			done
+			$__TECHO "\r${_BBLUE}<>${_BWHITE} Checking hardware drivers${_NORMAL}$(_EDONE)\n";
+		fi
+		$__TECHO "${_BGREEN}>>${_BWHITE} Loading hardware drivers${_NORMAL}.";
+		/etc/init.boot/rc.hwdetect;
+		if [ -f "/var/spool/modules/moduleslist" ]; then
+			for f in $(iocat /var/spool/modules/moduleslist); do
+				_EXECQ "modprobe -q $f";
+				$__NECHO ".";
+				usleep 10000; wait;
+			done
+			$__TECHO "\r${_BBLUE}<>${_BWHITE} Loading hardware drivers${_NORMAL}$(_EDONE)\n";
+		fi
+	fi
+	if [ -f "/lib/modules/ppp.txt" ]; then
+		for f in $(iocat /lib/modules/ppp.txt); do
+			_EXECQ "modprobe -q $(basename $f .ko)";
+			usleep 10000; wait;
+		done
+		_EXECQ "mknod /dev/ppp c 180 0";
+	fi
+	if [ -f "/lib/modules/lcd.txt" -a "$_LCD_PROG" = "1" ]; then
+		for f in $(iocat /lib/modules/lcd.txt); do
+			_EXECQ "modprobe -q $(basename $f .ko)";
+			usleep 10000; wait;
+		done
+	fi
+	
+	# intel microcode frimware
+	_RC_MICROCODE;
+
+	# create device incase hotplug failed
+	_EXECQ "mdev";
+	[ -e "/proc/bus/usb" ] && _EXECQ "mount -t usbfs none /proc/bus/usb";
+	if [ -f "/var/spool/modules/moduleslist" ]; then
+		local __mods="$(iocat /var/spool/modules/moduleslist | tr '\n' ',' |sed -e 's/,$//g')";
+		if [ -n "$__mods" ]; then
+			echo "__mods=\"$__mods\"" > /var/sys/moduleslist;
+		fi
+	fi
+	return 0;
+}
+
+_RC_CHECK_ERROR() {
+	lcdd_msg "SYSTEM LOADING..." ">> STORAGE ERROR";
+	_EWALL "1" "An error occurred during the file system check.\nDropping you to a shell; the system will reboot\nwhen you leave the shell.";
+	:> /var/sys/do_single;
+       	/bin/sh;
+}
+
+_DCHK_RET=-1;
+_RC_FSCK_PROGRESS() {
+	local msg="$1";
+	local _p;
+	$__TECHO "\r${_BGREEN}>>${_BWHITE} $msg -";
+	while read buff; do
+		for _p in $buff; do
+			_RC_SPIN "$msg";
+		done
+    	done
+}
+_RC_FSCK() {
+	local _disk="$1";
+	local _force="$2";
+	_DCHK_RET=-1;
+	fsck $_force -T -a -C $_disk;
+	_DCHK_RET=$?;
+}
+
+_RC_CHECK_DISK() {
+	local disk="$1";
+	local force="";
+	[ -n "$forcefsck" -a "$forcefsck" = "1" ] && force="-f";
+	local msg="Routine check of drives: [${disk}]";
+	_RC_FSCK "$disk" "$force" 2>/dev/null | _RC_FSCK_PROGRESS "$msg";
+	local ret=$_DCHK_RET;
+	if [ $ret -gt 1 ]; then
+		$__TECHO "\r${_NORMAL}\n";
+		_RC_CHECK_ERROR;
+	else
+		$__TECHO "\r${_BBLUE}<>${_BWHITE} $msg${_NORMAL}$(_EDONE)";
+	fi
+}
+
+_RC_DO_MOUNT() {
+	local _label="$1";
+	local _mount="$2";
+	local _fs="$3";
+	[ "x$_fs" = "x" ] && _fs="ext3";
+	
+	xmkdir /${_mount};
+
+	_opt="-orw";
+	if [ "$_fs" = "ext3" ]; then
+		_opt="-t ext3 ${_opt},errors=remount-ro,noatime";
+	elif [ "$_fs" = "reiserfs" ]; then
+		_opt="-t reiserfs ${_opt},notail";
+	fi
+	
+	if _EXECQ "mount ${_opt} LABEL=/${_label} /${_mount}"; then
+		_MOUNT_OK=1;
+		echo "/${_mount}" >> /var/sys/strg_mount;
+	else
+		_MOUNT_OK=0;
+	fi
+}
+
+_RC_MOUNT() {
+	local _lb _disk _docheck _lswap;
+	for _lb in BOOT MAIN LOG CACHE; do
+		_disk="$(findfs LABEL=/$_lb)";
+		if [ -n "$_disk" ]; then
+			if ! bool "$nofsck"; then
+				if [ -n "$checkfsck" ] && [ "$checkfsck" -gt "$__FSCKCNT" ]; then
+					_RC_CHECK_DISK "$_disk";
+				fi
+				if [ -z "${checkfsck:-}" ]; then
+					_RC_CHECK_DISK "$_disk";
+				fi
+			fi
+			echo "$_disk" |tr -d [0-9] >> /tmp/disk;
+		fi
+		unset _disk;
+	done
+	[ -n "$checkfsck" ] && [ "$checkfsck" -gt "$__FSCKCNT" ] && checkfsck=0;
+
+	unset _lb;
+	$__TECHO "\r";
+
+	_lswap="$(findfs LABEL=/SWAP)";
+	if [ -n "${_lswap}" ]; then
+		for _lb in $_lswap; do
+			_EXECQ "swapon $_lb";		
+		done
+	fi
+	_RC_DO_MOUNT "MAIN" "strg" "reiserfs";
+	_RC_DO_MOUNT "BOOT" "boot" "reiserfs";
+	_RC_DO_MOUNT "CACHE" "cachefs" "reiserfs";
+	_RC_DO_MOUNT "LOG" "logfs" "reiserfs";
+
+	if bool "$_MOUNT_OK" && [ -r "/tmp/disk" ]; then
+		unset _lb;
+		for _lb in $(iocat /tmp/disk |sort -u); do
+			_EXECQ "hdparm -d 1 -c 1 -u 1 $_lb";
+		done
+	fi
+
+	if ! bool "$_MOUNT_OK"; then
+		_EWALL "1" "MOUNTING STORAGE DISK FAILED";
+		lcdd_msg "SYSTEM LOADING..." ">> STORAGE FAILED";
+		:> /var/sys/log_setting/nolog;
+		:> /var/sys/do_single;
+	fi
+}
+
+_RC_LOOPFS_SETUP() {
+	[ $# -eq 1 ] || return 1;
+	[ ! -d "$1" ] && return 1;
+	local _dir="$1" _ln _cp _lb;
+	local _lp="bin usr/share usr/lib usr/smb";
+	local _lc="etc var strg";
+	for _ln in $_lp; do
+		if ! empty_dir "${_dir}/${_ln}"; then
+			symlink ${_dir}/${_ln}/* /${_ln}/;
+		fi
+	done
+	for _cp in $_lc; do
+		if ! empty_dir "${_dir}/${_cp}"; then
+			_EXECQ "cp -fa ${_dir}/${_cp}/* /${_cp}/";
+		fi
+	done
+	if ! empty_dir "${_dir}/lib"; then
+		for _lb in ${_dir}/lib/*; do
+			[ -d "$_lb" ] && symlink $_lb /lib/;
+		done
+		echo "${_dir}/lib" >> /etc/ld.so.conf.d/libloopfs.conf;
+	fi
+	if [ -x "${_dir}/setup" ]; then
+		_EXECQ "${_dir}/setup";
+	fi
+}
+
+_RC_MOUNT_LOOPFS() {
+	if bool "$__FALLBACK"; then
+		__LOOPFS="${__LOOPFS}.work";
+	fi
+	if bool "$_MOUNT_OK"; then
+		if [ -d "$__LOOPFS" ] && ! empty_dir "$__LOOPFS"; then
+			local _fx _fn _fe="" _cnt;
+			((_cnt=0));
+			$__TECHO "${_BGREEN}>>${_BWHITE} Mounting compressed filesystem${_NORMAL}";
+			for _fx in $__LOOPFS/*.mce; do
+				_fn="$(rmstr "$(rmstr "$(basename $_fx)" "mybox-")" ".mce")";
+				[ -z "${_fn:-}" ] && continue;
+				if [ ! -b "/dev/loop${_cnt}" ]; then
+					_EXECQ "mknod -m660 /dev/loop${_cnt} b 7 8";
+				fi
+				xmkdir /${_fn};
+				if _EXECQ "mount -oloop ${_fx} /${_fn}"; then
+					echo "/${_fn}" >> /var/sys/strg_mount;
+					_RC_LOOPFS_SETUP "/${_fn}";
+					$__NECHO ".";
+				else
+					_fe+="$_fn ";
+				fi
+				((_cnt++));
+			done
+			$__TECHO "\r${_BBLUE}<>${_BWHITE} Mounting compressed filesystem${_NORMAL}$(_EDONE)\n";
+			[ -f "/etc/ld.so.conf.d/libloopfs.conf" ] && [ -x "/bin/ldconfig" ] && _EXECQ "/bin/ldconfig";
+			if [ -n "$_fe" ]; then
+				_EWALL "1" "Failed to mount: $_fe";
+				return 1;
+			fi
+			return 0;
+		fi
+	fi
+	_EWALL "0" "No compressed filesystem found";
+	return 1;
+}
+
+_RC_POLICY_DEFAULT() {
+	# policy order
+	_EXECQ "ifconfig lo 127.0.0.1 netmask 255.0.0.0";
+	_EXECQ "iptables -F";
+	_EXECQ "iptables -P INPUT DROP";
+	_EXECQ "iptables -P FORWARD DROP";
+	_EXECQ "iptables -P OUTPUT ACCEPT";
+	_EXECQ "iptables -A INPUT -i lo -j ACCEPT";
+	_EXECQ "iptables -A INPUT -m confirmed -j ACCEPT";
+	_EXECQ "iptables -A INPUT -m state --state RELATED -j CONFIRMED";
+	_EXECQ "iptables -A INPUT -p icmp -m icmp --icmp-type 8/0 -j CONFIRMED";
+	_EXECQ "iptables -A FORWARD -m confirmed -j ACCEPT";
+	_EXECQ "iptables -A FORWARD -m state --state RELATED -j CONFIRMED";
+}
+
+_RC_START() {
+	:> /etc/resolv.conf;
+	:> /var/sys/init_no_restart;
+	:> /var/sys/init_start;
+	export _INIT_START=1;
+	if [ -x "/bin/boottime" ] && [ ! -f "/var/sys/log_setting/nolog" ] && [ ! -f "/.nolog" ] && [ -d "/logfs" ] && [ -w "/logfs" ]; then
+		local _dt=$(strftime %Y%m%d);
+		local _flog="/logfs/system-$_dt.log";
+		local _llog="[$(boottime log)] TYPE=INFO MSG=****** SYSTEM LOADING ******";
+		if [ -f "$_flog" ]; then
+			echo "$_llog" >> $_flog;
+		else
+			echo "$_llog" >> $_flog;
+		fi
+		_EXECQ "chmod 700 $_flog";
+	fi
+
+	_RC_POLICY_DEFAULT;
+	_RC_RANDOM_SEED "start";
+	_RC_SERVICE "start";
+
+	unset _INIT_START;
+}
+
+_RC_SYSCTL() {
+	$__TECHO "${_BGREEN}>>${_BWHITE} Setting kernel variables";
+	local _f;
+	if [ -r "/strg/mybox/registry/system/sysctl.cnf" ]; then
+		_COPY "/strg/mybox/registry/system/sysctl.cnf /etc/sysctl.conf";
+	fi
+	_EXECQ "/bin/sysctl -p";
+	(/bin/sysctl -a 2>/dev/null| while read _f; do
+			# Protect ICMP accept redirect
+        		if [[ $_f = *net.ipv4.conf.*.accept_redirects* ]]; then
+                		[[ $_f = *net.ipv4.conf.lo.accept_redirects* ]] && continue;
+                		_EXECQ "/bin/sysctl -w $_f=0";
+			fi
+			# arp flux
+        		if [[ $_f = *net.ipv4.conf.*.hidden* ]]; then
+                		[[ $_f = *net.ipv4.conf.lo.hidden* ]] && continue;
+                		_EXECQ "/bin/sysctl -w $_f=1";
+			fi
+		done
+	);
+	[ -x "/bin/set_conntrack" ] && _EXECQ "/bin/set_conntrack";
+	$__TECHO "\r${_BBLUE}<>${_BWHITE} Setting kernel variables${_NORMAL}$(_EDONE)";
+}
+
+_RC_CONF_CHECK() {
+	local _cf _cg _cgd;
+	if [ -d "/etc/factory/registry" ]; then
+		if [ -d "/strg/mybox/registry" ]; then
+			for _cf in $(find /etc/factory/registry/* -type f); do
+				_cg=$(echo "$_cf" | sed -e 's|/etc/factory|/strg/mybox|g');
+				if [ -n "$_cg" ]; then
+					_cgd="$(dirname $_cg)";
+					[ ! -d "$_cgd" ] && xmkdir $_cgd;
+					[ ! -f "$_cg" ] && _COPY "$_cf $_cg";
+				fi
+			done
+		else
+			xmkdir /strg/mybox/registry;
+			_COPY "/etc/factory/registry/* /strg/mybox/registry/";
+		fi
+	fi
+	if [ -x "/service/tools/initlang.exc" ]; then
+		_EXECQ "/service/tools/initlang.exc";
+	fi
+}
+
+_RC_CLEAN() {
+	# clean
+	remove /var/sys/init_*;
+	remove /etc/inittab /var/lib/microcode.dat /bin/rcstart;
+	remove /bin/microcode_ctl /etc/init.boot/rc.hwdetect;
+	remove /bin/rcstart /var/sys/lcd_msg;
+	remove /usr/share/fonts;
+	remove /var/spool/modules;
+	remove /root;
+	remove /strg/mybox/download/*;
+	remove /tmp/*;
+	remove /etc/init.boot/rc.conf;
+}
+_RC_LAST() {
+	echo "0 0 0 0" > /proc/sys/kernel/printk;
+	if [ -x "/service/tools/log.exc" ]; then
+		$__TECHO "\r${_BGREEN}>>${_BWHITE} Compressing log files.. please wait..";
+		_EXECQ "/service/tools/log.exc compress";
+		$__TECHO "\r${_BBLUE}<>${_BWHITE} Compressing log files${_NORMAL}$(_EDONE)\n";
+	fi
+	[ -n "$checkfsck" ] && echo "$checkfsck" > /.checkfsck 2>/dev/null;
+	# see /service/lib/init.exl -> _INIT_NETWORK_OK
+	[ -n "$_NETWORK_OK" ] && [ "$_NETWORK_OK" != "0" ] && :> /.network_ok;
+	[ -x "/service/init/http.init" ] && _EXECQ "/service/init/http.init check";
+}
+
+_MAIN_INIT() {
+	_RC_INIT;
+	_RC_HWDETECT;
+	_RC_LCD;
+	_RC_MOUNT;
+	if bool "$_MOUNT_OK"; then
+		#_RC_PKG_EXTRACT;
+		_RC_MOUNT_LOOPFS;
+		_RC_HWDETECT_USB_STORAGE;
+		_RC_FIRMWARE_VERSION;
+		_RC_CHECK_NETWORK;
+		_RC_CONF_CHECK;
+		if bool "$resetinit"; then
+			_EWALL "2" "STARTUP SCRIPTS DISABLED";
+			:>/var/sys/init_down;
+			if yesno "Start syslog service?"; then
+				_EXECQ "/service/init/syslog.init start";
+			fi
+			if yesno "Start cron service?"; then
+				_EXECQ "/service/init/cron.init start";
+			fi
+			if ! empty_dir /strg/mybox/scripts; then
+				if yesno "Executing pre/post scripts?"; then
+					_RC_EXEC_SCRIPT "pre";
+					_RC_EXEC_SCRIPT "post";
+				fi
+			fi
+		else
+			_RC_EXEC_SCRIPT "pre";
+			_RC_START;
+			_RC_EXEC_SCRIPT "post";
+		fi
+		_RC_SYSCTL;
+		_RC_MOUNT_LOCAL;
+		if [ "$_LCD_PROG" != "-1" -a -x "/bin/lcd-reset" ]; then
+			if [ "$_LCD_PROG" = "1" ]; then
+				$__NECHO "* Starting LCD client";
+				_EXECQ "/bin/lcd-reset bootup ${_LCD_PROG}";
+				if [ $? = 0 ]; then
+					echo " Done.";
+				else
+					echo " Failed.";
+				fi
+			fi
+			if [ -d "/etc/cron/1m" ]; then
+				_EXECQ "/bin/lcd-reset cron ${_LCD_PROG}";
+			fi
+		fi
+		dmesg -c > /strg/mybox/boot.msg;		
+	fi
+	_RC_CLEAN;
+	_RC_SETPASSWD;
+	_RC_LAST;
+
+	if [ "$_LCD_PROG" != "1" ]; then
+		# clean lcdproc file around 136k
+		remove /lib/lcdproc /etc/lcdproc /bin/LCD*;
+	fi
+	if [ -x "/bin/beep" ]; then
+		/bin/beep -f 900 -r 5 -d 1000 2>/dev/null &
+	fi
+}
+
+####################################################################
+# RC.INIT END
+####################################################################
+
+_PROGRAM="$(basename $0)";
+if [ "$_PROGRAM" = "bootup" ] || [ "$_PROGRAM" = "init" ] || [ -n "$1" -a "$1" = "bootup" ]; then
+	_MAIN_BOOTUP;
+	exit 0;
+elif [ "$_PROGRAM" = "bootdown" ] || [ -n "$1" -a "$1" = "bootdown" ]; then
+	_MAIN_BOOTDOWN;
+	exit 0;
+elif [ "$_PROGRAM" = "rcstart" ] || [ -n "$1" -a "$1" = "rcstart" ]; then
+	_MAIN_INIT;
+	exit 0;
+fi
+
+
+exit 0;

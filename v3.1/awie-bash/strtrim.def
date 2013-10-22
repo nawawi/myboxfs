@@ -1,0 +1,110 @@
+This file is strtrim.def, from which is created strtrim.c.
+It implements the builtin "strtrim, strrtrim, strltrim" in Bash.
+
+$PRODUCES strtrim.c
+#include <config.h>
+#include <stdio.h>
+#include <string.h>
+#include "../builtins.h"
+#include "../shell.h"
+
+static char *strrtrim(char *str, const char *trim) {
+	char *end;
+	if(!trim) trim=" \n\r\t\v\f";
+	end = str + strlen(str);
+	while(end-- > str) {
+		if(!strchr(trim, *end)) return str;
+		*end = 0;
+	}
+	return str;
+}
+
+static char *strltrim(char *str, const char *trim) {
+	if(!trim) trim=" \n\r\t\v\f";
+	while(*str) {
+		if(!strchr(trim, *str)) return str;
+		str++;
+	}
+	return str;
+}
+
+static char *strtrim(char *str, const char *trim) {
+	return strltrim(strrtrim(str, trim), trim);
+}
+
+$BUILTIN strtrim
+$FUNCTION strtrim_builtin
+$SHORT_DOC strtrim string [char]
+Strip whitespace (or other characters) from the beginning and end of a string
+$END
+
+int strtrim_builtin(WORD_LIST *list) {
+	char *string, *suffix;
+
+	if(list==0) {
+		builtin_usage();
+		return(EX_USAGE);
+	}
+
+	if(no_options(list)) return(EX_USAGE);
+
+	string=list->word->word;
+	suffix=(char *)NULL;
+	if(list->next) {
+		list=list->next;
+		suffix=list->word->word;
+	}
+	printf("%s",strtrim(string,suffix));
+	return(EXECUTION_SUCCESS);
+}
+
+$BUILTIN strrtrim
+$FUNCTION strrtrim_builtin
+$SHORT_DOC strrtrim string [char]
+Strip whitespace (or other characters) from the end of a string
+$END
+
+int strrtrim_builtin(WORD_LIST *list) {
+	char *string, *suffix;
+
+	if(list==0) {
+		builtin_usage();
+		return(EX_USAGE);
+	}
+
+	if(no_options(list)) return(EX_USAGE);
+
+	string=list->word->word;
+	suffix=(char *)NULL;
+	if(list->next) {
+		list=list->next;
+		suffix=list->word->word;
+	}
+	printf("%s",strrtrim(string,suffix));
+	return(EXECUTION_SUCCESS);
+}
+
+$BUILTIN strltrim
+$FUNCTION strltrim_builtin
+$SHORT_DOC strltrim string [char]
+Strip whitespace (or other characters) from the beginning of a string
+$END
+int strltrim_builtin(WORD_LIST *list) {
+	char *string, *suffix;
+
+	if(list==0) {
+		builtin_usage();
+		return(EX_USAGE);
+	}
+
+	if(no_options(list)) return(EX_USAGE);
+
+	string=list->word->word;
+	suffix=(char *)NULL;
+	if(list->next) {
+		list=list->next;
+		suffix=list->word->word;
+	}
+	printf("%s",strltrim(string,suffix));
+	return(EXECUTION_SUCCESS);
+}

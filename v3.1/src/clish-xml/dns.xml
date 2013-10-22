@@ -1,0 +1,251 @@
+﻿<?xml version="1.0"?>
+<CLISH_MODULE>
+<VIEW name="dns" prompt="${SYSTEM_NAME}/network/dns/&gt; ">
+        <COMMAND name="."
+                help="Return to main menu"
+                view="main"
+                viewid=""/>
+        <COMMAND name=".."
+                help="Return to previous menu"
+                view="network"
+                viewid=""/>
+        <COMMAND name="dyndns/"
+                help="Dynamic DNS configuration"
+                view="dyndns"
+                viewid=""/>
+        <COMMAND name="apply"
+                help="Apply changes">
+                <ACTION>exec /service/tools/dns_config.exc apply 2>/dev/null</ACTION>
+        </COMMAND>
+<!-- start config -->
+        <COMMAND name="config"
+                help="Display or change DNS configuration">
+                <ACTION>exec /service/tools/dns_config.exc config print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+        <COMMAND name="config print"
+                help="Display DNS configuration">
+                <ACTION>exec /service/tools/dns_config.exc config print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+        <COMMAND name="config set"
+                help="Change DNS configuration"/>
+        <COMMAND name="config set enable"
+                help="Enable DNS Server">
+		<PARAM name="enable"
+			help="Set enable"
+			ptype="ONOFF" 
+			default="off"/>
+                <ACTION>exec /service/tools/dns_config.exc config set enable ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="config set forwarder"
+                help="Set DNS forwarder">
+		<PARAM name="host_id"
+                        help="Resource Id for definition network host."
+                        ptype="MULTI_NUM_NULL"
+			default="NULL"/>
+                <ACTION>exec /service/tools/dns_config.exc config set forwarder "${host_id}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!-- end config -->
+<!-- start acl -->
+        <COMMAND name="acl"
+                help="Display or configure DNS access list">
+                <ACTION>exec /service/tools/dns_config.exc acl print 2>/dev/null|more -dl</ACTION>
+        </COMMAND>
+	<COMMAND name="acl print"
+                help="Display current config">
+                <ACTION>exec /service/tools/dns_config.exc acl print 2>/dev/null|more -dl</ACTION>
+        </COMMAND>
+
+	<COMMAND name="acl find"
+                help="Search DNS access list">
+		<PARAM name="string"
+			help="String to find"
+			ptype="STRING_ANY" />
+                <ACTION>exec /service/tools/dns_config.exc acl find "${string}" 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+	<COMMAND name="acl add"
+                help="Add new DNS access list">
+		<PARAM name="addr_id"
+                        help="Resource Id for definition network or any."
+                        ptype="MULTI_NUM_ANY"/>
+                <ACTION>exec /service/tools/dns_config.exc acl add "${addr_id}" 2>/dev/null</ACTION>
+        </COMMAND>
+	<COMMAND name="acl delete"
+                help="Delete DNS access list">
+		<PARAM name="id"
+                        help="Resource Id '*' for all"
+                        ptype="MULTI_NUM_ALL"/>
+                <ACTION>exec /service/tools/dns_config.exc acl delete "${id}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!-- end acl -->
+<!-- start routing -->
+        <COMMAND name="routing"
+                help="Display or configure DNS request routing">
+                <ACTION>exec /service/tools/dns_config.exc routing print 2>/dev/null|more -dl</ACTION>
+        </COMMAND>
+	<COMMAND name="routing print"
+                help="Display current config">
+                <ACTION>exec /service/tools/dns_config.exc routing print 2>/dev/null|more -dl</ACTION>
+        </COMMAND>
+	<COMMAND name="routing find"
+                help="Search DNS request routing list">
+		<PARAM name="string"
+			help="String to find"
+			ptype="STRING_ANY" />
+                <ACTION>exec /service/tools/dns_config.exc routing find "${string}" 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+	<COMMAND name="routing add"
+                help="Add new DNS request routing">
+                <PARAM name="domain"
+                        help="Domain name"
+                        ptype="STRING_ANY" />
+		<PARAM name="server_id"
+                        help="Resource Id for definition network host."
+                        ptype="MULTI_NUM"/>
+		<PARAM name="enable"
+			help="Set enable"
+			ptype="ONOFF" 
+			default="off"/>
+ 		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/dns_config.exc routing add "${domain}" "${server_id}" ${enable} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="routing set"
+                help="Change DNS request routing configuration"/>
+        <COMMAND name="routing set domain"
+                help="Set domain DNS request routing">
+		<PARAM name="id"
+                        help="Resource Id"
+                        ptype="NUM"/>
+                <PARAM name="domain"
+                        help="Domain name"
+                        ptype="STRING_ANY" />
+                <ACTION>exec /service/tools/dns_config.exc routing set domain ${id} "${domain}" 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="routing set servers"
+                help="Set target servers DNS request routing">
+		<PARAM name="id"
+                        help="Resource Id"
+                        ptype="NUM"/>
+		<PARAM name="server_id"
+                        help="Resource Id for definition network host."
+                        ptype="MULTI_NUM"/>
+                <ACTION>exec /service/tools/dns_config.exc routing set servers ${id} "${server_id}" 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="routing set enable"
+                help="Set enable">
+		<PARAM name="id"
+                        help="Resource Id"
+                        ptype="NUM"/>
+		<PARAM name="enable"
+			help="Set enable"
+			ptype="ONOFF" 
+			default="off"/>
+                <ACTION>exec /service/tools/dns_config.exc routing set enable ${id} "${enable}" 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="routing set description"
+                help="Set description">
+		<PARAM name="id"
+                        help="Resource Id"
+                        ptype="NUM"/>
+ 		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/dns_config.exc routing set enable ${id} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+	<COMMAND name="routing delete"
+                help="Delete DNS request routing">
+		<PARAM name="id"
+                        help="Resource Id '*' for all"
+                        ptype="MULTI_NUM_ALL"/>
+                <ACTION>exec /service/tools/dns_config.exc routing delete "${id}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!-- end routing -->
+<!-- start static -->
+        <COMMAND name="static"
+                help="Display or configure Static DNS mapping ">
+                <ACTION>exec /service/tools/dns_config.exc static print 2>/dev/null|more -dl</ACTION>
+        </COMMAND>
+	<COMMAND name="static print"
+                help="Display current config">
+                <ACTION>exec /service/tools/dns_config.exc static print 2>/dev/null|more -dl</ACTION>
+        </COMMAND>
+	<COMMAND name="static find"
+                help="Search Static DNS mapping list">
+		<PARAM name="string"
+			help="String to find"
+			ptype="STRING_ANY" />
+                <ACTION>exec /service/tools/dns_config.exc static find "${string}" 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+	<COMMAND name="static add"
+                help="Add new Static DNS mapping">
+                <PARAM name="hostname"
+                        help="Hostname"
+                        ptype="STRING_ANY" />
+		<PARAM name="addr"
+                        help="IP Address"
+                        ptype="IPV4"/>
+		<PARAM name="enable"
+			help="Set enable"
+			ptype="ONOFF" 
+			default="off"/>
+ 		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/dns_config.exc static add "${hostname}" "${addr}" ${enable} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="static set"
+                help="Change Static DNS mapping configuration"/>
+        <COMMAND name="static set hostname"
+                help="Set hostname Static DNS mapping ">
+		<PARAM name="id"
+                        help="Resource Id"
+                        ptype="NUM"/>
+                <PARAM name="hostname"
+                        help="Hostname"
+                        ptype="STRING_ANY" />
+                <ACTION>exec /service/tools/dns_config.exc static set hostname ${id} "${hostname}" 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="static set address"
+                help="Set IP Address Static DNS mapping ">
+		<PARAM name="addr"
+                        help="IP Address"
+                        ptype="IPV4"/>
+                <ACTION>exec /service/tools/dns_config.exc static set servers ${id} "${addr}" 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="static set enable"
+                help="Set enable">
+		<PARAM name="id"
+                        help="Resource Id"
+                        ptype="NUM"/>
+		<PARAM name="enable"
+			help="Set enable"
+			ptype="ONOFF" 
+			default="off"/>
+                <ACTION>exec /service/tools/dns_config.exc static set enable ${id} "${enable}" 2>/dev/null</ACTION>
+        </COMMAND>
+        <COMMAND name="static set description"
+                help="Set description">
+		<PARAM name="id"
+                        help="Resource Id"
+                        ptype="NUM"/>
+ 		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/dns_config.exc static set enable ${id} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+	<COMMAND name="static delete"
+                help="Delete Static DNS mapping ">
+		<PARAM name="id"
+                        help="Resource Id '*' for all"
+                        ptype="MULTI_NUM_ALL"/>
+                <ACTION>exec /service/tools/dns_config.exc static delete "${id}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!-- end static -->
+</VIEW>
+</CLISH_MODULE>

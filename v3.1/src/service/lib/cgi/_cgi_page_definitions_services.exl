@@ -1,0 +1,213 @@
+<?php
+if(!defined('_CGI_CODE')||_CGI_CODE!="90d45215e48dac81e802f17310ad0c1f") exit("\n\nERROR: _CGI_CODE not set\n\n");
+/* req_data = p_definitions_services */
+
+function _CGI_PAGE_DEFINITIONS_NAV_SERVICES() {
+	extract($GLOBALS['_IMG']);
+	_DEFINITIONS_GET("services",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+		return _GETTEXT("No data available");
+	}
+	$_page_s=array();
+	foreach($_TOKEN as $_type => $_id_array) {
+		if($_type=="builtin") {
+			foreach($_id_array as $_id => $_set_a) {
+				$_name=htmlspecialchars($_set_a['NAME']);
+				$_alt=$_set_a['PROTO'];
+				$_page_s[strtolower($_name)]="<div class='dnd_drag' id='dnd_{$_type}'><span "._CGI_TOOLTIPS($_alt)."><img style='width: 12px; float: left;margin-right: 2px;' src='{$_ICON_DEFSERVICE['builtin']}'>$_name</span></div>";
+			}
+		} elseif($_type=="tcp" || $_type=="udp" || $_type=="tcpudp") {
+			foreach($_id_array as $_id => $_set_a) {
+				$_name=htmlspecialchars($_set_a['NAME']);
+				$_alt="{$_set_a['SPORT']} &#8594; {$_set_a['DPORT']}";
+				$_page_s[strtolower($_name)]="<div class='dnd_drag' id='dnd_{$_type}'><span "._CGI_TOOLTIPS($_alt)."><img style='width: 12px; float: left;margin-right: 2px;' src='{$_ICON_DEFSERVICE['service']}'>$_name</span></div>";
+			}
+		} elseif($_type=="icmp") {
+			_INI_TOKEN_GET("definitions","icmptype.cfg",$_ETOKEN);
+			foreach($_id_array as $_id => $_set_a) {
+				$_name=htmlspecialchars($_set_a['NAME']);
+				$_alt="{$_ETOKEN['icmptype'][$_set_a['CODE']]}";
+				$_page_s[strtolower($_name)]="<div class='dnd_drag' id='dnd_{$_type}'><span "._CGI_TOOLTIPS($_alt)."><img style='width: 12px; float: left;margin-right: 2px;' src='{$_ICON_DEFSERVICE['service']}'>$_name</span></div>";
+			}
+		} elseif($_type=="ip") {
+			foreach($_id_array as $_id => $_set_a) {
+				$_name=htmlspecialchars($_set_a['NAME']);
+				$_alt="IP Protocol {$_set_a['NUM']}";
+				$_page_s[strtolower($_name)]="<div class='dnd_drag' id='dnd_{$_type}'><span "._CGI_TOOLTIPS($_alt)."><img style='width: 12px; float: left;margin-right: 2px;' src='{$_ICON_DEFSERVICE['service']}'>$_name</span></div>";
+			}
+		} elseif($_type=="esp" || $_type=="ah") {
+			foreach($_id_array as $_id => $_set_a) {
+				$_name=htmlspecialchars($_set_a['NAME']);
+				$_alt="{$_set_a['SPI']}";
+				$_page_s[strtolower($_name)]="<div class='dnd_drag' id='dnd_{$_type}'><span "._CGI_TOOLTIPS($_alt)."><img style='width: 12px; float: left;margin-right: 2px;' src='{$_ICON_DEFSERVICE['service']}'>$_name</span></div>";
+			}
+		} elseif($_type=="group") {
+			foreach($_id_array as $_id => $_set_a) {
+				$_name=htmlspecialchars($_set_a['NAME']);
+				$_alt="{$_set_a['SERVICE']}";
+				$_page_s[strtolower($_name)]="<div class='dnd_drag' id='dnd_{$_type}'><span "._CGI_TOOLTIPS($_alt)."><img style='width: 12px; float: left;margin-right: 2px;' src='{$_ICON_DEFSERVICE['group']}'>$_name</span></div>";
+			}
+		}
+		unset($_id_array,$_type,$_id,$_set_a,$_alt,$_name);
+	}
+	$_page="";
+	if(!_ARRAY_NULL($_page_s)) {
+		ksort($_page_s);
+		foreach($_page_s as $_line) {
+			$_page .="$_line";
+		}
+	}
+	return trim($_page);
+}
+
+function _CGI_PAGE_DEFINITIONS_PBOX_SERVICES($_stype='all',$_sfind='') {
+	extract($GLOBALS['_IMG']);
+	_DEFINITIONS_GET("services",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+		return _GETTEXT("No data available");
+	}
+	$_page_s=array();
+	foreach($_TOKEN as $_type => $_id_array) {
+		if($_type=="builtin") {
+			foreach($_id_array as $_id => $_set_a) {
+				if($_stype!='all' && $_stype!="$_type") continue;
+				if(!_NULL($_sfind) && !eregi($_sfind,$_set_a['NAME'])) continue;
+
+				$_name=htmlspecialchars($_set_a['NAME']);
+				$_alt=$_set_a['PROTO'];
+				$_desc=htmlspecialchars($_set_a['NOTE']);
+				if(!_NULL($_desc)) $_desc="<br /><span "._CGI_TOOLTIPS($_desc)."><span style='color: #ff6600;'>&#8764;</span> $_desc</span>";
+				$_page_s[strtolower($_name)]="
+					<tr id='page_def_{$_type}'>
+						<td class='defpbox_img'><img style='margin-right: 2px; float: left;' src='{$_ICON_DEFSERVICE['builtin']}'></td>
+						<td><div class='defpbox_name'>$_name$_desc</td>
+						<td class='defpbox_alt'>&nbsp;</td>
+						<td class='defpbox_opt'>&nbsp;</td>
+					</tr>
+				";
+			}
+		} elseif($_type=="tcp" || $_type=="udp" || $_type=="tcpudp") {
+			foreach($_id_array as $_id => $_set_a) {
+				if($_stype!='all' && $_stype!="$_type") continue;
+				if(!_NULL($_sfind) && !eregi($_sfind,$_set_a['NAME'])) continue;
+
+				$_name=htmlspecialchars($_set_a['NAME']);
+				$_alt="{$_set_a['SPORT']} &#8594; {$_set_a['DPORT']}";
+				$_proto=$_set_a['PROTO'];
+				$_desc=htmlspecialchars($_set_a['NOTE']);
+				if(!_NULL($_desc)) $_desc="<br /><span "._CGI_TOOLTIPS($_desc)."><span style='color: #ff6600;'>&#8764;</span> $_desc</span>";
+				$_page_s[strtolower($_name)]="
+					<tr id='page_def_{$_type}'>
+						<td class='defpbox_img'><img style='margin-right: 2px; float: left;' src='{$_ICON_DEFSERVICE['service']}'></td>
+						<td><div class='defpbox_name'>$_name$_desc</td>
+						<td><div class='defpbox_alt'><div style='font-weight: bold; padding-right: 10px; float: left; width: 50px;'>$_proto</div><div>$_alt</div></div></td>
+						<td class='defpbox_opt'>
+							"._CGI_BUTTON(array('id'=>"bdel_{$_id}|$_type",'class'=>'button_s','text'=>'Delete','css'=>'width: 80px;'))."
+							"._CGI_BUTTON(array('id'=>"bedit_{$_id}|$_type",'class'=>'button_s','text'=>'Edit','css'=>'width: 80px; margin-top: 2px;'))."
+						</td>
+					</tr>
+				";
+			}
+		} elseif($_type=="icmp") {
+			_INI_TOKEN_GET("definitions","icmptype.cfg",$_ETOKEN);
+			foreach($_id_array as $_id => $_set_a) {
+				if($_stype!='all' && $_stype!="$_type") continue;
+				if(!_NULL($_sfind) && !eregi($_sfind,$_set_a['NAME'])) continue;
+
+				$_name=htmlspecialchars($_set_a['NAME']);
+				$_alt="{$_ETOKEN['icmptype'][$_set_a['CODE']]}";
+				$_proto=$_set_a['PROTO'];
+				$_desc=htmlspecialchars($_set_a['NOTE']);
+				if(!_NULL($_desc)) $_desc="<br /><span "._CGI_TOOLTIPS($_desc)."><span style='color: #ff6600;'>&#8764;</span> $_desc</span>";
+				$_page_s[strtolower($_name)]="
+					<tr id='page_def_{$_type}'>
+						<td class='defpbox_img'><img style='margin-right: 2px; float: left;' src='{$_ICON_DEFSERVICE['service']}'></td>
+						<td><div class='defpbox_name'>$_name$_desc</td>
+						<td><div class='defpbox_alt'><div style='font-weight: bold; padding-right: 10px; float: left; width: 50px;'>$_proto</div><div>$_alt</div></div></td>
+						<td class='defpbox_opt'>
+							"._CGI_BUTTON(array('id'=>"bdel_{$_id}|$_type",'class'=>'button_s','text'=>'Delete','css'=>'width: 80px;'))."
+							"._CGI_BUTTON(array('id'=>"bedit_{$_id}|$_type",'class'=>'button_s','text'=>'Edit','css'=>'width: 80px; margin-top: 2px;'))."
+						</td>
+					</tr>
+				";
+			}
+		} elseif($_type=="ip") {
+			foreach($_id_array as $_id => $_set_a) {
+				if($_stype!='all' && $_stype!="$_type") continue;
+				if(!_NULL($_sfind) && !eregi($_sfind,$_set_a['NAME'])) continue;
+
+				$_name=htmlspecialchars($_set_a['NAME']);
+				$_alt="IP Protocol {$_set_a['NUM']}";
+				$_proto=$_set_a['PROTO'];
+				$_desc=htmlspecialchars($_set_a['NOTE']);
+				if(!_NULL($_desc)) $_desc="<br /><span "._CGI_TOOLTIPS($_desc)."><span style='color: #ff6600;'>&#8764;</span> $_desc</span>";
+				$_page_s[strtolower($_name)]="
+					<tr id='page_def_{$_type}'>
+						<td class='defpbox_img'><img style='margin-right: 2px; float: left;' src='{$_ICON_DEFSERVICE['service']}'></td>
+						<td><div class='defpbox_name'>$_name$_desc</td>
+						<td><div class='defpbox_alt'><div style='font-weight: bold; padding-right: 10px; float: left; width: 50px;'>$_proto</div><div>$_alt</div></div></td>
+						<td class='defpbox_opt'>
+							"._CGI_BUTTON(array('id'=>"bdel_{$_id}|$_type",'class'=>'button_s','text'=>'Delete','css'=>'width: 80px;'))."
+							"._CGI_BUTTON(array('id'=>"bedit_{$_id}|$_type",'class'=>'button_s','text'=>'Edit','css'=>'width: 80px; margin-top: 2px;'))."
+						</td>
+					</tr>
+				";
+			}
+		} elseif($_type=="esp" || $_type=="ah") {
+			foreach($_id_array as $_id => $_set_a) {
+				if($_stype!='all' && $_stype!="$_type") continue;
+				if(!_NULL($_sfind) && !eregi($_sfind,$_set_a['NAME'])) continue;
+
+				$_name=htmlspecialchars($_set_a['NAME']);
+				$_alt="{$_set_a['SPI']}";
+				$_proto=$_set_a['PROTO'];
+				$_desc=htmlspecialchars($_set_a['NOTE']);
+				if(!_NULL($_desc)) $_desc="<br /><span "._CGI_TOOLTIPS($_desc)."><span style='color: #ff6600;'>&#8764;</span> $_desc</span>";
+				$_page_s[strtolower($_name)]="
+					<tr id='page_def_{$_type}'>
+						<td class='defpbox_img'><img style='margin-right: 2px; float: left;' src='{$_ICON_DEFSERVICE['service']}'></td>
+						<td><div class='defpbox_name'>$_name$_desc</td>
+						<td><div class='defpbox_alt'><div style='font-weight: bold; padding-right: 10px; float: left; width: 50px;'>$_proto</div><div>$_alt</div></div></td>
+						<td class='defpbox_opt'>
+							"._CGI_BUTTON(array('id'=>"bdel_{$_id}|$_type",'class'=>'button_s','text'=>'Delete','css'=>'width: 80px;'))."
+							"._CGI_BUTTON(array('id'=>"bedit_{$_id}|$_type",'class'=>'button_s','text'=>'Edit','css'=>'width: 80px; margin-top: 2px;'))."
+						</td>
+					</tr>
+				";
+			}
+		} elseif($_type=="group") {
+			foreach($_id_array as $_id => $_set_a) {
+				if($_stype!='all' && $_stype!="$_type") continue;
+				if(!_NULL($_sfind) && !eregi($_sfind,$_set_a['NAME'])) continue;
+
+				$_name=htmlspecialchars($_set_a['NAME']);
+				$_alt="{$_set_a['SERVICE']}";
+				$_desc=htmlspecialchars($_set_a['NOTE']);
+				if(!_NULL($_desc)) $_desc="<br /><span "._CGI_TOOLTIPS($_desc)."><span style='color: #ff6600;'>&#8764;</span> $_desc</span>";
+				$_page_s[strtolower($_name)]="
+					<tr id='page_def_{$_type}'>
+						<td class='defpbox_img'><img style='margin-right: 2px; float: left;' src='{$_ICON_DEFSERVICE['group']}'></td>
+						<td><div class='defpbox_name'>$_name$_desc</td>
+						<td><div class='defpbox_alt' "._CGI_TOOLTIPS($_alt).">$_alt</div></td>
+						<td class='defpbox_opt'>
+							"._CGI_BUTTON(array('id'=>"bdel_{$_id}|$_type",'class'=>'button_s','text'=>'Delete','css'=>'width: 80px;'))."
+							"._CGI_BUTTON(array('id'=>"bedit_{$_id}|$_type",'class'=>'button_s','text'=>'Edit','css'=>'width: 80px; margin-top: 2px;'))."
+						</td>
+					</tr>
+				";
+			}
+		}
+		unset($_id_array,$_type,$_id,$_set_a,$_alt,$_name);
+	}
+	$_page="<table id='defpbox_table'>";
+	if(!_ARRAY_NULL($_page_s)) {
+		ksort($_page_s);
+		foreach($_page_s as $_line) {
+			$_page .="$_line";
+		}
+	}
+	$_page .="</table>";
+	return trim($_page);
+}
+
+?>

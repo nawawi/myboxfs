@@ -1,0 +1,115 @@
+<?php
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+function ntp_check() {
+	if(!_INIT_CHECK_BINARY(array("/bin/ntpd"))) {
+		_INIT_ECHO(1,_GETTEXT("Cannot execute %s. Internal error",_INIT_NAME()));
+		exit(1);
+	}
+}
+
+function ntp_quiet() {
+	_INIT_QUIET('1');
+}
+
+function _ntp_sync_first($_server_array) {
+	foreach($_server_array as $_host) {
+		if(_EXEC_CMD("/bin/ntpdate -t 0.2 $_host")==0) {
+			_clock_sync_hw();
+			break;
+		}
+	}
+}
+
+function ntp_config($_scriptdata='') {
+	_INI_TOKEN_GET("network","ntp.cfg",$_NTOKEN);
+	if(_ARRAY_NULL($_NTOKEN) || _NULL($_NTOKEN['ntpd']['SERVER'])) {
+		_INIT_ECHO(0,_GETTEXT("%s daemon (%s) disabled","NTP","ntpd"));
+		ntp_quiet();
+		return FALSE;
+	}
+	$_DATA=$_NTOKEN['ntpd'];
+	$_server="";
+	$_server_sync=array();
+	_DEFINITIONS_GET_BYNAME_R("networks",$_DATA['SERVER'],$_DTOKEN);
+	if(!_ARRAY_NULL($_DTOKEN)) {
+		foreach($_DTOKEN as $_DID => $_DDATA) {
+			if(!_NULL($_DDATA['ADDR'])) {
+				$_server_a=_STR_ARRAY($_DDATA['ADDR'],",");
+				if(!_ARRAY_NULL($_server_a)) {
+					foreach($_server_a as $_host) {
+						$_server .="server $_host iburst minpoll 7 maxpoll 15\n";
+						$_server_sync[]="$_host";
+					}
+				}
+			}
+		}
+	}
+	_TRIM($_server);
+	if(_NULL($_server)) {
+		$_server="ntp.tracenetworkcorporation.com";
+		$_server_sync[]="$_server";
+	}
+
+	$_config="";
+	$_config .="server 127.127.1.0 minpoll 7 maxpoll 15\n";
+	$_config .="fudge 127.127.1.0 stratum 10\n";
+	if(!_NULL($_server)) {
+		$_config .="$_server\n";
+		if(!_ARRAY_NULL($_server_sync)) {
+			_ntp_sync_first($_server_sync);
+		}
+	}
+
+	$_config .="tinker panic 0\n";
+	$_config .="driftfile /var/spool/ntp/ntp.drift\n";
+	if(!_NULL($_config)) {
+		if(!file_exists("/var/spool/ntp/ntp.drif")) {
+			_FILE_SAVE("/var/spool/ntp/ntp.drif","0.000\n");
+		}
+		return _FILE_SAVE("/etc/ntp.conf","$_config");
+	}
+	_INIT_ECHO(0,_GETTEXT("%s daemon (%s) disabled","NTP","ntpd"));
+	ntp_quiet();
+	return FALSE;
+}
+
+
+function ntp_up() {
+	@unlink(_TASKQ_PATH."/ntp_up");
+	$_prog="/bin/ntpd -g";
+	if(_EXEC_CMD("$_prog")==0) {
+		_INIT_CHKPROG_LOG("ntpd");
+		return TRUE;
+	}
+	return ntp_restart();
+}
+
+
+function ntp_start() {
+	_INIT_CHECK_DAEMON_STATUS("ntpd");
+	$_prog="/bin/ntpd -g";
+	if(!ntp_config()) {
+		_INIT_ECHO(1,_GETTEXT("Starting %s failed","ntpd"));
+		return FALSE;
+	}
+	_INIT_START_DAEMON("$_prog","ntp_up");
+	if(_INIT_BOOTUP()==FALSE) {
+		_INIT_TASKQ("policy_sysinput");
+	}
+	return TRUE;
+}
+
+function ntp_stop() {
+	_INIT_STOP_DAEMON("ntpd","ntp_up",1);
+	sleep(2);
+	return TRUE;
+}
+
+function ntp_restart() {
+	_INIT_EXEC("ntp_stop");
+	_INIT_EXEC("ntp_start");
+	return TRUE;
+}
+
+?>

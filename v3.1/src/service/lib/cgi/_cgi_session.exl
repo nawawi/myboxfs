@@ -1,0 +1,136 @@
+<?php
+if(!defined('_CGI_CODE')||_CGI_CODE!="90d45215e48dac81e802f17310ad0c1f") exit("\n\nERROR: _CGI_CODE not set\n\n");
+
+function _CGI_SESSION_AUTH_JSON($_status,$_msg) {
+	return _CGI_JSON(array("logged"=>"$_status","msg"=>"$_msg"));
+}
+
+function _SESSION_START($_secure=1) {
+	if($_secure==1) {
+		@ini_set('session.cookie_secure','1');
+	}
+	@session_start();
+}
+
+function _CGI_SESSION_GET_USERIP() {
+	$_userip="unknown";
+	if(!_NULL($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+		$_userip=$_SERVER['HTTP_X_FORWARDED_FOR'];
+	} elseif(!_NULL($_SERVER['HTTP_CLIENT_IP'])) {
+		$_userip=$_SERVER['HTTP_CLIENT_IP']; 
+	} else {
+		$_userip=$_SERVER['REMOTE_ADDR']; 
+	}
+	if(strpos($_userip,",")!==FALSE) {
+		list($_userip,)=_STR_ARRAY($_userip,",");
+		_TRIM($_userip);
+	}
+	return $_userip;
+}
+
+function _CGI_SESSION_LOG($_ecode,$_msg,$_who="none") {
+	$_ip=_CGI_SESSION_GET_USERIP();
+	$_txt="ECODE=$_ecode TYPE=web USER=$_who IP=$_ip MSG=$_msg";
+	_LOG_AUTH($_txt);
+}
+
+function _CGI_SESSION_SET_SESSION($_access) {
+	_INI_TOKEN_GET("system","system.cfg",$_TOKEN);
+	$_DATA=$_TOKEN['service_http'];
+	if(_NULL($_DATA['TIMEOUT'])) $_DATA['TIMEOUT']=300;
+	$_timeout=$_DATA['TIMEOUT'];
+	$_session_timeout=$_timeout;
+	if($_timeout!=0) {
+		$_session_timeout=time()+60 * $_timeout;
+	}
+	$_userip=_CGI_SESSION_GET_USERIP();
+	_SESSION_START();
+	$_sessid=session_id();
+	$_SESSION['traceos_login']['id']=$_access;
+	$_SESSION['traceos_login']['ip']=$_userip;
+	$_SESSION['traceos_login']['time_login']=time();
+	$_SESSION['traceos_login']['timeout_data']=$_timeout;
+	$_SESSION['traceos_login']['timeout']=$_session_timeout;
+	_CGI_SESSION_LOG("00",_GETTEXT("Password Accepted"),$_access);
+	return _CGI_SESSION_AUTH_JSON("OK",_GETTEXT("Password Accepted"));
+}
+
+function _CGI_SESSION_UPDATE_SESSION() {
+	_SESSION_START();
+	if(!_NULL($_SESSION['traceos_login']['timeout']) && $_SESSION['traceos_login']['timeout']!=0) {
+		$_timeout=300;
+		if(!_NULL($_SESSION['traceos_login']['timeout_data'])) {
+			$_timeout=$_SESSION['traceos_login']['timeout_data'];
+		}
+		$_session_timeout=time() + $_timeout; // in seconds
+		$_SESSION['traceos_login']['timeout']=$_session_timeout;
+	}
+}
+
+function _CGI_SESSION_AUTH($_passwd) {
+	if(!_NULL($_passwd)) {
+		if(_SESSION_CHECK_PASSWORD("admin","sysadmin",$_passwd)) {
+			return _CGI_SESSION_SET_SESSION("admin");
+		}
+		if(_SESSION_CHECK_PASSWORD("look","syslook",$_passwd)) {
+			return _CGI_SESSION_SET_SESSION("look");
+		}
+	}
+	_CGI_SESSION_LOG("01",_GETTEXT("Password incorrect"),"none");
+	return _CGI_SESSION_AUTH_JSON("KO",_GETTEXT("Password incorrect"));
+}
+
+function _CGI_SESSION_CHECK() {
+	_SESSION_START();
+	if(!_ARRAY_NULL($_SESSION['traceos_login'])) {
+		$_LOGIN=$_SESSION['traceos_login'];
+		if(!_NULL($_LOGIN['timeout']) && $_LOGIN['timeout']!=0) {
+                	if(time() >= $_LOGIN['timeout']) {
+				_CGI_SESSION_LOG("01",_GETTEXT("Session expired"),$_LOGIN['id']);
+				_CGI_SESSION_CLEAN();
+				return FALSE;
+			}
+		}
+		return TRUE;
+	}
+	_CGI_SESSION_CLEAN();
+	return FALSE;
+}
+
+function _CGI_SESSION_LOGOUT() {
+	_SESSION_START();
+	if(!_ARRAY_NULL($_SESSION['traceos_login'])) {
+		$_LOGIN=$_SESSION['traceos_login'];
+		if(!_NULL($_LOGIN['id'])) {
+			_CGI_SESSION_LOG("01",_GETTEXT("Session logout"),$_LOGIN['id']);
+			_CGI_SESSION_CLEAN();
+			return FALSE;
+		}
+		return FALSE;
+	}
+	_CGI_SESSION_CLEAN();
+	return FALSE;
+}
+
+function _CGI_SESSION_CLEAN() {
+        _SESSION_START();
+        $_session_id=session_id();
+        $_session_path=session_save_path();
+        @unlink("$_session_path/sess_{$_session_id}");
+        @session_unset();
+        @session_destroy();
+        @session_write_close();
+        _SESSION_HTTP_CLEAN();
+}
+
+function _CGI_IS_ADMIN() {
+	_SESSION_START();
+	if(!_NULL($_SESSION['traceos_login']['id'])) {
+		if($_SESSION['traceos_login']['id']=='admin') {
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+?>

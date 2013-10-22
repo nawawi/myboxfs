@@ -1,0 +1,293 @@
+<?php
+/**
+* cli function
+*/
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n"); 
+define('__CLI_BODY_SKIP_DATA_TAG','_____cli?___skip?___data?');
+define('__CLI_DATA_NL','_____cli?___data?___nl?');
+
+function _CLI_PROC($_option) {
+	if($_option{0}!="_") {
+		$_func="_cli_{$_option}";
+		if(function_exists($_func)) {
+			$_func();
+		}
+	}
+}
+
+function _CLI_YESNO($_msg) {
+	declare(ticks = 1);
+	echo "$_msg";
+	pcntl_signal(SIGINT, SIG_IGN);
+        pcntl_signal(SIGTSTP, SIG_IGN);
+	if(!is_resource(STDIN)) {
+		define('STDIN',fopen("php://stdin","r"));
+		register_shutdown_function(create_function('','fclose(STDIN);return true;'));
+	}
+	$_buff=trim(fgets(STDIN));
+	while($_buff!="yes" && $_buff!="no") {
+		echo "Please enter 'yes' or 'no': ";
+		$_buff=trim(fgets(STDIN));
+	}
+	pcntl_signal(SIGINT, SIG_DFL);
+        pcntl_signal(SIGTSTP, SIG_DFL);
+	if($_buff=="yes") {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+function _CLI_ACTIVATE($_func) {
+	if(function_exists($_func)) {
+		_INIT_QUIET('2');
+		$_func();
+	}
+}
+
+function _CLI_RESET_ARGS($_num,&$_args) {
+	for($_t=$_num;$_t >= 0;$_t--) {
+		unset($_args[$_t]);
+	}
+	$_xargs=array();
+	$_x=0;
+	foreach($_args as $_key => $_val) {
+		if($_val=="NULL" || _NULL($_val)) continue;
+		$_xargs[$_x]=$_val;
+		$_x++;
+	}
+	$_args=$_xargs;
+}
+
+function _CLI_TRIM_ARGS(&$_args) {
+	$_xargs=array();
+	foreach($_args as $_key => $_val) {
+		if(_NULL($_val)
+			|| $_val=="NULL") {
+			$_val="";
+		}
+		$_xargs[$_key]=$_val;
+	}
+	$_args=$_xargs;
+}
+
+function _CLI_MULTINUM($_num,&$_num_array) {
+	$_numa=_STR_ARRAY("$_num",",");
+	if(!_ARRAY_NULL($_numa)) {
+		foreach($_numa as $_n) {
+			if(_NULL($_n) || !_ISNUM($_n)) continue;
+			$_num_array[]="$_n";
+		}
+	} else {
+		$_num_array[]="$_num";
+	}
+}
+
+function _CLI_MULTIVALUE($_value,&$_val_array) {
+	if(!is_array($_val_array)) $_val_array=array();
+	$_vala=_STR_ARRAY("$_value",",");
+	if(!_ARRAY_NULL($_vala)) {
+		foreach($_vala as $_n) {
+			if(_NULL($_n)) continue;
+			$_val_array[]="$_n";
+		}
+	} else {
+		$_val_array[]="$_value";
+	}
+}
+
+function _CLI_TRIM_STR(&$_str,$_char="",$_len=18) {
+	if(strlen($_str) >= $_len) {
+		$_str=substr($_str,0,$_len)."..";
+	}
+	if(!_NULL($_char) && preg_match("/\s+/",$_str)) {
+		$_str="{$_char}{$_str}{$_char}";
+	}
+	return $_str;
+}
+
+function _CLI_ECHO($_str) {
+	echo "%% $_str\n";
+}
+
+function _CLI_DEFAULT_RETURN() {
+	_CLI_ECHO(_GETTEXT("Entered command is syntactically or logically incorrect"));
+	return FALSE;
+}
+
+function _CLI_DRAW_LINE($_len,$_line='=') {
+	return str_repeat($_line,$_len);
+}
+
+function _CLI_HEADER($_str,$_sep='=') {
+	$_output="$_str:\n";
+	$_output .=_CLI_DRAW_LINE(strlen($_str),$_sep)."{$_sep}\n";
+	return $_output;
+}
+
+function _CLI_ECHO_HEADER($_str,$_sep='=') {
+	echo _CLI_HEADER($_str,$_sep);
+}
+
+function _CLI_GET_WIDTH($_array) {
+	if(_ARRAY_NULL($_array)) return 0;
+	$_dt=array();
+	foreach($_array as $_key => $_val) {
+		if(_NULL($_val)) continue;
+		$_dt[]=strlen($_val);
+	}
+	rsort($_dt);
+	return $_dt[0];
+}
+
+function _CLI_DATA_BODY($_array) {
+	if(_ARRAY_NULL($_array)) return;
+	$_dt=array();
+	foreach($_array as $_key => $_val) {
+		if(($_key==_GETTEXT_U("DESCRIPTION") && _NULL($_val))
+			|| ($_val==__CLI_BODY_SKIP_DATA_TAG)
+			|| ($_key==__CLI_DATA_NL)
+		) {
+			continue;
+		}
+		$_dt[]=strlen($_key);
+	}
+	rsort($_dt);
+	$_wnum=$_dt[0];
+	unset($_dt,$_key,$_val);
+	$_output="";
+	foreach($_array as $_key => $_val) {
+		if(($_key==_GETTEXT_U("DESCRIPTION") && _NULL($_val))
+			|| ($_val==__CLI_BODY_SKIP_DATA_TAG)) {
+			continue;
+		}
+		if($_key==__CLI_DATA_NL && $_val==1) {
+			$_output .="\n";
+			continue;
+		}
+		if(_ARRAY($_val)) {
+			if(count($_val) > 1) {
+				$_nct=1;
+				$_output .=sprintf("%{$_wnum}s: ($_nct) %s\n",_UPPER($_key),$_val[0]);
+				unset($_val[0]);
+				foreach($_val as $_van) {
+					if(_NULL($_val)) continue;
+					$_nct++;
+					$_output .=sprintf("%{$_wnum}s  ($_nct) %s\n","",$_van);
+				}
+			} else {
+				$_output .=sprintf("%{$_wnum}s: %s\n",_UPPER($_key),$_val[0]);
+			}
+			continue;
+		}
+		$_output .=sprintf("%{$_wnum}s: %s\n",_UPPER($_key),$_val);
+	}
+	return $_output;
+}
+
+function _CLI_DATA_BODY_R($_array) {
+	if(_ARRAY_NULL($_array)) return;
+	$_dt=array();
+	foreach($_array as $_keyx => $_valx) {
+		foreach($_valx as $_key => $_val) {
+			if(($_key==_GETTEXT_U("DESCRIPTION") && _NULL($_val))
+				|| ($_val==__CLI_BODY_SKIP_DATA_TAG)
+				|| ($_key==__CLI_DATA_NL)
+			) {
+				continue;
+			}
+			$_dt[]=strlen($_key);
+		}
+	}
+	rsort($_dt);
+	$_wnum=$_dt[0];
+	unset($_dt,$_key,$_val,$_keyx,$_valx);
+	$_output="";
+	foreach($_array as $_keyx => $_valx) {
+		foreach($_valx as $_key => $_val) {
+			if(($_key==_GETTEXT_U("DESCRIPTION") && _NULL($_val))
+				|| ($_val==__CLI_BODY_SKIP_DATA_TAG)) {
+				continue;
+			}
+			if($_key==__CLI_DATA_NL && $_val==1) {
+				$_output .="\n";
+				continue;
+			}
+			if(_ARRAY($_val)) {
+				if(count($_val) > 1) {
+					$_nct=1;
+					$_output .=sprintf("%{$_wnum}s: ($_nct) %s\n",_UPPER($_key),$_val[0]);
+					unset($_val[0]);
+					foreach($_val as $_van) {
+						if(_NULL($_val)) continue;
+						$_nct++;
+						$_output .=sprintf("%{$_wnum}s  ($_nct) %s\n","",$_van);
+					}
+				} else {
+					$_output .=sprintf("%{$_wnum}s: %s\n",_UPPER($_key),$_val[0]);
+				}
+				continue;
+			}
+			$_output .=sprintf("%{$_wnum}s: %s\n",_UPPER($_key),$_val);
+		}
+	}
+	return $_output;
+}
+
+function _CLI_DATA_BODY_LINE($_array_h, $_array_b, $_array_f=array(),$_sep='=') {
+	if(_ARRAY_NULL($_array_h)
+		|| _ARRAY_NULL($_array_b)) return;
+	$_array_hh[]=$_array_h;
+	$_array=array_merge($_array_hh,$_array_b);
+	$_sx=array();$_w=array();
+	foreach($_array as $_cnt => $_varray) {
+		for($_x=0; $_x < count($_varray); $_x++) {
+			$_sx[$_x][]=$_array[$_cnt][$_x];
+		}
+	}
+	$_line="";
+	if(!_ARRAY_NULL($_sx)) {
+		foreach($_sx as $_num => $_darray) {
+			$_w[$_num]=_CLI_GET_WIDTH($_darray);
+		}
+		$_xm=count($_w);
+		// header
+		for($_x=0; $_x < $_xm; $_x++) {
+			$_ff="";
+			if(!_ARRAY_NULL($_array_f)) {
+				$_ff=$_array_f[$_x];
+			}
+			$_line .=sprintf("%{$_ff}{$_w[$_x]}s ",$_array_h[$_x]);			
+		}
+		if(!_NULL(trim($_line))) {
+			$_line .="\n";
+			for($_x=0; $_x < $_xm; $_x++) {
+				$_ff="";
+				if(!_ARRAY_NULL($_array_f)) {
+					$_ff=$_array_f[$_x];
+				}
+				if(_NULL(trim($_array_h[$_x]))) {
+					$_line .=sprintf("%{$_ff}{$_w[$_x]}s ",$_array_h[$_x]);
+				} else {
+					$_line .=sprintf("%{$_ff}{$_w[$_x]}s ",_CLI_DRAW_LINE($_w[$_x],$_sep));
+				}		
+			}
+		}
+		// body
+		if(!_NULL(trim($_line))) {
+			$_line .="\n";
+			foreach($_array_b as $_num => $_array_bb) {
+				for($_x=0; $_x < $_xm; $_x++) {
+					$_ff="";
+					if(!_ARRAY_NULL($_array_f)) {
+						$_ff=$_array_f[$_x];
+					}
+					$_line .=sprintf("%{$_ff}{$_w[$_x]}s ",$_array_bb[$_x]);		
+				}
+				$_line .="\n";
+			}
+		}
+	}
+	return $_line;
+}
+
+?>

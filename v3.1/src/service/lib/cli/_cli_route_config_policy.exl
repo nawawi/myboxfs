@@ -1,0 +1,362 @@
+<?php
+if(!defined('_CLI_CODE')||_CLI_CODE!="a098846421a09ab1cacd3b3a753cbe05") exit("\n\nERROR: _CLI_CODE not set\n\n");
+
+function ___CLI_ROUTE_CONFIG_POLICY_GETOBJ($_file,&$_obj) {
+	if(!_ARRAY_NULL($_obj)) return TRUE;
+	$_obj=_FILE_ARRAY_GET($_file);
+	if(!_ARRAY_NULL($_obj)) return TRUE;
+	_CLI_ECHO(_GETTEXT("Resource Id not available."));
+	_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions networks print"));
+	@unlink($_objf);
+	return FALSE;
+}
+
+function ___CLI_ROUTE_CONFIG_POLICY_PRINT($_find='') {
+	$_objf=_OBJ_PATH."/iosh_route_policy_print.obj";
+	@unlink($_objf);
+	_INI_TOKEN_GET("network","route_policy.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+              	_CLI_ECHO(_GETTEXT("No data available"));
+                return FALSE;
+	}
+	$_cnt=1;$_obj=array();
+	$_output="";$_DTX=array();
+	foreach($_TOKEN as $_ID => $_DATA) {
+		if(_NULL($_DATA['ROUTE_TYPE'])
+			|| _NULL($_DATA['DNAME'])
+			|| _NULL($_DATA['SRC'])
+			|| _NULL($_DATA['DST'])
+			|| _NULL($_DATA['SERVICE'])) {
+			_INI_TOKEN_DELETE("network","route_policy.cfg",$_ID);
+			continue;
+		}
+		if(_NULL($_DATA['STAT'])) $_DATA['STAT']=0;
+		_STR_ONOFF($_stat,$_DATA['STAT']);
+		$_DATA['STAT']=$_stat;
+
+		if($_DATA['SRC']!="any") {
+			$_addr=___CLI_DEFINITIONS_NETWORKS_OBJ_LOOKUP($_DATA['SRC']);
+			$_DATA['SRC']="{$_DATA['SRC']} [$_addr]";
+		}
+
+		if($_DATA['DST']!="any") {
+			$_addr=___CLI_DEFINITIONS_NETWORKS_OBJ_LOOKUP($_DATA['DST']);
+			$_DATA['DST']="{$_DATA['DST']} [$_addr]";
+		}
+
+		if($_DATA['SERVICE']!="any") {
+			$_service=___CLI_DEFINITIONS_SERVICES_OBJ_LOOKUP($_DATA['SERVICE']);
+			$_DATA['SERVICE']="{$_DATA['SERVICE']} [$_service]";
+		}
+
+		if($_DATA['ROUTE_TYPE']=="gateway") {
+			_DEFINITIONS_GET_BYNAME("networks",$_DATA['ROUTE_GATEWAY'],$_DTOKEN,"host");
+			if(!_NULL($_DTOKEN['ADDR'])) $_DATA['ROUTE_GATEWAY']="{$_DATA['ROUTE_GATEWAY']} [{$_DTOKEN['ADDR']}]";
+		}
+		unset($_DTOKEN);
+
+		if(!_NULL($_find)) {
+			if(!_ARRAY_FIND($_find,$_DATA)) {
+				continue;
+			}
+		}
+
+		if($_cnt > 1) $_DTX[$_cnt][__CLI_DATA_NL]=1;
+		$_DTX[$_cnt][_GETTEXT_U("ID")]=$_cnt;
+		$_DTX[$_cnt][_GETTEXT_U("TYPE")]=$_DATA['ROUTE_TYPE'];
+		$_DTX[$_cnt][_GETTEXT_U("SOURCE INTERFACE")]=$_DATA['DNAME'];
+		$_DTX[$_cnt][_GETTEXT_U("SOURCE NETWORK")]=$_DATA['SRC'];
+		$_DTX[$_cnt][_GETTEXT_U("SERVICE")]=$_DATA['SERVICE'];
+		$_DTX[$_cnt][_GETTEXT_U("DESTINATION NETWORK")]=$_DATA['DST'];
+		if($_DATA['ROUTE_TYPE']=="interface") {
+			$_DTX[$_cnt][_GETTEXT_U("TARGET INTERFACE")]=$_DATA['TNAME'];
+		}
+		if($_DATA['ROUTE_TYPE']=="gateway") {
+			$_DTX[$_cnt][_GETTEXT_U("GATEWAY")]=$_DATA['ROUTE_GATEWAY'];
+		}
+		$_DTX[$_cnt][_GETTEXT_U("ENABLE")]=$_DATA['STAT'];
+		$_DTX[$_cnt][_GETTEXT_U("DESCRIPTION")]=$_DATA['NOTE'];
+
+		$_obj[$_cnt]['id']=$_ID;
+		$_obj[$_cnt]['type']=$_DATA['ROUTE_TYPE'];
+		unset($_DTOKEN);
+		$_cnt++;
+	}
+	if(!_ARRAY_NULL($_DTX)) {
+		$_output .=_CLI_DATA_BODY_R($_DTX);
+		unset($_DTX);
+	}
+	if(_ARRAY_NULL($_obj) || !_FILE_ARRAY_SAVE($_objf,$_obj) || _NULL($_output)) {
+		if(!_NULL($_find)) {
+			_CLI_ECHO(_GETTEXT("No results found"));
+		} else {
+			_CLI_ECHO(_GETTEXT("No data available"));
+		}
+		@unlink($_objf);
+                return FALSE;
+	}
+	_CLI_ECHO_HEADER(_GETTEXT("Policy routes configuration"));
+	if(!_NULL($_find)) {
+		echo _GETTEXT("Search results match for '%s':","$_find")."\n\n";
+	}
+	echo "$_output";
+	return TRUE;
+}
+
+function ___CLI_ROUTE_CONFIG_POLICY_ADD($_args) {
+	if(!_ARRAY_NULL($_args)) {
+		$_objf_n=_OBJ_PATH."/iosh_definitions_networks_print.obj";
+		$_objf_s=_OBJ_PATH."/iosh_definitions_services_print.obj";
+		$_DATA=array();
+		/*
+			0) route type
+			1) position
+			2) source interface
+			3) source network
+			4) service
+			5) destination network
+			6) target
+			7) enable
+			8) description
+		*/
+		$_param=$_args[0];
+		$_position=$_args[1];
+		$_src_interface_id=$_args[2];
+		$_src_network_id=$_args[3];
+		$_service_id=$_args[4];
+		$_dst_network_id=$_args[5];
+		$_target_id=$_args[6];
+		$_enable=$_args[7];
+		$_note="{$_args[8]}";
+
+		$_DATA['DNAME']="$_src_interface_id";
+		if($_src_interface_id!="any" && ___CLI_DEFINITIONS_NETWORKS_ADD_INT($_src_interface_id,$_src_interface)) {
+			$_DATA['DNAME']="$_src_interface";
+		}
+
+		$_DATA['SRC']="$_src_network_id";
+		if($_src_network_id!="any" && ___CLI_ROUTE_CONFIG_POLICY_GETOBJ($_objf_n,$_obj)) {
+			$_src_network=___CLI_DEFINITIONS_OBJGETNAME($_obj,"networks",$_src_network_id);
+			if(_NULL($_src_network)) {
+				_CLI_ECHO(_GETTEXT("Resource Id '%s' not available.","$_src_network_id"));
+				_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions networks print"));
+				@unlink($_objf_n);
+				return FALSE;
+			}
+			$_DATA['SRC']="$_src_network";
+		}
+
+		$_DATA['SERVICE']="$_service_id";
+		if($_service_id!="any" && ___CLI_ROUTE_CONFIG_POLICY_GETOBJ($_objf_s,$_obj_s)) {
+			$_service=___CLI_DEFINITIONS_OBJGETNAME($_obj_s,"services",$_service_id);
+			if(_NULL($_service)) {
+				_CLI_ECHO(_GETTEXT("Resource Id '%s' not available.","$_service_id"));
+				_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions services print"));
+				@unlink($_objf_s);
+				return FALSE;
+			}
+			$_DATA['SERVICE']="$_service";
+		}
+
+		$_DATA['DST']="$_dst_network_id";
+		if($_dst_network_id!="any" && ___CLI_ROUTE_CONFIG_POLICY_GETOBJ($_objf_n,$_obj)) {
+			$_dst_network=___CLI_DEFINITIONS_OBJGETNAME($_obj,"networks",$_dst_network_id);
+			if(_NULL($_dst_network)) {
+				_CLI_ECHO(_GETTEXT("Resource Id '%s' not available.","$_dst_network_id"));
+				_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions networks print"));
+				@unlink($_objf_n);
+				return FALSE;
+			}
+			$_DATA['DST']="$_dst_network";
+		}
+
+		if($_param=="interface") {
+			if(!___CLI_DEFINITIONS_NETWORKS_ADD_INT($_target_id,$_dst_interface)) {
+				return FALSE;
+			}
+			$_DATA['TNAME']="$_dst_interface";
+		}
+
+		if($_param=="gateway") {
+			if(!___CLI_ROUTE_CONFIG_POLICY_GETOBJ($_objf_n,$_obj)) {
+				return FALSE;
+			}
+			$_gateway=___CLI_DEFINITIONS_OBJGETNAME($_obj,"networks",$_target_id,"host");
+			if(_NULL($_gateway)) {
+				_CLI_ECHO(_GETTEXT("Resource Id '%s' not available.","$_target_id"));
+				_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions networks print host"));
+				@unlink($_objf_n);
+				return FALSE;
+			}
+			$_DATA['ROUTE_GATEWAY']="$_gateway";
+		}
+		_STR_ONOFF($_stat,$_enable);
+		$_DATA['STAT']="$_stat";
+		$_DATA['NOTE']="$_note";
+		$_DATA['ROUTE_TYPE']="$_param";
+
+		$_saveok=0;
+		if(!_ARRAY_NULL($_DATA)) {
+			if($_position=="top") {
+				if(_INI_TOKEN_SAVE("network","route_policy_top.cfg",$_DATA)) {
+					$_BUFF=_FILE_GET(_REG_PATH."/network/route_policy.cfg");
+					if(!_NULL($_BUFF)) {
+						_FILE_APPEND(_REG_PATH."/network/route_policy_top.cfg","$_BUFF\n");
+					}
+					if(rename(_REG_PATH."/network/route_policy_top.cfg",_REG_PATH."/network/route_policy.cfg")) {
+						$_saveok=1;
+					}
+				}
+			} else {
+				if(_INI_TOKEN_SAVE("network","route_policy.cfg",$_DATA)) {
+					$_saveok=1;
+				}
+			}
+		}
+		if($_saveok==1) {
+			_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+			_INI_OBJECT_CLEAN_ALL();
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function ___CLI_ROUTE_CONFIG_POLICY_SET($_args) {
+	if(!_ARRAY_NULL($_args)) {
+		$_objf=_OBJ_PATH."/iosh_route_policy_print.obj";
+		$_obj=_FILE_ARRAY_GET($_objf);
+		$_type=$_args[0];
+		$_opt=$_args[1];
+		$_id=$_args[2];
+		$_val=$_args[3];
+		
+		if(_ARRAY_NULL($_obj) || _NULL($_obj[$_id]['id']) || _NULL($_obj[$_id]['type'])) {
+			_CLI_ECHO(_GETTEXT("No Resource Id available."));
+			_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","policy-routes print"));
+			@unlink($_objf);
+			return FALSE;
+		}
+		$_sid=$_obj[$_id]['id'];
+		$_stype=$_obj[$_id]['type'];
+		if($_type!="$_stype") {
+			_CLI_ECHO(_GETTEXT("Invalid route type."));
+			return FALSE;
+		}
+		$_DATA=array();
+		if($_opt=="enable") {
+			_STR_ONOFF($_stat,$_val);
+			$_DATA['STAT']="$_stat";
+		} elseif($_opt=="description") {
+			$_DATA['NOTE']="$_val";
+		} elseif($_opt=="src" || $_opt=="dst") {
+			if($_val!="any") {
+				$_nobjf=_OBJ_PATH."/iosh_definitions_networks_print.obj";
+				$_nobj=_FILE_ARRAY_GET($_nobjf);
+				if(_ARRAY_NULL($_nobj)) {
+					_CLI_ECHO(_GETTEXT("Resource Id for definition network not available."));
+					_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions networks print"));
+					@unlink($_nobjf);
+					return FALSE;
+				}
+				$_network=___CLI_DEFINITIONS_OBJGETNAME($_nobj,"networks",$_val);
+				if(_NULL($_network)) {
+					_CLI_ECHO(_GETTEXT("Resource Id '%s' not available.","$_val"));
+					_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions networks print"));
+					@unlink($_nobjf);
+					return FALSE;
+				}
+				$_val="$_network";
+			}
+			$_DATA[strtoupper($_opt)]="$_val";
+		} elseif($_opt=="service") {
+			if($_val!="any") {
+				$_nobjf=_OBJ_PATH."/iosh_definitions_services_print.obj";
+				$_nobj=_FILE_ARRAY_GET($_nobjf);
+				if(_ARRAY_NULL($_nobj)) {
+					_CLI_ECHO(_GETTEXT("Resource Id for definition service not available."));
+					_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions services print"));
+					@unlink($_nobjf);
+					return FALSE;
+				}
+				$_service=___CLI_DEFINITIONS_OBJGETNAME($_nobj,"services",$_val);
+				if(_NULL($_service)) {
+					_CLI_ECHO(_GETTEXT("Resource Id '%s' not available.","$_val"));
+					_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions services print"));
+					@unlink($_nobjf);
+					return FALSE;
+				}
+				$_val="$_service";
+			}
+			$_DATA['SERVICE']="$_val";
+		} elseif($_opt=="gateway") {
+			$_gobjf=_OBJ_PATH."/iosh_definitions_networks_print.obj";
+			$_gobj=_FILE_ARRAY_GET($_gobjf);
+			if(_ARRAY_NULL($_gobj)) {
+				_CLI_ECHO(_GETTEXT("Resource Id for definition network host not available."));
+				_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions networks print host"));
+				@unlink($_nobjf);
+				return FALSE;
+			}
+			$_gateway=___CLI_DEFINITIONS_OBJGETNAME($_gobj,"networks",$_val,"host");
+			if(_NULL($_gateway)) {
+				_CLI_ECHO(_GETTEXT("Resource Id '%s' not available.","$_val"));
+				_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions networks print host"));
+				@unlink($_gobjf);
+				return FALSE;
+			}
+			$_DATA['ROUTE_GATEWAY']="$_gateway";
+		} elseif($_opt=="dname") {
+			if($_val!="any") {
+				if(!___CLI_DEFINITIONS_NETWORKS_ADD_INT($_val,$_dname)) return FALSE;
+				$_val="$_dname";
+			}
+			$_DATA['DNAME']="$_val";
+		} elseif($_opt=="tname") {
+			if(!___CLI_DEFINITIONS_NETWORKS_ADD_INT($_val,$_tname)) return FALSE;
+			$_DATA['TNAME']="$_tname";
+		}
+		if(!_ARRAY_NULL($_DATA) && _INI_TOKEN_UPDATE("network","route_policy.cfg",$_sid,$_DATA)) {
+			_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function ___CLI_ROUTE_CONFIG_POLICY_DELETE($_nums) {
+	$_objf=_OBJ_PATH."/iosh_route_policy_print.obj";
+	$_obj=_FILE_ARRAY_GET($_objf);
+	if(_ARRAY_NULL($_obj)) {
+		_CLI_ECHO(_GETTEXT("No Resource Id available."));
+		_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","static-routes print"));
+		@unlink($_objf);
+		return FALSE;
+	}
+	if($_nums=='*' && _CLI_YESNO(_GETTEXT("This action will delete all %s.\nContinue this action? %s","Policy route configuration","[yes/no]: "))==TRUE) {
+		foreach($_obj as $_cnt => $_nval) {
+			if(_INI_TOKEN_DELETE("network","route_policy.cfg",$_nval['id'])) {
+				unset($_obj[$_cnt]);
+			}
+		}
+		if(_FILE_ARRAY_SAVE($_objf,$_obj)) {
+			return TRUE;
+		}
+	} else {
+		$_num_array=array();
+		_CLI_MULTINUM($_nums,$_num_array);
+		foreach($_num_array as $_no) {
+			if(!_NULL($_obj[$_no]['id'])) {
+				if(_INI_TOKEN_DELETE("network","route_policy.cfg",$_obj[$_no]['id'])) {
+					unset($_obj[$_no]);
+				}
+			}
+		}
+		if(_FILE_ARRAY_SAVE($_objf,$_obj)) {
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+?>

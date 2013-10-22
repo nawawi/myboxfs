@@ -1,0 +1,273 @@
+#!/bin/sh
+# +-----------------------------------------------------------------------------+
+# | Copyright (c) 2002-2006 Tracenetwork Corporation Sdn. Bhd.           	|
+# +-----------------------------------------------------------------------------+
+# | This source file is belongs to nawawi, the author.                    	|
+# | Any changes/use of the source, please email to the author.           	|
+# +-----------------------------------------------------------------------------+
+# | Authors: nawawi, Mohd nawawi Mohamad Jamili <nawawi@tracenetwork.com.my 	|
+# +-----------------------------------------------------------------------------+
+#
+
+trap : 1 2 3 15
+PATH="/bin"
+TERM=linux
+export PATH TERM
+umask 077
+
+cd /
+if [ -f "/strg/mybox/update/SYSTEM.VERSION" ]; then
+	cat /strg/mybox/update/SYSTEM.VERSION > /etc/firmware
+fi
+lcdd_msg() {
+	if [ -f "/bin/lcdd" -a -c "/dev/lcd" ]; then
+		if [ -f "/var/sys/lcd_proc" ]; then
+			echo "$2" > /var/sys/lcd_msg
+		else
+			/bin/lcdd "$1" "$2"
+		fi
+	fi
+}
+:> /etc/resolv.conf
+touch /var/sys/init_no_restart
+touch /var/sys/init_start
+
+SNMP_STAT=0;IPS_STAT=0;AUTH_AD=0;PPTP_STAT=0;DHCP_STAT=0;FTP_STAT=0;SSH_STAT=0;SHAPER_STAT=0;DDNS_STAT=0;
+CAPTIVE_STAT=0;
+
+for f in $(php -f /service/init/misc.init "init_chk_services_stat"); do
+	[ "$f" = "snmp" ] && SNMP_STAT=1;
+	[ "$f" = "ips" ] && IPS_STAT=1;
+	[ "$f" = "auth_ad" ] && AUTH_AD=1;
+	[ "$f" = "pptp" ] && PPTP_STAT=1;
+	[ "$f" = "dhcp" ] && DHCP_STAT=1;
+	[ "$f" = "dhcp_relay" ] && DHCP_RELAY_STAT=1;
+	[ "$f" = "ftp" ] && FTP_STAT=1;
+	[ "$f" = "ssh" ] && SSH_STAT=1;
+	[ "$f" = "shaper" ] && SHAPER_STAT=1;
+	[ "$f" = "ddns" ] && DDNS_STAT=1;
+	[ "$f" = "captive" ] && CAPTIVE_STAT=1;
+done
+ps grep getkey |xargs kill -9 >/dev/null 2>&1
+
+strstr() {
+	[ "$1" = "$2" ] && return 0
+	slice=${1#*$2*}
+	[ "$slice" = "$1" ] && return 1
+	return 0
+}
+
+wait_prog() {
+	local msg="$1";
+	local pathz="$2";
+	local prog="$3";
+	local argz="$4";
+	local pt="0";
+	local spin="- \\ | / \\ | /";
+	local ok="0";
+	local buff="";
+	:>/tmp/$prog.log
+	local lcdp=$(basename $prog .init)
+	php -q $pathz/$prog $argz >>/tmp/$prog.log 2>&1 && rm -f /tmp/$prog.log >>/dev/null 2>&1 &
+	while [ -f "/tmp/$prog.log" ]; do
+        	for x in $spin; do
+        		usleep 0
+                	echo -n -e "-> $msg [$x] \r"
+		done
+		buff=$(cat /tmp/$prog.log 2>&1)
+		if [ $? = 0 ]; then
+			if strstr "$buff" "unlicensed" ; then
+				echo -n -e "\r* $msg Unlicensed.\n"
+				rm -f /tmp/$prog.log; ok=1
+			elif strstr "$buff" "Internal error" ; then
+				echo -n -e "\r* $msg Internal error.\n"
+				rm -f /tmp/$prog.log; ok=1
+			elif strstr "$buff" "failed" ; then
+				echo -n -e "\r* $msg Failed.\n"
+				rm -f /tmp/$prog.log; ok=1
+			elif strstr "$buff" "Failed" ; then
+				echo -n -e "\r* $msg Failed.\n"
+				rm -f /tmp/$prog.log; ok=1
+			elif strstr "$buff" "disabled" ; then
+				echo -n -e "\r* $msg Disabled.\n"
+				rm -f /tmp/$prog.log; ok=1	
+			fi
+		fi
+		if [ "$prog" = "auth.init" ]; then
+			if [ "$pt" -gt 120 ]; then
+				echo -n -e "\r* $msg Timeout.\n"
+				rm -f /tmp/$prog.log;ok=1
+			fi
+		elif [ "$prog" = "network.init" ]; then
+			if [ "$pt" -gt 120 ]; then
+				echo -n -e "\r* $msg Timeout.\n"
+				rm -f /tmp/$prog.log;ok=1
+			fi
+		else
+			if [ "$pt" -gt 60 ]; then
+				echo -n -e "\r* $msg Timeout.\n"
+				rm -f /tmp/$prog.log;ok=1
+			fi
+		fi
+		let pt=pt+1
+		usleep 100000
+	done
+	if [ $ok = 0 ]; then
+		echo -n -e "\r* $msg Done.\n"
+		rm -f /tmp/$prog.log
+	fi
+}
+
+# policy order
+iptables -P INPUT DROP >/dev/null 2>&1
+iptables -P FORWARD DROP >/dev/null 2>&1
+iptables -P OUTPUT DROP >/dev/null 2>&1
+
+iptables -A INPUT -i lo -s 127.0.0.1 -j ACCEPT >/dev/null 2>&1
+iptables -A INPUT -o lo -s 127.0.0.1 -j ACCEPT >/dev/null 2>&1
+
+if [ -f "/etc/lcreset" ]; then
+	echo "* Starting LCD services";
+	/etc/lcreset p
+fi
+
+if [ -f "/service/init/misc.init" ]; then
+	/service/init/misc.init keymap >/dev/null 2>&1
+	if [ $? = 0 ]; then
+		echo "* Setting keymap. Done."
+		lcdd_msg "SYSTEM SETTING.." "-> KEYMAP"
+	fi
+fi
+
+if [ -f "/service/init/misc.init" ]; then
+	/service/init/misc.init clock >/dev/null 2>&1
+	if [ $? = 0 ]; then
+		echo "* Setting clock: $(date)"
+		lcdd_msg "SYSTEM SETTING.." "-> CLOCK"
+	fi
+fi
+
+if [ -f "/service/init/misc.init" ]; then
+	/service/init/misc.init dnshost >/dev/null 2>&1
+	if [ $? = 0 ]; then
+		echo "* Setting system hostname: $(hostname)."
+		lcdd_msg "SYSTEM SETTING.." "-> HOSTNAME"
+	fi
+fi
+
+if [ -f "/service/init/network.init" -a ! -f "/var/sys/nonetwork" ]; then
+	lcdd_msg "START SERVICES.." "-> NETWORKING"
+	wait_prog "Bringing up network interfaces." "/service/init" "network.init" "start"
+fi
+
+if [ -f "/service/init/dns.init" -a ! -f "/var/sys/nonetwork" ]; then
+	lcdd_msg "START SERVICES.." "-> DNS RESOLVER"
+	wait_prog "Starting DNS Resolver service." "/service/init" "dns.init" "start"
+fi
+
+if [ -f "/service/init/policy.init" -a ! -f "/var/sys/nonetwork" ]; then
+	lcdd_msg "START SERVICES.." "-> PACKET FILTER"
+	wait_prog "Applying packet filter rules." "/service/init" "policy.init" "start"
+fi
+
+if [ -f "/service/init/syslog.init" ]; then
+	lcdd_msg "START SERVICES.." "-> SYSTEM LOGGER"
+	wait_prog "Starting Syslog." "/service/init" "syslog.init" "start"
+fi
+
+if [ -f "/service/tools/mfs-query.exc" ]; then
+	lcdd_msg "START SERVICES.." "-> MYBOX"
+	echo -n "* Starting Mybox services: "
+	/service/tools/mfs-query.exc o >/dev/null 2>&1
+	echo -n -e " Done\n"
+fi
+
+if [ -f "/service/init/snmp.init" -a "$SNMP_STAT" = "1" -a ! -f "/var/sys/nonetwork" ]; then
+	lcdd_msg "START SERVICES.." "-> SNMP"
+	wait_prog "Starting SNMP service." "/service/init" "snmp.init" "start"
+fi
+
+if [ -f "/service/init/ips.init" -a "$IPS_STAT" = "1" -a ! -f "/var/sys/nonetwork" ]; then
+	lcdd_msg "START SERVICES.." "-> IPS"
+	wait_prog "Starting IPS service." "/service/init" "ips.init" "start"
+fi
+
+if [ -f "/service/init/auth.init" -a "$AUTH_AD" = "1" -a ! -f "/var/sys/nonetwork" ]; then
+	lcdd_msg "START SERVICES.." "-> AUTH AD"
+	wait_prog "Starting Auth AD service." "/service/init" "auth.init" "ad_start"
+fi
+
+if [ -f "/service/init/pptp.init" -a "$PPTP_STAT" = "1" -a ! -f "/var/sys/nonetwork" ]; then
+	lcdd_msg "START SERVICES.." "-> PPTP VPN"
+	wait_prog "Starting PPTP VPN service." "/service/init" "pptp.init" "start"
+fi
+
+if [ -f "/service/init/dhcp.init" -a "$DHCP_STAT" = "1" -a ! -f "/var/sys/nonetwork" ]; then
+	lcdd_msg "START SERVICES.." "-> DHCP"
+	wait_prog "Starting DHCP service." "/service/init" "dhcp.init" "start"
+fi
+
+if [ -f "/service/init/dhcp_relay.init" -a "$DHCP_RELAY_STAT" = "1" -a ! -f "/var/sys/nonetwork" ]; then
+	lcdd_msg "START SERVICES.." "-> DHCP RELAY"
+	wait_prog "Starting DHCP Relay service." "/service/init" "dhcp_relay.init" "start"
+fi
+
+if [ -f "/service/init/cron.init" ]; then
+	lcdd_msg "START SERVICES.." "-> SCHEDULER"
+	wait_prog "Starting scheduler service." "/service/init" "cron.init" "start"
+fi
+
+if [ -f "/service/init/ftp.init" -a "$FTP_STAT" = "1" -a ! -f "/var/sys/nonetwork" ]; then
+	lcdd_msg "START SERVICES.." "-> FTP"
+	wait_prog "Starting FTP service." "/service/init" "ftp.init" "start"
+fi
+
+if [ -f "/service/init/https.init" -a ! -f "/var/sys/nonetwork" ]; then
+	lcdd_msg "START SERVICES.." "-> MYADMIN"
+	wait_prog "Starting MyAdmin HTTPS service." "/service/init" "https.init" "start"
+fi
+if [ -f "/service/init/captive.init" -a "$CAPTIVE_STAT" = "1" -a ! -f "/var/sys/nonetwork" ]; then
+	lcdd_msg "START SERVICES.." "-> CAPTIVE PORTAL"
+	wait_prog "Starting Captive Portal service." "/service/init" "captive.init" "start"
+fi
+if [ -f "/service/init/ssh.init" -a "$SSH_STAT" = "1" -a ! -f "/var/sys/nonetwork" ]; then
+	lcdd_msg "START SERVICES.." "-> SSH"
+	wait_prog "Starting SSH service." "/service/init" "ssh.init" "start"
+fi
+
+if [ -f "/service/init/ntp.init" -a ! -f "/var/sys/nonetwork" ]; then
+	lcdd_msg "START SERVICES.." "-> NTP"
+	wait_prog "Starting NTP service." "/service/init" "ntp.init" "start"
+fi
+
+if [ -f "/service/init/ddns.init" -a "$DDNS_STAT" = "1" -a ! -f "/var/sys/nonetwork" ]; then
+	lcdd_msg "START SERVICES.." "-> DYNAMIC DNS"
+	wait_prog "Starting Dynamic DNS service." "/service/init" "ddns.init" "start"
+fi
+
+if [ -f "/service/init/shaper.init" -a "$SHAPER_STAT" = "1" -a ! -f "/var/sys/nonetwork" ]; then
+	lcdd_msg "START SERVICES.." "-> QOS"
+	wait_prog "Applying network QOS" "/service/init" "shaper.init" "start"
+fi
+
+if [ -f "/service/init/misc.init" -a ! -f "/var/sys/nonetwork" ]; then
+	lcdd_msg "START SERVICES.." "-> STATIC ARP"
+	wait_prog "Applying static ARP." "/service/init" "misc.init" "staticarp"
+fi
+
+if [ -f "/service/tools/mfs-graph.exc" ]; then
+	lcdd_msg "START SERVICES.." "-> GRAPH"
+	echo "* Creating diagnostic graphs. Done";
+	/service/tools/mfs-graph.exc >/dev/null 2>&1
+fi
+
+if [ -f "/service/tools/mfs-query.exc" ]; then
+	lcdd_msg "SYSTEM SETTING.." "-> COMPRESS LOGS"
+	echo "* Compressing logs. Done";
+	/service/tools/mfs-query.exc bl >/dev/null 2>&1
+fi
+rm -f /var/sys/init_no_restart
+if [ -f "/etc/lcreset" ]; then
+	/etc/lcreset >/dev/null 2>&1 &
+fi
+exit

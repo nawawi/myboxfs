@@ -1,0 +1,212 @@
+<?php
+if(!defined('_CLI_CODE')||_CLI_CODE!="a098846421a09ab1cacd3b3a753cbe05") exit("\n\nERROR: _CLI_CODE not set\n\n");
+
+function ___CLI_BACKUP_PRINT() {
+	$_objf=_OBJ_PATH."/iosh_backup_print.obj";
+	$_buff=_GLOB(_BACKUP_PATH."/*.mbk");
+	if(!_ARRAY_NULL($_buff)) {
+		$_cnt=1;
+		$_DTL=array();
+		$_ff=array();
+		foreach($_buff as $_lnx) {
+			$_ln=basename($_lnx,".mbk");
+			$_control=_BACKUP_READ_CONTROL($_lnx);
+			if(_ARRAY_NULL($_control)) continue;
+			if(!_NULL($_control['VERSION']) && !_NULL($_control['BUILD'])
+				&& !_NULL($_control['TIME'])) {
+				$_date=date('d-M-Y H:i',$_control['TIME']);
+				$_version="{$_control['VERSION']} build-{$_control['BUILD']}";
+				$_DTL[]=array($_cnt,$_date," ",$_version);
+				$_note=_BACKUP_READ_NOTE($_lnx);
+				if(!_NULL($_note)) {
+					_CLI_TRIM_STR($_DATA['NOTE'],'"',30);
+					$_DTL[]=array(" "," "," ","* $_note");
+				}
+				$_ff[$_cnt]=$_lnx;
+				$_cnt++;
+				unset($_ldate,$_date,$_note);
+			}
+			unset($_data,$_ln);
+		}
+		if(!_ARRAY_NULL($_ff) && !_FILE_ARRAY_SAVE($_objf,$_ff)) {
+			_CLI_ECHO(_GETTEXT("No backup available"));
+			@unlink($_objf);
+                	return FALSE;	
+		}
+		if(!_ARRAY_NULL($_DTL)) {
+			echo _GETTEXT("Flags:")." * = "._GETTEXT("Description")."\n";
+			$_DTH=array(_GETTEXT_U("ID"),_GETTEXT_U("DATE/TIME")," ",_GETTEXT_U("VERSION"));
+			echo _CLI_DATA_BODY_LINE($_DTH,$_DTL,array("","-","","-"));
+			return TRUE;
+		}
+	}
+	_CLI_ECHO(_GETTEXT("No backup available"));
+	@unlink($_objf);
+	return FALSE;
+}
+
+function ___CLI_BACKUP_DELETE($_num) {
+	$_objf=_OBJ_PATH."/iosh_backup_print.obj";
+	if($_num=='*') {
+		$_buff=_GLOB(_BACKUP_PATH."/*.mbk");
+		if(_ARRAY_NULL($_buff)) {
+			_CLI_ECHO(_GETTEXT("No backup available"));
+			@unlink($_objf);
+			return FALSE;
+		}
+		if(_CLI_YESNO(_GETTEXT("This action will delete all %s.\nContinue this action? %s","backup files","[yes/no]: "))==TRUE) {
+			foreach($_buff as $_ln) {
+				if(@unlink($_ln)) {
+					echo _GETTEXT("-> Deleting %s",basename($_ln))."\n";
+				}
+			}
+			return TRUE;
+		}
+		clearstatcache();
+		@unlink($_objf);
+		return FALSE;
+	} else {
+		$_buff=_FILE_ARRAY_GET($_objf);
+		if(_ARRAY_NULL($_buff)) {
+			_CLI_ECHO(_GETTEXT("Resource Id not available."));;
+			_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","print"));
+			@unlink($_objf);
+			return FALSE;
+		}
+		$_num_array=array();
+		_CLI_MULTINUM($_num,$_num_array);
+		foreach($_num_array as $_no) {
+			if(!_NULL($_buff[$_no])) {
+				$_f=$_buff[$_no];
+				if(file_exists("$_f")) {
+					@unlink($_f);
+					unset($_buff[$_no]);
+				}
+			}
+		}
+		clearstatcache();
+		if(_FILE_ARRAY_SAVE($_objf,$_buff)) {
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function ___CLI_BACKUP_RESTORE($_no) {
+	$_objf=_OBJ_PATH."/iosh_backup_print.obj";
+	$_buff=_FILE_ARRAY_GET($_objf);
+	if(!_NULL($_buff[$_no])) {
+		if(file_exists($_buff[$_no])) {
+			if(_BACKUP_RESTORE_CONFIG($_buff[$_no])) {
+				_CLI_ECHO(_GETTEXT("Configuration restored successfully"));
+				return TRUE;
+			}
+		}
+		_CLI_ECHO(_GETTEXT("Invalid backup file"));
+		return FALSE;
+	}
+	_CLI_ECHO(_GETTEXT("Resource Id '%s' not available.","$_no"));
+	_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","print"));
+	@unlink($_objf);
+	return FALSE;
+}
+
+function ___CLI_BACKUP_CONFIG_PRINT() {
+	_INI_TOKEN_GET("system","system.cfg",$_NTOKEN);
+	if(_ARRAY_NULL($_NTOKEN['backup'])) {
+		_CLI_ECHO(_GETTEXT("No data available"));
+		return FALSE;
+	}
+	$_DATA=$_NTOKEN['backup'];
+	_CLI_ECHO_HEADER(_GETTEXT("Auto backup configuration"));
+	_STR_ONOFF($_on,$_DATA['AUTO_STAT']);
+	if(!_NULL($_DATA['THRU_EMAIL'])) {
+		$_em_a=_STR_ARRAY($_DATA['THRU_EMAIL'],",");
+		if(!_ARRAY_NULL($_em_a)) {
+			$_DATA['THRU_EMAIL']=$_em_a;
+		}
+		unset($_em_a);
+	}
+	echo _CLI_DATA_BODY(
+		array(
+			_GETTEXT_U("AUTO BACKUP")=>"$_on",
+			_GETTEXT_U("BACKUP INTERVAL")=>_GETTEXT($_DATA['AUTO_INTERVAL']),
+			_GETTEXT_U("MAXIMUM BACKUP")=>$_DATA['AUTO_COUNT'],
+			_GETTEXT_U("EMAIL RECIPIENTS")=>$_DATA['THRU_EMAIL']
+		)
+	);
+	return TRUE;
+}
+
+function ___CLI_BACKUP_CONFIG_SET($_scmd,$_sval) {
+	if($_scmd=="thru_email") {
+		$_list=_STR_ARRAY($_sval,",");
+		if(!_ARRAY_NULL($_list)) {
+			foreach($_list as $_em) {
+				if(!_CHECK_EMAIL($_em)) {
+					_CLI_ECHO(_GETTEXT("Invalid email format '%s'","$_em"));
+					return FALSE;
+				}
+			}
+		}
+	}
+	_STR_ONOFF($_value,$_sval);
+	$_sval=$_value;
+	_UPPER($_scmd);
+	$_DATA[$_scmd]="$_sval";
+	if(_INI_TOKEN_UPDATE("system","system.cfg","backup",$_DATA)) {
+		_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+		if(!_NULL($_DATA['AUTO_STAT'])) {
+			_INIT_TASKQ("cron_restart");
+		}
+		return TRUE;
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function _cli_backup() {
+	if($_SERVER["argc"] > 1 ) {
+		$_max=$_SERVER["argc"];
+		_CLI_TRIM_ARGS($_SERVER['argv']);
+		for($_x=1;$_x < $_max;$_x++) {
+			$_cmd=$_SERVER["argv"][$_x];
+			if($_cmd=="print") {
+				return ___CLI_BACKUP_PRINT();
+			} elseif($_cmd=="delete") {
+				$_num=$_SERVER["argv"][$_x+1];
+				return ___CLI_BACKUP_DELETE($_num);
+			} elseif($_cmd=="autobackup") {
+				return _BACKUP_AUTO();
+			} elseif($_cmd=="create") {
+				$_note=$_SERVER["argv"][$_x+1];
+				if(_BACKUP_BACKUP_CONFIG($_note)) {
+					_CLI_ECHO(_GETTEXT("Backup created successfully"));
+					return TRUE;
+				}
+			} elseif($_cmd=="restore") {
+				$_num=$_SERVER["argv"][$_x+1];
+				return ___CLI_BACKUP_RESTORE($_num);
+			} elseif($_cmd=="_restore") {
+				$_file=$_SERVER["argv"][$_x+1];
+				if(!file_exists($_file)) {
+					_CLI_ECHO(_GETTEXT("File '%s' not exist","$_file"));
+					break;
+				}
+				if(_BACKUP_RESTORE_CONFIG($_file)) {
+					_CLI_ECHO(_GETTEXT("Configuration restored"));
+					return TRUE;
+				}
+			} elseif($_cmd=="config") {
+				$_scmd=$_SERVER["argv"][$_x+1];
+                        	if($_scmd=="print") {
+					return ___CLI_BACKUP_CONFIG_PRINT();
+				}
+				$_sval=$_SERVER["argv"][$_x+2];
+				return ___CLI_BACKUP_CONFIG_SET($_scmd,$_sval);
+			}
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+?>

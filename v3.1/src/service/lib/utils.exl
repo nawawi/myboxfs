@@ -1,0 +1,408 @@
+<?php
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+function _CHECK_EMAIL($_email) {
+	if(filter_var($_email, FILTER_VALIDATE_EMAIL)) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+function _BYTE_FORMAT($_size, $_round = 0) {
+	$_units=array('B', 'kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB');
+	for($_i=0; $_size > 1024 && isset($_units[$_i+1]); $_i++) {
+		$_size /= 1024;
+	}
+	return round($_size,$_round).$_units[$_i];
+}
+
+function _CHECK_DOMAIN_VAR($_domain) {
+	if(preg_match("/^(\.|\_|\-)/",$_domain)) {
+		return FALSE;
+	}
+	if(preg_match("/[A-Za-z_\.0-9\-]+/",$_domain)) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+function _BASE64_CRYPT($_string, $_epad='$aweo$!5047a88a7963275e43790ee796dcb7ec!$aweo$') {
+	$_mykey="!@#awie123{$_epad}!@#awie123";
+        $_pad=base64_decode($_mykey);
+        $_encrypted='';
+        for($_i=0;$_i<strlen($_string);$_i++) {
+                $_encrypted .= chr(ord($_string[$_i]) ^ ord($_pad[$_i]));
+        }
+        return base64_encode($_encrypted);
+}
+
+function _BASE64_DECRYPT($_string, $_epad='$aweo$!5047a88a7963275e43790ee796dcb7ec!$aweo$') {
+	$_mykey="!@#awie123{$_epad}!@#awie123";
+        $_pad=base64_decode($_mykey);
+        $_encrypted=base64_decode($_string);
+        $_decrypted='';
+        for($_i=0;$_i<strlen($_encrypted);$_i++) {
+                $_decrypted .= chr(ord($_encrypted[$_i]) ^ ord($_pad[$_i]));
+        }
+        return $_decrypted;
+}
+
+function _STR_HIDE($_string,$_hide_char='*') {
+	$_str_ret="";
+	for($_i=0; $_i < strlen($_string); $_i++) {
+		$_str_ret .=$_hide_char;
+	}
+	return $_str_ret;
+}
+// update device (eth+) kalo ade dlm config file
+// insert baru kalo takde
+// info dari file /var/sys/___nic_info yang di create masa boot
+// file yg create /etc/init.boot/rc.init
+
+function _UPDATE_NIC_DEVICE() {
+	if(!file_exists("/var/sys/___nic_info")) return FALSE;
+	$_buff=_FILE("/var/sys/___nic_info");
+	if(_ARRAY_NULL($_buff)) return FALSE;
+	_INI_TOKEN_GET("network","eth.cfg",$_NTOKEN);
+	if(_ARRAY_NULL($_NTOKEN)) return FALSE;
+	$_NIC=array();
+	foreach($_buff as $_line) {
+		_TRIM($_line);
+		if(_NULL($_line)) continue;
+		list($_a,$_b)=preg_split("/=/",$_line);
+		_TRIM($_a);_TRIM($_b);
+		if(_NULL($_a)||_NULL($_b)) continue;
+		$_NIC[$_a]=$_b;
+	}
+	foreach($_NTOKEN as $_ID => $_DATA) {
+		if(_NULL($_ID)) continue;
+		if(_NULL($_DATA['DEVICE'])) continue;
+		if(!_NULL($_NIC[$_DATA['DEVICE']])) {
+			$_DATA['VENDOR']=$_NIC[$_DATA['DEVICE']];
+			_INI_TOKEN_UPDATE("network","eth.cfg",$_ID,$_DATA);
+			unset($_NIC[$_DATA['DEVICE']]);
+			continue;
+		}
+	}
+	unset($_DATA,$_ID);
+	if(!_ARRAY_NULL($_NIC)) {
+		foreach($_NIC as $_a => $_b) {
+			_TRIM($_a);_TRIM($_b);
+			if(_NULL($_a)) continue;
+			$_DATA['DEVICE']=$_a;
+			$_DATA['VENDOR']=$_b;
+			$_DATA['STAT']=0;
+			_INI_TOKEN_SAVE("network","eth.cfg",$_DATA);
+		}
+	}
+	return TRUE;
+}
+
+// insert HWADDR_ORI jika mac address dlm config tak sama
+// dgn current.
+// Update kepada current jika sama.
+// insert baru kalo takde.
+
+function _UPDATE_NIC_HWADDR() {
+	if(!file_exists("/var/sys/___nic_hwaddr")) return FALSE;
+	$_buff=_FILE("/var/sys/___nic_hwaddr");
+	if(_ARRAY_NULL($_buff)) return FALSE;
+	_INI_TOKEN_GET("network","eth.cfg",$_NTOKEN);
+	if(_ARRAY_NULL($_NTOKEN)) return FALSE;
+	$_MAC=array();
+	foreach($_buff as $_line) {
+		_TRIM($_line);
+		if(_NULL($_line)) continue;
+		list($_a,$_b)=preg_split("/=/",$_line);
+		_TRIM($_a);_TRIM($_b);
+		if(_NULL($_a)||_NULL($_b)) continue;
+		$_MAC[$_a]=$_b;
+	}
+	foreach($_NTOKEN as $_ID => $_DATA) {
+		if(_NULL($_ID)) continue;
+		if(_NULL($_DATA['DEVICE'])) continue;
+		if(!_NULL($_MAC[$_DATA['DEVICE']])) {
+			//if(!_NULL($_DATA['HWADDR'])) {
+				//if($_DATA['HWADDR']!=$_MAC[$_DATA['DEVICE']]) {
+				//	$_DATA['HWADDR_ORI']=$_MAC[$_DATA['DEVICE']];
+				//} else {
+					$_DATA['HWADDR']=$_MAC[$_DATA['DEVICE']];
+				//}
+			//} else {
+				$_DATA['HWADDR']=$_MAC[$_DATA['DEVICE']];
+			//}
+			_INI_TOKEN_UPDATE("network","eth.cfg",$_ID,$_DATA);
+			unset($_MAC[$_DATA['DEVICE']]);
+			continue;
+		}
+	}
+	return TRUE;
+}
+
+function _UPDATE_NIC_INFO() {
+	_UPDATE_NIC_DEVICE();
+	_UPDATE_NIC_HWADDR();
+	return TRUE;
+}
+
+function _ARRAY_FIND($_string,$_array) {
+	if(_ARRAY_NULL($_array)) return FALSE;
+	foreach($_array as $_key => $_value) {
+		if(stripos($_value,$_string)!==FALSE) {
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+function _STR_FIND($_string,$_data) {
+	if(stripos($_data,$_string)!==FALSE) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+function _VERSION_R(&$_core,&$_build) {
+	$_core=_FILE_GET("/etc/version_core");
+	$_build=_FILE_GET("/etc/firmware");
+}
+
+function _VERSION_RR(&$_build,&$_build_c,&$_build_s) {
+	_VERSION_R($_core_r,$_build_r);
+	if(!_NULL($_core_r) && !_NULL($_build_r)) {
+		$_build="{$_core_r}.{$_build_r}";
+		$_build_cr=_FILE_GET(_ROOT_PATH."/info-cache/update/FIRMWARE_VERSION");
+		if(!_NULL($_build_cr)) {
+			$_build_c="{$_core_r}.{$_build_cr}";
+			$_build_s="$_build_cr";
+		}
+	}
+}
+/*
+return false if current version more bigger than new
+File format: name-<core_version>.<build_version>.mpu
+             name-[core_num].[core_sub].[year].[month].mpu
+             name-[core_num].[core_sub].[year].[month].[day].mpu
+             update-3.1.08.12.18.mpu
+
+Conditions:
+	1) Compare core version first
+	2) Compare if same build version
+	3) Compare build version
+*/
+function _VERSION_COMPARE($_current,$_new) {
+	if(!_NULL($_current)&& !_NULL($_new)) {
+		if($_current==$_new) {
+			return FALSE;
+		}
+		$_carray=explode(".",$_current);
+		$_narray=explode(".",$_new);
+		
+		if((!_ARRAY_NULL($_carray) && count($_carray) >=4)
+			&& (!_ARRAY_NULL($_narray) && count($_narray) >=4) 
+		) {
+			$_ccore="{$_carray[0]}{$_carray[1]}";
+			$_ncore="{$_narray[0]}{$_narray[1]}";
+
+			$_cbuild="{$_carray[2]}{$_carray[3]}";
+			$_nbuild="{$_narray[2]}{$_narray[3]}";
+
+			$_cbuild_r="{$_cbuild}{$_carray[4]}";
+			$_nbuild_r="{$_nbuild}{$_narray[4]}";
+
+			if(!_NULL($_ccore) && !_NULL($_ncore)) {
+				if($_ccore > $_ncore) return FALSE;
+			}
+			if(!_NULL($_cbuild) && !_NULL($_nbuild)) {	
+				if(!_NULL($_cbuild_r) || !_NULL($_nbuild_r)) {
+					$_cv="{$_ccore}{$_cbuild}{$_cbuild_r}";
+					$_nv="{$_ncore}{$_nbuild}{$_nbuild_r}";
+					if($_cv > $_nv) {
+						return FALSE;
+					}
+				}
+				$_cv="{$_ccore}{$_cbuild}";
+				$_nv="{$_ncore}{$_nbuild}";
+				if($_cv > $_nv) {
+					return FALSE;
+				}
+			}
+			// last test compare all
+			$_cv="{$_ccore}{$_cbuild}{$_cbuild_r}";
+			$_nv="{$_ncore}{$_nbuild}{$_nbuild_r}";
+			if($_cv > $_nv) {
+				return FALSE;
+			}
+
+			// true if all pass
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+function _VERSION() {
+	_VERSION_R($_core,$_build);
+	if(_NULL($_core)) $_core="3.1";
+	if(!_NULL($_build)) {
+		$_build=str_replace(".","",$_build);
+		$_build="build-{$_build}";
+	}
+	return "$_core $_build";
+}
+
+function _UPTIME() {
+	if(!file_exists("/proc/uptime")) return _GETTEXT("unknown");
+	$_data=_STR_ARRAY(_FILE_GET("/proc/uptime"),"\s+");
+	$_ticks=$_data[0];
+	$_minutes=$_ticks / 60;
+	$_hours=$_minutes  / 60; 
+	$_days=floor($_hours / 24);
+	$_hours=floor($_hours - ($_days * 24));
+	$_minutes=floor($_minutes  - ($_days * 60 * 24) - ($_hours * 60));
+	$_ret="";
+	if($_days > 0) {
+		$_dtxt=_GETTEXT("day");
+		if($_days <= 1) $_dtxt = _GETTEXT("days");
+		$_ret .="$_days $_dtxt, ";
+	}
+	if($_hours > 0) {
+		$_htxt =_GETTEXT("hours");
+		if($_hours <= 1) $_htxt =_GETTEXT("hour");
+		$_ret .="$_hours $_htxt, ";
+	}
+	$_mtxt=_GETTEXT("minutes");
+	if($_minutes <= 1) $_mtxt =_GETTEXT("minute");
+	$_ret .="$_minutes $_mtxt";
+	return trim($_ret,",");
+}
+
+function _RESOURCE_USAGE() {
+	$_memtotal=0;$_memfree=0;$_memused=0;
+	$_swaptotal=0;$_swapfree=0;$_swapused=0;
+	$_memp=0;$_swapp=0;
+	if(file_exists("/proc/meminfo")) {
+		$_buff=_FILE("/proc/meminfo");
+		if(!_ARRAY_NULL($_buff)) {
+			foreach($_buff as $_lx) {
+				$_lx=trim($_lx);
+				if($_lx=='') continue;
+				if(preg_match("/^MemTotal\:\s+(\d+)\s+/",$_lx,$_mm)) {
+					$_memtotal=$_mm[1];
+				}
+				unset($_mm);
+				if(preg_match("/^MemFree\:\s+(\d+)\s+/",$_lx,$_mm)) {
+					$_memfree=$_mm[1];
+				}
+				unset($_mm);
+				if(preg_match("/^MemUsed\:\s+(\d+)\s+/",$_lx,$_mm)) {
+					$_memused=$_mm[1];
+				}
+				unset($_mm);
+				if(preg_match("/^SwapTotal\:\s+(\d+)\s+/",$_lx,$_mm)) {
+					$_swaptotal=$_mm[1];
+				}
+				unset($_mm);
+				if(preg_match("/^SwapFree\:\s+(\d+)\s+/",$_lx,$_mm)) {
+					$_swapfree=$_mm[1];
+				}
+				unset($_mm);
+				if(preg_match("/^SwapUsed\:\s+(\d+)\s+/",$_lx,$_mm)) {
+					$_swapused=$_mm[1];
+				}
+			}
+			unset($_buff,$_lx);
+			$_memp=@(($_memused / $_memtotal) * 100);
+			$_swapp=@(($_swapused / $_swaptotal) * 100);
+			$_memp=round($_memp,0);
+			$_swapp=round($_swapp,0);
+			$_swaptotal *=1024;
+			$_swaptotal=_SIZE_READABLE($_swaptotal,'null',"%d %s");
+			$_memtotal *=1024;
+			$_memtotal=_SIZE_READABLE($_memtotal,'null',"%d %s");
+		}
+	}
+	unset($_buff);
+	_EXEC_CMD_OUTPUT("/bin/df -x rootfs",$_buff,$_STDERR);
+        if(!_ARRAY_NULL($_buff)) {
+		foreach($_buff as $_lx) {
+			_TRIM($_lx);
+			if(_NULL($_lx)) continue;
+			if(preg_match("/^(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+\/strg$/",$_lx,$_mm)) {
+				$_disk_t=$_mm[2];
+				$_disk_u=$_mm[3];
+				$_disk_f=$_mm[4];
+				$_disk_p=$_mm[5];
+				$_b++;
+				unset($_mm);
+			}
+			if(preg_match("/^(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+\/$/",$_lx,$_mm)) {
+				$_vdisk_t=$_mm[2];
+				$_vdisk_u=$_mm[3];
+				$_vdisk_f=$_mm[4];
+				$_vdisk_p=$_mm[5];
+				$_b++;
+				unset($_mm);
+			}
+			if(preg_match("/^(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+\/logfs$/",$_lx,$_mm)) {
+				$_ldisk_t=$_mm[2];
+				$_ldisk_u=$_mm[3];
+				$_ldisk_f=$_mm[4];
+				$_ldisk_p=$_mm[5];
+				$_b++;
+				unset($_mm);
+			}
+			if($_b==3) break;
+		}
+		$_disk_p=round($_disk_p,0);
+		$_vdisk_p=round($_vdisk_p,0);
+		$_ldisk_p=round($_ldisk_p,0);
+		$_disk_t *=1024;
+		$_vdisk_t *=1024;
+		$_ldisk_t *=1024;
+		$_disk_t=_SIZE_READABLE($_disk_t,'null',"%d %s");
+		$_vdisk_t=_SIZE_READABLE($_vdisk_t,'null',"%d %s");
+		$_ldisk_t=_SIZE_READABLE($_ldisk_t,'null',"%d %s");
+		
+	}
+	$_cpuload = new CPULoad();
+	$_cpuload->get_load();
+	$_cpu=$_cpuload->return_usage();
+	clearstatcache();
+	$_data["memp"]="$_memp";
+	$_data["memt"]="$_memtotal";
+	$_data["swapp"]="$_swapp";
+	$_data["swapt"]="$_swaptotal";
+	$_data["disk_p"]="$_disk_p";
+	$_data["disk_t"]="$_disk_t";
+	$_data["vdisk_p"]="$_vdisk_p";
+	$_data["vdisk_t"]="$_vdisk_t";
+	$_data["ldisk_p"]="$_ldisk_p";
+	$_data["ldisk_t"]="$_ldisk_t";
+	$_data["cpu"]="$_cpu";
+	return $_data;
+}
+
+function _EXT_LOADED($_dll) {
+	if(!extension_loaded($_dll)) {
+		return dl("{$_dll}.so");
+	}
+	return TRUE;
+}
+
+function _SAVE_BASH_FILE($_file,$_data) {
+	return _FILE_SAVE($_file,"#!/bin/sh\n{$_data}\nexit 0;\n",0700);
+}
+
+function _LCD_ETH_CONFIG($dev,$name='') {
+	if(!file_exists("/.lcdtype")) return FALSE;
+	$_lcdtype=_FILE_GET("/.lcdtype");
+	if(!_NULL($_lcdtype)) {
+		list($a,$b)=explode("=",$_lcdtype);
+		if(_ISNUM($b) && $b==1) {
+			if(_NULL($name)) $name=$dev;
+			return _FILE_APPEND("/var/sys/eth-lcdproc/$dev","$name");
+		}
+	}
+	return FALSE;
+}
+?>

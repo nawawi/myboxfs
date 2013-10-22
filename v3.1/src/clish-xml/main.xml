@@ -1,0 +1,58 @@
+﻿<?xml version="1.0"?>
+<CLISH_MODULE>
+	<STARTUP view="main"/>
+	<VIEW name="main" 
+		prompt="${SYSTEM_NAME}&gt; ">
+
+		<COMMAND name="help"
+			help="Show command line syntax">
+			<ACTION builtin="awie_help" />
+		</COMMAND>
+
+		<COMMAND name="version"
+			help="Show system information">
+			<ACTION builtin="awie_version"/>
+		</COMMAND>
+
+		<COMMAND name="reboot"
+			help="Reboot the system">
+			<ACTION builtin="awie_exec_pass">/bin/exec_cli reboot</ACTION>
+		</COMMAND>
+		<COMMAND name="shutdown"
+			help="Shutdown the system">
+			<ACTION builtin="awie_exec_pass">/bin/exec_cli shutdown</ACTION>
+		</COMMAND>
+
+		<COMMAND name="system/"
+			help="System configuration"
+			view="system"/>
+
+		<COMMAND name="network/"
+			help="Network configuration"
+			view="network"/>
+
+		<COMMAND name="logging/"
+			help="System logs"
+			view="log"/>
+
+		<COMMAND name="support/"
+			help="Support tool"
+			view="support"/>
+
+		<COMMAND name="session"
+			help="Session control">
+			<ACTION>exec /service/tools/session.exc print 2>/dev/null |more -dl</ACTION>
+		</COMMAND>
+		<COMMAND name="session print"
+                	help="Display current session">
+ 			<ACTION>exec /service/tools/session.exc print 2>/dev/null |more -dl</ACTION>
+		</COMMAND>
+		<COMMAND name="session delete"
+			help="Delete current session">
+			<PARAM name="id"
+				help="Resource Id '*' for all"
+				ptype="MULTI_NUM_ALL" />
+			<ACTION>exec /service/tools/session.exc delete ${id} 2>/dev/null</ACTION>
+		</COMMAND>
+	</VIEW>
+</CLISH_MODULE>

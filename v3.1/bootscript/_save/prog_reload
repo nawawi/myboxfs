@@ -1,0 +1,46 @@
+#!/bin/perl
+# $Id: prog_reload.pl,v 1.3 2008/03/06 12:45:01 nawawi Exp $
+# Copyright (c) 2007,2008 Tracenetwork Corporation Sdn. Bhd.
+
+sub write_file {
+        my $fi=shift;
+        my $txt=shift;
+        open(FO,"> $fi");
+        print FO "$txt\n";
+        close(FO);
+}
+
+write_file "/var/sys/init_no_restart";
+if ( -e "/var/sys/chk_xinetd" ) {
+	system("/service/init/xinet.init restart quiet >/dev/null 2>&1");
+}
+if ( -e "/var/sys/chk_snortd" ) {
+	system("/service/init/ips.init restart quiet >/dev/null 2>&1");
+}
+if ( -e "/var/sys/chk_snmpd" ) {
+	system("/service/init/snmp.init restart quiet >/dev/null 2>&1");
+}
+if ( -e "/var/sys/chk_crond" ) {
+	system("/service/init/cron.init restart quiet >/dev/null 2>&1");
+}
+if ( -e "/var/sys/chk_syslogd" ) {
+	system("/service/init/syslog.init restart quiet >/dev/null 2>&1");
+}
+if ( -e "/var/sys/chk_sophosd" ) {
+	system("/service/init/sophos.init restart quiet >/dev/null 2>&1");
+}
+if ( -e "/var/sys/chk_spamd" ) {
+	system("/service/init/spam.init restart quiet >/dev/null 2>&1");
+}
+if ( -e "/var/sys/chk_squid" ) {
+	system("/service/init/http_proxy.init restart quiet >/dev/null 2>&1");
+}
+if ( -e "/var/sys/chk_frox" ) {
+	system("/service/init/ftp_proxy.init restart quiet >/dev/null 2>&1");
+}
+if ( -e "/var/sys/chk_p3scan" ) {
+	system("/service/init/mail_proxy.init restart quiet >/dev/null 2>&1");
+}
+unlink("/var/sys/init_no_restart");
+system("/service/init/policy.init restart quiet >/dev/null 2>&1");
+exit 0;

@@ -1,0 +1,179 @@
+#!/bin/bash -e
+trap "exit 1" 2;
+# checking
+if [ "x$_START" = "x" ]; then
+        echo "_START not set";
+        exit 1;
+fi
+if [ ! -f "$_START/MYBOX_VERSION" ]; then
+        echo "MYBOX_VERSION not set";
+        exit 1;
+fi
+if [ "x$_MK" = "x" ]; then
+        echo "_MK not set";
+        exit 1;
+fi
+if [ "x$_MSRC" = "x" ]; then
+        echo "_MSRC not set";
+        exit 1;
+fi
+if [ ! -f "$_FUNC/functions.sh" ]; then
+        echo "_FUNC not set";
+        exit 1;
+fi
+
+cd $_START;
+
+. $_FUNC/functions.sh
+
+_BUILD_MSG "installer";
+
+_TDIR="$_START/cdrom";
+_PDIR="$_START/cdrom/rootfs";
+_KBASE="$_START/kernel_pkg";
+_KPKG="kmods_base kmods_fs kmods_nic kmods_scsi kmods_usb kmods_ipv4 kmods_lcd";
+_BUSYBOX="$_MSRC/busybox/installer";
+_BINLIST="$(cat $_START/configs/installer_bin.list)";
+_BOOTRC="$_START/bootscript";
+_VMDETECT="$_START/rootfs/bin/vmware-detect";
+_EDUMMY="$_START/scripts/nolog $_START/scripts/iowrap";
+_SKELDIR="$_START/configs/installer/skel";
+
+[ ! -e "$_MK/mk_skel" ] && _ERROR "$_MK/mk_skel not found";
+
+if [ -d "$_TDIR" ]; then
+	rm -rfv $_TDIR;
+fi
+
+sh $_MK/mk_skel "cdrom/rootfs";
+rm -rfv $_PDIR/etc
+rm -rfv $_PDIR/config
+rm -rfv $_PDIR/service
+rm -rfv $_PDIR/var/sys
+rm -rfv $_PDIR/lib/firmware
+cp -avf $_SKELDIR/* $_PDIR/
+cp -av $_START/configs/factory $_PDIR/etc
+
+for t in /lib/libnss*_files*; do
+	_COPY_LIB $t $_PDIR/lib
+done
+for t in /lib/libnss*_dns*; do
+	_COPY_LIB $t $_PDIR/lib
+done
+
+for x in $_BINLIST; do
+	[[ $x =~ ^# ]] && continue;
+	if [ -x "$x" ]; then
+        	_COPY_BIN "$x" "$_PDIR" 0;
+	else
+		_ERROR "mk_rootfs -> $x not found";
+        fi
+done
+
+if [ ! -d "$_BUSYBOX" ]; then
+	_ERROR "mk_rootfs -> $_BUSYBOX not found";
+else
+	_MECHO "rsync -aul $_BUSYBOX/* $_PDIR/";
+fi
+
+for pkg in $_KPKG;do
+	_MECHO "cp -f $_KBASE/$pkg.mpk $_PDIR/tmp";
+done
+
+# vmware
+_MECHO "cp -av $_VMDETECT $_PDIR/bin";
+
+for _bi in $_EDUMMY;do
+	_MECHO "cp -f $_bi $_PDIR/bin";
+done
+
+# script
+_MECHO "mkdir -p $_PDIR/etc/installer";
+_MECHO "cp -afv $_BOOTRC/installer/* $_PDIR/etc/installer/";
+_MECHO "cp -afv $_BOOTRC/init.boot/rc.hwdetect $_PDIR/etc/installer/";
+
+for fx in $(find $_PDIR/etc/init.boot/* -type f);do
+	_MECHO "dos2unix $fx";
+done
+_MECHO "chmod 700 $_PDIR/etc/installer/*";
+for f in $_PDIR/etc/installer/*; do
+	[ -f "$f" ] && _SH_COMPRESS $f;
+done
+
+if cd $_PDIR/bin >/dev/null 2>&1; then
+	ln -sf bash sh
+	ln -sf swapon swapoff
+	ln -sf /etc/installer/rc.install rcinit
+	ln -sf /etc/installer/rc.install rcinstall
+fi
+
+if cd $_PDIR/ >/dev/null 2>&1; then
+	ln -sf /etc/installer/rc.install bootup
+fi
+
+_MECHO "cd $_START";
+_BUILD_MSG "Installer image";
+
+_FS="$_START/cdrom/rootfs";
+_RV="$(date +%y.%m)";
+_KERNEL="$_START/kernel_pkg/mybox-kernel.bin";
+_RELDIR="$_START/cdrom/isofs";
+_IREL="$_RELDIR/isolinux/rootfs";
+_ISODIR="$_START/configs/installer/isofs";
+_OSDIR="$_START/OS";
+_RDATE="$(date +%Y%m%d)";
+_RLDATE="$(date +"%d-%b-%Y %H:%M:%S")";
+_GRUB="$_START/src/grub/data/grub.mpk";
+
+. $_START/MYBOX_VERSION
+
+[ -z "$_VER" ] && _ERROR "_VER not set";
+[ ! -e "$_KERNEL" ] && _ERROR "$_KERNEL not found";
+
+rm -rf $_RELDIR;
+mkdir -p $_RELDIR;
+
+if [ ! -d "$_ISODIR" ]; then
+	echo "_ISODIR not set";
+	exit;
+fi
+if [ ! -d "$_OSDIR" ]; then
+	echo "_OSDIR not set";
+	exit;
+fi
+if [ ! -f "$_GRUB" ]; then
+	echo "_GRUB not set";
+	exit;
+fi
+
+mkdir -p $_RELDIR/OS
+cp -vfa $_OSDIR/* $_RELDIR/OS
+cp -vfa $_ISODIR/* $_RELDIR
+echo "MYBOXOS v$_VER INSTALLER.." > $_RELDIR/isolinux/banner
+cat $_RELDIR/isolinux/banner.tmp >> $_RELDIR/isolinux/banner
+rm -f $_RELDIR/isolinux/banner.tmp
+cp -vfa $_GRUB $_PDIR/tmp
+echo "$_RV" > $_PDIR/etc/firmware
+echo "$_VER" > $_PDIR/etc/version_core
+sync
+
+if cd $_PDIR 2>/dev/null; then
+        echo "[*] Creating initramfs image: $_IREL";
+        find . | cpio -o -H newc | gzip > $_IREL
+        if [ -e "$_IREL" ]; then
+                echo "[*] Recompressing $_IREL";
+                $_FUNC/advdef -z4 $_IREL
+        fi
+fi
+_MECHO "cp -v $_KERNEL $_RELDIR/isolinux/kernel";
+_MECHO "cd $_RELDIR";
+echo "$_RLDATE" > $_RELDIR/DATE-CREATED
+mkisofs -o ../MYBOXOS-${_VER}-${_RDATE}.iso \
+-publisher "$VER" -V MYBOXOS-${_VER}-${_RDATE} -J -R -input-charset utf-8 -b isolinux/isolinux.bin -c isolinux/boot.cat \
+-no-emul-boot -boot-load-size 4  \
+-boot-info-table .
+
+_MECHO "cd $_START";
+
+
+exit 0;

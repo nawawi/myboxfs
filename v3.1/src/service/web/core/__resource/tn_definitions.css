@@ -1,0 +1,341 @@
+/* definitions */
+div#def_box {
+	display: none;
+	z-index: 200;
+	position: absolute;
+	top: 115px;
+	left: 2px;
+	width: 150px;
+	height: 572px;
+	border: none;
+}
+
+div#def_box_title {
+	background-image: url(/__resource/definitions/tbg.gif);
+	background-repeat: repeat-x;
+	background-position:left;
+	background-attachment: scroll;
+	border:1px solid #4f6d81;
+	border-bottom: none;
+	padding: 0px 4px 0px 4px;
+	height: 23px;
+}
+
+
+div#def_box_title_l {
+	font-weight: bold;
+	color: #355468;
+	float: left;
+	margin-top: 4px;
+	border: none;
+}
+
+div#def_box_title_r {
+	background: url(/__resource/definitions/tclose.gif) no-repeat;
+	float: right; 
+	cursor:pointer;
+	width:11px;
+	height: 11px;
+	margin: 5px 1px 0 0;
+	border: none;
+}
+
+div#def_box_content_t {
+	background-color: #4f6d81;
+	border: 1px solid #4f6d81;
+	border-bottom: none;
+	color: #000000;
+	overflow: hidden;
+	white-space: nowrap;
+	margin: 0px;
+}
+
+div#def_box_content {
+	background-color: #ffffff;
+	border: 1px solid #4f6d81;
+	color: #000000;
+	height: 525px;
+	overflow-x: hidden;
+	overflow-y: auto;
+}
+
+/* definitions input box */
+/* dont set id */
+.defi_box {
+	display: none;
+	z-index: 199;
+	position: absolute;
+	border: none;
+	width: 298px;
+}
+
+div#defi_box_title {
+	background-image: url(/__resource/definitions/tbg.gif);
+	background-repeat: repeat-x;
+	background-position:left;
+	background-attachment: scroll;
+	border:1px solid #4f6d81;
+	border-bottom: none;
+	padding: 0px 4px 0px 4px;
+	height: 23px;
+}
+
+
+div#defi_box_title_l {
+	font-weight: bold;
+	color: #355468;
+	float: left;
+	margin-top: 4px;
+	border: none;
+}
+
+div#defi_box_title_r {
+	background: url(/__resource/definitions/tclose.gif) no-repeat;
+	float: right; 
+	cursor:pointer;
+	width:11px;
+	height: 11px;
+	margin: 5px 1px 0 0;
+	border: none;
+}
+
+div#defi_box_content {
+	background-color: #ffffff;
+	border: 1px solid #4f6d81;
+	color: #000000;
+	overflow: hidden;
+}
+
+.def_ibox1_i {
+	text-align: left;
+	width: 150px;
+	height: 17px;
+	border: 1px solid #999999;
+	background: #ffffff;
+}
+
+.def_ibox1_ii {
+	border: none;
+	background: none;
+	padding-top: 2px;
+}
+
+.def_ibox1_f {
+	width: 16px;
+	height: 16px;
+	cursor: pointer;
+	background: url(/__resource/definitions/folder.gif) no-repeat;
+}
+
+.def_ibox1_p {
+	width: 16px;
+	height: 16px;
+	cursor: pointer;
+	background: url(/__resource/definitions/plus.gif) no-repeat;
+}
+
+.def_ibox1_ihover {
+	border: 1px dotted green;
+}
+
+.tbox_it {
+	width: 52px;
+	background-image: url(/__resource/definitions/find.gif);
+	background-repeat: no-repeat;
+	background-position:left;
+	background-attachment: scroll;
+	padding-left: 15px;
+}
+
+.tbox_is {
+	width: 150px;
+	height: 17px;
+	border: 1px solid #999999;
+	background-image: url(/__resource/definitions/find.gif);
+	background-repeat: no-repeat;
+	background-position:left;
+	background-attachment: scroll;
+	padding-top: 1px;
+	padding-left: 15px;
+}
+
+.tboxi_t {
+	padding: 2px;
+}
+
+.tboxi_tdl {
+	padding: 3px 0px 0px 10px;
+	text-align: right;
+	vertical-align: top;
+}
+
+.tboxi_tdr {
+	padding: 0px 50px 0px 5px;
+	vertical-align: top;
+}
+
+hr.tboxi_hr {
+	border: none;
+	color: #4f6d81;
+	background-color: #4f6d81;
+	height: 1px;
+	width: 100%;
+	text-align: center;
+	margin-top: 10px;
+	margin-bottom: 5px;
+}
+
+/* drag/drop class */
+div.dnd_drag_c {
+	background-color: #ffffff;
+	border: 1px solid #dddddd;
+	overflow: hidden;
+	height: 20px;
+	vertical-align: middle;
+	cursor: pointer;
+}
+
+div.dnd_drag {
+	background-color: #ffffff;
+	border: none;
+	color: #000000;
+	font-size: 12px;
+	padding-left: 5px;
+	padding-top: 2px;
+	overflow: hidden;
+	white-space: nowrap;
+	width: 142px;
+	height: 17px;
+	cursor: pointer;
+}
+
+/* acl page */
+div#tbox_acl {
+	width: 350px;
+	height: 250px;
+	border: none;
+}
+
+div#tbox_acl_title {
+	background-image: url(/__resource/definitions/tbg.gif);
+	background-repeat: repeat-x;
+	background-position:left;
+	background-attachment: scroll;
+	border:1px solid #4f6d81;
+	border-bottom: none;
+	padding: 4px;
+	height: 15px;
+}
+
+
+div#tbox_acl_title_t {
+	font-weight: bold;
+	color: #355468;
+	float: left;
+	border: none;
+}
+
+div#tbox_acl_title_l {
+	background: url(/__resource/definitions/folder.gif) no-repeat;
+	float: right; 
+	cursor:pointer;
+	width: 16px;
+	height: 16px;
+	border: none;
+}
+
+div#tbox_acl_title_r {
+	background: url(/__resource/definitions/plus.gif) no-repeat;
+	float: right; 
+	cursor:pointer;
+	width: 16px;
+	height: 16px;
+	border: none;
+	margin-left: 2px;
+}
+
+div#tbox_acl_content {
+	background-color: #e8e6e6;
+	border: 1px solid #4f6d81;
+	color: #000000;
+	height: 180px;
+	overflow-x: hidden;
+	overflow-y: auto;
+	white-space: nowrap;
+	margin: 0px;
+	text-align: left;
+}
+
+.tbox_acl_itt {
+	background-color: #ffffff;
+}
+
+.tbox_acl_it {
+	width: 180px;
+	color: #000000;
+	background-image: url(/__resource/definitions/find.gif);
+	background-repeat: no-repeat;
+	background-position:left;
+	background-attachment: scroll;
+	border: 1px solid #4f6d81;
+	padding-left: 15px;
+}
+.tbox_acl_td {
+	font-size: 10px;
+	color: #000000;
+	margin: 0px;
+	text-align: center;
+	width: 30px;
+	vertical-align: middle;
+	padding-top: 2px;
+}
+.tbox_acl_td_it {
+	width: 180px;
+	font-size: 12px;
+	color: #000000;
+	margin: 0px;
+	text-align: left;
+	vertical-align: middle;
+}
+.tbox_acl_tb {
+	width: 100%; background-color: #999999;
+	border-spacing: 0px; border-collapse: collapse;
+}
+
+table#defpbox_table {
+	width: 100%;
+	border-spacing: 0px;
+	border-collapse: collapse;
+	margin: 0px;
+	padding: 1px;
+	vertical-align: top;
+}
+table#defpbox_table td {
+	padding: 4px 1px 4px 1px;
+	vertical-align: top;
+}
+
+td.defpbox_img {
+	width: 18px;
+}
+
+td.defpbox_opt {
+	width: 162px;
+	overflow: hidden;
+	white-space: nowrap;
+}
+
+div.defpbox_name {
+	width: 300px;
+	font-weight: bold;
+	overflow: hidden;
+	white-space: nowrap;
+}
+
+div.defpbox_alt {
+	width: 300px;
+	overflow: hidden;
+	white-space: nowrap;
+}
+
+

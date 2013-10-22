@@ -1,0 +1,378 @@
+<?php
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+// internal use
+define('__UPDATE_KEY','6103e200a71703ec6841e049adeb4c3e');
+define('__UPDATE_URL','http://updates.tracenetworkcorporation.com');
+define('__UPDATE_WGET','/bin/wget-firmware-update');
+
+function _UPDATE_ECHO($_txt) {
+	if(!_NULL($GLOBALS['_firmware_update_verbose']) && $GLOBALS['_firmware_update_verbose']==1) {
+		echo "[*] $_txt\n";
+	}
+	_LOG_UPDATE($_txt);
+}
+
+function _UPDATE_ECHO_LOG($_txt) {
+	_FILE_APPEND(_PROC_PATH."/update_installer.log","$_txt");
+	_UPDATE_ECHO($_txt);
+}
+
+function _UPDATE_READ_CONTROL($_file) {
+	$_data=array();
+	if(!file_exists($_file)) {
+		return FALSE;
+	}
+	$_filex=basename($_file,".mpu");
+	$_data=_FILE_ARRAY_GET(_ROOT_PATH."/info-cache/update/{$_filex}.control");
+	if(_ARRAY_NULL($_data)) {
+		putenv("__UPDATE_KEY=".__UPDATE_KEY);
+		if(_EXEC_CMD_OUTPUT("/bin/openssl aes-128-cbc -pass env:__UPDATE_KEY -d -salt -in $_file |/bin/tar -O -zx tmp/UPDATE-CONTROL",$_STDOUT,$_STDERR)==0) {
+			$_data=unserialize(_ARRAY_STR($_STDOUT));
+		}
+		putenv("__UPDATE_KEY");
+	}
+	if(!_ARRAY_NULL($_data) && !_NULL($_data['VERSION']) && !_NULL($_data['BUILD']) && !_NULL($_data['TIME'])) {
+		_VERSION_R($_core_r,$_build_r);
+		$_version=$_data['VERSION'];
+		$_release=$_data['BUILD'];
+		if(_VERSION_COMPARE("{$_core_r}.{$_build_r}","{$_version}.{$_release}")==FALSE) {
+			// already applied
+			_UPDATE_KEEP_FILE($_filex);
+			_UPDATE_ECHO_LOG(_GETTEXT("Firmware update file '%s' already installed","{$_filex}.mpu"));
+			return FALSE;
+		}
+		_FILE_ARRAY_SAVE(_ROOT_PATH."/info-cache/update/{$_filex}.control",$_data);
+		return $_data;
+	}
+	@_UNLINK(_UPDATE_PATH."/{$_filex}.*");
+	@_UNLINK(_ROOT_PATH."/info-cache/update/{$_filex}.*");
+	_UPDATE_ECHO_LOG(_GETTEXT("Firmware update file '%s' corrupted","{$_filex}.mpu"));
+	return FALSE;
+}
+
+function _UPDATE_READ_NOTE($_file) {
+	$_note="";
+	if(file_exists($_file)) {
+		$_filex=basename($_file,".mpu");
+		$_note=_FILE_GET(_ROOT_PATH."/info-cache/update/{$_filex}.desc");
+		if(_NULL($_note)) {
+			putenv("__UPDATE_KEY=".__UPDATE_KEY);
+			if(_EXEC_CMD_OUTPUT("/bin/openssl aes-128-cbc -pass env:__UPDATE_KEY -d -salt -in $_file |/bin/tar -O -zx tmp/UPDATE-NOTE",$_STDOUT,$_STDERR)==0) {
+				$_note=_ARRAY_STR($_STDOUT);
+			}
+			putenv("__UPDATE_KEY");
+		}
+		if(_NULL($_note)) {
+			$_note=_GETTEXT("No description available");
+		}
+		_FILE_SAVE(_ROOT_PATH."/info-cache/update/{$_filex}.desc",$_note);
+	}
+	return trim($_note);
+}
+
+function _UPDATE_KEEP_FILE($_file) {
+	_INI_TOKEN_GET("system","update.cfg",$_TOKEN);
+	if(!_NULL($_TOKEN['update']['SAVE_DOWNLOAD']) && $_TOKEN['update']['SAVE_DOWNLOAD']==1) {
+		@_MOVE(_UPDATE_PATH."/{$_file}.mpu",_UPDATE_PATH."/.repo/{$_file}.mpu");
+		@_UNLINK(_ROOT_PATH."/info-cache/update/{$_file}.*");
+		return TRUE;
+	}
+	@_UNLINK(_UPDATE_PATH."/{$_file}.*");
+	@_UNLINK(_ROOT_PATH."/info-cache/update/{$_file}.*");
+	return FALSE;
+}
+
+function _UPDATE_INSTALL_EXEC($_file,$_post_install='') {
+	if(!file_exists($_file)) {
+		return FALSE;
+	}
+	$_src=$_file;
+	$_dst="/";
+	putenv("__UPDATE_KEY=".__UPDATE_KEY);
+	if(_EXEC_CMD("/bin/openssl aes-128-cbc -pass env:__UPDATE_KEY -d -salt -in $_src |/bin/tar -C $_dst -zx --exclude tmp/UPDATE-NOTE --exclude tmp/UPDATE-CONTROL")==0) {		
+		if(!_NULL($_post_install)) {
+			_EXEC_CMD($_post_install);
+		}
+		putenv("__UPDATE_KEY");
+		$_filex=basename($_file,".mpu");
+		_UPDATE_KEEP_FILE($_filex);
+		return TRUE;
+	}
+	putenv("__UPDATE_KEY");
+	return FALSE;
+}
+
+function _UPDATE_INSTALL() {
+	$_buff=_GLOB(_UPDATE_PATH."/*.mpu");
+	$_reboot=0;
+	$_install=0;
+	$_cbuff=array();
+	if(!_ARRAY_NULL($_buff)) {
+		_UPDATE_ECHO_LOG(_GETTEXT("Starting firmware update installer."));
+		foreach($_buff as $_lnx) {
+			$_ln=basename($_lnx);
+			_UPDATE_ECHO_LOG(_GETTEXT("Verifying update file '%s'","$_ln"));
+			if(($_control=_UPDATE_READ_CONTROL($_lnx))==FALSE) {
+				continue;
+			}
+			$_cbuff[$_control['TIME']]['date']=date('d-M-Y H:i',$_control['TIME']);
+			$_cbuff[$_control['TIME']]['version']="{$_control['VERSION']} build-{$_control['BUILD']}";
+			$_cbuff[$_control['TIME']]['build']="{$_control['BUILD']}";
+			$_cbuff[$_control['TIME']]['post_install']=$_control['POST_INSTALL'];
+			$_cbuff[$_control['TIME']]['file']="$_lnx";
+			$_cbuff[$_control['TIME']]['reboot']=$_control['REBOOT'];
+		}
+		if(!_ARRAY_NULL($_cbuff)) {
+			_INI_OBJECT_CLEAN_ALL();
+			foreach($_cbuff as $_line_a) {
+				if(_UPDATE_INSTALL_EXEC($_line_a['file'],$_line_a['post_install'])) {
+					_UPDATE_ECHO_LOG(_GETTEXT("Updating firmware to version '%s' released on %s","{$_line_a['version']}","{$_line_a['date']}"));
+					if($_reboot==0 && $_line_a['reboot']==1) {
+						$_reboot=1;
+					}
+					if(!_NULL($_line_a['build'])) {
+						_FILE_SAVE(_ROOT_PATH."/info-cache/update/FIRMWARE_VERSION","{$_line_a['build']}");
+					}
+					$_install++;
+				}
+			}
+		}
+
+		_UPDATE_ECHO_LOG(_GETTEXT("Stopping firmware update installer. %d update(s) installed.",$_install));
+
+		if($_reboot==1) {
+			_UPDATE_ECHO_LOG(_GETTEXT("Rebooting system"));
+			_EXEC_CMD("/bin/exec_cli reboot");
+		}
+		return TRUE;
+	}
+	return FALSE;
+}
+
+function _UPDATE_LAST_CHECK($_opt=0) {
+	if($_opt==0) {
+		$_lastcheck=_FILE_GET(_ROOT_PATH."/info-cache/update/lastcheck");
+		if(!_NULL($_lastcheck)) {
+			return date('D d-M-Y H:i',$_lastcheck);
+		}
+		return;
+	}
+	$_time=time();
+	return _FILE_SAVE(_ROOT_PATH."/info-cache/update/lastcheck",$_time);
+}
+
+function _UPDATE_NEXT_CHECK($_val) {
+	if($_val!='never') {
+		$_time=strtotime("+1 $_val");
+		_FILE_SAVE(_ROOT_PATH."/info-cache/update/nextcheck",$_time);
+		return $_time;
+	}
+}
+
+function _UPDATE_GET_LIST($_TOKEN) {
+	if(_EXT_LOADED("http")) {
+		_VERSION_R($_core_r,$_build_r);
+		$_cversion="{$_core_r}.{$_build_r}";
+		$_options=array("timeout"=>60,"useragent"=>"mybox/{$_cversion}","compress"=>true);
+		$_obj=http_parse_message(http_get(__UPDATE_URL."/?c=$_cversion", $_options));
+		if(is_object($_obj) && $_obj->responseStatus=="OK" && !_NULL(trim($_obj->body))) {
+			return trim($_obj->body);
+		}
+	}
+	return FALSE;
+}
+
+function _UPDATE_CHECK_LIST() {
+	_INI_TOKEN_GET("system","update.cfg",$_TOKEN);
+	if(!_NULL($_TOKEN['update']['UPDATE_CHECK']) && $_TOKEN['update']['UPDATE_CHECK']=='never') {
+		_UPDATE_ECHO(_GETTEXT("Firmware update disabled."));
+		@unlink(_ROOT_PATH."/info-cache/update/updates");
+		return FALSE;
+	} 
+	_UPDATE_ECHO(_GETTEXT("Starting firmware update checker."));
+	if(($_list=_UPDATE_GET_LIST($_TOKEN))!=FALSE) {
+		$_BUFF=_STR_ARRAY($_list,'\n');
+		$_cnt=0;
+		if(!_ARRAY_NULL($_BUFF)) {
+			foreach($_BUFF as $_x => $_ln) {
+				$_lnx=basename($_ln);
+				if(file_exists(_UPDATE_PATH."/$_lnx")) {
+					unset($_BUFF[$_x]);
+				}
+			}
+			$_cnt=count($_BUFF);
+		}
+		if($_cnt > 0) {
+			_UPDATE_ECHO(_GETTEXT("Stopping firmware update checker. %d update(s) available for download.",$_cnt));
+			_FILE_ARRAY_SAVE(_ROOT_PATH."/info-cache/update/updates",$_BUFF);
+			_UPDATE_LAST_CHECK(1);
+			return $_BUFF;
+		}
+	}
+	@unlink(_ROOT_PATH."/info-cache/update/updates");
+	_UPDATE_ECHO(_GETTEXT("Stopping firmware update checker. No updates available for download"));
+	$_FX=_GLOB(_UPDATE_PATH."/*.mpu");
+	if(!_ARRAY_NULL($_FX)) {
+		_UPDATE_ECHO(_GETTEXT("%d file(s) ready to install",count($_FX)));
+	}
+	_UPDATE_LAST_CHECK(1);
+	return FALSE;
+}
+
+function _UPDATE_DOWNLOAD_PROXY() {
+	_INI_TOKEN_GET("system","update.cfg",$_NTOKEN);
+	putenv("http_proxy");
+	if(!_ARRAY_NULL($_NTOKEN['update'])) {
+		$_DATA=$_NTOKEN['update'];
+		if(!_NULL($_DATA['PROXY_STAT']) 
+			&& !_NULL($_DATA['PROXY_HOST'])
+			&& !_NULL($_DATA['PROXY_PORT'])) {
+
+			$_host="";$_url="";
+			if($_DATA['PROXY_STAT']==1) {
+				if(!_NULL($_DATA['PROXY_AUTH_STAT'])
+					&& !_NULL($_DATA['PROXY_USER'])
+					&& !_NULL($_DATA['PROXY_PASSWORD'])) {
+				
+					if($_DATA['PROXY_AUTH_STAT']==1) {
+						$_url="{$_DATA['PROXY_USER']}:{$_DATA['PROXY_PASSWORD']}@";
+					}
+				}
+
+				_DEFINITIONS_GET_BYNAME("networks",$_DATA['PROXY_HOST'],$_DTOKEN);
+				if(!_NULL($_DTOKEN['ADDR'])) {
+					if($_DTOKEN['__DATA_TYPE']=='dnshost') {
+						$_host=$_DTOKEN['HOSTNAME'];
+					} elseif($_DTOKEN['__DATA_TYPE']=='host') {
+						$_host=$_DTOKEN['ADDR'];
+					}
+				}
+				if(!_NULL($_host) && _ISNUM($_DATA['PROXY_PORT'])) {
+					$_url .="{$_host}:{$_DATA['PROXY_PORT']}";
+				}
+				if(!_NULL($_ur)) {
+					putenv("http_proxy=http://{$_url}");
+				}
+			}
+		}
+	}
+}
+
+function _UPDATE_DOWNLOAD() {
+	_VERSION_R($_core_r,$_build_r);
+	$_cversion="{$_core_r}.{$_build_r}";
+	$_wcmd=__UPDATE_WGET." --user-agent='mybox/{$_cversion}'";
+	$_download=0;
+	if(($_list=_UPDATE_CHECK_LIST())!=FALSE) {
+		_UPDATE_ECHO(_GETTEXT("Starting firmware update downloader."));
+		if(!file_exists(__UPDATE_WGET)) {
+			_UPDATE_ECHO(_GETTEXT("Stopping firmware update downloader. Internal error."));
+			return FALSE;
+		}
+		if(_DAEMON_UP(__UPDATE_WGET)) {
+			_UPDATE_ECHO(_GETTEXT("Another instance of this process is already running, exiting.."));
+			return FALSE;
+		}
+		if(!_ARRAY_NULL($_list)) {
+			_UPDATE_DOWNLOAD_PROXY();
+			@_MKDIR(_UPDATE_PATH."/.part");
+			$_num_file=count($_list);
+			foreach($_list as $_file) {
+				if(!_NULL($GLOBALS['_firmware_update_verbose']) && $GLOBALS['_firmware_update_verbose']==1) {
+					if(@chdir(_UPDATE_PATH."/.part")) {
+						system("$_wcmd -v ".__UPDATE_URL."/pub/$_file -O $_file",$_ret);
+					} else {
+						system("$_wcmd -v ".__UPDATE_URL."/pub/$_file -O "._UPDATE_PATH."/.part/$_file",$_ret);
+					}
+					if($_ret==0) {
+						$_download++;
+						if($_download < $_num_file) sleep(1);
+					} else {
+						_UPDATE_ECHO(_GETTEXT("Error while downloading file %s.","$_file"));
+					}
+				} else {
+					if(_EXEC_CMD("$_wcmd ".__UPDATE_URL."/pub/$_file -O "._UPDATE_PATH."/.part/$_file")==0) {
+						$_download++;
+						if($_download < $_num_file) sleep(1);
+					} else {
+						_UPDATE_ECHO(_GETTEXT("Error while downloading file %s.","$_file"));
+					}
+				}
+			}
+		}
+		if($_download > 0) {
+			$_DBUFF=_GLOB(_UPDATE_PATH."/.part/*.mpu");
+			if(!_ARRAY_NULL($_DBUFF)) {
+				foreach($_DBUFF as $_df) {
+					if(_UPDATE_READ_CONTROL($_df)==FALSE) {
+						@unlink($_df);
+						$_download--;
+						continue;
+					}
+					$_dfx=basename($_df);
+					if(@rename($_df,_UPDATE_PATH."/$_dfx")==FALSE) {
+						$_download--;
+						continue;
+					}
+				}
+			}
+		}
+		if($_download > 0) {
+			_UPDATE_ECHO(_GETTEXT("Stopping firmware update downloader. %d file(s) ready to install.",$_download));
+			return TRUE;
+		}
+		_UPDATE_ECHO(_GETTEXT("Stopping firmware update downloader. No file need to install."));
+		return FALSE;
+	}
+	return FALSE;
+}
+
+function _UPDATE_INFO_ORGANIZE() {
+	$_BUFF=_FILE_ARRAY_GET(_ROOT_PATH."/info-cache/update/updates");
+	if(!_ARRAY_NULL($_BUFF)) {
+		foreach($_BUFF as $_x => $_ln) {
+			$_lnx=basename($_ln);
+			if(file_exists(_UPDATE_PATH."/$_lnx")) {
+				unset($_BUFF[$_x]);
+			}
+		}
+	}
+	_FILE_ARRAY_SAVE(_ROOT_PATH."/info-cache/update/updates",$_BUFF);
+	return count($_BUFF);
+}
+
+function _UPDATE_CLEAR() {
+	if(defined('_UPDATE_PATH') && is_dir(_UPDATE_PATH) && _UPDATE_PATH!="/") {
+		_CLEARDIR(_UPDATE_PATH);
+		_UPDATE_ECHO(_GETTEXT("Clearing update files"));
+		return TRUE;
+	}
+	_UPDATE_ECHO(_GETTEXT("Failed to delete update files"));
+	return FALSE;
+}
+
+function _UPDATE_CRONTAB() {
+	@_UNLINK("/etc/cron/*/firmwareupdate");
+	_INI_TOKEN_GET("system","update.cfg",$_NTOKEN);
+	if(_ARRAY_NULL($_NTOKEN['update'])) return FALSE;
+	$_DATA=$_NTOKEN['update'];
+	if(_NULL($_DATA['UPDATE_CHECK']) || $_DATA['UPDATE_CHECK']=='never') {
+		return FALSE;
+	}
+	$_intv=$_DATA['UPDATE_CHECK'];
+	$_file="";
+	if($_intv=="daily") {
+		$_file="/etc/cron/d/firmwareupdate";
+	} elseif($_intv=="monthly") {
+		$_file="/etc/cron/m/firmwareupdate";
+	} elseif($_intv=="weekly") {
+		$_file="/etc/cron/w/firmwareupdate";
+	}
+	if(!_NULL($_file)) {
+		return _SAVE_BASH_FILE($_file,"/bin/ionice -c3 /service/tools/update.exc croncheck");
+	}
+	return FALSE;
+}
+
+?>

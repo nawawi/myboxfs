@@ -1,0 +1,66 @@
+<?php
+if(!defined('_POLICY_CODE')||_POLICY_CODE!="214162c595ce24bf9285f0a98cb0fbca") exit("\n\nERROR: _POLICY_CODE not set\n\n");
+
+function _policy_sysinput_dhcrelay_test($_rules) {
+	$_test="*filter\n";
+	$_test .="$_rules\n";
+	$_test .="COMMIT\n";
+	if(!_policy_test($_test)) {
+		_INIT_ECHO(1,_GETTEXT("%s: rules failed","DHCRELAY INPUT POLICY"));
+		return FALSE;
+	}
+	return TRUE;
+}
+
+function _policy_sysinput_dhcrelay(&$_data) {
+	if(_dhcp_server_isenable()) {
+		return FALSE;
+	}
+	$_sport='67:68';
+	$_dport='67:68';
+	$_rules="";
+	$_rulesid="-m comment --comment dhcrelay";
+	_INI_TOKEN_GET("network","dhcp_relay.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+                return FALSE;
+	}
+	$_DATA=$_TOKEN['dhcp_relay'];
+	if((_NULL($_DATA['STAT']) || $_DATA['STAT']==0)
+		|| _NULL($_DATA['ADDR'])
+		|| _NULL($_DATA['DNAME'])) {
+		return FALSE;
+	}
+	
+	_DEFINITIONS_GET_BYNAME("networks",$_DATA['ADDR'],$_DTOKEN,"host");
+	if(_NULL($_DTOKEN['ADDR'])) {
+		return FALSE;
+	}
+	$_server=$_DTOKEN['ADDR'];
+	$_dev_a=_STR_ARRAY($_DATA['DNAME'],",");
+	if(count($_dev_a) < 2) {
+		return FALSE;
+	}
+
+	$_devf="";
+	foreach($_dev_a as $_name) {
+		$_dev=_DEFINITIONS_GET_INTERFACE_DEVICE($_name);
+		if(!_NULL($_server) && !_NULL($_dev)) {
+			if(_NULL($_devf)) $_devf="$_dev";
+			$_rules .="-A SYS_INPUT $_rulesid -i $_dev -p udp -m udp --sport $_sport --dport $_dport -j CONFIRMED\n";
+		}
+		unset($_dev);
+	}
+
+	if(!_NULL($_server) && !_NULL($_rules) && !_NULL($_dev_a[0])) {
+		$_rules .="-A SYS_INPUT $_rulesid -s $_server -i $_devf -p udp -m udp --sport $_sport --dport $_dport -j CONFIRMED\n";
+	}	
+	_TRIM($_rules);	
+
+	if(!_NULL($_rules) && _policy_sysinput_dhcrelay_test($_rules)) {
+		$_data .="$_rules\n";
+		return TRUE;
+	}
+	return FALSE;
+}
+
+?>

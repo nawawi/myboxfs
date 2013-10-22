@@ -1,0 +1,76 @@
+﻿<?xml version="1.0"?>
+<CLISH_MODULE>
+<VIEW name="ntp" prompt="${SYSTEM_NAME}/network/ntp/&gt; ">
+        <COMMAND name="."
+                help="Return to main menu"
+                view="main"
+                viewid=""/>
+        <COMMAND name=".."
+                help="Return to previous menu"
+                view="network"
+                viewid=""/>
+        <COMMAND name="apply"
+                help="Apply changes">
+                <ACTION>exec /service/tools/ntp_config.exc apply 2>/dev/null</ACTION>
+        </COMMAND>
+<!-- start config -->
+        <COMMAND name="config"
+                help="Display or change NTP status">
+                <ACTION>exec /service/tools/ntp_config.exc config print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+        <COMMAND name="config print"
+                help="Display NTP status">
+                <ACTION>exec /service/tools/ntp_config.exc config print 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+        <COMMAND name="config enable"
+                help="Enable NTP Server">
+		<PARAM name="enable"
+			help="Set enable"
+			ptype="ONOFF"/>
+                <ACTION>exec /service/tools/ntp_config.exc config set enable ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+<!--- see system > time-date
+        <COMMAND name="config set server"
+                help="Set NTP Server">
+		<PARAM name="host_id"
+			help="Resource Id for definition host or dnshost"
+			ptype="NUM"/>
+                <ACTION>exec /service/tools/ntp_config.exc config set server ${host_id} 2>/dev/null</ACTION>
+        </COMMAND>
+--->
+<!-- end config -->
+<!-- start acl -->
+        <COMMAND name="acl"
+                help="Display or configure NTP access list">
+                <ACTION>exec /service/tools/ntp_config.exc acl print 2>/dev/null|more -dl</ACTION>
+        </COMMAND>
+	<COMMAND name="acl print"
+                help="Display current config">
+                <ACTION>exec /service/tools/ntp_config.exc acl print 2>/dev/null|more -dl</ACTION>
+        </COMMAND>
+
+	<COMMAND name="acl find"
+                help="Search NTP access list">
+		<PARAM name="string"
+			help="String to find"
+			ptype="STRING_ANY" />
+                <ACTION>exec /service/tools/ntp_config.exc acl find "${string}" 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+	<COMMAND name="acl add"
+                help="Add new NTP access list">
+		<PARAM name="addr_id"
+                        help="Resource Id for definition network or any."
+                        ptype="MULTI_NUM_ANY"/>
+                <ACTION>exec /service/tools/ntp_config.exc acl add "${addr_id}" 2>/dev/null</ACTION>
+        </COMMAND>
+	<COMMAND name="acl delete"
+                help="Delete NTP access list">
+		<PARAM name="id"
+                        help="Resource Id '*' for all"
+                        ptype="MULTI_NUM_ALL"/>
+                <ACTION>exec /service/tools/ntp_config.exc acl delete "${id}" 2>/dev/null</ACTION>
+        </COMMAND>
+<!-- end acl -->
+</VIEW>
+</CLISH_MODULE>

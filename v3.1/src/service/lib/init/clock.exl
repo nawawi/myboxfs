@@ -1,0 +1,63 @@
+<?php
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+function clock_check() {
+	if(!_INIT_CHECK_BINARY(array("/bin/hwclock","/bin/lzmacat"))) {
+		_INIT_ECHO(1,_GETTEXT("Cannot execute %s. Internal error",_INIT_NAME()));
+		exit(1);
+	}
+}
+
+function clock_quiet() {
+	_INIT_QUIET('1');
+}
+
+function _clock_sync_hw() {
+	_EXEC_CMD("/bin/hwclock -w");
+}
+
+function _clock_sync_sys() {
+	_EXEC_CMD("/bin/hwclock -s");
+}
+
+function _clock_set_timezone($_TIMEZONE) {
+	$_BASE=basename($_TIMEZONE);
+	$_DIR=trim(dirname($_TIMEZONE),'.');
+	if(!_NULL($_DIR)) $_DIR="$_DIR/";
+	$_TIMEZONE="$_DIR$_BASE.gz";
+	if(file_exists("/usr/share/zoneinfo/$_TIMEZONE")) {
+		@unlink("/etc/localtime");
+		@_EXEC_SHELL("/bin/lzmacat /usr/share/zoneinfo/$_TIMEZONE > /etc/localtime");
+		return TRUE;
+	}
+	return FALSE;
+}
+
+function clock_start() {
+	_INI_TOKEN_GET("system","system.cfg",$_TOKEN);
+	$_TIMEZONE=$_TOKEN['system']['TIMEZONE'];
+	if(!_NULL($_TIMEZONE)) { 
+		if(_clock_set_timezone($_TIMEZONE)) {
+			_clock_sync_sys();
+			_INIT_ECHO(0,_GETTEXT("Setting timezone to %s","$_TIMEZONE"));
+		}
+	}
+	$_date=date('D M d H:i:s T Y');
+	_INIT_ECHO(0,_GETTEXT("Setting system clock to %s","$_date"));
+	return TRUE;
+}
+
+function clock_stop() {
+	_clock_sync_hw();
+	return TRUE;
+}
+
+function clock_restart() {
+	_INIT_EXEC("clock_stop");
+	_INIT_EXEC("clock_start");
+}
+
+function clock_reload() {
+	_INIT_EXEC("clock_restart");
+}
+?>

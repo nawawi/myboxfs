@@ -1,0 +1,104 @@
+<?php
+if(!defined('_CGI_CODE')||_CGI_CODE!="90d45215e48dac81e802f17310ad0c1f") exit("\n\nERROR: _CGI_CODE not set\n\n");
+/* req_data = p_system_reboot */
+
+function _CGI_PAGE_SYSTEM_REBOOT_P0() {
+	extract($GLOBALS['__CDATA']);
+	$_bid=_CGI_ATTR_KEY();
+	$_page="
+		<div class='tbox_tee'>
+		<div class='fbox_c' id='page_reboot'>
+		<fieldset>
+		<legend>Reboot</legend>
+		<div style='margin: 5px;'>
+		<table class='tbox_t'>
+		<tr>
+		<td class='tbox_tdl' colspan='2'>"._CGI_BUTTON(array('id'=>"button_{$_bid}1",'text'=>_GETTEXT("Reboot the system now"),'css'=>'width: 180px;'))."</td>
+		<td class='tbox_tdr' style='vertical-align: middle;'>"._GETTEXT("Click this button to reboot the system.")."</td>
+		</tr>
+		</table>
+		</div>
+		</fieldset>
+
+		<fieldset style='margin-top: 20px;'>
+		<legend>Shutdown</legend>
+		<div style='margin: 5px;'>
+		<table class='tbox_t'>
+		<tr>
+		<td class='tbox_tdl' colspan='2'>"._CGI_BUTTON(array('id'=>"button_{$_bid}2",'text'=>_GETTEXT("Shutdown the system now"),'css'=>'width: 180px;'))."</td>
+		<td class='tbox_tdr' style='vertical-align: middle;'>"._GETTEXT("Click this button to shutdown the system.")."</td>
+		</tr>
+		</table>
+		</div>
+		</fieldset>
+
+		</div>
+		</div>
+
+		<script type='text/javascript'>
+			\$(document).ready(function() {
+				var _bt1='div#button_{$_bid}1';
+				var _bt2='div#button_{$_bid}2';
+				\$(_bt1).click(function() {
+					if(!__tnpage.is_admin()) {
+						return false;
+					}
+					__tndialog.confirm_box('"._GETTEXT("This action will reboot the system. Are you really want to proceed?")."',function() {
+						__tnpage.loadpage('div#page_reboot','$_req_data&sub_data=1');
+					});
+				});
+				\$(_bt2).click(function() {
+					if(!__tnpage.is_admin()) {
+						return false;
+					}
+					__tndialog.confirm_box('"._GETTEXT("This action will shutdown the system. Are you really want to proceed?")."',function() {
+						__tnpage.loadpage('div#page_reboot','$_req_data&sub_data=2');
+					});
+				});
+			});
+		
+		</script>
+	";
+	return trim($_page);
+}
+
+function _CGI_PAGE_SYSTEM_REBOOT_P1($_opt) {
+	$_msg=_GETTEXT("The system is rebooting now. The operation may take some time to complete.");
+	$_action="reboot";
+	if($_opt==2) {
+		$_msg=_GETTEXT("The system is shutting down now. The operation may take some time to complete.");
+		$_action="shutdown";
+	}
+	$_page="
+		<div style='margin: 5px; font-size: 14px;'>
+		$_msg
+		</div>
+	";
+	if(_CGI_IS_ADMIN()) {
+		_FILE_SAVE("/var/sys/shutdown_from_web","");
+		_EXEC_CMD("/bin/exec_cli $_action");
+	}
+	return trim($_page);
+}
+
+function _CGI_PAGE_SYSTEM_REBOOT($_opt='') {
+	$_bid=_CGI_ATTR_KEY();
+	$GLOBALS['__CDATA']['_req_data']="req_data=p_system_reboot";
+	$_page="";
+	switch($_opt) {
+		case '1':
+			$_page=_CGI_PAGE_SYSTEM_REBOOT_P1($_opt);
+		break;
+		case '2':
+			$_page=_CGI_PAGE_SYSTEM_REBOOT_P1($_opt);
+		break;
+		default:
+			$_page=_CGI_PAGE_SYSTEM_REBOOT_P0();
+		break;
+	}
+
+	$_page .="<script type='text/javascript'>__tnpage.button_hover();</script>";
+	return trim($_page);
+}
+
+?>

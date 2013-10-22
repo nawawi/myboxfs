@@ -1,0 +1,19 @@
+﻿<?xml version="1.0"?>
+<CLISH_MODULE>
+	<COMMAND name="exit"
+		help="Logout from current session">
+		<ACTION builtin="awie_close"/>
+	</COMMAND>
+       <COMMAND name="history"
+		help="Show command line history">
+		<PARAM name="num"
+			help="Set the size of history list"
+			ptype="NUM"
+			default=""/>
+		<ACTION builtin="clish_history">${num}</ACTION>
+	</COMMAND>
+	<COMMAND name="clear"
+		help="Clear the terminal screen">
+		<ACTION>/bin/clear;/bin/reset</ACTION>
+	</COMMAND>
+</CLISH_MODULE>

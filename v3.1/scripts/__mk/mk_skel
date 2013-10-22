@@ -1,0 +1,70 @@
+#!/bin/bash -e
+trap "exit 1" 2;
+
+# checking
+if [ "x$_START" = "x" ]; then
+        echo "_START not set";
+        exit 1;
+fi
+if [ ! -f "$_START/MYBOX_VERSION" ]; then
+        echo "MYBOX_VERSION not set";
+        exit 1;
+fi
+if [ ! -f "$_FUNC/functions.sh" ]; then
+        echo "_FUNC not set";
+        exit 1;
+fi
+
+cd $_START;
+
+. $_FUNC/functions.sh
+
+_BUILD_MSG "skel";
+if [ ! -z "$1" ]; then
+	_PDIR="$_START/$1";
+else
+	_PDIR="$_START/rootfs";
+fi
+_SYSDIR="dev proc tmp bin lib etc config var/spool/cron/crontabs var/sys/xsessions var/run var/log sys";
+
+_TERM="
+/usr/share/terminfo/x/xterm
+/usr/share/terminfo/l/linux
+/usr/share/terminfo/v/vt100
+/usr/share/terminfo/v/vt102
+/usr/share/terminfo/d/dumb
+";
+
+_TABSET="/usr/share/tabset";
+_MICROCODE="/lib/firmware/microcode.dat";
+
+rm -rfv $_PDIR
+
+for f in $_SYSDIR; do
+	mkdir -pv $_PDIR/$f
+done
+
+for l in $_TERM; do
+        _lb=$(dirname $l)
+        mkdir -pv $_PDIR/$_lb
+        cp -v $l $_PDIR/$_lb
+done
+
+cp -av $_TABSET $_PDIR/usr/share
+
+MAKEDEV -d $_PDIR/dev -x console
+MAKEDEV -d $_PDIR/dev -x ram0
+MAKEDEV -d $_PDIR/dev -x null
+MAKEDEV -d $_PDIR/dev -x "ttyS0"
+#MAKEDEV -d $_PDIR/dev -m 20 loop
+
+cp -av $_START/configs/skel/* $_PDIR/
+cp -av $_START/configs/factory $_PDIR/etc
+if [ -e "$_MICROCODE" ]; then
+	cp --parents -av $_MICROCODE $_PDIR/
+fi
+cd $_PDIR/etc
+ln -sf /proc/mounts mtab
+
+cd $_START;
+exit 0;

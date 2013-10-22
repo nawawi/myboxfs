@@ -1,0 +1,148 @@
+<?php
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+function _LOG_NOLOG_LOCAL($_prog='') {
+	clearstatcache();
+	if(file_exists("/var/sys/log_setting/nolog")) return TRUE;
+	if(!_NULL($_prog) && !file_exists("/var/sys/log_setting/$_prog")) return TRUE; 
+	return FALSE;
+}
+
+function _LOG_NOLOG_REMOTE($_prog='') {
+	clearstatcache();
+	if(file_exists("/var/sys/rlog_setting/nolog")) return TRUE;
+	if(!_NULL($_prog) && !file_exists("/var/sys/rlog_setting/$_prog")) return TRUE; 
+	return FALSE;
+}
+
+function _LOG_CNTFILE($_name,&$_logcnt,&$_logsize) {
+	$_logcnt=0;
+	$_logsize=0;
+	$_dirarray=_GLOB(_LOG_PATH."/{$_name}-*");
+	if(!_ARRAY_NULL($_dirarray)) {
+		foreach($_dirarray as $_file) {
+			$_logsize +=sprintf("%u",filesize($_file));
+			clearstatcache();
+			$_logcnt++;
+		}
+	}
+	clearstatcache();
+}
+
+function _LOG_COMPRESS() {
+	$_prev=time() - 86400;
+	$_ny=date('Y',$_prev);
+	if($_ny < 2008) {
+		// wrong date
+		return FALSE;
+	}
+	unset($_ny);
+	$_FILE=_GLOB(_LOG_PATH."/*.log");
+	if(!_ARRAY_NULL($_FILE)) {
+		foreach($_FILE as $_fl) {
+			if(preg_match("/\-(\d+)\.log$/",$_fl,$_mm)) {
+				$_tt=strtotime($_mm[1]);
+				$_ny=date('Y',$_tt);
+				if($_ny < 2008) {
+					// invalid year
+					@unlink($_fl);
+					continue;
+				}
+				if($_tt==-1) continue;
+				if($_prev >= $_tt) {
+					_GZIP($_fl);
+				}
+				unset($_tt,$_mm,$_ny);
+			}
+			unset($_fl);
+		}
+		unset($_FILE);
+		clearstatcache();
+		return TRUE;
+	}
+	unset($_FILE);
+	return FALSE;
+}
+
+function _LOG_WRITE($_ldate,$_name,$_txt='') {
+	if(_NULL($_txt)) return FALSE;
+	_TRIM($_txt);
+	$_ny=date('Y',$_ldate);
+	if($_ny < 2008) return FALSE; // wrong date
+	clearstatcache();
+	$_logname=date('Ymd',$_ldate);
+	$_date=date('d/m/Y H:i:s',$_ldate);
+	$_msg="[$_date] $_txt";
+	if(!_LOG_NOLOG_LOCAL($_name)) {
+		$_logfile=_LOG_PATH."/{$_name}-{$_logname}.log";
+		_FILE_APPEND($_logfile,"$_msg\n");
+		return TRUE;
+	}
+	return FALSE;
+}
+
+function _LOG_SYSTEM($_type,$_str,$_ldate='') {
+	$_msg="TYPE=$_type MSG=$_str";
+	define_syslog_variables();
+	openlog("SYSTEM", LOG_NDELAY|LOG_PID, LOG_DAEMON);
+	$_stat=syslog(LOG_INFO,"$_msg");
+	closelog();
+	if($_stat) {
+		return TRUE;
+	}
+	if(_NULL($_ldate)) $_ldate=time();
+	return _LOG_WRITE($_ldate,"system","$_msg");
+}
+
+function _LOG_UPDATE($_msg) {
+	define_syslog_variables();
+	openlog("UPDATE", LOG_NDELAY|LOG_PID, LOG_DAEMON);
+	$_stat=syslog(LOG_INFO,"$_msg");
+	closelog();
+	if($_stat) {
+		return TRUE;
+	}
+	$_ldate=time();
+	return _LOG_WRITE($_ldate,"update","$_msg");
+}
+
+function _LOG_SOPHOSAV($_msg,$_ldate='') {
+	define_syslog_variables();
+	openlog("sophos", LOG_NDELAY|LOG_PID, LOG_DAEMON);
+	$_stat=syslog(LOG_INFO,"$_msg");
+	closelog();
+	if($_stat) {
+		return TRUE;
+	}
+	if(_NULL($_ldate)) $_ldate=time();
+	return _LOG_WRITE($_ldate,"sophosav","$_msg");
+}
+
+function _LOG_AUTH($_msg) {
+	define_syslog_variables();
+	openlog("LOGIN", LOG_NDELAY|LOG_PID, LOG_AUTHPRIV);
+	$_stat=syslog(LOG_INFO,"$_msg");
+	closelog();
+	if($_stat) {
+		return TRUE;
+	}
+	return _LOG_WRITE(time(),"auth","$_msg");
+}
+
+function _LOG_CHKPROG($_msg) {
+	define_syslog_variables();
+	openlog("CHKPROG", LOG_NDELAY|LOG_PID, LOG_DAEMON);
+	$_stat=syslog(LOG_ALERT,"$_msg");
+	closelog();
+	if(!$_stat) {
+		_LOG_WRITE(time(),"chkprog","$_msg");
+	}
+}
+
+function _LOG_TIME_STRTOTIME($_str) {
+	if(preg_match("/(\d\d)\/(\d\d)\/(\d\d\d\d)\s+(\d\d):(\d\d):(\d\d)/",$_str,$_mm)) {
+		return strtotime("{$_mm[2]}/{$_mm[1]}/{$_mm[3]} {$_mm[4]}:{$_mm[5]}:{$_mm[6]}");
+	}
+}
+
+?>

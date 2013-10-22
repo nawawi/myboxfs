@@ -1,0 +1,722 @@
+<?php
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+function syslog_check() {
+	if(!_INIT_CHECK_BINARY(array("/bin/syslog-ng"))) {
+		_INIT_ECHO(1,_GETTEXT("Cannot execute %s. Internal error",_INIT_NAME()));
+		exit(1);
+	}
+}
+
+function syslog_quiet() {
+	_INIT_QUIET('1');
+}
+
+function syslog_debug() {
+	_INIT_DEBUG('1');
+}
+
+function _syslog_setting(&$_REMOTE_DATA) {
+	if(!is_array($_REMOTE_DATA)) $_REMOTE_DATA=array();
+	@_CLEARDIR("/var/sys/log_setting/");
+	@_CLEARDIR("/var/sys/rlog_setting/");
+
+	_INI_TOKEN_GET("reporting","syslog.cfg",$_NTOKEN);
+	if(_ARRAY_NULL($_NTOKEN) || _NULL($_NTOKEN['local'])) {
+		@touch("/var/sys/log_setting/nolog");
+	}
+	$_DATA=$_NTOKEN['local'];
+	if(_NULL($_DATA['STAT']) || $_DATA['STAT']==0) {
+		@touch("/var/sys/log_setting/nolog");
+	}
+	if($_DATA['STAT']==1) {
+		unset($_DATA['STAT']);
+		foreach($_DATA as $_name => $_value) {
+			_TRIM($_name);_TRIM($_value);
+			if(_NULL($_name) || _NULL($_value)) continue;
+			if($_value==0) continue;
+			if(preg_match("/^(\S+)\_STAT/",$_name,$_mm)) {
+				$_lname=_TRIM($_mm[1]);
+				_LOWER($_lname);
+				if(!_NULL($_lname)) {
+					@touch("/var/sys/log_setting/$_lname");
+				}
+				unset($_mm,$_lname);
+			}
+		}
+	}
+	unset($_DATA);
+
+	$_DATA=$_NTOKEN['remote'];
+	if(_NULL($_DATA['STAT']) || $_DATA['STAT']==0) {
+		@touch("/var/sys/rlog_setting/nolog");
+	}
+	if($_DATA['STAT']==1) {
+		unset($_DATA['STAT']);
+		foreach($_DATA as $_name => $_value) {
+			_TRIM($_name);_TRIM($_value);
+			if(_NULL($_name) || _NULL($_value)) continue;
+			if($_value==0) continue;
+			if(preg_match("/^(\S+)\_STAT/",$_name,$_mm)) {
+				$_lname=_TRIM($_mm[1]);
+				_LOWER($_lname);
+				if(!_NULL($_lname)) {
+					@touch("/var/sys/rlog_setting/$_lname");
+				}
+				unset($_mm,$_lname);
+			}
+		}
+		if(!_NULL($_DATA['SERVER'])) {
+			_DEFINITIONS_GET_BYNAME("networks",$_DATA['SERVER'],$_STOKEN,"host");
+			if(!_NULL($_STOKEN['ADDR'])) {
+				$_host=$_STOKEN['ADDR'];
+			}
+		}
+
+		if(!_NULL($_DATA['SERVICE'])) {
+			_DEFINITIONS_GET_BYNAME("services",$_DATA['SERVICE'],$_STOKEN);
+			if(!_ARRAY_NULL($_STOKEN) && !_NULL($_STOKEN['__DATA_TYPE'])) {
+				if($_STOKEN['__DATA_TYPE']=="tcp" || $_STOKEN['__DATA_TYPE']=="udp") {
+					$_port=$_STOKEN['DPORT'];
+				}
+			}
+		}
+
+		if(!_NULL($_host) && !_NULL($_proto) && !_NULL($_port)) {  
+			$_REMOTE_DATA['host']=$_host;
+			$_REMOTE_DATA['proto']=$_proto;
+			$_REMOTE_DATA['port']=$_port;
+		}
+	}
+}
+
+function syslog_config($_scriptdata='') {
+	if(!_NULL($_scriptdata)) {
+		return _FILE_SAVE("/etc/syslog-ng.conf","$_scriptdata\n");
+	}
+	_syslog_setting($_REMOTE_DATA);
+	$_config='';
+	$_config .="options {\n";
+	$_config .="	sync(0);\n";
+	$_config .="	time_reopen(10);\n";
+	$_config .="	log_fifo_size(1000);\n";
+	$_config .="	long_hostnames(off);\n";
+	$_config .=" 	use_dns(no);\n";
+	$_config .="	use_fqdn(no);\n";
+	$_config .="	create_dirs(no);\n";
+	$_config .="	perm(0640);\n";
+	$_config .="	stats(43200);\n";
+	$_config .="	keep_hostname(yes);\n";
+	$_config .="};\n";
+
+	// local log
+	$_config .="source s_sys {\n";
+	$_config .="	file(\"/proc/kmsg\" log_prefix(\"kernel: \"));\n";
+	$_config .="	unix-stream(\"/dev/log\");\n";
+	$_config .="	internal();\n";
+	$_config .="};\n";
+
+	// remote log
+	if(!_ARRAY_NULL($_REMOTE_DATA)) {
+		$_config .="destination d_remote { {$_REMOTE_DATA['proto']}({$_REMOTE_DATA['host']} port({$_REMOTE_DATA['port']}) template(\"<\$PRI>[\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC] \$MSGONLY\\n\") template_escape(no));  };\n";
+	}
+
+	$_config .="destination d_devnull { file(\"/dev/null\"); };\n";
+	$_config .="destination d_syslog { program(\"/bin/syslog-filter\" template(\"\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC,\$PROGRAM,\$PID,\$MSGONLY\\n\") template_escape(no)); };\n";
+
+	$_config .="filter f_kernel { facility(kern); };\n";
+	$_config .="filter f_kdebug { level(debug); };\n";
+	$_config .="filter f_kerntrim { match(\"(?i)netfilter\") or match(\"(?i)ramdisk\") or match(\"(?i)squashfs\"); };\n";
+	$_debug="";
+	if(_INIT_DEBUG()==1) {
+		$_config .="destination d_debug { file(\"/var/log/debug\" template(\"\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC,\$PROGRAM,\$PID,\$MSGONLY\\n\") template_escape(no)); };\n";
+		$_debug="destination(d_debug);";
+	}
+
+	$_config .="log { source(s_sys); filter(f_kernel); filter(f_kerntrim); filter(f_kdebug); destination(d_devnull); $_debug flags(final); };\n";
+	$_config .="log { source(s_sys); filter(f_kernel); filter(f_kerntrim); destination(d_devnull); $_debug flags(final); };\n";
+
+	$_config .="filter f_me { program('syslog-ng') or program('xinetd'); };\n";
+	$_config .="log { source(s_sys); filter(f_me); destination(d_devnull); $_debug flags(final); };\n";
+
+/* --- kernel start --- */
+	if(_LOG_NOLOG_LOCAL("kernel") && _LOG_NOLOG_REMOTE("kernel")) {
+		$_config .="log { source(s_sys); filter(f_kernel); destination(d_devnull); $_debug flags(final); };\n";
+	} else {
+		$_dest="";
+		if(!_LOG_NOLOG_LOCAL("kernel")) {
+			$_config .="destination d_kernel { file(\""._LOG_PATH."/kernel-\$YEAR\$MONTH\$DAY.log\" template(\"[\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC] \$MSGONLY\\n\") template_escape(no)); };\n";
+			$_dest .="destination(d_kernel);";
+		}
+		if(!_LOG_NOLOG_REMOTE("kernel")) {
+			$_dest .="destination(d_remote);";
+		}
+		if(!_NULL($_dest)) {
+			$_config .="log { source(s_sys); filter(f_kernel);filter(f_kernel); $_dest $_debug flags(final); };\n";
+		}
+		unset($_dest);
+	}
+/* --- kernel end --- */
+
+/* --- flood start --- */
+	$_config .="filter f_flood { program('ulogd') and match(\"__UID=103\") or match(\"TYPE=(tcp|udp|icmp)\"); };\n";	
+	if(_LOG_NOLOG_LOCAL("flood") && _LOG_NOLOG_REMOTE("flood")) {
+		$_config .="log { source(s_sys); filter(f_flood); destination(d_devnull); $_debug flags(final); };\n";
+	} else {
+		$_dest="";
+		if(!_LOG_NOLOG_LOCAL("flood")) {
+			$_config .="destination d_flood { file(\""._LOG_PATH."/flood-\$YEAR\$MONTH\$DAY.log\" template(\"[\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC] \$MSGONLY\\n\") template_escape(no)); };\n";
+			$_dest .="destination(d_flood);";
+		}
+		if(!_LOG_NOLOG_REMOTE("flood")) {
+			$_dest .="destination(d_remote);";
+		}
+		if(!_NULL($_dest)) {
+			$_config .="log { source(s_sys); filter(f_flood); $_dest $_debug flags(final); };\n";
+		}
+		unset($_dest);
+	}
+/* --- flood end --- */
+
+/* --- portscan start --- */
+	$_config .="filter f_portscan { program('ulogd') and match(\"__UID=102\"); };\n";	
+	if(_LOG_NOLOG_LOCAL("portscan") && _LOG_NOLOG_REMOTE("portscan")) {
+		$_config .="log { source(s_sys); filter(f_portscan); destination(d_devnull); $_debug flags(final); };\n";
+	} else {
+		$_dest="";
+		if(!_LOG_NOLOG_LOCAL("portscan")) {
+			$_config .="destination d_portscan { file(\""._LOG_PATH."/portscan-\$YEAR\$MONTH\$DAY.log\" template(\"[\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC] \$MSGONLY\\n\") template_escape(no)); };\n";
+			$_dest .="destination(d_portscan);";
+		}
+		if(!_LOG_NOLOG_REMOTE("portscan")) {
+			$_dest .="destination(d_remote);";
+		}
+		if(!_NULL($_dest)) {
+			$_config .="log { source(s_sys); filter(f_portscan); $_dest $_debug flags(final); };\n";
+		}
+		unset($_dest);
+	}
+/* --- portscan end --- */
+
+/* --- packetfilter start --- */
+	$_config .="filter f_packetfilter { program('ulogd') and match(\"__UID=101\"); };\n";	
+	if(_LOG_NOLOG_LOCAL("packetfilter") && _LOG_NOLOG_REMOTE("packetfilter")) {
+		$_config .="log { source(s_sys); filter(f_packetfilter); destination(d_devnull); $_debug flags(final); };\n";
+	} else {
+		$_dest="";
+		if(!_LOG_NOLOG_LOCAL("packetfilter")) {
+			$_config .="destination d_packetfilter { file(\""._LOG_PATH."/packetfilter-\$YEAR\$MONTH\$DAY.log\" template(\"[\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC] \$MSGONLY\\n\") template_escape(no)); };\n";
+			$_dest .="destination(d_packetfilter);";
+		}
+		if(!_LOG_NOLOG_REMOTE("packetfilter")) {
+			$_dest .="destination(d_remote);";
+		}
+		if(!_NULL($_dest)) {
+			$_config .="log { source(s_sys); filter(f_packetfilter); $_dest $_debug flags(final); };\n";
+		}
+		unset($_dest);
+	}
+/* --- packetfilter end --- */
+
+
+/* --- httpd start --- */
+	$_config .="filter f_httpd { program('httpd'); };\n";	
+	if(_LOG_NOLOG_LOCAL("httpd") && _LOG_NOLOG_REMOTE("httpd")) {
+		$_config .="log { source(s_sys); filter(f_httpd); destination(d_devnull); $_debug flags(final); };\n";
+	} else {
+		$_dest="";
+		if(!_LOG_NOLOG_LOCAL("httpd")) {
+			$_config .="destination d_httpd { file(\""._LOG_PATH."/httpd-\$YEAR\$MONTH\$DAY.log\" template(\"[\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC] \$MSGONLY\\n\") template_escape(no)); };\n";
+			$_dest .="destination(d_httpd);";
+		}
+		if(!_LOG_NOLOG_REMOTE("httpd")) {
+			$_dest .="destination(d_remote);";
+		}
+		if(!_NULL($_dest)) {
+			$_config .="log { source(s_sys); filter(f_httpd); $_dest $_debug flags(final); };\n";
+		}
+		unset($_dest);
+	}
+/* --- httpd end --- */
+
+/* --- named start --- */
+	$_config .="filter f_named { program('named'); };\n";	
+	if(_LOG_NOLOG_LOCAL("named") && _LOG_NOLOG_REMOTE("named")) {
+		$_config .="log { source(s_sys); filter(f_named); destination(d_devnull); $_debug flags(final); };\n";
+	} else {
+		$_dest="";
+		if(!_LOG_NOLOG_LOCAL("named")) {
+			$_config .="destination d_named { file(\""._LOG_PATH."/named-\$YEAR\$MONTH\$DAY.log\" template(\"[\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC] \$MSGONLY\\n\") template_escape(no)); };\n";
+			$_dest .="destination(d_named);";
+		}
+		if(!_LOG_NOLOG_REMOTE("named")) {
+			$_dest .="destination(d_remote);";
+		}
+		if(!_NULL($_dest)) {
+			$_config .="log { source(s_sys); filter(f_named); $_dest $_debug flags(final); };\n";
+		}
+		unset($_dest);
+	}
+/* --- named end --- */
+
+/* --- ntpd start --- */
+	$_config .="filter f_ntpd { program('ntpd'); };\n";	
+	if(_LOG_NOLOG_LOCAL("ntpd") && _LOG_NOLOG_REMOTE("ntpd")) {
+		$_config .="log { source(s_sys); filter(f_ntpd); destination(d_devnull); $_debug flags(final); };\n";
+	} else {
+		$_dest="";
+		if(!_LOG_NOLOG_LOCAL("ntpd")) {
+			$_config .="destination d_ntpd { file(\""._LOG_PATH."/ntpd-\$YEAR\$MONTH\$DAY.log\" template(\"[\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC] \$MSGONLY\\n\") template_escape(no)); };\n";
+			$_dest .="destination(d_ntpd);";
+		}
+		if(!_LOG_NOLOG_REMOTE("ntpd")) {
+			$_dest .="destination(d_remote);";
+		}
+		if(!_NULL($_dest)) {
+			$_config .="log { source(s_sys); filter(f_ntpd); $_dest $_debug flags(final); };\n";
+		}
+		unset($_dest);
+	}
+/* --- ntpd end --- */
+
+/* --- pptpd start --- */
+	$_config .="filter f_pptpd { program('pptpd'); };\n";	
+	if(_LOG_NOLOG_LOCAL("pptpd") && _LOG_NOLOG_REMOTE("pptpd")) {
+		$_config .="log { source(s_sys); filter(f_pptpd); destination(d_devnull); $_debug flags(final); };\n";
+	} else {
+		$_dest="";
+		if(!_LOG_NOLOG_LOCAL("pptpd")) {
+			$_config .="destination d_pptpd { file(\""._LOG_PATH."/pptpd-\$YEAR\$MONTH\$DAY.log\" template(\"[\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC] \$MSGONLY\\n\") template_escape(no)); };\n";
+			$_dest .="destination(d_pptpd);";
+		}
+		if(!_LOG_NOLOG_REMOTE("pptpd")) {
+			$_dest .="destination(d_remote);";
+		}
+		if(!_NULL($_dest)) {
+			$_config .="log { source(s_sys); filter(f_pptpd); $_dest $_debug flags(final); };\n";
+		}
+		unset($_dest);
+	}
+/* --- pptpd end --- */
+
+/* --- pppd start --- */
+	$_config .="filter f_pppd { program('pppd'); };\n";	
+	if(_LOG_NOLOG_LOCAL("pppd") && _LOG_NOLOG_REMOTE("pppd")) {
+		$_config .="log { source(s_sys); filter(f_pppd); destination(d_devnull); $_debug flags(final); };\n";
+	} else {
+		$_dest="";
+		if(!_LOG_NOLOG_LOCAL("pppd")) {
+			$_config .="destination d_pppd { file(\""._LOG_PATH."/pppd-\$YEAR\$MONTH\$DAY.log\" template(\"[\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC] \$MSGONLY\\n\") template_escape(no)); };\n";
+			$_dest .="destination(d_pppd);";
+		}
+		if(!_LOG_NOLOG_REMOTE("pppd")) {
+			$_dest .="destination(d_remote);";
+		}
+		if(!_NULL($_dest)) {
+			$_config .="log { source(s_sys); filter(f_pppd); $_dest $_debug flags(final); };\n";
+		}
+		unset($_dest);
+	}
+/* --- pppd end --- */
+
+/* --- pppoe start --- */
+	$_config .="filter f_pppoe { program('pppoe') or program('pppoe-connect'); };\n";	
+	if(_LOG_NOLOG_LOCAL("pppoe") && _LOG_NOLOG_REMOTE("pppoe")) {
+		$_config .="log { source(s_sys); filter(f_pppoe); destination(d_devnull); $_debug flags(final); };\n";
+	} else {
+		$_dest="";
+		if(!_LOG_NOLOG_LOCAL("pppoe")) {
+			$_config .="destination d_pppoe { file(\""._LOG_PATH."/pppoe-\$YEAR\$MONTH\$DAY.log\" template(\"[\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC] \$MSGONLY\\n\") template_escape(no)); };\n";
+			$_dest .="destination(d_pppoe);";
+		}
+		if(!_LOG_NOLOG_REMOTE("pppoe")) {
+			$_dest .="destination(d_remote);";
+		}
+		if(!_NULL($_dest)) {
+			$_config .="log { source(s_sys); filter(f_pppoe); $_dest $_debug flags(final); };\n";
+		}
+		unset($_dest);
+	}
+/* --- pppoe end --- */
+
+/* --- nmbd start --- */
+	$_config .="filter f_nmbd { program('nmbd') or program('winbindd'); };\n";	
+	if(_LOG_NOLOG_LOCAL("nmbd") && _LOG_NOLOG_REMOTE("nmbd")) {
+		$_config .="log { source(s_sys); filter(f_nmbd); destination(d_devnull); $_debug flags(final); };\n";
+	} else {
+		$_dest="";
+		if(!_LOG_NOLOG_LOCAL("nmbd")) {
+			$_config .="destination d_nmbd { file(\""._LOG_PATH."/nmbd-\$YEAR\$MONTH\$DAY.log\" template(\"[\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC] \$MSGONLY\\n\") template_escape(no)); };\n";
+			$_dest .="destination(d_nmbd);";
+		}
+		if(!_LOG_NOLOG_REMOTE("nmbd")) {
+			$_dest .="destination(d_remote);";
+		}
+		if(!_NULL($_dest)) {
+			$_config .="log { source(s_sys); filter(f_nmbd); $_dest $_debug flags(final); };\n";
+		}
+		unset($_dest);
+	}
+/* --- nmbd end --- */
+
+/* --- dhcpd start --- */
+	$_config .="filter f_dhcpd { program('dhcpd') or program('dhrelay') or program('dhrelayd'); };\n";	
+	if(_LOG_NOLOG_LOCAL("dhcpd") && _LOG_NOLOG_REMOTE("dhcpd")) {
+		$_config .="log { source(s_sys); filter(f_dhcpd); destination(d_devnull); $_debug flags(final); };\n";
+	} else {
+		$_dest="";
+		if(!_LOG_NOLOG_LOCAL("dhcpd")) {
+			$_config .="destination d_dhcpd { file(\""._LOG_PATH."/dhcpd-\$YEAR\$MONTH\$DAY.log\" template(\"[\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC] \$MSGONLY\\n\") template_escape(no)); };\n";
+			$_dest .="destination(d_dhcpd);";
+		}
+		if(!_LOG_NOLOG_REMOTE("dhcpd")) {
+			$_dest .="destination(d_remote);";
+		}
+		if(!_NULL($_dest)) {
+			$_config .="log { source(s_sys); filter(f_dhcpd); $_dest $_debug flags(final); };\n";
+		}
+		unset($_dest);
+	}
+/* --- dhcpd end --- */
+
+/* --- dhcpcd start --- */
+	$_config .="filter f_dhcpcd { program('dhcpcd'); };\n";	
+	if(_LOG_NOLOG_LOCAL("dhcpcd") && _LOG_NOLOG_REMOTE("dhcpcd")) {
+		$_config .="log { source(s_sys); filter(f_dhcpcd); destination(d_devnull); $_debug flags(final); };\n";
+	} else {
+		$_dest="";
+		if(!_LOG_NOLOG_LOCAL("dhcpcd")) {
+			$_config .="destination d_dhcpcd { file(\""._LOG_PATH."/dhcpcd-\$YEAR\$MONTH\$DAY.log\" template(\"[\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC] \$MSGONLY\\n\") template_escape(no)); };\n";
+			$_dest .="destination(d_dhcpcd);";
+		}
+		if(!_LOG_NOLOG_REMOTE("dhcpcd")) {
+			$_dest .="destination(d_remote);";
+		}
+		if(!_NULL($_dest)) {
+			$_config .="log { source(s_sys); filter(f_dhcpcd); $_dest $_debug flags(final); };\n";
+		}
+		unset($_dest);
+	}
+/* --- dhcpcd end --- */
+
+/* --- snmpd start --- */
+	$_config .="filter f_snmpd { program('snmpd'); };\n";	
+	if(_LOG_NOLOG_LOCAL("snmpd") && _LOG_NOLOG_REMOTE("snmpd")) {
+		$_config .="log { source(s_sys); filter(f_snmpd); destination(d_devnull); $_debug flags(final); };\n";
+	} else {
+		$_dest="";
+		if(!_LOG_NOLOG_LOCAL("snmpd")) {
+			$_config .="destination d_snmpd { file(\""._LOG_PATH."/snmpd-\$YEAR\$MONTH\$DAY.log\" template(\"[\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC] \$MSGONLY\\n\") template_escape(no)); };\n";
+			$_dest .="destination(d_snmpd);";
+		}
+		if(!_LOG_NOLOG_REMOTE("snmpd")) {
+			$_dest .="destination(d_remote);";
+		}
+		if(!_NULL($_dest)) {
+			$_config .="log { source(s_sys); filter(f_snmpd); $_dest $_debug flags(final); };\n";
+		}
+		unset($_dest);
+	}
+/* --- snmpd end --- */
+
+/* --- crond start --- */
+	$_config .="filter f_crond { program('crond'); };\n";	
+	if(_LOG_NOLOG_LOCAL("crond") && _LOG_NOLOG_REMOTE("crond")) {
+		$_config .="log { source(s_sys); filter(f_crond); destination(d_devnull); $_debug flags(final); };\n";
+	} else {
+		$_dest="";
+		if(!_LOG_NOLOG_LOCAL("crond")) {
+			$_config .="destination d_crond { file(\""._LOG_PATH."/crond-\$YEAR\$MONTH\$DAY.log\" template(\"[\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC] \$MSGONLY\\n\") template_escape(no)); };\n";
+			$_dest .="destination(d_crond);";
+		}
+		if(!_LOG_NOLOG_REMOTE("crond")) {
+			$_dest .="destination(d_remote);";
+		}
+		if(!_NULL($_dest)) {
+			$_config .="log { source(s_sys); filter(f_crond); $_dest $_debug flags(final); };\n";
+		}
+		unset($_dest);
+	}
+/* --- crond end --- */
+
+/* --- inadynd start --- */
+	$_config .="filter f_inadynd { program('INADYN'); };\n";	
+	if(_LOG_NOLOG_LOCAL("inadynd") && _LOG_NOLOG_REMOTE("inadynd")) {
+		$_config .="log { source(s_sys); filter(f_inadynd); destination(d_devnull); $_debug flags(final); };\n";
+	} else {
+		$_dest="";
+		if(!_LOG_NOLOG_LOCAL("inadynd")) {
+			$_config .="destination d_inadynd { file(\""._LOG_PATH."/inadynd-\$YEAR\$MONTH\$DAY.log\" template(\"[\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC] \$MSGONLY\\n\") template_escape(no)); };\n";
+			$_dest .="destination(d_inadynd);";
+		}
+		if(!_LOG_NOLOG_REMOTE("inadynd")) {
+			$_dest .="destination(d_remote);";
+		}
+		if(!_NULL($_dest)) {
+			$_config .="log { source(s_sys); filter(f_inadynd); $_dest $_debug flags(final); };\n";
+		}
+		unset($_dest);
+	}
+/* --- inadynd end --- */
+
+/* --- spamfilter start --- */
+	$_config .="filter f_spamfilter { program('spamd'); };\n";	
+	if(_LOG_NOLOG_LOCAL("spamfilter") && _LOG_NOLOG_REMOTE("spamfilter")) {
+		$_config .="log { source(s_sys); filter(f_spamfilter); destination(d_devnull); $_debug flags(final); };\n";
+	} else {
+		$_dest="";
+		if(!_LOG_NOLOG_LOCAL("spamfilter")) {
+			$_config .="destination d_spamfilter { file(\""._LOG_PATH."/spamfilter-\$YEAR\$MONTH\$DAY.log\" template(\"[\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC] \$MSGONLY\\n\") template_escape(no)); };\n";
+			$_dest .="destination(d_spamfilter);";
+		}
+		if(!_LOG_NOLOG_REMOTE("spamfilter")) {
+			$_dest .="destination(d_remote);";
+		}
+		if(!_NULL($_dest)) {
+			$_config .="log { source(s_sys); filter(f_spamfilter); $_dest $_debug flags(final); };\n";
+		}
+		unset($_dest);
+	}
+/* --- spamfilter end --- */
+
+/* --- sophosav start --- */
+	$_config .="filter f_sophosav { program('sophos'); };\n";	
+	if(_LOG_NOLOG_LOCAL("sophosav") && _LOG_NOLOG_REMOTE("sophosav")) {
+		$_config .="log { source(s_sys); filter(f_sophosav); destination(d_devnull); $_debug flags(final); };\n";
+	} else {
+		$_dest="";
+		if(!_LOG_NOLOG_LOCAL("sophosav")) {
+			$_config .="destination d_sophosav { file(\""._LOG_PATH."/sophosav-\$YEAR\$MONTH\$DAY.log\" template(\"[\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC] \$MSGONLY\\n\") template_escape(no)); };\n";
+			$_dest .="destination(d_sophosav);";
+		}
+		if(!_LOG_NOLOG_REMOTE("sophosav")) {
+			$_dest .="destination(d_remote);";
+		}
+		if(!_NULL($_dest)) {
+			$_config .="log { source(s_sys); filter(f_sophosav); $_dest $_debug flags(final); };\n";
+		}
+		unset($_dest);
+	}
+/* --- sophosav end --- */
+
+/* --- mailproxy start --- */
+	$_config .="filter f_mailproxy { program('p3scan'); };\n";	
+	if(_LOG_NOLOG_LOCAL("mailproxy") && _LOG_NOLOG_REMOTE("mailproxy")) {
+		$_config .="log { source(s_sys); filter(f_mailproxy); destination(d_devnull); $_debug flags(final); };\n";
+	} else {
+		$_dest="";
+		if(!_LOG_NOLOG_LOCAL("mailproxy")) {
+			$_config .="destination d_mailproxy { file(\""._LOG_PATH."/mailproxy-\$YEAR\$MONTH\$DAY.log\" template(\"[\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC] \$MSGONLY\\n\") template_escape(no)); };\n";
+			$_dest .="destination(d_mailproxy);";
+		}
+		if(!_LOG_NOLOG_REMOTE("mailproxy")) {
+			$_dest .="destination(d_remote);";
+		}
+		if(!_NULL($_dest)) {
+			$_config .="log { source(s_sys); filter(f_mailproxy); $_dest $_debug flags(final); };\n";
+		}
+		unset($_dest);
+	}
+/* --- mailproxy end --- */
+
+/* --- chkprog start --- */
+	$_config .="filter f_chkprog { program('CHKPROG'); };\n";	
+	if(_LOG_NOLOG_LOCAL("chkprog") && _LOG_NOLOG_REMOTE("chkprog")) {
+		$_config .="log { source(s_sys); filter(f_chkprog); destination(d_devnull); $_debug flags(final); };\n";
+	} else {
+		$_dest="";
+		if(!_LOG_NOLOG_LOCAL("chkprog")) {
+			$_config .="destination d_chkprog { file(\""._LOG_PATH."/chkprog-\$YEAR\$MONTH\$DAY.log\" template(\"[\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC] \$MSGONLY\\n\") template_escape(no)); };\n";
+			$_dest .="destination(d_chkprog);";
+		}
+		if(!_LOG_NOLOG_REMOTE("chkprog")) {
+			$_dest .="destination(d_remote);";
+		}
+		if(!_NULL($_dest)) {
+			$_config .="log { source(s_sys); filter(f_chkprog); $_dest $_debug flags(final); };\n";
+		}
+		unset($_dest);
+	}
+/* --- chkprog end --- */
+
+/* --- uplinkd start --- */
+	$_config .="filter f_uplinkd { program('UPLINKD'); };\n";	
+	if(_LOG_NOLOG_LOCAL("uplinkd") && _LOG_NOLOG_REMOTE("uplinkd")) {
+		$_config .="log { source(s_sys); filter(f_uplinkd); destination(d_devnull); $_debug flags(final); };\n";
+	} else {
+		$_dest="";
+		if(!_LOG_NOLOG_LOCAL("uplinkd")) {
+			$_config .="destination d_uplinkd { file(\""._LOG_PATH."/uplinkd-\$YEAR\$MONTH\$DAY.log\" template(\"[\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC] \$MSGONLY\\n\") template_escape(no)); };\n";
+			$_dest .="destination(d_uplinkd);";
+		}
+		if(!_LOG_NOLOG_REMOTE("uplinkd")) {
+			$_dest .="destination(d_remote);";
+		}
+		if(!_NULL($_dest)) {
+			$_config .="log { source(s_sys); filter(f_uplinkd); $_dest $_debug flags(final); };\n";
+		}
+		unset($_dest);
+	}
+/* --- uplinkd end --- */
+
+/* --- login start --- */
+	$_config .="filter f_login { program('LOGIN'); };\n";	
+	if(_LOG_NOLOG_LOCAL("auth") && _LOG_NOLOG_REMOTE("auth")) {
+		$_config .="log { source(s_sys); filter(f_login); destination(d_devnull); $_debug flags(final); };\n";
+	} else {
+		$_dest="";
+		if(!_LOG_NOLOG_LOCAL("auth")) {
+			$_config .="destination d_login { file(\""._LOG_PATH."/auth-\$YEAR\$MONTH\$DAY.log\" template(\"[\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC] \$MSGONLY\\n\") template_escape(no)); };\n";
+			$_dest .="destination(d_login);";
+		}
+		if(!_LOG_NOLOG_REMOTE("auth")) {
+			$_dest .="destination(d_remote);";
+		}
+		if(!_NULL($_dest)) {
+			$_config .="log { source(s_sys); filter(f_login); $_dest destination(d_syslog); $_debug flags(final); };\n";
+		}
+		unset($_dest);
+	}
+/* --- login end --- */
+
+/* --- sshd start --- */
+	$_config .="filter f_sshd { program('sshd'); };\n";	
+	if(_LOG_NOLOG_LOCAL("sshd") && _LOG_NOLOG_REMOTE("sshd")) {
+		$_config .="log { source(s_sys); filter(f_sshd); destination(d_devnull); $_debug flags(final); };\n";
+	} else {
+		$_dest="";
+		if(!_LOG_NOLOG_LOCAL("sshd")) {
+			$_config .="destination d_sshd { file(\""._LOG_PATH."/sshd-\$YEAR\$MONTH\$DAY.log\" template(\"[\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC] \$MSGONLY\\n\") template_escape(no)); };\n";
+			$_dest .="destination(d_sshd);";
+		}
+		if(!_LOG_NOLOG_REMOTE("sshd")) {
+			$_dest .="destination(d_remote);";
+		}
+		if(!_NULL($_dest)) {
+			$_config .="log { source(s_sys); filter(f_sshd); $_dest destination(d_syslog); $_debug flags(final); };\n";
+		}
+		unset($_dest);
+	}
+/* --- sshd end --- */
+
+/* --- vsftpd start --- */
+	$_config .="filter f_vsftpd { program('vsftpd'); };\n";	
+	if(_LOG_NOLOG_LOCAL("ftpd") && _LOG_NOLOG_REMOTE("ftpd")) {
+		$_config .="log { source(s_sys); filter(f_vsftpd); destination(d_devnull); $_debug flags(final); };\n";
+	} else {
+		$_dest="";
+		if(!_LOG_NOLOG_LOCAL("ftpd")) {
+			$_config .="destination d_vsftpd { file(\""._LOG_PATH."/ftpd-\$YEAR\$MONTH\$DAY.log\" template(\"[\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC] \$MSGONLY\\n\") template_escape(no)); };\n";
+			$_dest .="destination(d_vsftpd);";
+		}
+		if(!_LOG_NOLOG_REMOTE("ftpd")) {
+			$_dest .="destination(d_remote);";
+		}
+		if(!_NULL($_dest)) {
+			$_config .="log { source(s_sys); filter(f_vsftpd); $_dest destination(d_syslog); $_debug flags(final); };\n";
+		}
+		unset($_dest);
+	}
+/* --- vsftpd end --- */
+
+/* --- system start --- */
+	$_config .="filter f_system { program('SYSTEM'); };\n";	
+	if(_LOG_NOLOG_LOCAL("system") && _LOG_NOLOG_REMOTE("system")) {
+		$_config .="log { source(s_sys); filter(f_system); destination(d_devnull); $_debug flags(final); };\n";
+	} else {
+		$_dest="";
+		if(!_LOG_NOLOG_LOCAL("system")) {
+			$_config .="destination d_system { file(\""._LOG_PATH."/system-\$YEAR\$MONTH\$DAY.log\" template(\"[\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC] \$MSGONLY\\n\") template_escape(no)); };\n";
+			$_dest .="destination(d_system);";
+		}
+		if(!_LOG_NOLOG_REMOTE("system")) {
+			$_dest .="destination(d_remote);";
+		}
+		if(!_NULL($_dest)) {
+			$_config .="log { source(s_sys); filter(f_system); $_dest destination(d_syslog); $_debug flags(final); };\n";
+		}
+		unset($_dest);
+	}
+/* --- system end --- */
+
+/* --- ipwatchd start --- */
+	$_config .="filter f_ipwatchd { program('IPwatchD'); };\n";	
+	if(_LOG_NOLOG_LOCAL("ipwatchd") && _LOG_NOLOG_REMOTE("ipwatchd")) {
+		$_config .="log { source(s_sys); filter(f_ipwatchd); destination(d_devnull); $_debug flags(final); };\n";
+	} else {
+		$_dest="";
+		if(!_LOG_NOLOG_LOCAL("ipwatchd")) {
+			$_config .="destination d_ipwatchd { file(\""._LOG_PATH."/ipwatchd-\$YEAR\$MONTH\$DAY.log\" template(\"[\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC] \$MSGONLY\\n\") template_escape(no)); };\n";
+			$_dest .="destination(d_ipwatchd);";
+		}
+		if(!_LOG_NOLOG_REMOTE("ipwatchd")) {
+			$_dest .="destination(d_remote);";
+		}
+		if(!_NULL($_dest)) {
+			$_config .="log { source(s_sys); filter(f_ipwatchd); $_dest $_debug flags(final); };\n";
+		}
+		unset($_dest);
+	}
+/* --- ipwatchd end --- */
+
+/* --- update start --- */
+	$_config .="filter f_update { program('UPDATE'); };\n";	
+	if(_LOG_NOLOG_LOCAL("update") && _LOG_NOLOG_REMOTE("update")) {
+		$_config .="log { source(s_sys); filter(f_update); destination(d_devnull); $_debug flags(final); };\n";
+	} else {
+		$_dest="";
+		if(!_LOG_NOLOG_LOCAL("update")) {
+			$_config .="destination d_update { file(\""._LOG_PATH."/update-\$YEAR\$MONTH\$DAY.log\" template(\"[\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC] \$MSGONLY\\n\") template_escape(no)); };\n";
+			$_dest .="destination(d_update);";
+		}
+		if(!_LOG_NOLOG_REMOTE("update")) {
+			$_dest .="destination(d_remote);";
+		}
+		if(!_NULL($_dest)) {
+			$_config .="log { source(s_sys); filter(f_update); $_dest destination(d_syslog); $_debug flags(final); };\n";
+		}
+		unset($_dest);
+	}
+/* --- update end --- */
+
+	if(!_NULL($_debug)) {
+		$_config .="destination d_debug { file(\"/var/log/debug\" template(\"\$DAY-\$MONTHNAME-\$YEAR \$HOUR:\$MIN:\$SEC,\$PROGRAM,\$PID,\$MSGONLY\\n\") template_escape(no)); };\n";
+		$_config .="log { source(s_sys); destination(d_debug); flags(final); };\n";
+	}
+	return _FILE_SAVE("/etc/syslog-ng.conf",$_config);
+}
+
+
+function syslog_up() {
+	@unlink(_TASKQ_PATH."/syslog_up");
+	if(_EXEC_CMD("/bin/syslog-ng")==0) {
+		_INIT_NICE_LEVEL("syslog-ng","-1");
+		_INIT_CHKPROG_LOG("syslog-ng");
+		return TRUE;
+	}
+	return syslog_restart();
+}
+
+
+function syslog_start() {
+	_INIT_CHECK_DAEMON_STATUS("syslog-ng");
+	if(!syslog_config()) {
+		_INIT_ECHO(1,_GETTEXT("Starting %s failed","syslog-ng"));
+		return FALSE;
+	}
+	_INIT_START_DAEMON("/bin/syslog-ng","syslog_up","-1");
+	return TRUE;
+}
+
+function syslog_stop() {
+	_INIT_STOP_DAEMON("syslog-ng","syslog_up");
+	return TRUE;
+}
+
+function syslog_restart() {
+	_INIT_EXEC("syslog_stop");
+	_INIT_EXEC("syslog_start");
+	return TRUE;
+}
+
+?>

@@ -1,0 +1,69 @@
+<?php
+if(!defined('_CLI_CODE')||_CLI_CODE!="a098846421a09ab1cacd3b3a753cbe05") exit("\n\nERROR: _CLI_CODE not set\n\n");
+
+// session handle
+function _cli_session_delete($_num) {
+	$_objf=_OBJ_PATH."/sessions_print.obj";
+	$_obj=_FILE_ARRAY_GET($_objf);
+	if(_ARRAY_NULL($_obj)) {
+		_CLI_ECHO(_GETTEXT("Resource Id not available."));
+		_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","sessions print"));
+		@unlink($_objf);
+		return FALSE;
+	}
+	if($_num=='*' && _CLI_YESNO(_GETTEXT("This action will delete %s.\nContinue this action? %s","all sessions","[yes/no]: "))==TRUE) {
+		foreach($_obj as $_cnt => $_pid) {
+			_SESSION_DELETE($_pid);
+			unset($_obj[$_cnt]);
+		}
+		if(_FILE_ARRAY_SAVE($_objf,$_obj)) {
+			return TRUE;
+		}
+	} else {
+		$_num_array=array();
+		_CLI_MULTINUM($_num,$_num_array);
+		foreach($_num_array as $_no) {
+			if(!_NULL($_obj[$_no])) {
+				_SESSION_DELETE($_obj[$_no]);
+				unset($_obj[$_no]);
+			}
+		}
+		if(_FILE_ARRAY_SAVE($_objf,$_obj)) {
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function _cli_session() {
+	if($_SERVER["argc"] > 1 ) {
+		$_max=$_SERVER["argc"];
+		_CLI_TRIM_ARGS($_SERVER['argv']);
+		for($_x=1;$_x < $_max;$_x++) {
+			$_cmd=$_SERVER["argv"][$_x];
+			if($_cmd=="print") {
+				return _SESSION_PRINT(0);
+			} elseif($_cmd=="delete") {
+				$_num=$_SERVER["argv"][$_x+1];
+				return _cli_session_delete($_num);
+			} elseif($_cmd=="check") {
+				return _SESSION_PRINT(1);
+			} elseif($_cmd=="check_block") {
+				return _SESSION_ATTEMPT_CHECK();
+			} elseif($_cmd=="check_password") {
+				return _SESSION_RESET_AUTH_PASSWORD();
+			} elseif($_cmd=="reset_password") {
+				$_ccmd=$_SERVER["argv"][$_x+1];
+				$_cpasswd=$_SERVER["argv"][$_x+2];
+				$_caccess=$_SERVER["argv"][$_x+3];
+				if(!_NULL($_ccmd) && !_NULL($_cpasswd) && !_NULL($_caccess) 
+					&& ___CLI_ACCESS_CONTROL_PASSWORD_SET($_ccmd,$_cpasswd,$_caccess)) {
+					return _SESSION_RESET_AUTH_PASSWORD();
+				}
+			}
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+?>

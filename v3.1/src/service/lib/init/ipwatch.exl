@@ -1,0 +1,113 @@
+<?php
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+function ipwatch_check() {
+	if(!_INIT_CHECK_BINARY(array("/bin/ipwatchd","/bin/ifconfig","/bin/awk"))) {
+		_INIT_ECHO(1,_GETTEXT("Cannot execute %s. Internal error",_INIT_NAME()));
+		exit(1);
+	}
+}
+
+function ipwatch_quiet() {
+	_INIT_QUIET('1');
+}
+
+function ipwatch_debug() {
+	_INIT_DEBUG('1');
+}
+
+function ipwatch_config($_scriptdata='') {
+	_INI_TOKEN_GET("network","eth.cfg",$_ITOKEN);
+	if(_ARRAY_NULL($_ITOKEN)) {
+              	_INIT_ECHO(1,_GETTEXT("%s: no interfaces found","IPWATCH"));
+		ipwatch_quiet();
+                return FALSE;
+	}
+	_INI_TOKEN_GET("network","ipwatchd.cfg",$_NTOKEN);
+	$_DATA=$_NTOKEN['ipwatchd'];
+	if(_NULL($_DATA['STAT']) || $_DATA['STAT']==0) {
+		_INIT_ECHO(0,_GETTEXT("%s daemon (%s) disabled","IPWATCH","ipwatchd"));
+		ipwatch_quiet();
+		return FALSE;
+	}
+	if(_NULL($_DATA['MODE'])) $_DATA['MODE']="active";
+
+	if(!_NULL($_scriptdata)) {
+		return _FILE_SAVE("/etc/ipwatchd.conf","$_scriptdata\n");
+	}
+	$_ETH=array();
+	foreach($_ITOKEN as $_IID => $_IIDATA) {
+		if(_NULL($_IIDATA['NAME']) || _NULL($_IIDATA['TYPE'])
+			|| _NULL($_IIDATA['DEVICE'])
+			|| _NULL($_IIDATA['ADDR'])
+			|| ($_IIDATA['TYPE']!="static" && $_IIDATA['TYPE']!="vlan")) continue;
+		if(_NULL($_IIDATA['STAT']) || $_IIDATA['STAT']==0) continue;
+		if($_IIDATA['TYPE']=="vlan" && !_NULL($_IIDATA['TAG'])) {
+			$_config .="{$_IIDATA['DEVICE']}.{$_IIDATA['TAG']} {$_DATA['MODE']}\n";
+			$_ETH[$_IIDATA['NAME']]="{$_IIDATA['DEVICE']}.{$_IIDATA['TAG']}";
+			continue;
+		}
+		if($_IIDATA['TYPE']=="static") {
+			$_config .="{$_IIDATA['DEVICE']} {$_DATA['MODE']}\n";
+			$_ETH[$_IIDATA['NAME']]=$_IIDATA['DEVICE'];
+			continue;
+		}
+	}
+	_INI_TOKEN_GET("network","additional.cfg",$_ETOKEN);
+	if(!_ARRAY_NULL($_ETOKEN) && !_ARRAY_NULL($_ETH)) {
+		foreach($_ETOKEN as $_EID => $_EDATA) {
+			if(_NULL($_EDATA['PNAME'])) continue;
+			if(_NULL($_EDATA['STAT']) || $_EDATA['STAT']==0) continue;
+			if(!_NULL($_ETH[$_EDATA['PNAME']])) {
+				$_config .="{$_ETH[$_EDATA['PNAME']]}:{$_EID} passive\n";
+			}
+		}
+			
+	}
+	_TRIM($_config);
+	if(!_NULL($_config)) {
+		return _FILE_SAVE("/etc/ipwatchd.conf","$_config\n");
+	}
+	_INIT_ECHO(0,_GETTEXT("%s daemon (%s) disabled","IPWATCH","ipwatchd"));
+	ipwatch_quiet();
+	return FALSE;
+}
+
+
+function ipwatch_up() {
+	@unlink(_TASKQ_PATH."/ipwatch_up");
+	if(_EXEC_CMD("/bin/ipwatchd -c /etc/ipwatchd.conf")==0) {
+		_INIT_CHKPROG_LOG("ipwatchd");
+		return TRUE;
+	}
+	return ipwatch_restart();
+}
+
+
+function ipwatch_start() {
+	_INIT_CHECK_DAEMON_STATUS("ipwatchd");
+	if(!ipwatch_config()) {
+		_INIT_ECHO(1,_GETTEXT("Starting %s failed","ipwatchd"));
+		return FALSE;
+	}
+	$_prog="/bin/ipwatchd -c /etc/ipwatchd.conf";
+	if(_INIT_DEBUG()==1) {
+		$_prog="/bin/ipwatchd -c /etc/ipwatchd.conf --debug";
+	}
+	_INIT_START_DAEMON("$_prog","ipwatch_up");
+	return TRUE;
+}
+
+function ipwatch_stop() {
+	_INIT_STOP_DAEMON("ipwatchd","ipwatch_up");
+	return TRUE;
+}
+
+function ipwatch_restart() {
+	_INIT_EXEC("ipwatch_stop");
+	sleep(1);
+	_INIT_EXEC("ipwatch_start");
+	return TRUE;
+}
+
+?>

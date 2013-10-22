@@ -1,0 +1,163 @@
+#!/bin/bash -e
+trap "exit 1" 2;
+
+# checking
+if [ "x$_START" = "x" ]; then
+        echo "_START not set";
+        exit 1;
+fi
+if [ ! -f "$_START/MYBOX_VERSION" ]; then
+        echo "MYBOX_VERSION not set";
+        exit 1;
+fi
+if [ "x$_MK" = "x" ]; then
+        echo "_MK not set";
+        exit 1;
+fi
+if [ "x$_MSRC" = "x" ]; then
+        echo "_MSRC not set";
+        exit 1;
+fi
+if [ ! -f "$_FUNC/functions.sh" ]; then
+        echo "_FUNC not set";
+        exit 1;
+fi
+
+cd $_START;
+
+. $_FUNC/functions.sh
+
+_BUILD_MSG "rootfs";
+
+_PDIR="$_START/rootfs";
+_KBASE="$_START/kernel_pkg";
+#_BUSYBOX="$_MSRC/busybox/inst";
+_BINLIST="$(cat $_START/configs/rootfs_bin.list)";
+#_RCSTART="$(cat $_START/configs/rc_start)";
+#_RCSTOP="$(cat $_START/configs/rc_stop)";
+_RCSTART="$_START/configs/rc_start";
+_RCSTOP="$_START/configs/rc_stop";
+_MYBOX="$_MSRC/mybox/inst";
+#_LCDPROC="$_MSRC/lcdproc/inst";
+_BOOTRC="$_START/bootscript";
+_READAHEAD_LIST="$_START/configs/readahead.list";
+
+[ ! -e "$_MK/mk_skel" ] && _ERROR "$_MK/mk_skel not found";
+
+if [ -d "$_PDIR" ]; then
+	rm -rfv $_PDIR;
+fi
+
+sh $_MK/mk_skel;
+
+for t in /lib/libnss*_files*; do
+	_COPY_LIB $t $_PDIR/lib
+done
+for t in /lib/libnss*_dns*; do
+	_COPY_LIB $t $_PDIR/lib
+done
+
+for x in $_BINLIST; do
+	[[ $x =~ ^# ]] && continue;
+	if [ -x "$x" ]; then
+        	_COPY_BIN "$x" "$_PDIR" 0;
+	else
+		_ERROR "mk_rootfs -> $x not found";
+        fi
+done
+
+for s in $_MSRC/*/core_prog; do
+	if [ -f "$s" ]; then
+		for sx in $(cat $s); do
+			_COPY_BIN "$sx" "$_PDIR" 0;
+		done
+	fi
+done
+for s in $_MSRC/*/*.mk_rootfs; do
+	sh $s;
+done
+
+#if [ ! -d "$_BUSYBOX" ]; then
+#	_ERROR "mk_rootfs -> $_BUSYBOX not found";
+#else
+#	_MECHO "rsync -aul $_BUSYBOX/* $_PDIR/";
+#fi
+
+
+#if [ ! -d "$_MYBOX" ]; then
+#        _ERROR "mk_rootfs -> $_MYBOX not found";
+#else
+#	_MECHO "rsync -aul $_MYBOX/* $_PDIR/";
+#fi
+
+#if [ ! -d "$_LCDPROC" ]; then
+#       _ERROR "mk_rootfs -> $_LCDPROC not found";
+#else
+#	_MECHO "rsync -aul $_LCDPROC/* $_PDIR/";
+#fi
+
+_MECHO "cp -f $_KBASE/kmods*.mpk $_PDIR/tmp";
+#for f in $_KBASE/kmods*.mpk; do
+#	tar --use-compress-program=/usr/bin/lzma -C $_PDIR -xvf $f;
+#done
+
+# init.boot
+_MECHO "mkdir -p $_PDIR/etc/init.boot";
+_MECHO "cp -afv $_BOOTRC/init.boot/* $_PDIR/etc/init.boot/";
+for fx in $(find $_PDIR/etc/init.boot/* -type f);do
+	_MECHO "dos2unix $fx";
+done
+
+_MECHO "chmod 700 $_PDIR/etc/init.boot/*";
+for f in $_PDIR/etc/init.boot/rc.*; do
+	[ -f "$f" ] && _SH_COMPRESS "$f";
+done
+if [ -f "$_PDIR/etc/init.boot/commons" ]; then
+	_SH_COMPRESS "$_PDIR/etc/init.boot/commons";
+fi
+
+_MECHO "dos2unix $_BOOTRC/bin.boot/*";
+_MECHO "cp -fv $_BOOTRC/bin.boot/* $_PDIR/bin";
+_MECHO "chmod 700 $_PDIR/bin/*";
+
+if [ -f "$_PDIR/bin/exec_cli" ]; then
+	_SH_COMPRESS "$_PDIR/bin/exec_cli";
+fi
+
+[ -f "$_PDIR/bin/set_conntrack" ] && _PERL_STRIP $_PDIR/bin/set_conntrack
+if cd $_PDIR/bin >/dev/null 2>&1; then
+	ln -sf bash sh
+	#ln -sf swapon swapoff
+	ln -sf nano pico
+	ln -sf wget wget-firmware-update
+	ln -sf reiserfsck fsck.reiserfs
+	ln -sf /etc/init.boot/rc.init rcstart
+	ln -sf /etc/init.boot/rc.init bootdown
+fi
+if cd $_PDIR/ >/dev/null 2>&1; then
+	ln -sf /etc/init.boot/rc.init bootup
+fi
+
+if [ -f "$_RCSTART" ]; then
+	_MECHO "cp -fv $_RCSTART $_PDIR/etc/init.boot/rc.start";
+fi
+if [ -f "$_RCSTOP" ]; then
+	_MECHO "cp -fv $_RCSTOP $_PDIR/etc/init.boot/rc.stop";
+fi
+_MECHO "cd $_START";
+
+#cp -v $START_POINT/configs/ip2country/ip-to-country.csv $_PDIR/usr/share/ip-to-country.csv
+
+_MECHO "cd $_START";
+
+#for _ppp in $_START/src/*/*.mk_pkg;do 
+#	_FK="$(basename $_ppp .mk_pkg)";
+#	[ "x$_FK" != "x" ] && echo "$_FK" >> $_PDIR/tmp/pkg.list
+#	unset _FK;
+#done
+
+if [ -f "$_READAHEAD_LIST" ]; then
+	_MECHO "cp -v $_READAHEAD_LIST $_PDIR/tmp";
+fi
+
+exit 0;

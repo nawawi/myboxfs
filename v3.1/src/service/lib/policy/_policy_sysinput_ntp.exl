@@ -1,0 +1,110 @@
+<?php
+if(!defined('_POLICY_CODE')||_POLICY_CODE!="214162c595ce24bf9285f0a98cb0fbca") exit("\n\nERROR: _POLICY_CODE not set\n\n");
+
+function __policy_sysinput_ntp_acl(&$_rules,$_rulesid,$_type,$_host,$_sport,$_dport,$_iface="") {
+	$_int="";
+	if(!_NULL($_iface)) {
+		$_iface1=_DEFINITIONS_GET_INTERFACE_DEVICE($_iface);
+		if(!_NULL($_iface1)) {
+			$_int="-i $_iface1";
+		}
+	}
+	if($_type=="host" || $_type=="dnshost") {
+		if($_type=="dnshost" && $_host==_GETTEXT("unresolved")) {
+			return TRUE;
+		}
+		if(_IS_IPV4($_host)) {
+			$_rules .="-A SYS_INPUT $_rulesid $_int -p udp -m udp -s $_host --sport $_sport --dport $_dport -j CONFIRMED\n";
+			return TRUE;
+		}
+		_INIT_ECHO(1,_GETTEXT("%s ACL: invalid %s %s","NTP","IPv4 address","$_host"));
+		return FALSE;
+	} elseif($_type=="hostmac") {
+		if(_CHECK_MACADDR($_host)) {
+			$_rules .="-A SYS_INPUT $_rulesid $_int -p udp -m udp -m mac --mac-source $_host --sport $_sport --dport $_dport -j CONFIRMED\n";
+			return TRUE;
+		}
+		_INIT_ECHO(1,_GETTEXT("%s ACL: invalid %s %s","NTP","hostmac","$_host"));
+		return FALSE;
+	} elseif($_type=="hostrange") {
+		$_list=_STR_ARRAY($_host,"-");
+		if(!_NULL($_list[0]) && !_NULL($_list[1])) {
+			if(_CHK_HOSTRANGE($_list[0],$_list[1])) {
+				$_rules .="-A SYS_INPUT $_rulesid $_int -p udp -m udp -m iprange --src-range $_host --sport $_sport --dport $_dport -j CONFIRMED\n";
+				return TRUE;
+			}
+		}
+		_INIT_ECHO(1,_GETTEXT("%s ACL: invalid %s %s","NTP","hostrange","$_host"));
+		unset($_list);
+		return FALSE;
+	} else {
+		if(!_NULL($_host)) {
+			$_rules .="-A SYS_INPUT $_rulesid $_int -p udp -m udp -s $_host --sport $_sport --dport $_dport -j CONFIRMED\n";
+			return TRUE;
+		}
+	}
+	_INIT_ECHO(1,_GETTEXT("%s ACL: function failed","NTP"));
+	return FALSE;
+}
+
+function _policy_sysinput_ntp_test($_rules) {
+	$_test="*filter\n";
+	$_test .="$_rules";
+	$_test .="COMMIT\n";
+	if(!_policy_test($_test)) {
+		_INIT_ECHO(1,_GETTEXT("%s: rules failed","NTP INPUT POLICY"));
+		return FALSE;
+	}
+	return TRUE;
+}
+
+function _policy_sysinput_ntp(&$_data) {
+	$_sport='123:65535';
+	$_dport='123';
+	$_rules="";
+	$_rulesid="-m comment --comment ntpd";
+	_INI_TOKEN_GET("network","ntp.cfg",$_NTOKEN);
+	if(!_NULL($_NTOKEN['ntpd']['STAT']) && $_NTOKEN['ntpd']['STAT']==1) {
+		unset($_NTOKEN);
+		_INI_TOKEN_GET("network","ntp_acl.cfg",$_TOKEN);
+		if(!_ARRAY_NULL($_TOKEN)) {
+			$_HOST_CHECK=array();
+			foreach($_TOKEN as $_ID => $_DATA) {
+				if(_NULL($_DATA['ADDR'])) {
+					_INI_TOKEN_DELETE("network","ntp_acl.cfg",$_ID);
+					continue;
+				}
+				_DEFINITIONS_GET_BYNAME_R("networks",$_DATA['ADDR'],$_DTOKEN);
+				if(!_ARRAY_NULL($_DTOKEN)) {
+					foreach($_DTOKEN as $_DID => $_DDATA) {
+						if(_NULL($_DDATA['ADDR']) || _NULL($_DDATA['__DATA_TYPE'])) continue;
+						if($_DDATA['__DATA_TYPE']=="network") {
+							if(!_NULL($_DDATA['PREF'])) {
+								$_DDATA['ADDR']="{$_DDATA['ADDR']}/{$_DDATA['PREF']}";
+							}
+						}
+						$_type=$_DDATA['__DATA_TYPE'];
+						$_inf=$_DDATA['DNAME'];
+						$_addr_array=_STR_ARRAY($_DDATA['ADDR'],",");
+						foreach($_addr_array as $_addr) {
+							if(_NULL($_addr)) continue;
+							if(!_NULL($_HOST_CHECK[$_addr])) continue;
+							$_HOST_CHECK[$_addr]=1;
+							__policy_sysinput_ntp_acl($_rules,$_rulesid,$_type,$_addr,$_sport,$_dport,$_inf);
+						}
+						unset($_addr_array,$_addr,$_type,$_inf);
+					}
+				}
+				unset($_DTOKEN,$_DID,$_DDATA);
+			}
+		}
+	}
+	$_rules .="-A SYS_INPUT $_rulesid -p udp -m udp --sport $_sport --dport $_dport -j DROP\n";
+	if(_policy_sysinput_ntp_test($_rules)) {
+		$_data .="$_rules";
+		return TRUE;
+	}
+	return FALSE;
+}
+
+?>

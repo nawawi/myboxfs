@@ -1,0 +1,52 @@
+This file is empty_dir.def, from which is created empty_dir.c.
+It implements the builtin "empty_dir" in Bash.
+empty_dir - check if directory empty
+
+$PRODUCES empty_dir.c
+#include <config.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <dirent.h>
+
+#include "../builtins.h"
+#include "../shell.h"
+
+$BUILTIN empty_dir
+$FUNCTION empty_dir_builtin
+$SHORT_DOC empty_dir [directory]
+return true if directory empty
+$END
+
+static int check_empty(char *dirname) {
+        DIR *dir;
+        struct dirent *entry;
+        int check=0;
+        if((dir = opendir(dirname)) == NULL) return(check);
+        for(;;) {
+                if((entry = readdir(dir)) == NULL) {
+                        closedir(dir);
+                        return(check);
+                }
+                if(!strcmp(entry->d_name,".") || !strcmp(entry->d_name,"..")) continue;
+                check=1;
+                return(check);
+        }
+        return(check);
+}
+
+int empty_dir_builtin(WORD_LIST *list) {
+	char *dirname;
+	if(list==0) {
+		builtin_usage();
+		return (EX_USAGE);
+	}
+	if(no_options(list)) return(EX_USAGE);
+	dirname=list->word->word;
+	if(check_empty(dirname)==0) {
+		return(EXECUTION_SUCCESS);
+	}
+	return(EXECUTION_FAILURE);
+}

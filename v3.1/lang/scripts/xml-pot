@@ -1,0 +1,42 @@
+#!/bin/bash
+trap "exit 1" 2;
+
+_TOP="/root/mybox-build";
+_PDIR="$_TOP/src/lang";
+_CDIR="$_TOP/src/mybox/clish-xml";
+_INST="$_PDIR/pot_data";
+
+if [ "x$_FUNC" = "x" ]; then
+        _FUNC="$_TOP/scripts";
+        if [ ! -f "$_FUNC/functions.sh" ]; then
+                echo "ERROR: $_FUNC/functions.sh not exist";
+                exit 1;
+        fi
+fi
+. $_FUNC/functions.sh
+
+if !cd $_PDIR 2>/dev/null; then
+        echo "Invalid Path";
+        exit 1;
+fi
+
+:>./gg
+for f in $_CDIR/*.xml;do
+	[ ! -f "$f" ] && continue;
+	egrep -r 'help=".*"' $f \
+	|sed -e 's|help="||g' -e 's|">||g' -e 's|/>||g' -e 's|"||g' \
+	|perl -pe 's/^\s+//g' >> ./gg
+done
+
+if [ -f "./gg" ]; then
+	cat ./gg |sort -u > ./gg2
+	mv gg2 gg;
+	while read p;do
+		_B=$(echo $p |tr -d '\n' |tr -d '\r');
+		echo "msgid   \"$_B\"";
+		echo "msgstr  \"\"";
+		echo ""
+		unset _B;
+	done < ./gg;
+	rm -f ./gg;
+fi

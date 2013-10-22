@@ -1,0 +1,84 @@
+<?php
+if(!defined('_CGI_CODE')||_CGI_CODE!="90d45215e48dac81e802f17310ad0c1f") exit("\n\nERROR: _CGI_CODE not set\n\n");
+/* req_data = p_system_antivirus */
+
+function _CGI_PAGE_SYSTEM_ANTIVIRUS_SOPHOS_INFO() {
+	$_fpath=_SOPHOSAV_PATH;
+	$_eversion=_FILE_GET("$_fpath/EVERSION");
+	$_iversion=_FILE_GET("$_fpath/IVERSION");
+	$_tvirus=_FILE_GET("$_fpath/VICNT");
+	$_page="
+		<fieldset style='margin-top: 20px;'>
+		<legend>Version Information</legend>
+		<div style='margin: 5px;'>
+		<table class='tbox_t' style='width: 100%;'>
+		<tr>
+		<td class='tbox_tdl'>"._GETTEXT("Engine version:")."</td>
+		<td class='tbox_tdc' style='padding-top: 3px;font-weight: bold;'>$_eversion</td>
+		<th rowspan='3' class='tbox_tdr'>"._GETTEXT("This table display current Sophos Antivirus version that used by system. The information will automatically update when new pattern installed.<br />The system will connect to updates server and download if newer version is available. For security reasons pattern can only be updated automatically.")."</th>
+		</tr>
+		<tr>
+		<td class='tbox_tdl'>"._GETTEXT("Pattern version:")."</td>
+		<td class='tbox_tdc' style='padding-top: 3px;font-weight: bold;'>$_iversion</td>
+		</tr>
+		<tr>
+		<td class='tbox_tdl'>"._GETTEXT("Virus detection:")."</td>
+		<td class='tbox_tdc' style='padding-top: 3px;font-weight: bold;'>$_tvirus</td>
+		</tr>
+		</table>
+		</div>
+		</fieldset>
+	";
+	return trim($_page);
+}
+
+function _CGI_PAGE_SYSTEM_ANTIVIRUS_SOPHOS() {
+	extract($GLOBALS['_IMG']);
+	_INI_TOKEN_GET("system","antivirus.cfg",$_TOKEN);
+	$_DATA=$_TOKEN['sophos_av'];
+	$_bid=_CGI_ATTR_KEY();
+	$_page="
+		<div class='tbox_tee'>
+		<div class='fbox_c'>
+		<fieldset>
+		<legend>Sophos Antivirus</legend>
+		<div style='margin: 5px;'>
+		"._CGI_BUTTON_ENABLE(array('img_id'=>'av_stat'))."
+		<hr />
+		"._CGI_BUTTON_APPLY("button_{$_bid}")."
+		</div>
+		</fieldset>
+
+		"._CGI_PAGE_SYSTEM_ANTIVIRUS_SOPHOS_INFO()."
+		</div>
+		</div>
+	";
+	$_page .="<script type='text/javascript'>
+			__tnpage.button_hover();
+			\$(document).ready(function() {
+				var _imgoff='{$_ICON_ONOFF[0]}';
+				var _imgon='{$_ICON_ONOFF[1]}';
+				var _stat_onoff=function(stat) {
+					if(stat==1) {
+						\$('div.fbox_c img#av_stat').attr({'src': _imgon});
+						\$('div.fbox_c div#button_stat').text('Disable').attr('title','Disable');
+					} else {
+						\$('div.fbox_c img#av_stat').attr({'src': _imgoff});
+						\$('div.fbox_c div#button_stat').text('Enable').attr('title','Enable');
+					}
+				};
+				_stat_onoff({$_DATA['STAT']});
+				\$('div.fbox_c div#button_stat').click(function() {
+					var _cstat=\$.trim(\$(this).text());
+					if(_cstat==='Enable') {
+						_stat_onoff(1);
+					} else {
+						_stat_onoff(0);
+					}
+				});
+			});
+	</script>";
+	return trim($_page);
+}
+
+?>

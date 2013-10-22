@@ -1,0 +1,6 @@
+#!/bin/sh
+if [ -r "/etc/group" ]; then
+        echo "$(sed -e 's/:.*//g' /etc/group |tr '\n' ' ')"
+        exit 0;
+fi
+exit 1;

@@ -1,0 +1,30 @@
+This file is unlink.def, from which is created unlink.c.
+It implements the builtin "unlink" in Bash.
+unlink - delete file
+
+$PRODUCES unlink.c
+#include <config.h>
+#include <unistd.h>
+#include <stdio.h>
+#include "../builtins.h"
+#include "../shell.h"
+#include "bashgetopt.h"
+
+$BUILTIN unlink
+$FUNCTION unlink_builtin
+$SHORT_DOC unlink [file ...]
+delete file
+$END
+
+int unlink_builtin(WORD_LIST *list) {
+	if(no_options(list)) return (EX_BADUSAGE);
+	list=loptend;
+	if(list == 0) {
+		builtin_usage();
+		return(EX_USAGE);
+	}
+	for ( ; list; list = list->next) {
+		unlink(list->word->word);
+        }
+	return(EXECUTION_SUCCESS);
+}

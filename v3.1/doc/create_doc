@@ -1,0 +1,31 @@
+#!/bin/bash
+_SRC="/home/awieapps/drive_d/rnd/tracenetwork/mybox-dev/v3.1/src/service/";
+_DST="/home/awieapps/drive_d/rnd/tracenetwork/mybox-dev/v3.1/doc/document/";
+_PHPDOC=" /usr/bin/phpdoc";
+
+if [ -x "$_PHPDOC" ]; then
+	echo "_PHPDOC not found";
+fi
+#-o HTML:frames:earthli \
+# -o HTML:frames:phphtmllib \
+#-o HTML:frames:l0l33t \
+#-o HTML:frames:DOM/earthli \
+#-o PDF:default:default \
+
+#$_PHPDOC \
+#-o HTML:frames:earthli \
+#-dh \
+#-ti "TNOS" \
+#-dn main \
+#-dc global \
+#-d $_SRC \
+#-t $_DST
+
+$_PHPDOC \
+-o PDF:default:default \
+-dh \
+-ti "Tracenetwork Source Code" \
+-dn main \
+-dc global \
+-d $_SRC \
+-t $_DST

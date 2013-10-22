@@ -1,0 +1,255 @@
+<?php
+if(!defined('_CGI_CODE')||_CGI_CODE!="90d45215e48dac81e802f17310ad0c1f") exit("\n\nERROR: _CGI_CODE not set\n\n");
+
+function _CGI_PAGE_SYSTEM_UPDATE_LAST_CHECK() {
+	$_page="
+		<tr class='lcheck'>
+		<td class='tbox_tdl'>"._GETTEXT("Last checked:")."</td>
+		<td id='lastcheck' class='tbox_tdc' style='vertical-align: bottom;'></td>
+		</tr>
+		<tr class='lcheck' id='isupdate' style='display: none;'><td class='tbox_tdl'>&nbsp;</td>
+		<td id='isupdatetxt' class='tbox_tdc' style='vertical-align: bottom; color: red;'></td>
+		</tr>
+		<tr class='lcheck' id='isnext'><td class='tbox_tdl'>"._GETTEXT("Next check:")."</td>
+		<td id='ncheck' class='tbox_tdc' style='vertical-align: bottom;'></td>
+		</tr>
+		<tr class='lcheck'><td class='tbox_tdl'>&nbsp;</td>
+		<td class='tbox_tdc' style='vertical-align: bottom;'>
+		"._CGI_BUTTON(array('id'=>"bt_check",'text'=>_GETTEXT("Check Now"),'class'=>'button_s','direction'=>'none','css'=>'width: 150px;'))."
+		</td>
+		</tr>
+	";
+	return trim($_page);
+}
+
+function _CGI_PAGE_SYSTEM_UPDATE_TAB_2() {
+	_INI_TOKEN_GET("system","update.cfg",$_TOKEN);
+	$_DATA=$_TOKEN['update'];
+	$_bid=_CGI_ATTR_KEY();
+
+	$_page="
+		<div class='fbox_c'>
+		<fieldset>
+		<legend>"._GETTEXT("Firmware updates")."</legend>
+		<div style='margin: 5px;'>
+		<table class='tbox_t'>
+		<tr>
+		<td class='tbox_tdl'>"._GETTEXT("Check for updates:")."</td>
+		<td class='tbox_tdc'>
+			<select id='update_check' class='tbox_s' size='1'>
+	";
+	foreach(array("never","daily","weekly","monthly") as $_d) {
+		$_page .="<option value='$_d' "._CGI_DROPDOWNBOX_VAL($_d,$_DATA['UPDATE_CHECK']).">".ucfirst(_GETTEXT($_d))."</option>";
+	}
+	$_page .="
+		</select>
+		</td>
+		<td class='tbox_tdr'>"._GETTEXT("The system will connect to updates server and check if newer version is available. Select %s to disable this operation.",_GETTEXT("never"))."</td>
+		</tr>
+		"._CGI_PAGE_SYSTEM_UPDATE_LAST_CHECK()."
+		</table>
+		<hr />
+		"._CGI_BUTTON_APPLY("button_{$_bid}1")."
+		</div>
+		</fieldset>
+
+		<fieldset style='margin-top: 20px;'>
+		<legend>"._GETTEXT("Firmware download")."</legend>
+		<div style='margin: 5px;'>
+		<table class='tbox_t'>
+		<tr>
+		<td class='tbox_tdl' style='width: 10px; vertical-align: top;'><input id='download' type='checkbox' "._CGI_CHECKBOX_VAL($_DATA['DOWNLOAD'])."></td>
+		<td class='tbox_tdc' style='width: 250px; padding: 5px 0px 0px 2px'>"._GETTEXT("Enable automatic firmware download")."</td>
+		<td class='tbox_tdr'>"._GETTEXT("When this option is enabled and newer version is available, the system will automatically download the updates. Make sure check for updates is enabled.")."</td>
+		</tr>
+		<tr><td>&nbsp;</td></tr>
+		<tr>
+		<td class='tbox_tdl' style='width: 10px; vertical-align: top;'><input id='save_download' type='checkbox' "._CGI_CHECKBOX_VAL($_DATA['SAVE_DOWNLOAD'])."></td>
+		<td class='tbox_tdc' style='width: 250px; padding: 5px 0px 0px 2px'>"._GETTEXT("Enable keep update files")."</td>
+		<td class='tbox_tdr'>"._GETTEXT("When this option is enabled, the system will never remove downloaded updates.")."</td>
+		</tr>
+		</table>
+		<hr />
+		"._CGI_BUTTON_APPLY("button_{$_bid}2")."
+		</div>
+		</fieldset>
+
+		<fieldset style='margin-top: 20px;'>
+		<legend>"._GETTEXT("Parent Proxy")."</legend>
+		<div style='margin: 5px;'>
+		<table class='tbox_t'>
+		<tr>
+		<td class='tbox_tdl' style='width: 100px; vertical-align: top;'><input id='proxy_stat' type='checkbox' "._CGI_CHECKBOX_VAL($_DATA['PROXY_STAT'])."></td>
+		<td class='tbox_tdc' style='width: 250px; padding: 5px 0px 0px 7px'>"._GETTEXT("Enable a parent proxy")."</td>
+		<th rowspan='10' class='tbox_tdr'>"._GETTEXT("When this option is enabled, the system will use parent proxy to fetch firmware updates.<br /><br />You can enable a proxy authentication and specify username and password if your parent proxy requires authentication. Leaving a password's fields empty will preserve the existing password.")."</th>
+		</tr>
+		<tr><td colspan='2' style='padding-left: 20px;'><hr style='padding: 0px;margin: 0px;' /></td></tr>
+		<tr>
+		<td class='tbox_tdl' style='width: 100px;'>"._GETTEXT("Proxy host:")."</td>
+		<td class='tbox_tdc' style='width: 250px;'>
+			"._CGI_PAGE_DEFINITIONS_INPUT(array(
+				'input_css'=>'width: 200px;',
+				'fid'=>'proxy_host',
+				'default'=>$_DATA['PROXY_HOST'],
+				'section'=>'networks',
+				'accept'=>'#dnd_host,#dnd_dnshost',
+				'alt'=>"$_ALT",
+				'adjust'=>180))."
+		</td></tr>
+		<tr>
+		<td class='tbox_tdl' style='width: 100px;'>"._GETTEXT("Proxy port:")."</td>
+		<td class='tbox_tdc' style='width: 250px; padding-left: 7px;'>
+			<input id='proxy_port' type='text' class='tbox_i' style='width: 100px;' value='{$_DATA['PROXY_PORT']}' />
+		</td></tr>
+		<tr><td colspan='2' style='padding-top: 5px;'>&nbsp;</td></tr>
+		<tr>
+		<td class='tbox_tdl' style='width: 100px; vertical-align: top;'><input id='proxy_auth_stat' type='checkbox' "._CGI_CHECKBOX_VAL($_DATA['PROXY_AUTH_STAT'])."></td>
+		<td class='tbox_tdc' style='width: 250px; padding: 5px 0px 0px 7px'>"._GETTEXT("Enable a proxy authentication")."</td>
+		</tr>
+		<tr class='pauth'><td colspan='2' style='padding-left: 20px;'><hr style='padding: 0px;margin: 0px;' /></td></tr>
+		<tr class='pauth'>
+		<td class='tbox_tdl' style='width: 100px;'>"._GETTEXT("Username:")."</td>
+		<td class='tbox_tdc' style='width: 250px; padding-left: 7px;'>
+			<input id='proxy_user' type='text' class='tbox_i' value='{$_DATA['PROXY_USER']}' />
+		</td></tr>
+		<tr class='pauth'>
+		<td class='tbox_tdl' style='width: 100px;'>"._GETTEXT("Password").":</td>
+		<td class='tbox_tdc' style='width: 250px; padding-left: 7px;'>
+			<input id='proxy_pass1' type='password' class='tbox_i' value='' /> 
+		</td></tr>
+		<tr class='pauth'>
+		<td class='tbox_tdl' style='width: 100px;'>"._GETTEXT("Repeat:")."</td>
+		<td class='tbox_tdc' style='width: 250px; padding-left: 7px;'>
+			<input id='proxy_pass2' type='password' class='tbox_i' value='' />
+		</td></tr>
+		</table>
+		<hr />
+		"._CGI_BUTTON_APPLY("button_{$_bid}3")."
+		</div>
+		</fieldset>
+
+		</div>
+		<script type='text/javascript'>
+			\$(document).ready(function() {
+				var _lastcheck='"._UPDATE_LAST_CHECK(0)."';
+				var _updates="._UPDATE_INFO_ORGANIZE()." || 0;
+				var _do_lastcheck=function(check,update) {
+					_lastcheck=check;
+					_updates=update;
+					\$('tr#isupdate').hide();
+					\$('tr#isnext').hide();
+					if(is_null(check)) {
+						\$('td#lastcheck').text('"._GETTEXT("Not checking yet")."');
+					} else {
+						\$('td#lastcheck').text(check);
+						if(is_num(update) && update!=0) {
+							\$('tr#isupdate').show();
+							\$('td#isupdatetxt').text(update+' "._GETTEXT("updates available for download")."');
+						} else {
+							\$('tr#isupdate').hide();
+						}
+						\$('tr#isnext').show();
+					}
+				};
+				var _do_chkupdate=function(_val) {
+					var _nval={'daily':'days','weekly':'weeks','monthly':'months'};
+					if(_val=='never') {
+						\$('tr.lcheck').hide();
+					} else {
+						\$('tr.lcheck').show();
+						\$.ajaxSetup({cache:false,async:false});
+						\$('td#ncheck').load('index.exh',{'update_check_next_time':_nval[_val]});
+						_do_lastcheck(_lastcheck,_updates);
+					}
+				};
+
+				\$('select#update_check').change(function() {
+					var _val=\$(this).attr('value');
+					_do_chkupdate(_val);
+				});
+				_do_chkupdate(\$('select#update_check').attr('value'));
+				_do_lastcheck(_lastcheck,_updates);
+
+				\$('#bt_check').click(function(evt) {
+					var e=evt || window.event;
+					e.preventDefault();
+					\$.ajaxSetup({cache:false,async:false});
+					\$.post('index.exh',{'firmware_update_check':'1'},function(data,status) {
+						if(status==='success' && is_object(data)) {
+							_do_lastcheck(data.check,data.cnt);
+						}
+					},'json');
+				});
+
+				\$('#button_{$_bid}1').click(function(evt) {
+					var e=evt || window.event;
+					e.preventDefault();
+					var _check=\$('select#update_check').attr('value');
+					var _data='_update_data=2&_sec=system&_secf=update&_id=update&_eq=cron_restart&_data[UPDATE_CHECK]='+_check;
+					__tnpage.data_update(_data);
+				});
+
+				\$('#button_{$_bid}2').click(function(evt) {
+					var e=evt || window.event;
+					e.preventDefault();
+					var _download=\$('#download:checked').length;
+					var _save_download=\$('#save_download:checked').length;
+					var _data='_update_data=2&_sec=system&_secf=update&_id=update&_data[DOWNLOAD]='+_download+'&_data[SAVE_DOWNLOAD]='+_save_download;
+					__tnpage.data_update(_data);
+				});
+
+				\$('#button_{$_bid}3').click(function(evt) {
+					var e=evt || window.event;
+					e.preventDefault();
+					var _proxy_stat=\$('#proxy_stat:checked').length;
+					var _proxy_host=\$.trim(\$('#proxy_host').text());
+					var _proxy_port=\$.trim(\$('#proxy_port').val());
+					var _proxy_auth_stat=\$('#proxy_auth_stat:checked').length;
+					var _proxy_user=\$.trim(\$('#proxy_user').val());
+					var _proxy_pass1=\$.trim(\$('#proxy_pass1').val());
+					var _proxy_pass2=\$.trim(\$('#proxy_pass2').val());
+					if((is_null(_proxy_host) || (!is_num(_proxy_port) || _proxy_port > 65535 )) && _proxy_stat==1) {
+						__tndialog.ebox('"._GETTEXT("Entered values at Parent Proxy is syntactically or logically incorrect")."');
+						\$('#proxy_stat').attr('checked',false);
+						return false;
+					}
+					var _data='_update_data=2&_sec=system&_secf=update&_id=update&_data[PROXY_STAT]='+_proxy_stat;
+					_data +='&_data[PROXY_HOST]='+_proxy_host;
+					_data +='&_data[PROXY_PORT]='+_proxy_port;
+					_data +='&_data[PROXY_AUTH_STAT]='+_proxy_auth_stat;
+					_data +='&_data[PROXY_USER]='+_proxy_user;
+					if(_proxy_auth_stat==1) {
+						if(is_null(_proxy_user)) {
+							__tndialog.ebox('"._GETTEXT("No Proxy User defined")."');
+							return false;
+						}
+						if(!is_null(_proxy_pass1) && !is_null(_proxy_pass2)) {
+							if(is_same(_proxy_pass1,_proxy_pass2)) {
+								_data +='&_data[PROXY_PASSWORD]='+_proxy_pass2;
+							}
+						}
+					}
+					__tnpage.data_update(_data);
+					return true;
+				});
+
+				var _do_pcheck=function() {
+					if(\$('input#proxy_auth_stat').attr('checked')===true) {
+						\$('tr.pauth').show();
+					} else {
+						\$('tr.pauth').hide();
+					}
+				};
+
+				\$('input#proxy_auth_stat').click(function() {
+					_do_pcheck();
+				});
+
+				_do_pcheck();
+			});
+		</script>
+	";
+	return trim($_page);
+}
+
+?>

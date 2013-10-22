@@ -1,0 +1,140 @@
+﻿<?xml version="1.0"?>
+<CLISH_MODULE>
+<VIEW name="dyndns" prompt="${SYSTEM_NAME}/network/dns/dyndns/&gt; ">
+        <COMMAND name="."
+                help="Return to main menu"
+                view="main"
+                viewid=""/>
+        <COMMAND name=".."
+                help="Return to previous menu"
+                view="dns"
+                viewid=""/>
+        <COMMAND name="apply"
+                help="Apply changes">
+                <ACTION>exec /service/tools/dns_config.exc dyndns apply 2>/dev/null</ACTION>
+        </COMMAND>
+
+	<COMMAND name="print"
+                help="Display current config">
+                <ACTION>exec /service/tools/dns_config.exc dyndns print 2>/dev/null|more -dl</ACTION>
+        </COMMAND>
+
+	<COMMAND name="find"
+                help="Search Dynamic DNS">
+		<PARAM name="string"
+			help="String to find"
+			ptype="STRING_ANY" />
+                <ACTION>exec /service/tools/dns_config.exc dyndns find "${string}" 2>/dev/null |more -dl</ACTION>
+        </COMMAND>
+
+	<COMMAND name="add"
+                help="Add new Dynamic DNS">
+		<PARAM name="provider"
+                        help="Dynamic DNS provider"
+                        ptype="DYNDNS_OPTION"
+			default="no-ip"/>
+		<PARAM name="hostname"
+			help="Hostname"
+			ptype="STRING_ANY" />
+		<PARAM name="username"
+			help="Username"
+			ptype="STRING_ANY" />
+		<PARAM name="password"
+			help="Password"
+			ptype="STRING_ANY" />
+                <ACTION>exec /service/tools/dns_config.exc dyndns add ${provider} "${hostname}" "${username}" "${password}" 2>/dev/null</ACTION>
+        </COMMAND>
+
+	<COMMAND name="edit"
+                help="Change Dynamic DNS configuration"/>
+	<COMMAND name="edit provider"
+                help="Set DNS rovider">
+		<PARAM name="id"
+                        help="Resource Id"
+                        ptype="NUM"/>
+		<PARAM name="provider"
+                        help="Dynamic DNS provider"
+                        ptype="DYNDNS_OPTION"
+			default="no-ip"/>
+                <ACTION>exec /service/tools/dns_config.exc dyndns set provider ${id} ${provider} 2>/dev/null</ACTION>
+        </COMMAND>
+
+	<COMMAND name="edit hostname"
+                help="Set hostname">
+		<PARAM name="id"
+                        help="Resource Id"
+                        ptype="NUM"/>
+		<PARAM name="hostname"
+			help="Hostname"
+			ptype="STRING_ANY" />
+                <ACTION>exec /service/tools/dns_config.exc dyndns set hostname ${id} ${hostname} 2>/dev/null</ACTION>
+        </COMMAND>
+
+	<COMMAND name="edit aliases"
+                help="Set aliases">
+		<PARAM name="id"
+                        help="Resource Id"
+                        ptype="NUM"/>
+		<PARAM name="aliases"
+			help="Additional hostname"
+			ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/dns_config.exc dyndns set aliases ${id} ${aliases} 2>/dev/null</ACTION>
+        </COMMAND>
+
+	<COMMAND name="edit username"
+                help="Set username">
+		<PARAM name="id"
+                        help="Resource Id"
+                        ptype="NUM"/>
+		<PARAM name="username"
+			help="Username"
+			ptype="STRING_ANY" />
+                <ACTION>exec /service/tools/dns_config.exc dyndns set username ${id} ${username} 2>/dev/null</ACTION>
+        </COMMAND>
+
+	<COMMAND name="edit password"
+                help="Set password">
+		<PARAM name="id"
+                        help="Resource Id"
+                        ptype="NUM"/>
+		<PARAM name="password"
+			help="Password"
+			ptype="STRING_ANY" />
+                <ACTION>exec /service/tools/dns_config.exc dyndns set password ${id} ${password} 2>/dev/null</ACTION>
+        </COMMAND>
+
+	<COMMAND name="edit enable"
+                help="Set enable">
+		<PARAM name="id"
+                        help="Resource Id"
+                        ptype="NUM"/>
+		<PARAM name="enable"
+			help="Set enable"
+			ptype="ONOFF" 
+			default="off"/>
+                <ACTION>exec /service/tools/dns_config.exc dyndns set enable ${id} ${enable} 2>/dev/null</ACTION>
+        </COMMAND>
+
+	<COMMAND name="edit description"
+                help="Set description">
+		<PARAM name="id"
+                        help="Resource Id"
+                        ptype="NUM"/>
+		<PARAM name="description"
+                        help="Description"
+                        ptype="STRING_ANY"
+			default=""/>
+                <ACTION>exec /service/tools/dns_config.exc dyndns set description ${id} "${description}" 2>/dev/null</ACTION>
+        </COMMAND>
+
+	<COMMAND name="delete"
+                help="Delete DNS access list">
+		<PARAM name="id"
+                        help="Resource Id '*' for all"
+                        ptype="MULTI_NUM_ALL"/>
+                <ACTION>exec /service/tools/dns_config.exc dyndns delete "${id}" 2>/dev/null</ACTION>
+        </COMMAND>
+
+</VIEW>
+</CLISH_MODULE>

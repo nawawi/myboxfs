@@ -1,0 +1,6 @@
+#!/bin/sh
+if [ -x "/service/tools/taskq.exc" ]; then
+	_PROC=$(/bin/pgrep -f 'taskq.exc');
+	[ -z "$_PROC" ] && /service/tools/taskq.exc &>/dev/null &
+fi
+exit 0;

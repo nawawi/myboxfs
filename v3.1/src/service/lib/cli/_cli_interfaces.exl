@@ -1,0 +1,373 @@
+<?php
+if(!defined('_CLI_CODE')||_CLI_CODE!="a098846421a09ab1cacd3b3a753cbe05") exit("\n\nERROR: _CLI_CODE not set\n\n");
+
+function ___CLI_INTERFACES_PRINT($_opt="all") {
+	$_objf=_OBJ_PATH."/iosh_interfaces_ip_print.obj";
+	@unlink($_objf);
+	_INI_TOKEN_GET("network","eth.cfg",$_ITOKEN);
+	if(_ARRAY_NULL($_ITOKEN)) {
+              	_CLI_ECHO(_GETTEXT("No data available"));
+                return FALSE;
+	}
+	$_static=0;$_vlan=0;$_pppoe=0;$_dhcp=0;
+	if($_opt=="static") {
+		$_static=1;$_vlan=0;$_pppoe=0;$_dhcp=0;
+	} elseif($_opt=="vlan") {
+		$_static=0;$_vlan=1;$_pppoe=0;$_dhcp=0;
+	} elseif($_opt=="pppoe") {
+		$_static=0;$_vlan=0;$_pppoe=1;$_dhcp=0;
+	} elseif($_opt=="dhcp") {
+		$_static=0;$_vlan=0;$_pppoe=1;$_dhcp=1;
+	} else {
+		$_static=1;$_vlan=1;$_pppoe=1;$_dhcp=1;
+	}
+	$_cnt=1;$_obj=array();
+	$_output="";$_DTX=array();
+	foreach($_ITOKEN as $_ID => $_DATA) {
+		if(_NULL($_DATA['NAME']) || _NULL($_DATA['TYPE'])) continue;
+		if($_DATA['TYPE']=="static" && $_static==1) {
+			$_link=_GETTEXT_U("NO");
+			if(_NULL($_DATA['STAT'])) $_DATA['STAT']=0;
+			if(_NULL($_DATA['NAT'])) $_DATA['NAT']=0;
+			if(_NULL($_DATA['UPLINK'])) $_DATA['UPLINK']=0;
+			if(_NULL($_DATA['ARP'])) $_DATA['ARP']=0;
+			if(_NULL($_DATA['MTU'])) $_DATA['MTU']="1500";
+			if(!_NULL($_DATA['VENDOR'])) $_DATA['VENDOR']="({$_DATA['VENDOR']})";
+			if(_LINK_ISUP($_DATA['DEVICE'])) $_link=_GETTEXT_U("YES");
+			_STR_ONOFF($_nat,$_DATA['NAT']);
+			_STR_ONOFF($_uplink,$_DATA['UPLINK']);
+			_STR_ONOFF($_arp,$_DATA['ARP']);
+			_STR_ONOFF($_enable,$_DATA['STAT']);
+
+			if($_cnt > 1) $_DTX[$_cnt][__CLI_DATA_NL]=1;
+			$_DTX[$_cnt][_GETTEXT_U("ID")]=$_cnt;
+			$_DTX[$_cnt][_GETTEXT_U("NAME")]=$_DATA['NAME'];
+			$_DTX[$_cnt][_GETTEXT_U("TYPE")]="Ethernet Standard (static)";
+			$_DTX[$_cnt][_GETTEXT_U("DEVICE")]="{$_DATA['DEVICE']} {$_DATA['VENDOR']}";
+			$_DTX[$_cnt][_GETTEXT_U("ADDRESS")]=$_DATA['ADDR'];
+			$_DTX[$_cnt][_GETTEXT_U("NETMASK")]="{$_DATA['PREF']} ({$_DATA['MASK']})";
+			if(!_NULL($_DATA['DEFAULT']) && $_DATA['DEFAULT']==1) {
+				_STR_ONOFF($_default,$_DATA['DEFAULT']);
+				$_DTX[$_cnt][_GETTEXT_U("DEFAULT GATEWAY")]=$_default;
+				if(!_NULL($_DATA['GATEWAY'])) {
+					$_DTX[$_cnt][_GETTEXT_U("GATEWAY IP")]=$_DATA['GATEWAY'];
+				}
+			}
+			$_DTX[$_cnt][_GETTEXT_U("NAT")]=$_nat;
+			$_DTX[$_cnt][_GETTEXT_U("UPLINK FAILOVER")]=$_uplink;
+			$_DTX[$_cnt][_GETTEXT_U("PROXY ARP")]=$_arp;
+			$_DTX[$_cnt][_GETTEXT_U("MTU")]=$_DATA['MTU'];
+			$_DTX[$_cnt][_GETTEXT_U("ENABLE")]=$_enable;
+			$_DTX[$_cnt][_GETTEXT_U("LINK DETECTED")]=$_link;
+			$_DTX[$_cnt][_GETTEXT_U("DESCRIPTION")]=$_DATA['NOTE'];
+			$_obj[$_cnt]=$_ID;
+			$_cnt++;
+		} elseif($_DATA['TYPE']=="vlan" && $_vlan==1) {
+			$_link=_GETTEXT_U("NO");
+			if(_NULL($_DATA['STAT'])) $_DATA['STAT']=0;
+			if(_NULL($_DATA['NAT'])) $_DATA['NAT']=0;
+			if(_NULL($_DATA['UPLINK'])) $_DATA['UPLINK']=0;
+			if(_NULL($_DATA['MTU'])) $_DATA['MTU']="1500";
+			if(!_NULL($_DATA['VENDOR'])) $_DATA['VENDOR']="({$_DATA['VENDOR']})";
+			if(_NULL($_DATA['TAG'])) $_DATA['TAG']=1;
+			if(_LINK_ISUP($_DATA['DEVICE'])) $_link=_GETTEXT_U("YES");
+			_STR_ONOFF($_nat,$_DATA['NAT']);
+			_STR_ONOFF($_uplink,$_DATA['UPLINK']);
+			_STR_ONOFF($_enable,$_DATA['STAT']);
+
+			if($_cnt > 1) $_DTX[$_cnt][__CLI_DATA_NL]=1;
+			$_DTX[$_cnt][_GETTEXT_U("ID")]=$_cnt;
+			$_DTX[$_cnt][_GETTEXT_U("NAME")]=$_DATA['NAME'];
+			$_DTX[$_cnt][_GETTEXT_U("TYPE")]="Ethernet Vlan (vlan)";
+			$_DTX[$_cnt][_GETTEXT_U("DEVICE")]="{$_DATA['DEVICE']} {$_DATA['VENDOR']}";
+			$_DTX[$_cnt][_GETTEXT_U("VLAN TAG")]=$_DATA['TAG'];
+			$_DTX[$_cnt][_GETTEXT_U("ADDRESS")]=$_DATA['ADDR'];
+			$_DTX[$_cnt][_GETTEXT_U("NETMASK")]="{$_DATA['PREF']} ({$_DATA['MASK']})";
+			if(!_NULL($_DATA['DEFAULT']) && $_DATA['DEFAULT']==1) {
+				_STR_ONOFF($_default,$_DATA['DEFAULT']);
+				$_DTX[$_cnt][_GETTEXT_U("DEFAULT GATEWAY")]=$_default;
+				if(!_NULL($_DATA['GATEWAY'])) {
+					$_DTX[$_cnt][_GETTEXT_U("GATEWAY IP")]=$_DATA['GATEWAY'];
+				}
+			}
+			$_DTX[$_cnt][_GETTEXT_U("NAT")]=$_nat;
+			$_DTX[$_cnt][_GETTEXT_U("UPLINK FAILOVER")]=$_uplink;
+			$_DTX[$_cnt][_GETTEXT_U("MTU")]=$_DATA['MTU'];
+			$_DTX[$_cnt][_GETTEXT_U("ENABLE")]=$_enable;
+			$_DTX[$_cnt][_GETTEXT_U("LINK DETECTED")]=$_link;
+			$_DTX[$_cnt][_GETTEXT_U("DESCRIPTION")]=$_DATA['NOTE'];
+
+			$_obj[$_cnt]=$_ID;
+			$_cnt++;
+		} elseif($_DATA['TYPE']=="dhcp" && $_dhcp==1) {
+			$_link=_GETTEXT_U("NO");
+			if(_NULL($_DATA['STAT'])) $_DATA['STAT']=0;
+			if(_NULL($_DATA['NAT'])) $_DATA['NAT']=0;
+			if(_NULL($_DATA['UPLINK'])) $_DATA['UPLINK']=0;
+			if(_NULL($_DATA['ARP'])) $_DATA['ARP']=0;
+			if(_NULL($_DATA['MTU'])) $_DATA['MTU']="1500";
+			if(!_NULL($_DATA['VENDOR'])) $_DATA['VENDOR']="({$_DATA['VENDOR']})";
+			if(_NULL($_DATA['ADDR'])) $_DATA['ADDR']=_GETTEXT("unresolved");
+			if(_NULL($_DATA['MASK'])) $_DATA['MASK']=_GETTEXT("unresolved");
+			if(_LINK_ISUP($_DATA['DEVICE'])) $_link=_GETTEXT_U("YES");
+			_STR_ONOFF($_nat,$_DATA['NAT']);
+			_STR_ONOFF($_uplink,$_DATA['UPLINK']);
+			_STR_ONOFF($_arp,$_DATA['ARP']);
+			_STR_ONOFF($_enable,$_DATA['STAT']);
+
+			if($_cnt > 1) $_DTX[$_cnt][__CLI_DATA_NL]=1;
+			$_DTX[$_cnt][_GETTEXT_U("ID")]=$_cnt;
+			$_DTX[$_cnt][_GETTEXT_U("NAME")]=$_DATA['NAME'];
+			$_DTX[$_cnt][_GETTEXT_U("TYPE")]="Cable Modem (dhcp)";
+			$_DTX[$_cnt][_GETTEXT_U("DEVICE")]="{$_DATA['DEVICE']} {$_DATA['VENDOR']}";
+			$_DTX[$_cnt][_GETTEXT_U("ADDRESS")]=$_DATA['ADDR'];
+			$_DTX[$_cnt][_GETTEXT_U("NETMASK")]="{$_DATA['PREF']} ({$_DATA['MASK']})";
+			if(!_NULL($_DATA['DEFAULT']) && $_DATA['DEFAULT']==1) {
+				_STR_ONOFF($_default,$_DATA['DEFAULT']);
+				$_DTX[$_cnt][_GETTEXT_U("DEFAULT GATEWAY")]=$_default;
+				if(!_NULL($_DATA['GATEWAY'])) {
+					$_DTX[$_cnt][_GETTEXT_U("GATEWAY IP")]=$_DATA['GATEWAY'];
+				}
+			}
+			$_DTX[$_cnt][_GETTEXT_U("NAT")]=$_nat;
+			$_DTX[$_cnt][_GETTEXT_U("UPLINK FAILOVER")]=$_uplink;
+			$_DTX[$_cnt][_GETTEXT_U("PROXY ARP")]=$_arp;
+			$_DTX[$_cnt][_GETTEXT_U("MTU")]=$_DATA['MTU'];
+			$_DTX[$_cnt][_GETTEXT_U("ENABLE")]=$_enable;
+			$_DTX[$_cnt][_GETTEXT_U("LINK DETECTED")]=$_link;
+			$_DTX[$_cnt][_GETTEXT_U("DESCRIPTION")]=$_DATA['NOTE'];
+
+			$_obj[$_cnt]=$_ID;
+			$_cnt++;
+		} elseif($_DATA['TYPE']=="pppoe" && $_pppoe==1) {
+			$_link=_GETTEXT_U("NO");
+			if(_NULL($_DATA['STAT'])) $_DATA['STAT']=0;
+			if(_NULL($_DATA['NAT'])) $_DATA['NAT']=0;
+			if(_NULL($_DATA['UPLINK'])) $_DATA['UPLINK']=0;
+			if(_NULL($_DATA['ARP'])) $_DATA['ARP']=0;
+			if(_NULL($_DATA['MTU'])) $_DATA['MTU']="1492";
+			if(!_NULL($_DATA['VENDOR'])) $_DATA['VENDOR']="({$_DATA['VENDOR']})";
+			if(_NULL($_DATA['ADDR'])) $_DATA['ADDR']=_GETTEXT("unresolved");
+			if(_NULL($_DATA['MASK'])) $_DATA['MASK']=_GETTEXT("unresolved");
+			if(!_NULL($_DATA['PASSWORD'])) {
+				$_DATA['PASSWORD']=_STR_HIDE(_BASE64_DECRYPT($_DATA['PASSWORD']));
+			}
+			if(_LINK_ISUP($_DATA['DEVICE'])) $_link=_GETTEXT_U("YES");
+			_STR_ONOFF($_nat,$_DATA['NAT']);
+			_STR_ONOFF($_uplink,$_DATA['UPLINK']);
+			_STR_ONOFF($_arp,$_DATA['ARP']);
+			_STR_ONOFF($_enable,$_DATA['STAT']);
+
+			if($_cnt > 1) $_DTX[$_cnt][__CLI_DATA_NL]=1;
+			$_DTX[$_cnt][_GETTEXT_U("ID")]=$_cnt;
+			$_DTX[$_cnt][_GETTEXT_U("NAME")]=$_DATA['NAME'];
+			$_DTX[$_cnt][_GETTEXT_U("TYPE")]="DSL (pppoe)";
+			$_DTX[$_cnt][_GETTEXT_U("DEVICE")]="{$_DATA['DEVICE']} {$_DATA['VENDOR']}";
+			$_DTX[$_cnt][_GETTEXT_U("ADDRESS")]=$_DATA['ADDR'];
+			if($_DATA['MASK']==_GETTEXT("unresolved")) {
+				$_DTX[$_cnt][_GETTEXT_U("NETMASK")]="{$_DATA['MASK']}";
+			} else {
+				$_DTX[$_cnt][_GETTEXT_U("NETMASK")]="{$_DATA['PREF']} ({$_DATA['MASK']})";
+			}
+			if(!_NULL($_DATA['DEFAULT']) && $_DATA['DEFAULT']==1) {
+				_STR_ONOFF($_default,$_DATA['DEFAULT']);
+				$_DTX[$_cnt][_GETTEXT_U("DEFAULT GATEWAY")]=$_default;
+				if(!_NULL($_DATA['GATEWAY'])) {
+					$_DTX[$_cnt][_GETTEXT_U("GATEWAY IP")]=$_DATA['GATEWAY'];
+				}
+			}
+			$_DTX[$_cnt][_GETTEXT_U("USERNAME")]=$_DATA['USERNAME'] ? $_DATA['USERNAME'] : _GETTEXT("not set");
+			$_DTX[$_cnt][_GETTEXT_U("PASSWORD")]=$_DATA['PASSWORD'] ? $_DATA['PASSWORD'] : _GETTEXT("not set");;
+			$_DTX[$_cnt][_GETTEXT_U("RECONNECT DELAY")]="{$_DATA['RETRY']} seconds";
+			$_DTX[$_cnt][_GETTEXT_U("DAILY RECONNECT")]=$_DATA['RECONNECT'] ? $_DATA['RECONNECT'] : _GETTEXT("Never");
+			$_DTX[$_cnt][_GETTEXT_U("NAT")]=$_nat;
+			$_DTX[$_cnt][_GETTEXT_U("UPLINK FAILOVER")]=$_uplink;
+			$_DTX[$_cnt][_GETTEXT_U("MTU")]=$_DATA['MTU'];
+			$_DTX[$_cnt][_GETTEXT_U("ENABLE")]=$_enable;
+			$_DTX[$_cnt][_GETTEXT_U("LINK DETECTED")]=$_link;
+			$_DTX[$_cnt][_GETTEXT_U("DESCRIPTION")]=$_DATA['NOTE'];
+
+			$_obj[$_cnt]=$_ID;
+			$_cnt++;
+		}
+		unset($_arp,$_uplink,$_default,$_nat,$_link,$_enable);
+	}
+	if(!_ARRAY_NULL($_DTX)) {
+		$_output .=_CLI_DATA_BODY_R($_DTX);
+		unset($_DTX);
+	}
+	if(_ARRAY_NULL($_obj) || !_FILE_ARRAY_SAVE($_objf,$_obj) || _NULL($_output)) {
+		_CLI_ECHO(_GETTEXT("No data available"));
+		@unlink($_objf);
+                return FALSE;
+	}
+	_CLI_ECHO_HEADER(_GETTEXT("Interfaces configuration"));
+	echo "$_output";
+	return TRUE;
+}
+
+function ___CLI_INTERFACES_DELETE($_num) {
+	if(!_NULL($_num)) {
+		$_objf=_OBJ_PATH."/iosh_interfaces_ip_print.obj";
+		$_obj=_FILE_ARRAY_GET($_objf);
+		$_sid=$_num;
+		if(_ARRAY_NULL($_obj) || _NULL($_obj[$_sid])) {
+			_CLI_ECHO(_GETTEXT("Resource Id not available."));
+			_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","ip print"));
+			@unlink($_objf);
+			return FALSE;
+		}
+		$_ID=$_obj[$_sid];
+		if(_CLI_YESNO(_GETTEXT("This action will remove %s.\nContinue this action? %s","interface Id $_sid","[yes/no]: "))==TRUE) {
+			if(_INI_TOKEN_DELETE("network","eth.cfg",$_ID)) {
+				_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+				_UPDATE_NIC_INFO();
+				return TRUE;
+			}
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function ___CLI_INTERFACES_HARDWARE_PRINT() {
+	_INI_TOKEN_GET("network","eth.cfg",$_ETOKEN);
+	if(_ARRAY_NULL($_ETOKEN)) {
+              	_CLI_ECHO(_GETTEXT("No free device available"));
+                return FALSE;
+	}
+	$_cnt=1;$_obj=array();
+	$_output="";
+	foreach($_ETOKEN as $_ID => $_DATA) {
+		if(_NULL($_DATA['DEVICE']) || !_NULL($_DATA['TYPE'])) continue;
+		if(_NULL($_DATA['VENDOR'])) $_DATA['VENDOR']=__CLI_BODY_SKIP_DATA_TAG;
+		if($_cnt > 1) $_output .="\n";
+		$_output .=_CLI_DATA_BODY(
+			array(
+				_GETTEXT("ID")=>$_cnt,
+				_GETTEXT("DEVICE")=>$_DATA['DEVICE'],
+				_GETTEXT("MAC ADDRESS")=>$_DATA['HWADDR'],
+				_GETTEXT("VENDOR")=>$_DATA['VENDOR']
+			)
+		);
+		$_obj[$_cnt]=$_ID;
+		$_cnt++;
+	}
+	if(!_NULL($_output) && !_ARRAY_NULL($_obj)) {
+		_CLI_ECHO_HEADER(_GETTEXT("Network Interface list"));
+		echo "$_output";
+		return _FILE_ARRAY_SAVE(_OBJ_PATH."/iosh_definitions_networks_interface.obj",$_obj);
+	}
+	_CLI_ECHO(_GETTEXT("No free device available"));
+	return FALSE;
+}
+
+
+function ___CLI_INTERFACES_PRINT_VIP() {
+	$_objf=_OBJ_PATH."/iosh_interfaces_vip_print.obj";
+	@unlink($_objf);
+	_INI_TOKEN_GET("network","additional.cfg",$_ITOKEN);
+	if(_ARRAY_NULL($_ITOKEN)) {
+              	_CLI_ECHO(_GETTEXT("No data available"));
+                return FALSE;
+	}
+	$_cnt=1;$_obj=array();
+	$_output="";
+	foreach($_ITOKEN as $_ID => $_DATA) {
+		if(_NULL($_DATA['NAME']) || _NULL($_DATA['PNAME'])) continue;
+		$_device="";
+		_INI_TOKEN_GET_BYPARAM("network","eth.cfg","NAME",$_DATA['PNAME'],$_ETOKEN);
+		if(!_ARRAY_NULL($_ETOKEN) && !_NULL($_ETOKEN['ADDR']) && !_NULL($_ETOKEN['PREF'])) {
+			$_device="({$_ETOKEN['ADDR']}/{$_ETOKEN['PREF']})";
+		}
+		unset($_ETOKEN);
+		_STR_ONOFF($_enable,$_DATA['STAT']);
+
+		if($_cnt > 1) $_output .="\n";
+		$_output .=_CLI_DATA_BODY(
+			array(
+				_GETTEXT("ID")=>$_cnt,
+				_GETTEXT("NAME")=>$_DATA['NAME'],
+				_GETTEXT("ON INTERFACE")=>"{$_DATA['PNAME']} $_device",
+				_GETTEXT("ADDRESS")=>$_DATA['ADDR'],
+				_GETTEXT("NETMASK")=>"{$_DATA['PREF']} ({$_DATA['MASK']})",
+				_GETTEXT("ENABLE")=>$_enable,
+				_GETTEXT("DESCRIPTION")=>$_DATA['NOTE'],
+			)
+		);
+		$_obj[$_cnt]=$_ID;
+		$_cnt++;
+	}
+	if(_ARRAY_NULL($_obj) || !_FILE_ARRAY_SAVE($_objf,$_obj) || _NULL($_output)) {
+		_CLI_ECHO(_GETTEXT("No data available"));
+		@unlink($_objf);
+                return FALSE;
+	}
+	_CLI_ECHO_HEADER(_GETTEXT("Additional Interfaces configuration"));
+	echo "$_output";
+	return TRUE;
+}
+
+function _cli_interfaces() {
+        if($_SERVER["argc"] > 1 ) {
+                $_max=$_SERVER["argc"];
+		_CLI_TRIM_ARGS($_SERVER['argv']);
+                for($_x=1;$_x < $_max;$_x++) {
+                        $_options=$_SERVER["argv"][$_x];
+                        if($_options=="show_hardware") {
+				return ___CLI_INTERFACES_HARDWARE_PRINT();
+			} elseif($_options=="apply") {
+				return _INIT_EXEC("network_restart");
+			} elseif($_options=="ip") {
+                        	$_cmd=$_SERVER["argv"][$_x+1];
+                        	if($_cmd=="print") {
+					$_opt=$_SERVER["argv"][$_x+2];
+					return ___CLI_INTERFACES_PRINT($_opt);
+				} elseif($_cmd=="delete") {
+					$_num=$_SERVER["argv"][$_x+2];
+					return ___CLI_INTERFACES_DELETE($_num);
+				} elseif($_cmd=="add") {
+					$_type=$_SERVER["argv"][$_x+2];
+					_CLI_RESET_ARGS(3,$_SERVER["argv"]);
+					if($_type=="static") {
+						return ___CLI_INTERFACES_ADD_STATIC($_SERVER["argv"]);
+					} elseif($_type=="vlan") {
+						return ___CLI_INTERFACES_ADD_VLAN($_SERVER["argv"]);
+					} elseif($_type=="dhcp") {
+						return ___CLI_INTERFACES_ADD_DHCP($_SERVER["argv"]);
+					} elseif($_type=="pppoe") {
+						return ___CLI_INTERFACES_ADD_PPPOE($_SERVER["argv"]);
+					}
+				} elseif($_cmd=="set") {
+					$_type=$_SERVER["argv"][$_x+2];
+					_CLI_RESET_ARGS(3,$_SERVER["argv"]);
+					if($_type=="static") {
+						return ___CLI_INTERFACES_SET_STATIC($_SERVER["argv"]);
+					} elseif($_type=="vlan") {
+						return ___CLI_INTERFACES_SET_VLAN($_SERVER["argv"]);
+					} elseif($_type=="dhcp") {
+						return ___CLI_INTERFACES_SET_DHCP($_SERVER["argv"]);
+					} elseif($_type=="pppoe") {
+						return ___CLI_INTERFACES_SET_PPPOE($_SERVER["argv"]);
+					}
+				}
+			} elseif($_options=="vip") {
+                        	$_cmd=$_SERVER["argv"][$_x+1];
+                        	if($_cmd=="print") {
+					return ___CLI_INTERFACES_PRINT_VIP();
+				} elseif($_cmd=="delete") {
+					$_num=$_SERVER["argv"][$_x+2];
+					return ___CLI_INTERFACES_DELETE_VIP($_num);
+				} elseif($_cmd=="add") {
+					_CLI_RESET_ARGS(2,$_SERVER["argv"]);
+					return ___CLI_INTERFACES_ADD_VIP($_SERVER["argv"]);
+				} elseif($_cmd=="set") {
+					_CLI_RESET_ARGS(2,$_SERVER["argv"]);
+					return ___CLI_INTERFACES_SET_VIP($_SERVER["argv"]);
+				}
+			}
+                }
+        }
+	return _CLI_DEFAULT_RETURN();
+}
+
+?>

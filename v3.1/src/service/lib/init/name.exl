@@ -1,0 +1,325 @@
+<?php
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+function name_check() {
+	if(!_INIT_CHECK_BINARY(array("/bin/named"))) {
+		_INIT_ECHO(1,_GETTEXT("Cannot execute %s. Internal error",_INIT_NAME()));
+		exit(1);
+	}
+}
+
+function name_quiet() {
+	_INIT_QUIET('1');
+}
+
+function name_debug() {
+	_INIT_DEBUG('1');
+}
+
+function _name_inet6() {
+	_INI_TOKEN_GET("network","named.cfg",$_NTOKEN);
+	$_DATA=$_NTOKEN['named'];
+	if(_ARRAY_NULL($_DATA)) {
+		return FALSE;
+	}
+	if(!_NULL($_DATA['INET6']) && $_DATA['INET6']==1) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+function _name_get_address($_host,&$_list) {
+	_DEFINITIONS_GET_BYNAME_R("networks",$_host,$_DTOKEN);
+	if(!_ARRAY_NULL($_DTOKEN)) {
+		foreach($_DTOKEN as $_ID => $_DATA) {
+			if(_NULL($_DATA['ADDR']) || _NULL($_DATA['__DATA_TYPE'])) continue;
+			if($_DATA['__DATA_TYPE']!="host") continue;
+			$_list .="{$_DATA['ADDR']};";
+		}
+	}
+}
+
+function _name_config_forwarder(&$_config) {
+	_INI_TOKEN_GET("network","named.cfg",$_NTOKEN);
+	$_TOKEN=$_NTOKEN['named'];
+	$_forwarders='';
+	if(!_ARRAY_NULL($_TOKEN)) {
+		if(!_NULL($_TOKEN['ISP']) && $_TOKEN['ISP']==1) {
+			$_NSD=_GLOB("/etc/ppp/pppoe/resolv/*.conf");
+			if(!_ARRAY_NULL($_NSD)) {
+				foreach($_NSD as $_flx) {
+					$_fd=_FILE_GET($_flx);
+					if(_NULL($_fd)) continue;
+					$_forwarders .="$_fd";
+					unset($_fd);
+				}
+			}
+			unset($_NSD);
+			$_NSD=_GLOB("/etc/dhcpcd/resolv/*.conf");
+			if(!_ARRAY_NULL($_NSD)) {
+				foreach($_NSD as $_flx) {
+					$_fd=_FILE_GET($_flx);
+					if(_NULL($_fd)) continue;
+					$_forwarders .="$_fd";
+					unset($_fd);
+				}
+			}
+		}
+		if(!_NULL($_TOKEN['FORWARDER']) && !_NULL($_config)) {
+			$_server_a=_STR_ARRAY($_TOKEN['FORWARDER'],",");
+			if(!_ARRAY_NULL($_server_a)) {
+				$_list="";
+				foreach($_server_a as $_server) {
+					_TRIM($_server);
+					if(_NULL($_server)) continue;
+					_name_get_address($_server,$_forwarders);
+				}
+			}
+		}
+	}
+	if(!_NULL($_forwarders)) $_config .="forwarders { $_forwarders };\n";
+}
+
+function _name_config_routing(&$_config) {
+	_INI_TOKEN_GET("network","named_routing.cfg",$_NTOKEN);
+	if(!_ARRAY_NULL($_NTOKEN) && !_NULL($_config)) {
+		$_routing="";
+		foreach($_NTOKEN as $_ID => $_DATA) {
+			if(_NULL($_DATA['DOMAIN']) || _NULL($_DATA['FORWARDER'])) continue;
+			if(_NULL($_DATA['STAT']) || $_DATA['STAT']==0) continue;
+			$_server_a=_STR_ARRAY($_DATA['FORWARDER'],",");
+			if(!_ARRAY_NULL($_server_a)) {
+				$_list="";
+				foreach($_server_a as $_server) {
+					_TRIM($_server);
+					if(_NULL($_server)) continue;
+					_name_get_address($_server,$_list);
+				}
+				if(!_NULL($_list)) {
+					$_routing .="zone \"{$_DATA['DOMAIN']}\" IN {\n";
+					$_routing .="type forward;\n";
+					$_routing .="forwarders { $_list };\n";
+					$_routing .="check-names fail;\n";
+					$_routing .="};\n";
+				}
+				unset($_list,$_server);
+			}
+			unset($_server_a,$_DATA);
+		}
+		if(!_NULL($_routing)) {
+			$_config .=$_routing;
+		}
+	}
+}
+
+function _name_config_static(&$_config) {
+	_DELDIR("/etc/named/static");
+	_INI_TOKEN_GET("network","named_static.cfg",$_NTOKEN);
+	if(!_ARRAY_NULL($_NTOKEN) && !_NULL($_config)) {
+		foreach($_NTOKEN as $_ID => $_DATA) {
+			if(_NULL($_DATA['HOSTNAME']) || _NULL($_DATA['ADDR'])) continue;
+			if(_NULL($_DATA['STAT']) || $_DATA['STAT']==0) continue;
+			if(!_CHECK_IP($_DATA['ADDR'])) continue;
+			if(_NULL($_DATA['SERIAL'])) {
+				$_DATA['SERIAL']=time();
+				_INI_TOKEN_UPDATE("network","named_static.cfg",$_ID,$_DATA);
+			}
+			$_hostname=$_DATA['HOSTNAME'];
+			$_ip=$_DATA['ADDR'];
+			$_serial=$_DATA['SERIAL'];
+			$_tpl="";
+			$_tpl .="@\t\t\t1D IN SOA\t$_hostname. do-not-reply.{$_hostname}. (\n";
+			$_tpl .="\t\t\t\t\t$_serial\t; serial\n";
+			$_tpl .="\t\t\t\t\t3H\t; refresh\n";
+			$_tpl .="\t\t\t\t\t15M\t; retry\n";
+			$_tpl .="\t\t\t\t\t1W\t; expiry\n";
+			$_tpl .="\t\t\t\t\t1D )\t; minimum\n";
+			$_tpl .="\t\t\t1D IN NS\t$_hostname.\n";
+			$_tpl .="@\t\t\t1D IN A\t\t$_ip\n";
+			if(_FILE_SAVE("/etc/named/static/{$_hostname}.zone",$_tpl)) {
+				$_config .="zone \"$_hostname\" IN {";
+				$_config .="type master;\n";
+				$_config .="file \"static/$_hostname.zone\";\n";
+				$_config .="check-names fail;\n";
+				$_config .="allow-update { none; };\n";
+				$_config .="};\n";
+			}
+			unset($_tpl,$_hostname,$_ip,$_serial);
+		}
+	}
+}
+
+// TODO
+function ___name_config_resolve_ad(&$_host) {
+}
+
+function _name_config_resolve() {
+	$_host=array();
+	$_host[]="127.0.0.1";
+	___name_config_resolve_ad($_host);
+	$_host=array_reverse($_host);
+	foreach($_host as $_name) {
+		$_config .="nameserver 127.0.0.1\n";
+	}
+	_TRIM($_config);
+	if(!_NULL($_config)) {
+		return _FILE_SAVE("/etc/resolv.conf","$_config\n");
+	}
+	return FALSE;
+}
+
+/*function _name_config_acl(&$_config) {
+	_INI_TOKEN_GET("network","named_acl.cfg",$_NTOKEN);
+	if(!_ARRAY_NULL($_NTOKEN) && !_NULL($_config)) {
+		foreach($_NTOKEN as $_ID => $_DATA) {
+			if(_NULL($_DATA['ADDR'])) continue;
+			_DEFINITIONS_GET_BYNAME_R("networks",$_DATA['ADDR'],$_DTOKEN);
+			if(!_ARRAY_NULL($_DTOKEN)) {
+				foreach($_DTOKEN as $_DID => $_DDATA) {
+					if(_NULL($_DDATA['ADDR']) || _NULL($_DDATA['__DATA_TYPE'])) continue;
+					if($_DDATA['__DATA_TYPE']=="hostrange" && $_DDATA['__DATA_TYPE']=="hostmac") continue;
+					$_list .="{$_DDATA['ADDR']};";
+				}
+			}
+			unset($_DTOKEN,$_DID,$_DDATA);
+		}
+		if(!_NULL($_list)) $_config .=$_list;
+	}
+}*/
+
+function name_config($_scriptdata='') {
+	_INI_TOKEN_GET("network","named.cfg",$_NTOKEN);
+	$_DATA=$_NTOKEN['named'];
+	if(_NULL($_DATA['STAT'])) $_DATA['STAT']=0;
+
+	$_config="";
+	$_config .="acl bogon {0.0.0.0/8;1.0.0.0/8;2.0.0.0/8;5.0.0.0/8;7.0.0.0/8;10.0.0.0/8;23.0.0.0/8;27.0.0.0/8;31.0.0.0/8;36.0.0.0/8;37.0.0.0/8;39.0.0.0/8;41.0.0.0/8;42.0.0.0/8;49.0.0.0/8;50.0.0.0/8;58.0.0.0/8;59.0.0.0/8;70.0.0.0/8;71.0.0.0/8;72.0.0.0/8;73.0.0.0/8;74.0.0.0/8;75.0.0.0/8;76.0.0.0/8;77.0.0.0/8;78.0.0.0/8;79.0.0.0/8;83.0.0.0/8;84.0.0.0/8;85.0.0.0/8;86.0.0.0/8;87.0.0.0/8;88.0.0.0/8;89.0.0.0/8;90.0.0.0/8;91.0.0.0/8;92.0.0.0/8;93.0.0.0/8;94.0.0.0/8;95.0.0.0/8;96.0.0.0/8;97.0.0.0/8;98.0.0.0/8;99.0.0.0/8;100.0.0.0/8;101.0.0.0/8;102.0.0.0/8;103.0.0.0/8;104.0.0.0/8;105.0.0.0/8;106.0.0.0/8;107.0.0.0/8;108.0.0.0/8;109.0.0.0/8;110.0.0.0/8;111.0.0.0/8;112.0.0.0/8;113.0.0.0/8;114.0.0.0/8;115.0.0.0/8;116.0.0.0/8;117.0.0.0/8;118.0.0.0/8;119.0.0.0/8;120.0.0.0/8;121.0.0.0/8;122.0.0.0/8;123.0.0.0/8;124.0.0.0/8;125.0.0.0/8;126.0.0.0/8;169.254.0.0/16;172.16.0.0/12;173.0.0.0/8;174.0.0.0/8;175.0.0.0/8;176.0.0.0/8;177.0.0.0/8;178.0.0.0/8;179.0.0.0/8;180.0.0.0/8;181.0.0.0/8;182.0.0.0/8;183.0.0.0/8;184.0.0.0/8;185.0.0.0/8;186.0.0.0/8;187.0.0.0/8;189.0.0.0/8;190.0.0.0/8;192.0.2.0/24;197.0.0.0/8;223.0.0.0/8;224.0.0.0/3;};\n";
+	$_config .="acl local_acl {\n";
+	//$_config .="\t127.0.0.1;\n";
+	$_config .="\tany;\n";
+	//if($_DATA['STAT']==1) {
+	//	_name_config_acl($_config);
+	//}
+	$_config .="};\n";
+	$_config .="options {\n";
+	$_config .="directory \"/etc/named\";\n";
+	$_config .="listen-on port 53 { any; };\n";
+	if(_name_inet6()) {
+		$_config .="listen-on-v6 port 53 { any; };\n";
+	}
+	$_config .="version \"TraceOS DNS\";\n";
+	$_config .="check-names master warn;\n";
+	$_config .="pid-file \"/var/run/named.pid\";\n";
+	$_config .="datasize default;\n";
+	$_config .="stacksize default;\n";
+	$_config .="coresize default;\n";
+	$_config .="files unlimited;\n";
+	$_config .="recursion yes;\n";
+	$_config .="allow-recursion {local_acl;};\n";
+        $_config .="allow-query { local_acl;};\n";
+	$_config .="blackhole {bogon;};\n";
+	$_config .="allow-transfer { none; };\n";
+	$_config .="interface-interval 0;\n";
+	$_config .="notify no;\n";
+
+	if($_DATA['STAT']==1) {
+		_name_config_forwarder($_config);
+	}
+
+	$_config .="};\n";
+	$_config .="logging {\n";
+	$_config .="category xfer-in {default_syslog;};\n";
+	$_config .="category xfer-out {default_syslog;};\n";
+	$_config .="category security {default_syslog;};\n";
+	$_config .="category default {null;};\n";
+	$_config .="};\n";
+
+	$_config .="zone \".\" IN {";
+	$_config .="type hint;\n";
+	$_config .="file \"root.hint\";\n";
+	$_config .="};\n";
+	$_config .="zone \"localhost\" IN {";
+	$_config .="type master;\n";
+	$_config .="file \"localhost.zone\";\n";
+	$_config .="check-names fail;\n";
+	$_config .="allow-update { none; };\n";
+	$_config .="};\n";
+
+	$_config .="zone \"0.0.127.in-addr.arpa\" IN {";
+	$_config .="type master;\n";
+	$_config .="file \"127.0.0.zone\";\n";
+	$_config .="check-names fail;\n";
+ 	$_config .="allow-update { none; };\n";
+	$_config .="};\n";
+	
+	// disable rndc: tcp/953
+	$_config .="controls {};\n";
+
+	if($_DATA['STAT']==1) {
+		_name_config_routing($_config);
+		_name_config_static($_config);
+	}
+	_name_config_resolve();
+	if(!_NULL($_scriptdata)) {
+		return _FILE_SAVE("/etc/named/named.conf","$_scriptdata\n");
+	}
+	return _FILE_SAVE("/etc/named/named.conf","$_config");
+}
+
+
+function name_up() {
+	@unlink(_TASKQ_PATH."/name_up");
+	$_prog="/bin/named -4";
+	if(_name_inet6()) {
+		$_prog="/bin/named";
+	}
+	if(_EXEC_CMD("$_prog")==0) {
+		_INIT_NICE_LEVEL("named","-10");
+		_INIT_CHKPROG_LOG("named");
+		return TRUE;
+	}
+	return name_restart();
+}
+
+
+function name_start() {
+	_INIT_CHECK_DAEMON_STATUS("named");
+	$_prog="/bin/named -4";
+	if(_name_inet6()) {
+		$_prog="/bin/named";
+	}
+	if(!name_config()) {
+		_INIT_ECHO(1,_GETTEXT("Starting %s failed","named"));
+		return FALSE;
+	}
+	_INIT_START_DAEMON("$_prog","name_up","-10");
+	if(_INIT_BOOTUP()==FALSE) {
+		_INIT_TASKQ("policy_sysinput");
+	}
+	return TRUE;
+}
+
+function name_stop() {
+	_INIT_STOP_DAEMON("named","name_up",1);
+	sleep(2);
+	return TRUE;
+}
+
+function name_restart() {
+	_INIT_EXEC("name_stop");
+	_INIT_EXEC("name_start");
+	return TRUE;
+}
+
+function name_reload() {
+	if(name_config()) {
+		if(_SIGHUP("named")) {
+			_INIT_ECHO(0,_GETTEXT("Reloading %s daemon","named"));
+			return TRUE;
+		}
+	}
+	_INIT_ECHO(1,_GETTEXT("Reloading %s daemon failed","named"));
+	return FALSE;
+}
+
+?>

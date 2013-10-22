@@ -1,0 +1,102 @@
+#!/bin/bash -e
+trap "exit 1" 2;
+
+# checking
+if [ "x$_START" = "x" ]; then
+        echo "_START not set";
+	exit 1;
+fi
+if [ ! -f "$_START/MYBOX_VERSION" ]; then
+        echo "MYBOX_VERSION not set";
+	exit 1;
+fi
+if [ ! -f "$_FUNC/functions.sh" ]; then
+        echo "_FUNC not set";
+	exit 1;
+fi
+
+cd $_START;
+
+. $_FUNC/functions.sh
+
+_BUILD_MSG "iptables";
+
+# setting
+_IPTABLES_ONLY=0;
+_SOURCE=$_START/src/iptables/iptables
+_KSOURCE=$_START/src/kernel/kernel
+_KBASE=$_START/kernel_pkg
+_IBASE=$_START/iptables_tmp
+
+if [ ! -d "$_SOURCE" ]; then
+	_ERROR "$_SOURCE not exist";
+fi
+
+if [ ! -d "$_KSOURCE" ]; then
+	_ERROR "$_KSOURCE not exist";
+fi
+
+if [ -n "$2" -a "$2" = "test" ]; then
+        echo "--> IPTABLES ONLY <--";
+        _IPTABLES_ONLY=1;
+fi
+
+cd $_START;
+
+rm -rfv $_IBASE
+mkdir -p $_KBASE
+mkdir -p $_IBASE
+
+if cd $_SOURCE >/dev/null 2>&1; then
+	make distclean
+	export CFLAGS="-g -Wall -Os -w -fno-strict-aliasing -funsigned-char -Wno-char-subscripts -Wimplicit -pedantic -Wno-pointer-sign"
+	export CC=gcc
+	./configure --prefix=/usr \
+	--with-kernel=$_KSOURCE \
+	--with-ksource=$_KSOURCE \
+	--with-kbuild=$_KSOURCE \
+	--bindir=/bin \
+	--libdir=/lib/iptables \
+	--with-xtlibdir=/lib/iptables \
+	--enable-libipq
+	make CC=gcc
+	mkdir -p $_IBASE/{bin,lib/iptables}
+	cp -v ip*tables-multi $_IBASE/bin
+	for _XL in ./extensions/*.so;do
+		cp -v $_XL $_IBASE/lib/iptables
+	done
+else
+	_ERROR "failed to change working directory";
+fi
+
+[ -n "$_IPTABLES_ONLY" -a "$_IPTABLES_ONLY" = "1" ] && exit;
+
+cd $_START
+rm -rfv $_IBASE/man*
+cd $_IBASE/bin
+strip -v iptables-multi
+strip -v ip6tables-multi
+ln -s iptables-multi iptables
+ln -s iptables-multi iptables-save
+ln -s iptables-multi iptables-restore
+ln -s ip6tables-multi ip6tables
+ln -s ip6tables-multi ip6tables-save
+ln -s ip6tables-multi ip6tables-restore
+
+_UPX_COMPRESS iptables-multi 0
+_UPX_COMPRESS ip6tables-multi 0
+
+cd $_START
+cd $_IBASE
+tar -cvf kmods_iptables.tar bin/iptables* lib/iptables/libipt_* lib/iptables/libxt_* |sort
+_LZMA_COMPRESS kmods_iptables.tar kmods_iptables.mpk
+mv -v kmods_iptables.mpk $_KBASE
+
+tar -cvf kmods_ip6tables.tar bin/ip6tables* lib/iptables/libip6t_* |sort
+_LZMA_COMPRESS kmods_ip6tables.tar kmods_ip6tables.mpk
+mv -v kmods_ip6tables.mpk $_KBASE
+
+rm -rfv $_IBASE
+
+cd $_START;
+exit 0;

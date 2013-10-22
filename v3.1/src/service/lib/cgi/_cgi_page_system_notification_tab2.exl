@@ -1,0 +1,165 @@
+<?php
+if(!defined('_CGI_CODE')||_CGI_CODE!="90d45215e48dac81e802f17310ad0c1f") exit("\n\nERROR: _CGI_CODE not set\n\n");
+/* req_data = p_system_notification */
+
+function _CGI_PAGE_SYSTEM_NOTIFICATION_TAB_2() {
+	extract($GLOBALS['_IMG']);
+	_INI_TOKEN_GET("system","notification.cfg",$_TOKEN);
+	$_DATA_SYSTEM=$_TOKEN['notification_alert_system'];
+	$_DATA_SYSTEM_INFO=$_TOKEN['notification_alert_system_info'];
+	$_DATA_TASKQ=$_TOKEN['notification_alert_taskq'];
+	$_DATA_TASKQ_INFO=$_TOKEN['notification_alert_taskq_info'];
+	$_DATA_LOG=$_TOKEN['notification_alert_log'];
+	$_DATA_LOG_INFO=$_TOKEN['notification_alert_log_info'];
+	$_DATA_UPDATE=$_TOKEN['notification_alert_update'];
+	$_DATA_UPDATE_INFO=$_TOKEN['notification_alert_update_info'];
+	$_bid=_CGI_ATTR_KEY();
+	$_page="
+		<div class='fbox_c'>
+			<div style='margin: 5px; margin-bottom: 10px;'>
+				"._GETTEXT("This options will let you set which notification type you want receive. The system will send each notification thru email previously added on configuration tab.")."
+			</div>
+	";
+	unset($_DATA_SYSTEM['__DATA_ID'],$_DATA_SYSTEM_INFO['__DATA_ID']);
+	if(!_ARRAY_NULL($_DATA_SYSTEM) && !_ARRAY_NULL($_DATA_SYSTEM_INFO)) {
+		$_page .="<fieldset>
+			<legend>System</legend>
+			<div style='margin: 5px;'>
+			<table class='tbox_t' style='width: 100%;'>
+		";
+		$_rcnt=0;
+		foreach($_DATA_SYSTEM as $_DID => $_DVAL) {
+			if($_rcnt==0) $_page .="<tr>";
+			$_rcnt++;
+			$_page .="
+				<td class='tbox_tdl' style='width: 10px; vertical-align: top;'><input id='$_DID' type='checkbox' "._CGI_CHECKBOX_VAL($_DVAL)."></td>
+				<td class='tbox_tdc' style='width: 250px; padding: 5px 0px 0px 2px'>{$_DATA_SYSTEM_INFO[$_DID]}</td>
+			";
+			if($_rcnt == 3) {
+				$_page .="</tr>";
+				$_rcnt=0;
+			}
+		}
+		$_page .="
+			</table>
+			<hr />
+			"._CGI_BUTTON_APPLY("button_{$_bid}1")."
+			</div>
+			</fieldset>
+		";
+	}
+	unset($_DATA_TASKQ['__DATA_ID'],$_DATA_TASKQ_INFO['__DATA_ID'],$_DID,$_DVAL,$_rcnt);
+	if(!_ARRAY_NULL($_DATA_TASKQ) && !_ARRAY_NULL($_DATA_TASKQ_INFO)) {
+		$_page .="<fieldset style='margin-top: 20px;'>
+			<legend>Service monitor</legend>
+			<div style='margin: 5px;'>
+			<table class='tbox_t' style='width: 100%;'>
+		";
+		$_rcnt=0;
+		foreach($_DATA_TASKQ as $_DID => $_DVAL) {
+			if($_rcnt==0) $_page .="<tr>";
+			$_rcnt++;
+			$_page .="
+				<td class='tbox_tdl' style='width: 10px; vertical-align: top;'><input id='$_DID' type='checkbox' "._CGI_CHECKBOX_VAL($_DVAL)."></td>
+				<td class='tbox_tdc' style='width: 250px; padding: 5px 0px 0px 2px'>{$_DATA_TASKQ_INFO[$_DID]}</td>
+			";
+			if($_rcnt == 3) {
+				$_page .="</tr>";
+				$_rcnt=0;
+			}
+		}
+		$_page .="
+			</table>
+			<hr />
+			"._CGI_BUTTON_APPLY("button_{$_bid}2")."
+			</div>
+			</fieldset>
+		";
+	}
+	unset($_DATA_LOG['__DATA_ID'],$_DATA_LOG_INFO['__DATA_ID'],$_DID,$_DVAL,$_rcnt);
+	if(!_ARRAY_NULL($_DATA_LOG) && !_ARRAY_NULL($_DATA_LOG_INFO)) {
+		$_page .="<fieldset style='margin-top: 20px;'>
+			<legend>Logging</legend>
+			<div style='margin: 5px;'>
+			<table class='tbox_t' style='width: 100%;'>
+		";
+		$_rcnt=0;
+		foreach($_DATA_LOG as $_DID => $_DVAL) {
+			if($_rcnt==0) $_page .="<tr>";
+			$_rcnt++;
+			$_page .="
+				<td class='tbox_tdl' style='width: 10px; vertical-align: top;'><input id='$_DID' type='checkbox' "._CGI_CHECKBOX_VAL($_DVAL)."></td>
+				<td class='tbox_tdc' style='width: 250px; padding: 5px 0px 0px 2px'>{$_DATA_LOG_INFO[$_DID]}</td>
+			";
+			if($_rcnt == 3) {
+				$_page .="</tr>";
+				$_rcnt=0;
+			}
+		}
+		$_page .="
+			</table>
+			<hr />
+			"._CGI_BUTTON_APPLY("button_{$_bid}3")."
+			</div>
+			</fieldset>
+		";
+	}
+	unset($_DATA_UPDATE['__DATA_ID'],$_DATA_UPDATE_INFO['__DATA_ID'],$_DID,$_DVAL,$_rcnt);
+	if(!_ARRAY_NULL($_DATA_UPDATE) && !_ARRAY_NULL($_DATA_UPDATE_INFO)) {
+		$_page .="<fieldset style='margin-top: 20px;'>
+			<legend>System / Pattern update</legend>
+			<div style='margin: 5px;'>
+			<table class='tbox_t' style='width: 100%;'>
+		";
+		$_rcnt=0;
+		foreach($_DATA_UPDATE as $_DID => $_DVAL) {
+			if($_rcnt==0) $_page .="<tr>";
+			$_rcnt++;
+			$_page .="
+				<td class='tbox_tdl' style='width: 10px; vertical-align: top;'><input id='$_DID' type='checkbox' "._CGI_CHECKBOX_VAL($_DVAL)."></td>
+				<td class='tbox_tdc' style='width: 250px; padding: 5px 0px 0px 2px'>{$_DATA_UPDATE_INFO[$_DID]}</td>
+			";
+			if($_rcnt == 3) {
+				$_page .="</tr>";
+				$_rcnt=0;
+			}
+		}
+		$_page .="
+			</table>
+			<hr />
+			"._CGI_BUTTON_APPLY("button_{$_bid}4")."
+			</div>
+			</fieldset>
+		";
+	}
+	$_page .="
+		</div>
+		<script type='text/javascript'>
+			\$(document).ready(function() {
+				var _imgoff='{$_ICON_ONOFF[0]}';
+				var _imgon='{$_ICON_ONOFF[1]}';
+				var _stat_onoff=function(stat) {
+					if(stat==1) {
+						\$('div.fbox_c img#nt_stat').attr({'src': _imgon});
+						\$('div.fbox_c div#button_stat').text('Disable').attr('title','Disable');
+					} else {
+						\$('div.fbox_c img#nt_stat').attr({'src': _imgoff});
+						\$('div.fbox_c div#button_stat').text('Enable').attr('title','Enable');
+					}
+				};
+				_stat_onoff({$_DATA['STAT']});
+				\$('div.fbox_c div#button_stat').click(function() {
+					var _cstat=\$.trim(\$(this).text());
+					if(_cstat==='Enable') {
+						_stat_onoff(1);
+					} else {
+						_stat_onoff(0);
+					}
+				});
+			});
+		</script>
+	";
+	return trim($_page);
+}
+
+?>

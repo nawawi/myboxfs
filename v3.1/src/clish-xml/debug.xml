@@ -1,0 +1,122 @@
+﻿<?xml version="1.0"?>
+<CLISH_MODULE>
+<VIEW name="debug" prompt="[debug]# ">
+        <COMMAND name="quit"
+                help="Quit debug mode"
+                view="support"
+                viewid="">
+		<ACTION>echo -e "\nLeaving debug mode..\n"</ACTION>
+	</COMMAND>
+
+        <COMMAND name="top"
+                help="Display system tasks">
+                <ACTION>exec /bin/top 2>/dev/null</ACTION>
+        </COMMAND>
+
+        <COMMAND name="ps"
+                help="Display current processes">
+                <ACTION>exec /bin/ps 2>/dev/null |grep -v ps |grep -v exec_cli |grep -v 'more -dl' |grep -v 'grep -v' |more -dl</ACTION>
+        </COMMAND>
+
+	<COMMAND name="ping"
+		help="Send ICMP Echo packets">
+		<PARAM name="options"
+			help="Ping options"
+			ptype="STRING_ANY" 
+			default="127.0.0.1"/>
+		<ACTION>exec /bin/ping ${options} 2>/dev/null</ACTION>
+	</COMMAND>
+
+	<COMMAND name="arping"
+		help="Ping hosts by ARP requests/replies">
+		<PARAM name="options"
+			help="ARPing options"
+			ptype="STRING_ANY" 
+			default="127.0.0.1"/>
+		<ACTION>exec /bin/arping ${options} 2>/dev/null</ACTION>
+	</COMMAND>
+
+	<COMMAND name="traceroute" 
+		help="Trace the route to host">
+		<PARAM name="options"
+			help="Traceroute options"
+			ptype="STRING_ANY" 
+			default="127.0.0.1"/>
+		<ACTION>exec /bin/traceroute ${options} 2>/dev/null</ACTION>
+	</COMMAND>
+
+	<COMMAND name="nslookup" 
+		help="Host lookup">
+		<PARAM name="host"
+			help="Server Host"
+			ptype="HOST" />
+		<PARAM name="server"
+			help="Name server to query"
+			ptype="IPV4" 
+			default="127.0.0.1"/>
+		<ACTION>exec /bin/nslookup ${host} ${server} 2>/dev/null</ACTION>
+	</COMMAND>
+
+	<COMMAND name="dig" 
+		help="DNS lookup utility">
+		<PARAM name="options"
+			help="Dig options"
+			ptype="STRING_ANY" 
+			default=""/>
+		<ACTION>exec /bin/dig ${options} 2>/dev/null |more -dl</ACTION>
+	</COMMAND>
+
+	<COMMAND name="ifconfig"
+		help="ifconfig command">
+		<PARAM name="options"
+			help="ifconfig options"
+			ptype="STRING_ANY" 
+			default="-a"/>
+		<ACTION>exec /bin/ifconfig ${options} 2>/dev/null |more -dl</ACTION>
+	</COMMAND>
+	<COMMAND name="ip"
+		help="ip command">
+		<PARAM name="options"
+			help="ip options"
+			ptype="STRING_ANY" 
+			default="route show"/>
+		<ACTION>exec /bin/ip ${options} 2>/dev/null |more -dl</ACTION>
+	</COMMAND>
+	<COMMAND name="iptables"
+		help="iptables command">
+		<PARAM name="options"
+			help="iptables options"
+			ptype="STRING_ANY" 
+			default="show"/>
+		<ACTION>exec /bin/exec_cli iptables ${options} 2>/dev/null|more -dl</ACTION>
+	</COMMAND>
+	<COMMAND name="lspci"
+		help="list all PCI devices">
+		<PARAM name="options"
+			help="lspci options"
+			ptype="STRING_ANY" 
+			default="-nnk"/>
+		<ACTION>exec /bin/lspci ${options} 2>/dev/null |more -dl</ACTION>
+	</COMMAND>
+	<COMMAND name="dmidecode"
+		help="SMBIOS decoder">
+		<PARAM name="options"
+			help="dmidecode options"
+			ptype="STRING_ANY" 
+			default=""/>
+		<ACTION>exec /bin/dmidecode ${options} 2>/dev/null |more -dl</ACTION>
+	</COMMAND>
+	<COMMAND name="netstat"
+		help="Network information">
+		<PARAM name="options"
+			help="netstat options"
+			ptype="STRING_ANY" 
+			default="-tupan"/>
+		<ACTION>exec /bin/netstat ${options} 2>/dev/null |more -dl</ACTION>
+	</COMMAND>
+	<COMMAND name="meminfo"
+		help="Memory information">
+		<ACTION>exec /bin/exec_cli meminfo 2>/dev/null |more -dl</ACTION>
+	</COMMAND>
+</VIEW>
+</CLISH_MODULE>

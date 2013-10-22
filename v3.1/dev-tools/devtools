@@ -1,0 +1,485 @@
+#!/bin/sh
+
+_EXEC_DIR="/strg/mybox";
+_EXEC_NAME="devtools";
+_INST_ROOT="/strg/__inst";
+_INST_TMP="${_INST_ROOT}/tmp";
+_STRG_ROOT="/strg/mybox";
+#_STRG_PKG="${_STRG_ROOT}/pkg";
+_LOOPFS_PATH="${_STRG_ROOT}/loopfs";
+_BOOT_PATH="/boot";
+_FTP_CONF="${_INST_ROOT}/.ftpconfig";
+_FTP_REMOTE_PATH="/root/mybox-build";
+
+_FTP_USER="";
+_FTP_PASS="";
+_FTP_HOST="";
+_FTP_PORT="";
+
+_BASENAME() {
+	local name="${1##*/}";
+	local opt="$2";
+	[ -n "$opt" ] && name="${name%.$opt}";
+	echo "${name%$2}";
+}
+
+_MECHO() {
+        local msg=$1;
+        echo "[EXEC] $msg";
+        $msg;
+}
+
+_EMPTY_DIR() {
+        local _dir="$1";
+        [ ! -d "$_dir" ] && return 0;
+        local _CK="$(/bin/ls $_dir/ 2>/dev/null)";
+        [ ${#_CK} -gt 0 ] && return 1;
+        return 0;
+}
+
+_YESNO() {
+	local _prompt="$1";
+	local _ANS="";
+        read -p "${_prompt} [yes/no]: " _ANS;
+        while [ "$_ANS" != "yes" ] && [ "$_ANS" != "no" ]; do
+                read -p "Please enter 'yes' or 'no': " _ANS;
+        done
+        [ "$_ANS" = "yes" ] && return 0;
+        return 1;
+}
+_FTP_CMD() {
+	local _FTP_CMD="$1";
+	local _sync="$2";
+	if [ ! -x "/bin/ftp" ]; then
+		echo "ftp command not found";
+		exit 1;
+	fi
+	[ -f "$_FTP_CONF" ] && source $_FTP_CONF;
+	while [ -z "$_FTP_HOST" ]; do
+		read -p "Enter Dev Server Host: " _FTP_HOST;
+	done
+
+	[ -z "$_FTP_PORT" ] && _FTP_PORT="21";
+
+	while [ -z "$_FTP_USER" ]; do
+		read -p "Enter Dev Server FTP User: " _FTP_USER;
+	done
+	while [ -z "$_FTP_PASS" ]; do
+		read -s -p "Enter Dev Server FTP Password: " _FTP_PASS;
+	done
+	[ -z "$_FTP_CMD" ] && _FTP_CMD="ls";
+	if [ ! -f "$_FTP_CONF" ]; then
+		[ -n "$_INST_ROOT" -a ! -d "$_INST_ROOT" ] && _MECHO "mkdir -p $_INST_ROOT";
+		echo "_FTP_HOST=\"$_FTP_HOST\";" > $_FTP_CONF;
+		echo "_FTP_PORT=\"$_FTP_PORT\";" >> $_FTP_CONF;
+		echo "_FTP_USER=\"$_FTP_USER\";" >> $_FTP_CONF;
+		echo "_FTP_PASS=\"$_FTP_PASS\";" >> $_FTP_CONF;
+	fi
+	if [ -z "$_sync" ]; then
+		(echo -e "user $_FTP_USER ${_FTP_PASS}\nbinary\nhash\nbell\n${_FTP_CMD}\nbye" | /bin/ftp -i -v -n  ${_FTP_HOST} ${_FTP_PORT});
+		return $?;
+	fi
+	if [ -x "/bin/ftpsync" ]; then
+		(/bin/ftpsync -l -n -g ftpuser=$_FTP_USER ftppasswd=$_FTP_PASS ftpserver=$_FTP_HOST $_FTP_CMD);
+		return $?;
+	fi
+	return 1;
+}
+
+_CREATE_FALLBACK() {
+	local _b;
+	#if [ -d "${_STRG_PKG}.work" ]; then
+	#	_MECHO "rm -rf ${_STRG_PKG}.work";
+	#fi
+
+	#_MECHO "cp -a ${_STRG_PKG} ${_STRG_PKG}.work";
+
+	for _b in ${_BOOT_PATH}/*.bin;do
+		if [ -f "${_b}.work" ]; then
+			_MECHO "rm -rf ${_b}.work";
+		fi
+		_MECHO "cp -fa ${_b} ${_b}.work";
+	done
+	if [ -d "$_LOOPFS_PATH" ]; then
+		[ -d "${_LOOPFS_PATH}.work" ] && _MECHO "rm -rf ${_LOOPFS_PATH}.work";
+		_MECHO "cp -fa $_LOOPFS_PATH ${_LOOPFS_PATH}.work";
+	fi
+	exit 0;
+}
+
+_UPDATE_SERVICE_DATA() {
+	if [ ! -x "/bin/rsync" ]; then
+		echo "rsync not found";
+		exit 1;
+	fi
+	local _RDIR="${_FTP_REMOTE_PATH}/src/service/inst";
+	local _umount="$(mount  |grep /service)";
+	if [ -n "$_umount" ]; then
+		umount /service;
+		if [ $? != 0 ]; then
+			echo "Failed to umount loopfs service";
+			exit 1;
+		fi
+	fi
+	[ -d "/service" ] && _MECHO "rm -rf /service/*";
+	export RSYNC_PASSWORD=sync
+	[ -f "$_FTP_CONF" ] && source $_FTP_CONF;
+	while [ -z "$_FTP_HOST" ]; do
+		read -p "Enter Dev Server Host: " _FTP_HOST;
+	done
+	/bin/rsync -arvl sync@$_FTP_HOST::service /service;
+	exit 0;
+}
+
+_UPDATE_CORE_DATA() {
+	local _TDIR="${_INST_ROOT}/core";
+	#local _TPKG_DIR="${_TDIR}/pkg";
+	local _MCE_DIR="${_TDIR}/loopfs";
+	local _TBOOT_DIR="${_TDIR}/boot";
+	local _RDIR="${_FTP_REMOTE_PATH}/OS";
+	local _F _X;
+	if [ -d "$_TDIR" ]; then
+		_MECHO "rm -rf $_TDIR";
+	fi
+	_MECHO "mkdir -p $_MCE_DIR $_LOOPFS_PATH";
+	_MECHO "mkdir -p $_TBOOT_DIR";
+	_FTP_CMD "lcd ${_TBOOT_DIR}\ncd $_RDIR\nmget *.bin\nlcd ${_MCE_DIR}\nmget *.mce";
+	if [ $? = 0 ]; then
+		if ! _EMPTY_DIR ${_MCE_DIR}; then
+			unset _F _X;
+			for _F in $_LOOPFS_PATH/*.mce; do
+				_X=$(_BASENAME $_F);
+				[ ! -e "$_MCE_DIR/$_X" ] && _MECHO "rm -f $_F";
+			done
+			unset _F _X;
+			for _F in $_MCE_DIR/*.mce; do
+				_X=$(_BASENAME $_F);
+				echo "[*] Replacing ${_LOOPFS_PATH}/$_X";
+				if [ -f "${_LOOPFS_PATH}/$_X" ]; then
+					_MECHO "rm -f ${_LOOPFS_PATH}/$_X";
+				fi
+				_MECHO "cp -a $_F ${_LOOPFS_PATH}/$_X";
+				unset _X;
+			done
+		fi
+		if ! _EMPTY_DIR ${_TBOOT_DIR}; then
+			unset _F _X;
+			for _F in $_TBOOT_DIR/*.bin; do
+				_X=$(_BASENAME $_F);
+				echo "[*] Replacing ${_BOOT_PATH}/$_X";
+				if [ -f "${_BOOT_PATH}/$_X" ]; then
+					_MECHO "rm -f ${_BOOT_PATH}/$_X";
+				fi
+				_MECHO "cp -a $_F ${_BOOT_PATH}/$_X";
+				unset _X;
+			done
+		fi
+	fi
+	exit 0;
+}
+
+_TEST_CLISH() {
+	local _TDIR="/etc/clish";
+	local _RDIR="${_FTP_REMOTE_PATH}/src/mybox/inst/etc/clish";
+	if [ -d "$_TDIR" ] && cd $_TDIR; then
+		_FTP_CMD "cd $_RDIR\nmget *";
+	fi
+}
+
+_CREATE_UPDATE() {
+	local _TDIR="${_INST_ROOT}/firmware_update";
+	local _RDIR="$_TDIR/release";
+	local _LDIR="$_TDIR/update";
+	#local _PKG_U="$_LDIR/strg/mybox/pkg";
+	local _BOOT_U="$_LDIR/boot";
+	local _CONF="$_TDIR/.config";
+	local _REBOOT=0;
+	local _VERSION="$(cat /etc/version_core 2>/dev/null)";
+	local _BUILD_P="$(cat /etc/firmware 2>/dev/null)";
+	local _BUILD="$(date +%y.%m)";
+	local _TIME="$(date +%s)";
+	local _UPDATE_KEY="";
+	local _BUILD_T="";
+	local _CONTROL="";
+	local _RNAME="update";
+	#local _CT="$(/bin/ls $_STRG_PKG/*.mpk)";
+	local _CT="$(/bin/ls $_LOOPFS_PATH/*.mce)";
+	local _CK="$(/bin/ls $_BOOT_PATH/*.bin)";
+
+	[ -d "$_TDIR" ] && _MECHO "rm -rf $_LDIR";
+	_MECHO "mkdir -p $_TDIR";
+	_MECHO "mkdir -p $_RDIR";
+	_MECHO "mkdir -p $_LDIR";
+
+	if [ ${#_CT} = 0 ] || [ ${#_CK} = 0 ] || [ -z "$_VERSION" ] || [ -z "$_BUILD_P" ] || [ ! -x "/bin/php" ]; then
+		echo "not enough data/application to create update";
+		exit;
+	fi
+
+	[ -f "$_CONF" ] && source $_CONF;
+
+	while [ -z "$_UPDATE_KEY" ]; do
+		read -p "Enter update key: " _UPDATE_KEY;
+	done
+	export _UPDATE_KEY;
+	echo "_UPDATE_KEY=\"$_UPDATE_KEY\";" > $_CONF;
+	if [ "$_BUILD" = "$_BUILD_P" ]; then
+		_BUILD="$(date +%y.%m.%d)";
+	fi
+	echo "";
+	echo "[*] Version setting";
+	echo "Current version: v$_VERSION Build-$_BUILD_P";
+	read -p "Enter Update version [default: $_BUILD]: " _BUILD_T;
+	[ -n "$_BUILD_T" ] && _BUILD=$_BUILD_T;
+	
+	echo "";
+	echo "[*] Creating skel";
+	_MECHO "mkdir -p $_LDIR/tmp";
+	_MECHO "mkdir -p $_LDIR/etc";
+	_MECHO "mkdir -p $_BOOT_U";
+	_MECHO "mkdir -p $_PKG_U";
+	_MECHO "mkdir -p $_LDIR/strg/mybox/info-cache/update";
+
+	echo "";
+	if _YESNO "[*] Update kernel?"; then
+		_MECHO "cp -a $_BOOT_PATH/mybox-kernel.bin $_BOOT_U/";
+		_MECHO "cp -a $_BOOT_PATH/mybox-boot.bin $_BOOT_U/";
+		_REBOOT=1;
+	fi
+
+	echo "";
+	if _YESNO "[*] Update corefs?"; then
+		_MECHO "cp -a $_BOOT_PATH/mybox-corefs.bin $_BOOT_U/";
+	fi
+
+	#local _f;
+	#echo "";
+	#if _YESNO "[*] update all packages?"; then
+	#	for _f in $_STRG_PKG/*.mpk; do
+	#		_MECHO "cp -a $_f $_PKG_U/";
+	#	done
+	#else
+	#	local _PNAME="" _PCHK=0;
+	#	while [ -z "$_PNAME" ]; do
+	#		read -p "Enter package name: " _PNAME;
+	#	done
+	#	_PCHK="$(/bin/ls $_STRG_PKG/*${_PNAME}* 2>/dev/null)";
+	#	if [ ${#_PCHK} = 0 ]; then
+	#		echo "Package $_PNAME not found";
+	#		exit 1;
+	#	fi
+	#
+	#	unset _f;
+	#	for _f in $_PCHK; do
+	#		_MECHO "cp -a $_P $_PKG_U/";
+	#	done
+	#fi
+	
+	if [ "$_REBOOT" != 1 ]; then
+		if _YESNO "[*] update require reboot?"; then
+			_REBOOT=1;
+		fi
+	fi
+	echo "";
+	echo "[*] Creating update description. Press ctrl+d when finish";
+	cat > $_LDIR/tmp/UPDATE-NOTE;
+	echo "";
+	echo "[*] Update information";
+	echo "TIME=$_TIME";
+	echo "VERSION=$_VERSION";
+	echo "BUILD=$_BUILD";
+	echo "REBOOT=$_REBOOT";
+	echo "DESCRIPTION:";
+	cat $_LDIR/tmp/UPDATE-NOTE;
+	echo "";
+	if ! _YESNO "is this correct?"; then
+		echo "Process aborted";
+		exit 1;
+	fi
+	_CONTROL=$(/bin/php -r "echo serialize(array('TIME'=>$_TIME,'VERSION'=>'$_VERSION','BUILD'=>'$_BUILD','REBOOT'=>$_REBOOT));");
+	echo "$_CONTROL" > $_LDIR/tmp/UPDATE-CONTROL
+	echo "$_BUILD" > $_LDIR/etc/firmware
+	echo "$_BUILD" > $_LDIR/strg/mybox/info-cache/update/FIRMWARE_VERSION
+	echo "$_VERSION" > $_LDIR/etc/version_core
+	echo -n "[*] Creating updates..";
+	if cd $_LDIR; then
+		[ -f "$_RDIR/${_RNAME}-${_VERSION}.${_BUILD}.mpu" ] && _MECHO "rm -f $_RDIR/${_RNAME}-${_VERSION}.${_BUILD}.mpu";
+		tar -zcf - * | openssl aes-128-cbc -pass env:_UPDATE_KEY -salt -out $_RDIR/${_RNAME}-${_VERSION}.${_BUILD}.mpu;
+		echo -n -e "done\n";
+		du -hc $_RDIR/${_RNAME}-${_VERSION}.${_BUILD}.mpu;
+	else
+		echo -n -e "failed\n";
+	fi
+	
+}
+
+_READAHEAD_LIST() {
+	local _RDIR="${_FTP_REMOTE_PATH}/configs";
+	#local _DIR="bin strg/mybox/registry strg/mybox/pkg strg/mybox/scripts lib service usr etc";
+	local _DIR="bin strg/mybox/registry strg/mybox/loopfs strg/mybox/scripts lib usr etc";
+	local _f;
+	:>/tmp/readahead.list;
+	for _f in $_DIR $(grep loop /proc/mounts |awk '{print $2}' |sed -e 's|^/||g'); do
+		find /$_f -type f ! -type l -print \
+			|grep -v ^/strg/mybox/registry/ssl_cert >> /tmp/readahead.list;
+	done
+	du -h /tmp/readahead.list;
+	_FTP_CMD "lcd /tmp\ncd $_RDIR\nsend readahead.list";
+	exit $?;
+}
+
+_CLEAN() {
+	if [ -n "$_INST_ROOT" ] && [ -d "$_INST_ROOT" ]; then
+		if _YESNO "Clearing working directory: $_INST_ROOT"; then
+			_MECHO "rm -rf $_INST_ROOT";
+			exit 0;
+		fi
+	fi
+	echo "aborted";
+	exit 1;
+}
+
+_CLEAN_ALL() {
+	local _b;
+	if _YESNO "Clearing file related to development"; then
+		if [ -n "$_INST_ROOT" ] && [ -d "$_INST_ROOT" ]; then
+			_MECHO "rm -rf $_INST_ROOT";
+		fi
+		if [ -n "$_STRG_PKG" ] && [ -d "${_STRG_PKG}.work" ]; then
+			_MECHO "rm -rf ${_STRG_PKG}.work";
+		fi
+		if [ -n "$_BOOT_PATH" ] && [ -d "$_BOOT_PATH" ]; then
+			for _b in ${_BOOT_PATH}/*.bin;do
+				if [ -f "${_b}.work" ]; then
+					_MECHO "rm -rf ${_b}.work";
+				fi
+			done
+		fi
+		if [ -n "$_EXEC_NAME" ] && [ -f "${_EXEC_DIR}/${_EXEC_NAME}" ]; then
+			_MECHO "rm -f ${_EXEC_DIR}/${_EXEC_NAME} ${_EXEC_DIR}/${_EXEC_NAME}.bak";
+		fi
+		exit 0;
+	fi
+	echo "aborted";
+	exit 1;
+}
+
+_FACTORY() {
+	local _doempty="/logfs /cachefs /strg/mybox/scripts /strg/mybox/update /strg/mybox/info-cache";
+	local _registry_src="/etc/factory/registry";
+	local _registry_dst="/strg/mybox/registry";
+	local _dodel="/etc/firmware /strg/mybox/scripts /strg/mybox/update/.repo";
+	local _d;
+	if _YESNO "This action will create fresh system, current config will set to default"; then
+		if [ -w "/strg/mybox/registry/reporting/syslog.cfg" ]; then
+			sed -i -e 's/STAT=1/STAT=0/g' /strg/mybox/registry/reporting/syslog.cfg;
+			[ -d "/var/sys/obj" ] && _MECHO "rm -f /var/sys/obj/*";
+			[ -x "/service/init/syslog.init" ] && _MECHO "/service/init/syslog.init restart";
+		fi
+		:> /.nolog;
+		for _d in $_doempty; do
+			[ -d "$_d" ] && _MECHO "rm -rf $_d/*";
+		done
+		_MECHO "mkdir -p /strg/mybox";
+		if [ -d "$_registry_src" ]; then
+			[ -d "$_registry_dst" ] && _MECHO "rm -rf $_registry_dst";
+			_MECHO "cp -a $_registry_src $_registry_dst";
+		fi
+		for _d in $_dodel; do
+			_MECHO "rm -rf $_d";
+		done
+		if [ -n "$_INST_ROOT" ] && [ -d "$_INST_ROOT" ]; then
+			_MECHO "rm -rf $_INST_ROOT";
+		fi
+		if [ -n "$_LOOPFS_PATH" ] && [ -d "${_LOOPFS_PATH}.work" ]; then
+			_MECHO "rm -rf ${_LOOPFS_PATH}.work";
+		fi
+		if [ -n "$_BOOT_PATH" ] && [ -d "$_BOOT_PATH" ]; then
+			for _b in ${_BOOT_PATH}/*.bin.work;do
+				_MECHO "rm -rf ${_b}.work";
+			done
+		fi
+		if [ -n "$_EXEC_NAME" ] && [ -f "${_EXEC_DIR}/${_EXEC_NAME}" ]; then
+			_MECHO "rm -f ${_EXEC_DIR}/${_EXEC_NAME} ${_EXEC_DIR}/${_EXEC_NAME}.bak";
+		fi
+		if _YESNO "Shutdown the system"; then
+			/bin/poweroff;
+		fi
+		exit 0;
+	fi
+	echo "aborted";
+	exit 1;
+}
+
+_SYSEXEC() {
+	[ ! -f "/etc/clish/sysexec.xml" ] && return 1;
+	if [ ! -d "/strg/mybox/scripts" ]; then
+		_MECHO "mkdir -p /strg/mybox/scripts";
+	fi
+	if [ -f "/strg/mybox/scripts/post-init" ]; then
+		if ! grep -q sysexec.cli /strg/mybox/scripts/post-init 2>/dev/null; then
+			sed -i -e 's/exit/#exit/g' /strg/mybox/scripts/post-init;
+			echo -e "echo -n '$(cat /etc/clish/sysexec.xml)' > /etc/clish/sysexec.cli\nexit 0;" >> /strg/mybox/scripts/post-init;
+		fi
+	else
+		echo -e "#!/bin/sh\necho -n '$(cat /etc/clish/sysexec.xml)' > /etc/clish/sysexec.cli\nexit 0;" >> /strg/mybox/scripts/post-init;
+	fi
+	_MECHO "chmod 700 /strg/mybox/scripts/post-init";
+	return 0;
+}
+
+_UPDATE_SCRIPT() {
+	[ -z "$_EXEC_DIR" ] || [ -z "$_EXEC_NAME" ] && return 1;
+	local _RDIR="${_FTP_REMOTE_PATH}/scripts/";
+	if cd $_EXEC_DIR 2>/dev/null; then
+		_MECHO "cp $_EXEC_NAME ${_EXEC_NAME}.bak";
+		_FTP_CMD "lcd ${_EXEC_DIR}\ncd ${_RDIR}\nget ${_EXEC_NAME}";
+		if [ $? = 0 ]; then
+			_MECHO "chmod 700 ${_EXEC_DIR}/${_EXEC_NAME}";
+			_MECHO "rm -f ${_EXEC_DIR}/${_EXEC_NAME}.bak";
+		fi
+		exit $?;
+	fi
+	exit 1;
+}
+
+_USAGE() {
+	echo "Usage: $(_BASENAME $0) [options]";
+	echo " Available options";
+	echo "------------------------------------------------------";
+	echo " update       = update this script";
+	echo " firmware     = create firmware update";
+	echo " service      = install service package";
+	echo " service test = will temporary install service file";
+	echo " fallback     = will create fallback system";
+	echo " core         = will update core file (boot/pkg)";
+	echo " clish        = will temporary install clish xml file";
+	echo " readahead    = will create readahead list file";
+	echo " sysexec      = Enable sysexec permanently";
+	echo " clean        = delete working directory ($_INST_ROOT)";
+	echo " clean_all    = delete file related to development";
+	echo " factory      = will create fresh system";
+	echo "------------------------------------------------------";
+	exit 0;
+}
+
+_MAIN() {
+	case $1 in
+		update) _UPDATE_SCRIPT;;
+		firmware) _CREATE_UPDATE;;
+		service) _UPDATE_SERVICE_DATA "$2";;
+		fallback) _CREATE_FALLBACK;;
+		core) _UPDATE_CORE_DATA;;
+		clish) _TEST_CLISH;;
+		readahead) _READAHEAD_LIST;;
+		sysexec) _SYSEXEC;;
+		clean) _CLEAN;;
+		clean_all) _CLEAN_ALL;;
+		factory) _FACTORY;;
+		*) _USAGE;;
+	esac;
+}
+
+_MAIN $@;
+
+exit 0;

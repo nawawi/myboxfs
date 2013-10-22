@@ -1,0 +1,6 @@
+var _LANG={
+	"Reading data. Please wait..":"",
+	"Unable to complete backend request. Please reload your browser.":"",
+	"Session logout":"",
+	"Permission denied":""
+};

@@ -1,0 +1,260 @@
+<?php
+if(!defined('_CLI_CODE')||_CLI_CODE!="a098846421a09ab1cacd3b3a753cbe05") exit("\n\nERROR: _CLI_CODE not set\n\n");
+
+function ___CLI_DHCP_CONFIG_SERVER_PRINT($_find='') {
+	$_objf=_OBJ_PATH."/iosh_dhcp_server_print.obj";
+	@unlink($_objf);
+	_INI_TOKEN_GET("network","dhcp_server.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+              	_CLI_ECHO(_GETTEXT("No data available"));
+                return FALSE;
+	}
+	$_cnt=1;$_obj=array();
+	$_output="";
+	_INI_TOKEN_GET("network","dhcp_server_winsnode.cfg",$_WTOKEN);
+	foreach($_TOKEN as $_ID => $_DATA) {
+		if(_NULL($_DATA['DNAME'])
+			|| _NULL($_DATA['RANGE_START'])
+			|| _NULL($_DATA['RANGE_END'])) {
+			_INI_TOKEN_DELETE("network","dhcp_server.cfg",$_ID);
+			continue;
+		}
+		if(_NULL($_DATA['STAT'])) $_DATA['STAT']=0;
+		_STR_ONOFF($_stat,$_DATA['STAT']);
+		$_DATA['STAT']=$_stat;
+
+		_INI_TOKEN_GET_BYPARAM("network","eth.cfg","NAME",$_DATA['DNAME'],$_NTOKEN);
+		if(!_ARRAY_NULL($_NTOKEN) && !_NULL($_NTOKEN['ADDR']) && !_NULL($_NTOKEN['PREF'])) {
+			$_DATA['DNAME']="{$_DATA['DNAME']} ({$_NTOKEN['ADDR']}/{$_NTOKEN['PREF']})";
+		}
+		unset($_NTOKEN);
+
+		if(!_ARRAY_NULL($_WTOKEN) && !_NULL($_DATA['WINS_NODE'])) {
+			if($_DATA['WINS_NODE']==0) unset($_DATA['WINS_ADDR']);
+			$_DATA['WINS_NODE']="{$_WTOKEN['wins_node'][$_DATA['WINS_NODE']]}";
+		}
+		if(!_NULL($_find)) {
+			if(!_ARRAY_FIND($_find,$_DATA)) {
+				continue;
+			}
+		}
+		if($_cnt > 1) $_output .="\n";
+		$_output .=_CLI_DATA_BODY(
+			array(
+				_GETTEXT_U("ID")=>$_cnt,
+				_GETTEXT_U("INTERFACE")=>$_DATA['DNAME'],
+				_GETTEXT_U("RANGE START")=>$_DATA['RANGE_START'],
+				_GETTEXT_U("RANGE END")=>$_DATA['RANGE_END'],
+				_GETTEXT_U("DNS SERVER %d",1)=>$_DATA['DNS1'],
+				_GETTEXT_U("DNS SERVER %d",2)=>$_DATA['DNS2'],
+				_GETTEXT_U("DEFAULT GATEWAY")=>$_DATA['GATEWAY'],
+				_GETTEXT_U("DOMAIN")=>$_DATA['DOMAIN'] ? $_DATA['DOMAIN'] : __CLI_BODY_SKIP_DATA_TAG,
+				_GETTEXT_U("WINS NODE TYPE")=>$_DATA['WINS_NODE'],
+				_GETTEXT_U("WINS SERVER")=>$_DATA['WINS_ADDR'] ? $_DATA['WINS_ADDR'] : __CLI_BODY_SKIP_DATA_TAG,
+				_GETTEXT_U("ENABLE")=>$_DATA['STAT'],
+				_GETTEXT_U("DESCRIPTION")=>$_DATA['NOTE']
+			)
+		);
+		$_obj[$_cnt]=$_ID;
+		unset($_DTOKEN);
+		$_cnt++;
+	}
+	if(_ARRAY_NULL($_obj) || !_FILE_ARRAY_SAVE($_objf,$_obj) || _NULL($_output)) {
+		if(!_NULL($_find)) {
+			_CLI_ECHO(_GETTEXT("No results found"));
+		} else {
+			_CLI_ECHO(_GETTEXT("No data available"));
+		}
+		@unlink($_objf);
+                return FALSE;
+	}
+	_CLI_ECHO_HEADER(_GETTEXT("DHCP Server configuration"));
+	if(!_NULL($_find)) {
+		echo _GETTEXT("Search results match for '%s':","$_find")."\n\n";
+	}
+	echo "$_output";
+	return TRUE;
+}
+
+function ___CLI_DHCP_CONFIG_SERVER_ADD($_args) {
+	if(!_ARRAY_NULL($_args)) {
+		$_DATA=array();
+		$_intf=$_args[0];
+
+		_STR_ONOFF($_stat,$_args[1]);
+
+		if(___CLI_DEFINITIONS_NETWORKS_ADD_INT($_intf,$_val)) {
+			$_DATA['DNAME']="$_val";
+		} else {
+                        @unlink($_objf);
+			return FALSE;
+		}
+
+		_INI_TOKEN_GET_BYPARAM("network","eth.cfg","NAME",$_DATA['DNAME'],$_ITOKEN);
+
+		if(_ARRAY_NULL($_ITOKEN)
+			|| _NULL($_ITOKEN['TYPE'])
+			|| _NULL($_ITOKEN['ADDR'])
+			|| _NULL($_ITOKEN['HOST_MIN'])
+			|| _NULL($_ITOKEN['HOST_MAX'])) {
+			_CLI_ECHO(_GETTEXT("No data available for interface '%s'","{$_DATA['DNAME']}"));
+			return FALSE;
+		}
+		if($_ITOKEN['TYPE']!="vlan" && $_ITOKEN['TYPE']!="static") {
+			_CLI_ECHO(_GETTEXT("Invalid interface type. DHCP Server only accept interface type static and vlan"));
+			return FALSE;
+		}
+		$_DATA['RANGE_START']=$_ITOKEN['HOST_MIN'];
+		$_DATA['RANGE_END']=$_ITOKEN['HOST_MAX'];
+		$_DATA['GATEWAY']=$_ITOKEN['ADDR'];
+		$_DATA['DNS1']=$_ITOKEN['ADDR'];
+		$_DATA['DNS2']="";
+		/*
+			/strg/mybox/registry/network/dhcp_server_winsnode.cfg:
+			ID=wins_node
+			0=B-Node (no WINS
+			1=None
+			2=P-Node (WINS only)
+			4=M-Node (Broadcast, then WINS)
+			8=H-Node (WINS, then Broadcast)
+		*/
+
+		$_DATA['WINS_NODE']="1";
+		$_DATA['WINS_ADDR']="0.0.0.0";
+		$_DATA['STAT']="$_stat";
+		$_DATA['NOTE']="{$_args[2]}";
+		if(_INI_TOKEN_SAVE("network","dhcp_server.cfg",$_DATA)) {
+			_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function ___CLI_DHCP_CONFIG_SERVER_SET($_args) {
+	if(!_ARRAY_NULL($_args)) {
+		$_objf=_OBJ_PATH."/iosh_dhcp_server_print.obj";
+		$_obj=_FILE_ARRAY_GET($_objf);
+		if(_ARRAY_NULL($_obj) || _NULL($_obj[$_args[1]])) {
+			_CLI_ECHO(_GETTEXT("No Resource Id available."));
+			_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id","server print"));
+			@unlink($_objf);
+			return FALSE;
+		}
+
+		$_DATA=array();
+		$_param=$_args[0];
+		$_sid=$_obj[$_args[1]];
+		if($_param=="dns") {
+			$_dns1=$_args[2];
+			$_dns2=$_args[3];
+			if(!_NULL($_dns1) && !_CHECK_IP($_dns1)) {
+				_CLI_ECHO(_GETTEXT("Invalid DNS Server IP '%s'","$_dns1"));
+				return FALSE;
+			}
+			if(!_NULL($_dns2) && !_CHECK_IP($_dns2)) {
+				_CLI_ECHO(_GETTEXT("Invalid DNS Server IP '%s'","$_dns2"));
+				return FALSE;
+			}
+			$_DATA['DNS1']="$_dns1";
+			$_DATA['DNS2']="$_dns2";
+		} elseif($_param=="range") {
+			$_range1=$_args[2];
+			$_range2=$_args[3];
+
+			if(!_NULL($_range1) && !_CHECK_IP($_range1)) {
+				_CLI_ECHO(_GETTEXT("Invalid IP Address '%s'","$_range1"));
+				return FALSE;
+			}
+			if(!_NULL($_range2) && !_CHECK_IP($_range2)) {
+				_CLI_ECHO(_GETTEXT("Invalid IP Address '%s'","$_range1"));
+				return FALSE;
+			}
+			if(!_CHK_HOSTRANGE($_range1,$_range2)) {
+				_CLI_ECHO(_GETTEXT("Invalid address range %s","{$_range1}-{$_range2}"));
+				return FALSE;
+			}
+
+			_INI_TOKEN_GET_BYPARAM("network","dhcp_server.cfg","ID",$_sid,$_ITOKEN);
+			if(!_ARRAY_NULL($_ITOKEN) && !_NULL($_ITOKEN['DNAME'])) {
+				if(!_CHK_INRANGE($_ITOKEN['DNAME'],$_range1) 
+					||!_CHK_INRANGE($_ITOKEN['DNAME'],$_range2)) {
+					_CLI_ECHO(_GETTEXT("Invalid address range %s on interface %s","{$_range1}-{$_range2}","{$_ITOKEN['DNAME']}"));
+					return FALSE;
+				} 				
+			}
+			$_DATA['RANGE_START']="$_range1";
+			$_DATA['RANGE_END']="$_range2";
+		} elseif($_param=="gateway") {
+			$_gateway=$_args[2];
+			if(!_CHECK_IP($_gateway)) {
+				_CLI_ECHO(_GETTEXT("Invalid gateway Address '%s'","$_gateway"));
+				return FALSE;
+			}
+			$_DATA['GATEWAY']="$_gateway";
+		} elseif($_param=="domain") {
+			$_domain=$_args[2];
+			if(!_CHECK_DOMAIN_VAR($_domain)) {
+				_CLI_ECHO(_GETTEXT("Invalid domain '%s'","$_domain"));
+				return FALSE;
+			}
+			$_DATA['DOMAIN']="$_domain";
+		} elseif($_param=="wins") {
+			$_node=$_args[2];
+			$_server=$_args[3];
+			if(!_NULL($_server) && !_CHECK_IP($_server)) {
+				_CLI_ECHO(_GETTEXT("Invalid WINS Server '%s'","$_server"));
+				return FALSE;
+			}
+			$_DATA['WINS_NODE']="$_node";
+			$_DATA['WINS_ADDR']="$_server";
+		} elseif($_param=="enable") {
+			_STR_ONOFF($_stat,$_args[2]);
+			$_DATA['STAT']="$_stat";
+		} elseif($_param=="description") {
+			$_DATA['NOTE']=$_args[2];
+		}
+		if(!_ARRAY_NULL($_DATA) && _INI_TOKEN_UPDATE("network","dhcp_server.cfg",$_sid,$_DATA)) {
+			_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function ___CLI_DHCP_CONFIG_SERVER_DELETE($_nums) {
+	$_objf=_OBJ_PATH."/iosh_dhcp_server_print.obj";
+	$_obj=_FILE_ARRAY_GET($_objf);
+	if(_ARRAY_NULL($_obj)) {
+		_CLI_ECHO(_GETTEXT("No Resource Id available."));
+		_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","server print"));
+		@unlink($_objf);
+		return FALSE;
+	}
+	if($_nums=='*' && _CLI_YESNO(_GETTEXT("This action will delete all %s.\nContinue this action? %s","DHCP Server","[yes/no]: "))==TRUE) {
+		foreach($_obj as $_cnt => $_id) {
+			if(_INI_TOKEN_DELETE("network","dhcp_server.cfg",$_id)) {
+				unset($_obj[$_cnt]);
+			}
+		}
+		if(_FILE_ARRAY_SAVE($_objf,$_obj)) {
+			return TRUE;
+		}
+	} else {
+		$_num_array=array();
+		_CLI_MULTINUM($_nums,$_num_array);
+		foreach($_num_array as $_no) {
+			if(!_NULL($_obj[$_no])) {
+				if(_INI_TOKEN_DELETE("network","dhcp_server.cfg",$_obj[$_no])) {
+					unset($_obj[$_no]);
+				}
+			}
+		}
+		if(_FILE_ARRAY_SAVE($_objf,$_obj)) {
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+?>

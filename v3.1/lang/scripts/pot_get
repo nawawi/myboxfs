@@ -1,0 +1,200 @@
+#!/bin/bash
+trap "exit 1" 2;
+
+_TOP="/root/mybox-build";
+_PDIR="$_TOP/src/lang";
+_SERVICE_DIR="$_TOP/src/service/service";
+_MYBOX_DIR="$_TOP/src/mybox/mybox";
+_INIT_DIR="$_TOP/bootscript/init.boot";
+_BINIT_DIR="$_TOP/bootscript/bin.boot";
+_INST="$_PDIR/pot_data";
+_CDIR="$_MYBOX_DIR/clish-xml";
+
+if [ "x$_FUNC" = "x" ]; then
+        _FUNC="$_TOP/scripts";
+        if [ ! -f "$_FUNC/functions.sh" ]; then
+                echo "ERROR: $_FUNC/functions.sh not exist";
+                exit 1;
+        fi
+fi
+. $_FUNC/functions.sh
+
+_XGETTEXT_OPTIONS="-i --omit-header";
+
+if !cd $_PDIR 2>/dev/null; then
+	echo "Invalid Path";
+	exit 1;
+fi
+
+_MECHO "rm -rfv $_INST";
+_MECHO "mkdir -p $_INST";
+
+cat $_PDIR/configs/locale-header > $_INST/traceos.pot;
+cat $_PDIR/configs/globals.pot >> $_INST/traceos.pot;
+
+if [ -d "$_MYBOX_DIR" ]; then
+	for fx in $(find $_MYBOX_DIR/* -type f -name *.c); do
+		_DN=$(dirname $fx);
+
+		if [ ! -f "$fx" -o ! -d "$_DN" ]; then
+			unset _DN _FN;
+			continue;
+		fi
+		if cd $_DN 2>/dev/null; then
+			_FN=$(basename $fx);
+			if [ ! -f "$_FN" ]; then
+				unset _DN _FN;
+				cd $_PDIR;
+				continue;
+			fi
+			xgettext ${_XGETTEXT_OPTIONS} -L C $_FN -j --output=$_INST/traceos.pot;
+			unset _DN _FN;
+			cd $_PDIR;
+		fi
+	done
+	unset fx;
+	cd $_PDIR;
+fi
+
+if [ -d "$_INIT_DIR" ]; then
+	for fx in $(find $_INIT_DIR/* -type f); do
+		_DN=$(dirname $fx);
+		if [ ! -f "$fx" -o ! -d "$_DN" ]; then
+			unset _DN _FN;
+			continue;
+		fi
+		if cd $_DN 2>/dev/null; then
+			_FN=$(basename $fx);
+			if [ ! -f "$_FN" ]; then
+				unset _DN _FN;
+				cd $_PDIR;
+				continue;
+			fi
+			xgettext ${_XGETTEXT_OPTIONS} -L Shell --force-po $_FN -j --output=$_INST/traceos.pot;
+			unset _DN _FN;
+			cd $_PDIR;
+		fi
+	done
+	unset fx;
+	cd $_PDIR;
+fi
+
+if [ -d "$_BINIT_DIR" ]; then
+	for fx in $(find $_BINIT_DIR/* -type f); do
+		_DN=$(dirname $fx);
+		if [ ! -f "$fx" -o ! -d "$_DN" ]; then
+			unset _DN _FN;
+			continue;
+		fi
+		if cd $_DN 2>/dev/null; then
+			_FN=$(basename $fx);
+			if [ ! -f "$_FN" ]; then
+				unset _DN _FN;
+				cd $_PDIR;
+				continue;
+			fi
+			xgettext ${_XGETTEXT_OPTIONS} -L Shell --force-po $_FN -j --output=$_INST/traceos.pot;
+			unset _DN _FN;
+			cd $_PDIR;
+		fi
+	done
+	unset fx;
+	cd $_PDIR;
+fi
+
+if [ -d "$_SERVICE_DIR" ]; then
+	for fx in $(find $_SERVICE_DIR/* -type f -name *.ex*); do
+		[[ $fx = */tpl/* ]] && continue;
+
+		_DN=$(dirname $fx);
+		if [ ! -f "$fx" -o ! -d "$_DN" ]; then
+			unset _DN _FN;
+			continue;
+		fi
+		if cd $_DN 2>/dev/null; then
+			_FN=$(basename $fx);
+			if [ ! -f "$_FN" ]; then
+				unset _DN _FN;
+				cd $_PDIR;
+				continue;
+			fi
+			xgettext ${_XGETTEXT_OPTIONS} --keyword=_GETTEXT -L PHP $_FN -j --output=$_INST/traceos.pot;
+			unset _DN _FN;
+			cd $_PDIR;
+		fi
+	done
+	unset fx;
+	:> $_INST/js.pot.tmp;
+	for fx in $(find $_SERVICE_DIR/* -type f -name *.js); do
+		[[ $fx = */tpl/* ]] && continue;
+
+		_DN=$(dirname $fx);
+		if [ ! -f "$fx" -o ! -d "$_DN" ]; then
+			unset _DN _FN;
+			continue;
+		fi
+		if cd $_DN 2>/dev/null; then
+			_FN=$(basename $fx);
+			if [ ! -f "$_FN" ]; then
+				unset _DN _FN;
+				cd $_PDIR;
+				continue;
+			fi
+			xgettext ${_XGETTEXT_OPTIONS} --no-wrap --keyword=js_gettext -L Java $_FN -j --output=$_INST/js.pot.tmp;
+			xgettext ${_XGETTEXT_OPTIONS} --no-wrap --keyword=js_gettext -L Java $_FN -j --output=$_INST/traceos.pot;
+			unset _DN _FN;
+			cd $_PDIR;
+		fi
+	done
+	unset fx;
+	rm -f $_INST/js.pot;
+	if [ -f "$_INST/js.pot.tmp" ]; then
+		while read p; do
+			_B=$(echo "$p" |egrep 'msgid.*".*"' |sed -e 's|msgid   "||g' -e 's|"||g');
+			[ "x$_B" = "x" ] && continue;
+			if [ ! -f "$_INST/js.pot" ]; then
+				echo "var _LANG={" > $_INST/js.pot;
+			fi
+			echo -ne "\"$_B\":\"\"", >> $_INST/js.pot;
+			unset _B;
+		done < $_INST/js.pot.tmp;
+		if [ -f "$_INST/js.pot" ]; then
+			sed -i -e 's|,$||g' \
+			       -e 's|,|,\n\t|g' \
+			       -e 's|^"|\t"|g' $_INST/js.pot;
+			echo -e "\n};" >> $_INST/js.pot;
+		fi
+		rm -f $_INST/js.pot.tmp;
+	fi
+	cd $_PDIR;
+fi
+
+cd $_PDIR;
+:>./gg
+:>$_INST/clish.pot
+for f in $_CDIR/*.xml;do
+        [ ! -f "$f" ] && continue;
+        egrep -r 'help=".*"' $f \
+        |sed -e 's|help="||g' -e 's|">||g' -e 's|/>||g' -e 's|"||g' \
+        |perl -pe 's/^\s+//g' >> ./gg
+done
+
+if [ -f "./gg" ]; then
+        cat ./gg |sort -u > ./gg2
+        mv gg2 gg;
+        while read p;do
+                _B=$(echo $p |tr -d '\n' |tr -d '\r');
+                echo "msgid   \"$_B\"" >> $_INST/clish.pot;
+                echo "msgstr  \"\"" >> $_INST/clish.pot
+                echo ""
+                unset _B;
+        done < ./gg;
+        rm -f ./gg;
+fi
+
+if [ -f "$_INST/clish.pot" -a -f "$_INST/traceos.pot" ]; then
+	msgcat -i $_INST/traceos.pot $_INST/clish.pot -o $_INST/traceos.pot2
+	if [ $? = 0 ] && [ -f "$_INST/traceos.pot2" ]; then
+		mv -v $_INST/traceos.pot2 $_INST/traceos.pot
+	fi
+fi

@@ -1,0 +1,222 @@
+<?php
+if(!defined('_CGI_CODE')||_CGI_CODE!="90d45215e48dac81e802f17310ad0c1f") exit("\n\nERROR: _CGI_CODE not set\n\n");
+/* req_data = p_system_access_control */
+
+function  _CGI_PAGE_SYSTEM_ACL_SET_PASSWD($_DATA_POST) {
+	if(!_NULL($_DATA_POST['_cmd'])
+		&& !_NULL($_DATA_POST['_pass'])
+		&& !_NULL($_DATA_POST['_access'])) {
+			
+		if(!_NULL($_DATA_POST['_msg'])) {
+			$_msg=base64_decode($_DATA_POST['_msg']);
+		} else {
+			$_msg="Configuration applied successfully";
+		}
+
+		if($_DATA_POST['_cmd']=="web") {
+			if(!_SESSION_CHECK_ACCESS_PASSWORD($_DATA_POST['_access'],$_DATA_POST['_pass'])) {
+				return _CGI_JSON(array("status"=>"KO","msg"=>"Password '{$_DATA_POST['_pass']}' already exist"));
+			}
+			if(_SESSION_SET_ACCESS_PASSWORD($_DATA_POST['_access'],$_DATA_POST['_pass'])) {
+				return _CGI_JSON(array("status"=>"OK","msg"=>"$_msg"));
+			}
+		} elseif($_DATA_POST['_cmd']=="ssh" || $_DATA_POST['_cmd']=="ftp") {
+			$_ret=_SESSION_CHECK_ACCESS_PASSWORD($_DATA_POST['_cmd'],$_DATA_POST['_pass'],$_DATA_POST['_access']);
+			if($_ret==0) {
+				return _CGI_JSON(array("status"=>"KO","msg"=>"Password already exist"));
+			} elseif($_ret==-1) {
+				return _CGI_JSON(array("status"=>"KO","msg"=>"User already exist"));
+			} elseif($_ret==-2) {
+				return _CGI_JSON(array("status"=>"KO","msg"=>"Invalid username"));
+			}
+			if(_SESSION_SET_ACCESS_PASSWORD($_DATA_POST['_cmd'],$_DATA_POST['_pass'],$_DATA_POST['_access'])) {
+				if($_DATA_POST['_cmd']=="ssh") {
+					_INIT_TASKQ("ssh_restart");
+				} elseif($_DATA_POST['_cmd']=="ftp") {
+					_INIT_TASKQ("ftp_restart");
+				}
+				return _CGI_JSON(array("status"=>"OK","msg"=>"$_msg"));
+			}
+		} elseif($_DATA_POST['_cmd']=="console") {
+			if(!_SESSION_CHECK_ACCESS_PASSWORD($_DATA_POST['_cmd'],$_DATA_POST['_pass'])) {
+				return _CGI_JSON(array("status"=>"KO","msg"=>"Password already exist"));
+			}
+			if(_SESSION_SET_ACCESS_PASSWORD($_DATA_POST['_cmd'],$_DATA_POST['_pass'])) {
+				return _CGI_JSON(array("status"=>"OK","msg"=>"$_msg"));
+			}
+		}
+	}
+	return FALSE;
+}
+
+function _CGI_PAGE_SYSTEM_ACL_SET_LIST($_DATA_POST) {
+	if(!_ARRAY_NULL($_DATA_POST['_data'])) {
+		if(!_NULL($_DATA_POST['_msg'])) {
+			$_DATA_POST['_msg']=base64_decode($_DATA_POST['_msg']);
+		}
+		$_msg=$_DATA_POST['_msg'] ? $_DATA_POST['_msg'] : "Configuration applied successfully";
+
+		_INI_TOKEN_GET("system","acl.cfg",$_NTOKEN);
+		$_DATA=array();
+		if(!_ARRAY_NULL($_NTOKEN)) {
+			foreach($_NTOKEN as $_ID => $_datax) {
+				foreach($_datax as $_p => $_v) {
+					if($_p=='HOST') {
+						$_DATA[$_v]=$_ID;
+					}
+				}
+			}
+		}
+		$_failed=0;
+		foreach($_DATA_POST['_data'] as $_host => $_data) {
+			$_SAVE=array();
+			_TRIM($_host);
+			$_SAVE['HOST']=$_host;
+			$_SAVE['STAT']=$_data['stat'] ? $_data['stat'] : 0;
+			$_SAVE['TYPE']=trim($_data['type'],",");
+			if(!_INI_TOKEN_CHECK("system","acl.cfg","HOST","$_host")) {
+				_INI_TOKEN_GET_BYPARAM("system","acl.cfg","HOST",$_host,$_ITOKEN);
+				if(!_NULL($_ITOKEN['__DATA_ID'])) {
+					if(!_INI_TOKEN_UPDATE("system","acl.cfg",$_ITOKEN['__DATA_ID'],$_SAVE)) {
+						$_failed++;
+					} else {
+						unset($_DATA[$_host]);
+					}
+				}
+				unset($_ITOKEN);
+				continue;
+			}
+			if(!_INI_TOKEN_SAVE("system","acl.cfg",$_SAVE)) {
+				$_failed++;
+			} else {
+				unset($_DATA[$_host]);
+			}
+		}
+		if($_failed==0) {
+			if(!_ARRAY_NULL($_DATA)) {
+				foreach($_DATA as $_h => $_id) {
+					_INI_TOKEN_DELETE("system","acl.cfg",$_id);
+				}
+			}
+			_INIT_TASKQ("policy_admin");
+			return _CGI_JSON(array("status"=>"OK","msg"=>"$_msg"));
+		}
+	}
+	return FALSE;
+}
+
+function _CGI_PAGE_SYSTEM_ACL_SET_SECURITY($_DATA_POST) {
+	if(!_NULL($_DATA_POST['_attempt'])
+		&& !_NULL($_DATA_POST['_block'])
+		&& !_ARRAY_NULL($_DATA_POST['_data'])) {
+
+		if(!_NULL($_DATA_POST['_msg'])) {
+			$_msg=base64_decode($_DATA_POST['_msg']);
+		} else {
+			$_msg="Configuration applied successfully";
+		}
+
+		_INI_TOKEN_GET("system","attempt_exclude.cfg",$_NTOKEN);
+		$_DATA=array();
+		if(!_ARRAY_NULL($_NTOKEN)) {
+			foreach($_NTOKEN as $_ID => $_datax) {
+				foreach($_datax as $_p => $_v) {
+					if($_p=='HOST') {
+						$_DATA[$_v]=$_ID;
+					}
+				}
+			}
+		}
+
+		$_failed=0;
+		foreach($_DATA_POST['_data'] as $_host) {
+			$_SAVE=array();
+			_TRIM($_host);
+			$_SAVE['HOST']=$_host;
+			if(!_INI_TOKEN_CHECK("system","attempt_exclude.cfg","HOST","$_host")) {
+				_INI_TOKEN_GET_BYPARAM("system","attempt_exclude.cfg","HOST",$_host,$_ITOKEN);
+				if(!_NULL($_ITOKEN['__DATA_ID'])) {
+					if(!_INI_TOKEN_UPDATE("system","attempt_exclude.cfg",$_ITOKEN['__DATA_ID'],$_SAVE)) {
+						$_failed++;
+					} else {
+						unset($_DATA[$_host]);
+					}
+				}
+				unset($_ITOKEN);
+				continue;
+			}
+			if(!_INI_TOKEN_SAVE("system","attempt_exclude.cfg",$_SAVE)) {
+				$_failed++;
+			} else {
+				unset($_DATA[$_host]);
+			}
+		}
+		$_SAVE=array();
+		$_SAVE['ATTEMPT']=$_DATA_POST['_attempt'];
+		$_SAVE['BLOCK']=$_DATA_POST['_block'];
+		if($_failed==0) {
+			if(!_ARRAY_NULL($_DATA)) {
+				foreach($_DATA as $_h => $_id) {
+					_INI_TOKEN_DELETE("system","attempt_exclude.cfg",$_id);
+				}
+			}
+			if(_INI_TOKEN_UPDATE("system","system.cfg","security",$_SAVE)) {
+				_INIT_TASKQ("policy_admin");
+				return _CGI_JSON(array("status"=>"OK","msg"=>"$_msg"));
+			}
+		}
+	}
+	return FALSE;
+}
+
+function _CGI_PAGE_SYSTEM_ACL_TAB_0() {
+	extract($GLOBALS['_IMG']);
+	extract($GLOBALS['__CDATA']);
+	$_hkey=_RAND_TEXT(30);
+	$_page="";
+	$_page .="<div id='tabs{$_hkey}' class='tbox_c'>";
+	$_page .="<ul style='height: 20px;'>";
+	$_page .="<li><a href='#$_hkey' onclick=\"__tnpage.loadpage('#$_hkey','$_req_data&sub_data=1',true);return false;\"><span>Access Settings</span></a></li>"; 
+	$_page .="<li><a href='#$_hkey' onclick=\"__tnpage.loadpage('#$_hkey','$_req_data&sub_data=2',true);return false;\"><span>Access List</span></a></li>";
+	$_page .="<li><a href='#$_hkey' onclick=\"__tnpage.loadpage('#$_hkey','$_req_data&sub_data=3',true);return false;\"><span>Security</span></a></li>"; 
+	$_page .="</ul>";
+	$_page .="<div id='$_hkey'></div>";
+	$_page .="</div>";
+	$_page .="
+		<script type='text/javascript'>
+			\$(document).ready(function() {
+				\$('#tabs{$_hkey} > ul').tabs();
+				\$('div#$_hkey').html(\"<img src='$_ICON_SPINNER'> "._GETTEXT("Reading data. Please wait..")."\");
+				__tnpage.loadpage('#$_hkey','$_req_data&sub_data=1',true);
+				\$('div#tabs{$_hkey} a').click(function() {
+					__tndialog.clear();
+					\$('div#$_hkey').html(\"<img src='$_ICON_SPINNER'> "._GETTEXT("Reading data. Please wait..")."\");
+				});
+			});
+		</script>
+	";
+	return trim($_page);
+}
+
+function _CGI_PAGE_SYSTEM_ACL_TABS($_opt='') {
+	$GLOBALS['__CDATA']['_req_data']="req_data=p_system_access_control";
+	$_page="";
+	switch($_opt) {
+		case '1':
+			$_page=_CGI_PAGE_SYSTEM_ACL_TAB_1();
+		break;
+		case '2':
+			$_page=_CGI_PAGE_SYSTEM_ACL_TAB_2();
+		break;
+		case '3':
+			$_page=_CGI_PAGE_SYSTEM_ACL_TAB_3();
+		break;
+		default:
+			$_page=_CGI_PAGE_SYSTEM_ACL_TAB_0();
+		break;
+	}
+	$_page .="<script type='text/javascript'>__tnpage.button_hover();</script>";
+	return trim($_page);
+}
+
+?>

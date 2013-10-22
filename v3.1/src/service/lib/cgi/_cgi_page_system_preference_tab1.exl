@@ -1,0 +1,135 @@
+<?php
+if(!defined('_CGI_CODE')||_CGI_CODE!="90d45215e48dac81e802f17310ad0c1f") exit("\n\nERROR: _CGI_CODE not set\n\n");
+
+function _CGI_PAGE_SYSTEM_PREFERENCE_TAB_1() {
+	_INI_TOKEN_GET("system","system.cfg",$_TOKEN);
+	$_DATA=$_TOKEN['system'];
+	$_bid=_CGI_ATTR_KEY();
+	$_page="
+		<div class='fbox_c'>
+		<fieldset>
+		<legend>"._GETTEXT("System Hostname")."</legend>
+		<div style='margin: 5px;'>
+		<table class='tbox_t'>
+		<tr>
+		<td class='tbox_tdl'>"._GETTEXT("Hostname:")."</td>
+		<td class='tbox_tdc'><input id='hostname' type='text' class='tbox_i' value='{$_DATA['HOSTNAME']}' /></td>
+		<td class='tbox_tdr'>"._GETTEXT("This is the hostname of the system. It should be a fully qualified DNS hostname, including a domain.")."</td>
+		</tr>
+		</table>
+		<hr />
+		"._CGI_BUTTON_APPLY("button_{$_bid}1")."
+		</div>
+		</fieldset>
+
+		<fieldset style='margin-top: 20px;'>
+		<legend>"._GETTEXT("Organizational Information")."</legend>
+		<div style='margin: 5px;'>
+		<table class='tbox_t'>
+		<tr>
+		<td class='tbox_tdl'>"._GETTEXT("Organization Name:")."</td>
+		<td class='tbox_tdc'><input id='organization' type='text' class='tbox_i' value='{$_DATA['ORGANIZATION']}' /></td>
+		<th class='tbox_tdr' rowspan='5'>"._GETTEXT("This is the name and location of your organization.")."</th>
+		</tr>
+		<tr>
+		<td class='tbox_tdl'>"._GETTEXT("City:")."</td>
+		<td class='tbox_tdc'><input id='city' type='text' class='tbox_i' value='{$_DATA['CITY']}' /></td>
+		</tr>
+		<tr>
+		<td class='tbox_tdl'>"._GETTEXT("State:")."</td>
+		<td class='tbox_tdc'><input id='state' type='text' class='tbox_i' value='{$_DATA['STATE']}' /></td>
+		</tr>
+		<tr>
+		<td class='tbox_tdl'>"._GETTEXT("Country:")."</td>
+		<td class='tbox_tdc'>
+			<select class='tbox_s' id='country' size='1'></select>
+			<script type='text/javascript'>__tndefinitions.country('{$_DATA['COUNTRY']}');</script>
+		</td>
+		</tr>
+		<tr>
+		<td style='padding-left: 10px; width: 120px; text-align: right;'>"._GETTEXT("Administrator's Email:")."</td>
+		<td class='tbox_tdc'><input id='admin' type='text' class='tbox_i' value='{$_DATA['ADMIN']}' /></td>
+		</tr>
+		</table>
+		<hr />
+		"._CGI_BUTTON_APPLY("button_{$_bid}2")."
+		</div>
+		</fieldset>
+
+		<fieldset style='margin-top: 20px;'>
+		<legend>"._GETTEXT("Language setting")."</legend>
+		<div style='margin: 5px;'>
+		<table class='tbox_t'>
+		<tr>
+		<td class='tbox_tdl'>"._GETTEXT("Language:")."</td>
+		<td class='tbox_tdc'>
+			<select class='tbox_s' id='lang' size='1'>
+		";
+		foreach($GLOBALS['_LOCALE'] as $_a => $_b) {
+			$_page .="<option value='$_a' "._CGI_DROPDOWNBOX_VAL($_a,$_DATA['LANG']).">$_b</option>";
+		}
+		$_page .="</select>
+		</td>
+		<th class='tbox_tdr' rowspan='5'>"._GETTEXT("This sets the language used in system. You will have to re-login when you change this setting")."</th>
+		</tr>
+		</table>
+		<hr />
+		"._CGI_BUTTON_APPLY("button_{$_bid}3")."
+		</div>
+		</fieldset>
+		</div>
+	";
+	$_page .="
+		<script type='text/javascript'>
+			\$(document).ready(function() {
+				\$('#button_{$_bid}1').click(function() {
+					if(!__tnpage.is_admin()) {
+						return false;
+					}
+					var _hostname=\$.trim(\$('input#hostname').val());
+					if(_hostname!=='') {
+						var _data='_update_data=2&_sec=system&_secf=system&_id=system&_ex=hostname_start&_data[HOSTNAME]='+_hostname;
+						__tnpage.data_update(_data,function() {
+							document.title='WebGui: '+__login_id+'@'+_hostname;
+						});
+					}
+				});
+				\$('#button_{$_bid}2').click(function() {
+					if(!__tnpage.is_admin()) {
+						return false;
+					}
+					var _tok=['organization','city','state','country','admin'];
+					var _save='';
+					for(var x in _tok) {
+						var _txt=\$.trim(\$('#'+_tok[x]).attr('value'));
+						if(_txt==='') {
+							continue;
+						}
+						if(_tok[x]=='admin') {
+							if(is_email(_txt)===false) {
+								__tndialog.sbox(\""._GETTEXT("Invalid Administrator's Email")."\");
+								return false;
+							}
+						}
+						_save +='&_data['+_tok[x].toUpperCase()+']='+_txt;
+					}
+					if(\$.trim(_save)!=='') {
+						var _data='_update_data=2&_sec=system&_secf=system&_id=system'+_save;
+						__tnpage.data_update(_data);
+					}
+				});
+				\$('#button_{$_bid}3').click(function() {
+					var _lang=\$.trim(\$('#lang').attr('value'));
+					if(!is_null(_lang)) {
+						var _data='_update_data=2&_sec=system&_secf=system&_id=system&_data[LANG]='+_lang;
+						__tnpage.data_update(_data,function() {
+							setTimeout(\"__tnpage.logout('"._GETTEXT("Session logout")."')\",3000);
+						});
+					}
+				});
+			});
+		</script>
+	";
+	return trim($_page);
+}
+?>

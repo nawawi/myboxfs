@@ -1,0 +1,308 @@
+<?php
+if(!defined('_CGI_CODE')||_CGI_CODE!="90d45215e48dac81e802f17310ad0c1f") exit("\n\nERROR: _CGI_CODE not set\n\n");
+
+function _CGI_PAGE_DASHBOARD_TITLE() {
+	_INI_TOKEN_GET("system","system.cfg",$_TOKEN);
+	$_hostname=$_TOKEN['system']['HOSTNAME'];
+	if($_hostname=='') $_hostname='mybox.traceos.local';
+	$_time=date('D d M H:i:s Y T');
+	return "<i>$_hostname - $_time</i>";
+}
+
+function _CGI_PAGE_DASHBOARD_BAR($_config=array()) {
+	if(_ARRAY_NULL($_config)) return;
+
+	$_bar='';
+	$_bar .="<table border=0 width='100%' style='padding: 0px; margin: 0px; border: 1px solid #ccc; background: #ffffff;'>";
+	$_bar .="<tr><td style='font-weight: bold; table-layout: fixed; white-space: nowrap; width: 50%; text-align: right;'>{$_config['text']}</td>";
+	$_bar .="<td style='table-layout: fixed; white-space: nowrap; width: 50%;'>";
+	$_bar .="<table border=0 style='width: 170px; table-layout: fixed; padding: 0px; margin: 0px; border: 0px none; background: #ffffff;'>";
+	$_bar .="<tr>";
+	$_cn="#ff6600";
+	for($_i=0; $_i<100; $_i+=2) {
+		$_color=($_i< $_config['size']) ? "$_cn" : "#fae5b0";
+		$_bar .="<td style='background-color: $_color; font-size: 8pt; height: 15px; width: 2px;'>&nbsp;</td>";
+	}
+	$_bar .="</tr></table>";
+	$_bar .="</td></tr></table>";
+	return "{$_bar}";
+}
+
+function _CGI_PAGE_DASHBOARD_CONTENT() {
+	extract($GLOBALS['_IMG']);
+	_INI_TOKEN_GET("system","system.cfg",$_TOKEN);
+	// product
+	$_css_table="margin: 0px; padding: 1px; width: 100%;";
+	$_css_tdleft="text-align: right; font-weight: bold; width: 40%; padding: 2px;";
+	$_css_tdright="width: 60%; padding: 2px;";
+	$_version=_VERSION();
+	$_product_data="
+		<table style='$_css_table'>
+		<tr>
+		<td style='$_css_tdleft'>Model:</td>
+		<td style='$_css_tdright'>0000000</td>
+		</tr>
+		<tr>
+		<td style='$_css_tdleft'>Firmware Version:</td>
+		<td style='$_css_tdright'>$_version</td>
+		</tr>
+		<tr>
+		<td style='$_css_tdleft'>License ID:</td>
+		<td style='$_css_tdright'>0000</td>
+		</tr>
+		</table>
+	";
+
+	$_css_table="margin: 0px; padding: 1px; width: 100%;";
+	$_css_tdleft="text-align: right; font-weight: bold; width: 30%; padding: 2px;";
+	$_css_tdright="width: 70%; padding: 2px;";
+	
+	$_lday=_LOWER(date('l'));
+	$_sday=date('d');
+	$_smon=_LOWER(date('M'));
+	$_lyear=date('Y');
+	$_btime=strtotime(_EXEC_SHELL("/bin/boottime"));
+	$_blday=_LOWER(date('l',$_btime));
+	$_bsday=date('d',$_btime);
+	$_bsmon=_LOWER(date('M',$_btime));
+	$_blyear=date('Y',$_btime);
+	$_time_data="
+		<table style='$_css_table'>
+		<tr>
+		<td style='$_css_tdleft'>Uptime:</td>
+		<td style='$_css_tdright'>"._UPTIME()."</td>
+		</tr>
+		<tr>
+		<td style='$_css_tdleft'>Current:</td>
+		<td style='$_css_tdright'>".ucfirst(_GETTEXT($_lday))." {$_sday}-".ucfirst(_GETTEXT($_smon))."-{$_lyear} ".date('H:i:s')."</td>
+		</tr>
+		<tr>
+		<td style='$_css_tdleft'>BootUp:</td>
+		<td style='$_css_tdright'>".ucfirst(_GETTEXT($_lday))." {$_sday}-".ucfirst(_GETTEXT($_smon))."-{$_lyear} ".date('H:i:s',$_btime)."</td>
+		</tr>
+		</table>
+	";
+
+	$_css_table="margin: 0px; padding: 1px; width: 100%;";
+	$_css_tdleft="text-align: right; font-weight: bold; width: 25%; padding: 3px; ";
+	$_css_tdmid="width: 5%; vertical-align: middle;";
+	$_css_tdright="width: 70%; padding: 0px; border: none;";
+	$_resource=_RESOURCE_USAGE();
+	$_resource_data="
+		<table style='$_css_table'>
+		<tr>
+		<td style='$_css_tdleft'>CPU</td><td style='$_css_tdmid'><img src='$_ICON_CPU'></td>
+		<td style='$_css_tdright'>"._CGI_PAGE_DASHBOARD_BAR(array("size"=>"{$_resource['cpu']}","text"=>"{$_resource['cpu']}%"))."</td>
+		</tr>
+		<tr>
+		<td style='$_css_tdleft'>Memory</td><td style='$_css_tdmid'><img src='$_ICON_MEMORY'></td>
+		<td style='$_css_tdright'>"._CGI_PAGE_DASHBOARD_BAR(array("size"=>"{$_resource['memp']}","text"=>"{$_resource['memp']}% of {$_resource['memt']}"))."</td>
+		</tr>
+		<tr>
+		<td style='$_css_tdleft'>Swap</td><td style='$_css_tdmid'><img src='$_ICON_SWAP'></td>
+		<td style='$_css_tdright'>"._CGI_PAGE_DASHBOARD_BAR(array("size"=>"{$_resource['swapp']}","text"=>"{$_resource['swapp']}% of {$_resource['swapt']}"))."</td>
+		</tr>
+		<tr>
+		<!--<td style='$_css_tdleft'>Operation Disk</td><td style='$_css_tdmid'><img src='$_ICON_VDISK'></td>
+		<td style='$_css_tdright'>"._CGI_PAGE_DASHBOARD_BAR(array("size"=>"{$_resource['vdisk_p']}","text"=>"{$_resource['vdisk_p']}% of {$_resource['vdisk_t']}"))."</td>
+		</tr>-->
+		<tr>
+		<td style='$_css_tdleft'>Data Disk</td><td style='$_css_tdmid'><img src='$_ICON_DISK'></td>
+		<td style='$_css_tdright'>"._CGI_PAGE_DASHBOARD_BAR(array("size"=>"{$_resource['disk_p']}","text"=>"{$_resource['disk_p']}% of {$_resource['disk_t']}"))."</td>
+		</tr>
+		<tr>
+		<td style='$_css_tdleft'>Log Disk</td><td style='$_css_tdmid'><img src='$_ICON_DISK'></td>
+		<td style='$_css_tdright'>"._CGI_PAGE_DASHBOARD_BAR(array("size"=>"{$_resource['ldisk_p']}","text"=>"{$_resource['ldisk_p']}% of {$_resource['ldisk_t']}"))."</td>
+		</tr>
+		</table>
+	";
+
+	$_css_table="margin: 0px; padding: 1px; width: 450px; table-layout: fixed; white-space: nowrap;";
+	$_css_td="margin: 0px; padding: 2px; ";
+
+	_DEVICE_TRAFFIC($_RESULTS);
+	//unset($_RESULTS['eth1']);
+	//unset($_RESULTS['eth2']);
+	$_netdev=0;
+	$_network_data="";
+	if(!_ARRAY_NULL($_RESULTS)) {
+		$_css_table="margin: 0px; padding: 1px; width: 100%; background-color: #ffffff; border: 0px; color: #000000;";
+		$_css_td_t="font-weight: bold; background-color: #d8e4f1; padding: 2px;";
+		$_css_td_c="padding: 2px;";
+		$_network_data .="
+			<table style='$_css_table'>
+  			<tr>
+    			<td></td>
+    			<td style='$_css_td_t'>Port</td>
+    			<td style='$_css_td_t; width: 80px;'>Name</td>
+    			<td style='$_css_td_t'>Type</td>
+    			<td style='$_css_td_t; text-align: center;'>Enable</td>
+    			<td style='$_css_td_t; text-align: right;'>Sent</td>
+    			<td style='$_css_td_t; text-align: right;'>Received</td>
+  			</tr>
+		";
+		foreach($_RESULTS as $_port => $_data_array) {
+			if(!preg_match("/^eth(\d+)$/",$_port)) continue;
+			$_in=$_data_array[rx_bytes];
+			$_out=$_data_array[tx_bytes];
+			$_link="<img src='{$_ICON_ETH[0]}' title='Link: Down'>";
+			$_ecolor="red";
+			_INI_TOKEN_GET_BYPARAM("network","eth.cfg","DEVICE",$_port,$_ITOKEN);
+			if(!_ARRAY_NULL($_ITOKEN)) {
+				if(_NULL($_ITOKEN['NAME'])
+					|| _NULL($_ITOKEN['TYPE']) ) continue;
+
+				if($_ITOKEN['TYPE']=="static") {
+					$_type="Ethernet";
+				} elseif($_ITOKEN['TYPE']=="vlan") {
+					$_type="Vlan [{$_ITOKEN['TAG']}]";
+				} elseif($_ITOKEN['TYPE']=="dhcp") {
+					$_type="Cable modem";
+				} elseif($_ITOKEN['TYPE']=="pppoe") {
+					$_type="DSL pppoe";
+				}
+
+				$_name=$_ITOKEN['NAME'];
+				if(_LINK_ISUP($_port)) $_link="<img src='{$_ICON_ETH[1]}' title='Link: Up'>";
+				
+				if(_NULL($_ITOKEN['STAT'])) $_ITOKEN['STAT']=0;
+				_STR_ONOFF($_enable,$_ITOKEN['STAT']);
+				$_ecolor=($_enable!=OFF) ? "green" : "red";
+				
+			}
+
+			$_network_data .="
+				<tr>
+				<td style='$_css_td_c'>$_link</td>
+				<td style='$_css_td_c'>$_port</td>
+				<td style='$_css_td_c'><div style='width: 80px; overflow: hidden;'>$_name</div></td>
+				<td style='$_css_td_c'>$_type</td>
+				<td style='$_css_td_c; text-align: center; color: $_ecolor;'>$_enable</td>
+				<td style='$_css_td_c; text-align: right;'>"._SIZE_READABLE($_out,'null',"%d %s")."</td>
+				<td style='$_css_td_c; text-align: right;'>"._SIZE_READABLE($_in,'null',"%d %s")."</td>
+				</tr>
+			";
+			unset($_ITOKEN,$_type,$_name);
+			$_netdev++;
+		}
+		$_network_data .="</table>";
+	}
+
+	$_css_table="margin: 0px; padding: 1px; width: 100%;";
+	$_css_tdleft="text-align: center; font-weight: bold; padding: 2px;";
+	$_css_tdright="padding: 2px;";
+	
+	$_session_data="
+		<table style='$_css_table'>
+		<tr>
+		<td style='$_css_tdleft'>Console:</td>
+		<td style='$_css_tdright'>".count(_GLOB(_CONSOLE_SESSIONS_PATH."/console_*"))."</td>
+
+		<td style='$_css_tdleft'>Web:</td>
+		<td style='$_css_tdright'>".count(_GLOB(_HTTP_SESSIONS_PATH."/sess_*"))."</td>
+
+		<td style='$_css_tdleft'>SSH:</td>
+		<td style='$_css_tdright'>".count(_GLOB(_CONSOLE_SESSIONS_PATH."/ssh_*"))."</td>
+
+		<td style='$_css_tdleft'>FTP:</td>
+		<td style='$_css_tdright'>".count(_GLOB(_CONSOLE_SESSIONS_PATH."/ftp_*"))."</td>
+		</tr>
+		</table>
+	";
+
+	$_page="";
+	// left
+	$_page .="<div style='position: absolute; top: 10px; left: 10px;'>";
+	$_page .=_CGI_PAGE_CONTENT_BOX(array("title"=>_GETTEXT("Product Information"),
+				"data"=>"$_product_data",
+				"width"=>"320",
+				"top"=>"0",
+				"left"=>"0")
+		);
+	$_page .=_CGI_PAGE_CONTENT_BOX(array("title"=>_GETTEXT("System Time"),
+				"data"=>"$_time_data",
+				"width"=>"320",
+				"top"=>"110",
+				"left"=>"0")
+		);
+
+	$_page .=_CGI_PAGE_CONTENT_BOX(array("title"=>_GETTEXT("Active Sessions"),
+				"data"=>"$_session_data",
+				"width"=>"320",
+				"top"=>"220",
+				"left"=>"0")
+		);
+
+	// right
+	$_page .=_CGI_PAGE_CONTENT_BOX(array("title"=>_GETTEXT("Ethernet Port Usage"),
+				"data"=>"$_network_data",
+				"width"=>"460",
+				"top"=>"0",
+				"left"=>"330")
+		);
+
+	if(_CGI_IF_MSIE()) {
+		$_tnp='90';
+		if($_netdev > 1) $_tnp=($_netdev * 20) + 70;
+	} else {
+		$_tnp='94';
+		if($_netdev > 1) $_tnp=($_netdev * 24) + 70;
+	}
+	$_page .=_CGI_PAGE_CONTENT_BOX(array("title"=>_GETTEXT("Resource Usage"),
+				"data"=>"$_resource_data",
+				"width"=>"460",
+				"top"=>"$_tnp",
+				"left"=>"330")
+		);
+
+	$_page .="</div>";
+	$_anyterm=$_TOKEN['system']['ANYTERM'] ? $_TOKEN['system']['ANYTERM'] : 0;
+	$_dashboard_refresh=$_TOKEN['system']['DASHBOARD_REFRESH'] ? $_TOKEN['system']['DASHBOARD_REFRESH'] : 0;
+	$_refresh_box="";
+	if($_anyterm==1 && _CGI_IS_ADMIN()) {
+		$_refresh_box .="<img id='webterm' style='float: left; margin-right: 5px;' src='{$_ICON_TERMINAL}'>";
+	}
+	$_refresh_box .="<img src='{$_ICON_REFRESH}' style='float: left; padding-top: 2px;'> <select class='tbox_s' style='width: 130px;' id='drefresh' size='1'>";
+	$_etext1=_GETTEXT("Every");
+	$_etext2=_GETTEXT("Never");
+	$_etext3=_GETTEXT("seconds");
+	foreach(array("0"=>"$_etext2",
+			"10"=>"$_etext1 10 $_etext3",
+			"25"=>"$_etext1 25 $_etext3",
+			"60"=>"$_etext1 60 $_etext3",
+			"300"=>"$_etext1 300 $_etext3") as $_a => $_b) {
+		$_refresh_box .="<option value='$_a' "._CGI_DROPDOWNBOX_VAL($_a,$_dashboard_refresh).">$_b</option>";
+	}
+	$_refresh_box .="</select>";
+	$_page .="<script type='text/javascript'>
+			\$(document).ready(function() {
+				\$('#box_title_l').css({'width':'200px','left':'800px', 'top':'85px'}).show().html(\"$_refresh_box\");
+				var _update_refresh=function(_num) {
+					clearTimeout(_dashboard_interval);
+					if(_num!=0) {
+						_numr=_num * 1000; /* 1 minute = 60 second = 60x1000 = 60000 miliseconds */
+						_dashboard_interval=setTimeout('__tnpage.dashboard(0)',_numr);
+					}
+				};
+				_update_refresh($_dashboard_refresh);
+				\$('select#drefresh').change(function() {
+					var _val=$(this).attr('value');
+					var _data='_update_data=2&_sec=system&_secf=system&_id=system&_msg=none&_data[DASHBOARD_REFRESH]='+_val;
+					__tnpage.data_update(_data,function() {
+						_update_refresh(_val);
+					});					
+				});
+	";
+	if(_CGI_IS_ADMIN()) {
+		$_page .="
+				__tnpage.anyterm(1);
+		";
+	}
+	$_page .="
+			});
+		</script>
+	";
+	return trim($_page);
+}
+
+?>

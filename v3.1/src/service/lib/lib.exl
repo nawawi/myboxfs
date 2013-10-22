@@ -1,0 +1,217 @@
+<?php
+/**
+* File global untuk setiap library
+*
+* Digunakan untuk include file lain dan define global<br />
+* setting sama ada variable, constant atau array
+*
+* @author nawawi, Mohd Nawawi Mohamad Jamili <nawawi@tracenetworkcorporation.com>
+* @copyright Copyright (c) 2008 Nawawi, Tracenetwork Corporation Sdn. Bhd.
+* @version $_Id: lib.exl,v 0.1 12/Jun/2008 22:21 nawawi Exp $; 
+* @package library
+* @category global
+* @filesource
+*/
+/**
+* @ignore
+*/
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+/**
+* Default storage path
+*/
+define('_ROOT_PATH','/strg/mybox');
+
+/**
+* Configuration file path
+*/
+define('_REG_PATH',_ROOT_PATH.'/registry');
+
+/**
+* logging path
+*/
+define('_LOG_PATH','/logfs');
+
+/**
+* Proxy cache path
+*/
+define('_CACHE_PATH','/cachefs');
+
+/**
+* Reporting path
+*/
+define('_REPORT_PATH',_ROOT_PATH.'/report');
+
+/**
+* RRA database path
+*/
+define('_RRA_PATH',_REPORT_PATH.'/rra');
+
+/**
+* Backup path
+*/
+define('_BACKUP_PATH',_ROOT_PATH.'/backup');
+
+/**
+* File update path
+*/
+define('_UPDATE_PATH',_ROOT_PATH.'/update');
+
+/**
+* System download path
+*/
+define('_DOWNLOAD_PATH',_ROOT_PATH.'/download');
+
+/**
+* System external script path
+*/
+define('_SCRIPT_PATH',_ROOT_PATH.'/scripts');
+
+/**
+* Permanent temporary path
+*/
+define('_TMP_PATH',_ROOT_PATH.'/tmp');
+
+/**
+* System temporary data path
+*/
+define('_PROC_PATH','/var/sys');
+
+/**
+* Task daemon command instruction path
+*/
+define('_TASKQ_PATH',_PROC_PATH.'/taskq');
+
+/**
+* Process check path
+*/
+define('_CHECKQ_PATH',_PROC_PATH.'/check');
+
+/**
+* Registry object path
+*/
+define('_OBJ_PATH',_PROC_PATH.'/obj');
+
+/**
+* HTTP Session File
+*/
+define('_HTTP_SESSIONS_PATH',ini_get('session.save_path'));
+
+/**
+* HTTP upload file
+*/
+define('_HTTP_UPLOADPROGRESS_PATH',dirname(ini_get('uploadprogress.file.filename_template')));
+
+/**
+* Console Session File
+*/
+define('_CONSOLE_SESSIONS_PATH',_PROC_PATH.'/xsessions');
+
+/**
+* SOPHOS AV Path
+*/
+define('_SOPHOSAV_PATH',_ROOT_PATH.'/sophos');
+
+/**
+* Main scripts path
+*/
+define('_SERVICE_PATH','/service');
+
+/**
+* Scripts function library path
+*/
+define('_SERVICE_LIB_PATH',_SERVICE_PATH.'/lib');
+
+/**
+* Scripts tool path
+*/
+define('_SERVICE_TOOLS_PATH',_SERVICE_PATH.'/tools');
+
+/**
+* Definitions registry path
+*/
+define('_DEFINITIONS_PATH',_ROOT_PATH.'/registry/definitions');
+
+/**
+* Web root path
+*/
+define('_CGI_MAIN_PATH',_SERVICE_PATH.'/web');
+
+/**
+* Timezone list
+*/
+define('_ZONE_LIST_FILE','/usr/share/zoneinfo/ZONELIST.TXT');
+
+/**
+* Function library untuk manipulasi string
+*/
+include_once(_SERVICE_LIB_PATH.'/string.exl');
+
+/**
+* Function library untuk manipulasi filedan directory
+*/
+include_once(_SERVICE_LIB_PATH.'/file.exl');
+
+/**
+* Function library untuk cpuload
+*/
+include_once(_SERVICE_LIB_PATH.'/cpuload.exl');
+
+/**
+* Function library untuk registry/database
+*/
+include_once(_SERVICE_LIB_PATH.'/registry.exl');
+
+/**
+* Function library untuk system
+*/
+include_once(_SERVICE_LIB_PATH.'/system.exl');
+
+/**
+* Function library untuk network
+*/
+include_once(_SERVICE_LIB_PATH.'/network.exl');
+
+/**
+* Function library untuk ip calculator
+*/
+include_once(_SERVICE_LIB_PATH.'/ipcalc.exl');
+
+/**
+* Function library untuk logs file
+*/
+include_once(_SERVICE_LIB_PATH.'/logs.exl');
+
+/**
+* Function library untuk utitlites
+*/
+include_once(_SERVICE_LIB_PATH.'/utils.exl');
+
+/**
+* Function library untuk manipulasi session
+*/
+include_once(_SERVICE_LIB_PATH.'/sessions.exl');
+
+/**
+* Function library untuk definitions
+*/
+include_once(_SERVICE_LIB_PATH.'/definitions.exl');
+
+/**
+* Function library untuk backup
+*/
+include_once(_SERVICE_LIB_PATH.'/backup.exl');
+
+/**
+* Function library untuk update
+*/
+include_once(_SERVICE_LIB_PATH.'/update.exl');
+
+// set language
+// lang
+$GLOBALS['_LOCALE']=array(
+	'ms_MY'=>'Bahasa Malaysia',
+	'en_US'=>'English'
+);
+_SET_LANG();
+?>

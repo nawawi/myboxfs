@@ -1,0 +1,142 @@
+<?php
+if(!defined('_CLI_CODE')||_CLI_CODE!="a098846421a09ab1cacd3b3a753cbe05") exit("\n\nERROR: _CLI_CODE not set\n\n");
+
+function ___CLI_NTP_ACL_PRINT($_find='') {
+	$_objf=_OBJ_PATH."/iosh_ntp_acl_print.obj";
+	@unlink($_objf);
+	_INI_TOKEN_GET("network","ntp_acl.cfg",$_TOKEN);
+	if(_ARRAY_NULL($_TOKEN)) {
+              	_CLI_ECHO(_GETTEXT("No data available"));
+                return FALSE;
+	}
+	$_cnt=1;$_obj=array();
+	$_output="";
+	foreach($_TOKEN as $_ID => $_DATA) {
+		if(_NULL($_DATA['ADDR'])) {
+			_INI_TOKEN_DELETE("network","ntp_acl.cfg",$_ID);
+			continue;
+		}
+		$_addr="";
+		_DEFINITIONS_GET_BYNAME_R("networks",$_DATA['ADDR'],$_DTOKEN);
+		if(!_ARRAY_NULL($_DTOKEN)) {
+			foreach($_DTOKEN as $_DID => $_DDATA) {
+				if(!_NULL($_DDATA['ADDR'])) {
+					$_addr .="{$_DDATA['ADDR']},";
+				}
+			}
+			_TRIM($_addr,",");
+		}
+		if(!_NULL($_addr)) {
+			$_DATA['ADDR']="{$_DATA['ADDR']} [$_addr]";
+		}
+		if(!_NULL($_find)) {
+			if(!_ARRAY_FIND($_find,$_DATA)) {
+				continue;
+			}
+		}
+		if($_cnt > 1) $_output .="\n";
+		$_output .=_CLI_DATA_BODY(
+			array(
+				_GETTEXT_U("ID")=>$_cnt,
+				_GETTEXT_U("ADDRESS")=>$_DATA['ADDR']
+			)
+		);
+		$_obj[$_cnt]=$_ID;
+		unset($_DTOKEN);
+		$_cnt++;
+	}
+	if(_ARRAY_NULL($_obj) || !_FILE_ARRAY_SAVE($_objf,$_obj) || _NULL($_output)) {
+		if(!_NULL($_find)) {
+			_CLI_ECHO(_GETTEXT("No results found"));
+		} else {
+			_CLI_ECHO(_GETTEXT("No data available"));
+		}
+		@unlink($_objf);
+                return FALSE;
+	}
+	_CLI_ECHO_HEADER(_GETTEXT("NTP access list configuration"));
+	if(!_NULL($_find)) {
+		echo _GETTEXT("Search results match for '%s':","$_find")."\n\n";
+	}
+	echo "$_output";
+	return TRUE;
+}
+
+function ___CLI_NTP_ACL_ADD($_nums) {
+	$_objf=_OBJ_PATH."/iosh_definitions_networks_print.obj";
+	$_obj=_FILE_ARRAY_GET($_objf);
+	if($_nums!="any" && _ARRAY_NULL($_obj)) {
+		_CLI_ECHO(_GETTEXT("Resource Id not available."));
+		_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions networks print"));
+		@unlink($_objf);
+		return FALSE;
+	}
+	$_num_array=array();
+	$_DATA=array();$_ok=0;
+	_CLI_MULTINUM($_nums,$_num_array);
+	foreach($_num_array as $_no) {
+		if($_no!="any" && _NULL($_obj[$_no])) {
+			_CLI_ECHO(_GETTEXT("Resource Id not available."));
+			_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","definitions networks print"));
+			@unlink($_objf);
+			return FALSE;
+		}
+		if($_no=="any") {
+			$_add="$_no";
+		} else {
+			$_add=___CLI_DEFINITIONS_OBJGETNAME($_obj,"networks",$_no);
+		}
+		if(_NULL($_add)) continue;
+		if(!_INI_TOKEN_CHECK("network","ntp_acl.cfg","ADDR","$_add")) {
+			_CLI_ECHO(_GETTEXT("Address '%s' already exist","$_add"));
+			return FALSE;
+		}
+		$_DATA['ADDR']="$_add";
+		if(_INI_TOKEN_SAVE("network","ntp_acl.cfg",$_DATA)) {
+			$_ok++;
+		}
+		unset($_add,$_DATA);
+	}
+	if($_ok!=0) {
+		_CLI_ECHO(_GETTEXT("Configuration saved successfully"));
+		return TRUE;
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+function ___CLI_NTP_ACL_DELETE($_nums) {
+	$_objf=_OBJ_PATH."/iosh_ntp_acl_print.obj";
+	$_obj=_FILE_ARRAY_GET($_objf);
+	if(_ARRAY_NULL($_obj)) {
+		_CLI_ECHO(_GETTEXT("No Resource Id available."));
+		_CLI_ECHO(_GETTEXT("Enter -> '%s' to view Resource Id.","acl print"));
+		@unlink($_objf);
+		return FALSE;
+	}
+	if($_nums=='*' && _CLI_YESNO(_GETTEXT("This action will delete all %s.\nContinue this action? %s","NTP access list","[yes/no]: "))==TRUE) {
+		foreach($_obj as $_cnt => $_id) {
+			if(_INI_TOKEN_DELETE("network","ntp_acl.cfg",$_id)) {
+				unset($_obj[$_cnt]);
+			}
+		}
+		if(_FILE_ARRAY_SAVE($_objf,$_obj)) {
+			return TRUE;
+		}
+	} else {
+		$_num_array=array();
+		_CLI_MULTINUM($_nums,$_num_array);
+		foreach($_num_array as $_no) {
+			if(!_NULL($_obj[$_no])) {
+				if(_INI_TOKEN_DELETE("network","ntp_acl.cfg",$_obj[$_no])) {
+					unset($_obj[$_no]);
+				}
+			}
+		}
+		if(_FILE_ARRAY_SAVE($_objf,$_obj)) {
+			return TRUE;
+		}
+	}
+	return _CLI_DEFAULT_RETURN();
+}
+
+?>

@@ -1,0 +1,10 @@
+# Advancetech Network Appliance - 6280A
+alias eth0 e1000
+alias eth1 e1000
+alias eth2 e1000
+alias eth3 e1000
+alias eth4 e1000
+alias eth5 e1000
+alias eth6 e1000
+alias eth7 e1000
+alias eth8 e100

@@ -1,0 +1,44 @@
+<?php
+if(!defined('_AWIE_CODE')||_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\nERROR: _CODE not set\n\n");
+
+function rng_check() {
+	if(!_INIT_CHECK_BINARY(array("/bin/rngd")) && !file_exists("/dev/urandom")) {
+		_INIT_ECHO(1,_GETTEXT("Cannot execute %s. Internal error",_INIT_NAME()));
+		exit(1);
+	}
+}
+
+function rng_quiet() {
+	_INIT_QUIET('1');
+}
+
+function rng_up() {
+	@unlink(_TASKQ_PATH."/rng_up");
+	$_prog="/bin/rngd -b -r /dev/urandom";
+	if(_EXEC_CMD("$_prog")==0) {
+		_INIT_CHKPROG_LOG("rngd");
+		return TRUE;
+	}
+	return rng_restart();
+}
+
+
+function rng_start() {
+	_INIT_CHECK_DAEMON_STATUS("rngd");
+	$_prog="/bin/rngd -b -r /dev/urandom";
+	_INIT_START_DAEMON("$_prog","rng_up");
+	return TRUE;
+}
+
+function rng_stop() {
+	_INIT_STOP_DAEMON("rngd","rng_up",1);
+	return TRUE;
+}
+
+function rng_restart() {
+	_INIT_EXEC("rng_stop");
+	_INIT_EXEC("rng_start");
+	return TRUE;
+}
+
+?>
