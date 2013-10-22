@@ -1,0 +1,77 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+chk_session();
+//write_nocache();
+if(isset($cmd) && $cmd!='') {
+	$command=$cmd;
+	$values=$value;
+	$select[$cmd]='selected';
+	$c1=$cmd;
+	$c2=$value;
+	unset($cmd,$value);
+}
+if(isset($do)&& $do==1) {
+	$load="onload='do_console();';";
+} elseif(isset($do)&& $do=='stop') {
+	echo_query("cmd-stop");
+} else {
+	unset($load);
+}
+unset($do);
+
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<style type="text/css">
+body {
+background: #005a8f;
+}
+</style>
+<script language="javascript">
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+	function do_console() {
+		document.f.ebut.disabled=true;
+		var cmd=document.f.command.value;
+		var value=document.f.console.value;
+		parent.console_main.location.href='<?echo $_URL_PATH;?>/console_main.exh?cmd='+cmd+'&value='+value;
+		return true;
+	}
+	function do_stop() {
+		document.f.sbut.disabled=true;
+		parent.console_top.location.href='<?echo $_URL_PATH;?>/console_top.exh?do=stop';
+		return true;
+	}
+	function do_clear() {
+		document.f.fbut.disabled=true;
+		parent.console_main.location.href='<?echo $_URL_PATH;?>/console_main.exh?do=flush';
+		document.f.fbut.disabled=false;
+		return true;
+	}
+</script>
+</head>
+<body bgcolor="#005a8f" leftmargin="0" topmargin="0" marginwidth="0" marginheight="0" oncontextmenu="return false" oncontextmenu="return false" scroll=no border=0 onsubmit='return do_console();' <?echo $load;?>>
+<center>
+<table height="38" width="100%" border="0" cellpadding="0" cellspacing="0">
+	<tr valign="top">
+		<td valign=middle align=center><form name=f method=post>
+		<select name=command class=textbox onclick='document.f.ebut.disabled=false;document.f.fbut.disabled=false;document.f.sbut.disabled=false;'>
+		<option value="ping" <?echo $select['ping'];?>>ping</option>
+		<option value="nslookup" <?echo $select['nslookup'];?>>nslookup</option>
+		<option value="traceroute" <?echo $select['traceroute'];?>>traceroute</option>
+		<option value="tcpdump" <?echo $select['tcpdump'];?>>tcpdump</option>
+		</select>
+		<input type="text" name="console" size="25" value="<?echo $c2;?>" class="textbox" onclick="document.f.console.value='';document.f.ebut.disabled=false;document.f.fbut.disabled=false;document.f.sbut.disabled=false;"> <input type=button name=ebut value="Execute" class="button-small" onclick="return do_console();"> <input type=button name=sbut value="Stop" class="button-small" onclick="return do_stop();"><input type=button name=fbut value="Flush" class="button-small" onclick="return do_clear();">
+		</form></td>
+	</tr>
+</table>
+</center>
+</body>
+</html>
+<?flush();?>

@@ -1,0 +1,477 @@
+<?
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+mybox_chk_session();
+mybox_send_nocache();
+
+
+$_SYSID="system_update";
+$msg='';
+if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+	if(isset($do_save)&&$do_save==1) {
+		if($tab==1) {
+			if(move_uploaded_file("$filename","$_DOWNLOAD_PATH/$filename_name")) {
+				if(mybox_update_firmware("$_DOWNLOAD_PATH/$filename_name")!=0 && $msg=='') {
+					$msg="Firmware update failed!";
+					mybox_auditlog("UPDATE","UI","Firmware update failed.");
+				}
+			}
+			if($msg=='') {
+				$msg='Firmware updated. You need to reboot the system.';
+				mybox_auditlog("UPDATE","UI","Firmware updated.");
+			}
+		}
+		if($tab==2) {
+			if(move_uploaded_file("$filename","$_DOWNLOAD_PATH/$filename_name")) {
+				if(mybox_update_ips_sig("$_DOWNLOAD_PATH/$filename_name")!=0 && $msg=='') {
+					$msg="IPS signature updated!";
+					mybox_auditlog("UPDATE","UI","IPS signature updated.");
+				}
+			}
+			if($msg=='') {
+				$msg='Updating IPS signature failed!';
+				mybox_auditlog("UPDATE","UI","IPS signature update failed.");
+			}
+		}
+		if($tab==3) {
+			if(move_uploaded_file("$filename","$_DOWNLOAD_PATH/$filename_name")) {
+				if(mybox_update_blacklist("$_DOWNLOAD_PATH/$filename_name")!=0 && $msg=='') {
+					$msg="Blacklist updated!";
+					mybox_auditlog("UPDATE","UI","Blacklist updated.");
+				}
+			}
+			if($msg=='') {
+				$msg='Updating Blacklist database failed!';
+				mybox_auditlog("UPDATE","UI","Blacklist update failed.");
+			}
+		}
+		if($tab==4) {
+			if(move_uploaded_file("$filename","$_DOWNLOAD_PATH/$filename_name")) {
+				if(mybox_update_license("$_DOWNLOAD_PATH/$filename_name")!=0 && $msg=='') {
+					$msg='License updated!';
+					mybox_auditlog("UPDATE","UI","License updated.");
+				}
+			}
+			if($msg=='') {
+				$msg="Updating license failed!";
+				mybox_auditlog("UPDATE","UI","License update failed.");
+			}
+		}
+		if($tab==5) {
+			$db_id=mybox_db_connect($_DB_NAME);
+			if($ustat!='') $ustat=1;
+			if($ustat=='') $ustat=0;
+			if($udate=='') $udate='2';
+			if($udatesp=='') $udatesp='10';
+			mybox_db_query("update misc set val='$ustat' where name='update_stat'",$db_id);
+			mybox_db_query("update misc set val='$udate' where name='update_date'",$db_id);
+			mybox_db_query("update misc set val='$udatedo' where name='update_do'",$db_id);
+			mybox_db_query("update misc set val='$udatesp' where name='update_speed'",$db_id);
+			mybox_db_close($db_id);
+			mybox_echo_query("cron-restart-quiet");
+			$msg="Setting updated!";
+		}
+	}
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied!.";
+		mybox_auditlog("EXECUTE","UI","UPDATE: $msg");
+	}
+}
+if(!isset($tab)||$tab=='') $tab=1;
+$rrid=rand().'.'.time();
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script type='text/javascript' src="<?echo $_URL_PATH;?>/j/strings.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+	var coreversion='<?echo $_core_version;?>';
+	page_load();
+</script>
+<?
+$_version='';
+$_lastupdate='';
+$_core_version=mybox_core_version();
+if($tab==1) {
+	if(file_exists("/etc/firmware")) {
+		$fupdate=mybox_fget_contents("/etc/firmware");
+		$ftm=strtotime($fupdate);
+		if(preg_match("/^(\d\d\d\d)(\d\d)(\d\d)$/",$fupdate,$mm)) {
+			$y=$mm[1];
+			$m=$mm[2];
+			$d=$mm[3];
+		}
+		$_version="$fupdate";
+		if(file_exists("$_RTMP_PATH/firmware_lastupdate")) {
+			$_lastupdate=date('d/m/Y h:i:s A',mybox_fget_contents("$_RTMP_PATH/firmware_lastupdate"));
+		} else {
+			$_lastupdate=date('d/m/Y h:i:s A',$ftm);
+		}
+	}
+}
+if($tab==2) {
+	$_version=mybox_fget_contents("/etc/ipsversion");
+	$ftm=strtotime($_version);
+	if(preg_match("/^(\d\d\d\d)(\d\d)(\d\d)$/",$_version,$mm)) {
+		$y=$mm[1];
+		$m=$mm[2];
+		$d=$mm[3];
+	}
+	if(file_exists("$_RTMP_PATH/ips_lastupdate")) {
+		$_lastupdate=date('d/m/Y h:i:s A',mybox_fget_contents("$_RTMP_PATH/ips_lastupdate"));
+	} else {
+		$_lastupdate=date('d/m/Y h:i:s A',$ftm);
+	}
+}
+if($tab==3) {
+	$_version=mybox_fget_contents("/etc/blacklistversion");
+	$ftm=strtotime($_version);
+	if(preg_match("/^(\d\d\d\d)(\d\d)(\d\d)$/",$_version,$mm)) {
+		$y=$mm[1];
+		$m=$mm[2];
+		$d=$mm[3];
+	}
+	if(file_exists("$_RTMP_PATH/blacklist_lastupdate")) {
+		$_lastupdate=date('d/m/Y h:i:s A',mybox_fget_contents("$_RTMP_PATH/blacklist_lastupdate"));
+	} else {
+		$_lastupdate=date('d/m/Y h:i:s A',$ftm);
+	}
+}
+if($tab==4) {
+	$_LR=mybox_license('released');
+	$_LE=mybox_license('expired');
+}
+?>
+<script type='text/javascript'>
+<?if($tab < 4){?>
+function winupload() {
+	var LeftPosition = (screen.width) ? (screen.width-375)/2 : 0;
+	var TopPosition = (screen.height) ? (screen.height-95)/2 : 0;
+	var settings='width=375,height=95,top='+TopPosition+',left='+LeftPosition+',scrollbars=0,status=0,resizable=0';
+	var file=basename(document.f.filename.value);
+	var url='<?echo $_URL_PATH;?>/pg.exh?mid=<?echo $rrid;?>&mf='+file;
+	win=window.open(url,'aa<?echo time();?>',settings);
+	if(!win) {
+		error("Please allow window popup!");
+		return false;
+	}
+	win.focus();
+	return true;
+}
+<?}?>
+<?if($tab==1){?>
+function check_imgfile() {
+	var file=Trim(document.f.filename.value);
+	if(file=='') { error("File empty!"); return false; }
+	file=basename(file);
+	var m=/myboxOS\.v(\S+)\.(\d\d\d\d)(\d\d)(\d\d)\.bin/;
+	var ret=file.match(m);
+	if(ret==null) {
+		error("Invalid Firmware file!");
+		return false;
+	}
+	var cversion=ret[1];
+	var year=ret[2];
+	var month=ret[3];
+	var day=ret[4];
+	if(coreversion!=cversion) {
+		error("Invalid mybox version!");
+		return false;
+	}
+	var tm=datetounixtime(day,month,year,0,0,0);
+	var fv=datetounixtime(<?echo "$d,$m,$y,0,0,0";?>);
+	if(fv=='') {$fv=0;}
+	if(tm < fv && !confirm("You are updating older firmware than current.\nAre you want to proceed?")) {
+		return false;
+	}
+	if(fv >= tm && !confirm("Firmware already up to date.\nAre you want to proceed?")) {
+		return false;
+	}
+	return true;
+}
+<?}?>
+<?if($tab==2){?>
+function check_ipssig() {
+	var file=Trim(document.f.filename.value);
+	if(file=='') { error("File empty!"); return false; }
+	file=basename(file);
+	var m=/myboxOS\.v(\S+)\.ips\.(\d\d\d\d)(\d\d)(\d\d)\.bin/;
+	var ret=file.match(m);
+	if(ret==null) {
+		error("Invalid IPS Signature file!");
+		return false;
+	}
+	var cversion=ret[1];
+	var year=ret[2];
+	var month=ret[3];
+	var day=ret[4];
+	if(coreversion!=cversion) {
+		error("Invalid mybox version!");
+		return false;
+	}
+	var tm=datetounixtime(day,month,year,0,0,0);
+	var fv=datetounixtime(<?echo "$d,$m,$y,0,0,0";?>);
+	if(fv=='') {$fv=0;}
+	if(tm < fv && !confirm("You are updating older signature than current.\nAre you want to proceed?")) {
+		return false;
+	}
+	if(fv >= tm && !confirm("IPS Signature already up to date.\nAre you want to proceed?")) {
+		return false;
+	}
+	return true;
+}
+<?}?>
+<?if($tab==3){?>
+function check_blacklistfile() {
+	var file=Trim(document.f.filename.value);
+	if(file=='') { error("File empty!"); return false; }
+	file=basename(file);
+	var m=/myboxOS\.v(\S+)\.blacklist\.(\d\d\d\d)(\d\d)(\d\d)\.bin/;
+	var ret=file.match(m);
+	if(ret==null) {
+		error("Invalid IPS Signature file!");
+		return false;
+	}
+	var cversion=ret[1];
+	var year=ret[2];
+	var month=ret[3];
+	var day=ret[4];
+	if(coreversion!=cversion) {
+		error("Invalid mybox version!");
+		return false;
+	}
+	var tm=datetounixtime(day,month,year,0,0,0);
+	var fv=datetounixtime(<?echo "$d,$m,$y,0,0,0";?>);
+	if(fv=='') {$fv=0;}
+	if(tm < fv && !confirm("You are updating older database than current.\nAre you want to proceed?")) {
+		return false;
+	}
+	if(fv >= tm && !confirm("Blacklist database already up to date.\nAre you want to proceed?")) {
+		return false;
+	}
+}
+<? } ?>
+<?if($tab==4) {?>
+function check_licensefile() {
+	var file=Trim(document.f.filename.value);
+	if(file=='') { return false; }
+	file=basename(file);
+	if(file!="mfs-license.exc") {
+		error("Invalid license file!");
+		return false;
+	}
+	return true;
+}
+<?}?>
+function do_upload() {
+	<?if($tab==1) {?>
+	if(!check_imgfile()) { return false; };
+	error("Please wait while updating firmware!");
+	<?}?>
+	<?if($tab==2) {?>
+	if(!check_ipssig()) { return false; };
+	error("Please wait while updating IPS signature!");
+	<?}?>
+	<?if($tab==3) {?>
+	if(!check_blacklistfile()) { return false; };
+	error("Please wait while updating blacklist file!");
+	<?}?>
+	<?if($tab==4) {?>
+	if(!check_licensefile()) { return false; };
+	error("Please wait while updating license file!");
+	<?}?>
+	<?if($tab < 4){?>
+	winupload();
+	<?}?>
+	<?if($tab==5){?>
+	var sp=Trim(document.f.udatesp.value);
+	if(!isnum(sp)) {
+		error("Invalid size!");
+		return false;
+	}
+	<?}?>
+	if(document.f.btsave) document.f.btsave.disabled=true;
+	document.f.do_save.value='1';
+	document.f.submit();
+	return true;
+}
+</script>
+</head>
+<body onload="parent.left_frame.switchmenu('sub1');" scroll=auto>
+<form name=f method=post action="<?echo "$_URL_PATH/system_update.exh";?>" enctype="multipart/form-data">
+<input type=hidden name=UPLOAD_METTER_ID value='<?echo $rrid;?>'>
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 10px;'>
+<tr>
+<td>
+<p class="sectitle"><b>System:</b> Updates</p><br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="<?echo "$_URL_PATH/system_update.exh?tab=1";?>" <?if($tab==1){?>class="tabact"<?}?>>Firmware</a></li>
+<li><a href="<?echo "$_URL_PATH/system_update.exh?tab=2";?>" <?if($tab==2){?>class="tabact"<?}?>>IPS Signature</a></li>
+<li><a href="<?echo "$_URL_PATH/system_update.exh?tab=3";?>" <?if($tab==3){?>class="tabact"<?}?>>Blacklist</a></li>
+<li><a href="<?echo "$_URL_PATH/system_update.exh?tab=4";?>" <?if($tab==4){?>class="tabact"<?}?>>License</a></li>
+<?if(mybox_license('AUP')==1) {?>
+<li><a href="<?echo "$_URL_PATH/system_update.exh?tab=5";?>" <?if($tab==5){?>class="tabact"<?}?>>Auto Update</a></li>
+<?}?>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td> 
+<br>
+
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><?if(isset($msg)&&$msg!='') {?><span id=msg class=notice><?echo "$msg";?></span><?}else{echo "<span id=msg class=notice style='display: none;'></span>";}?></td></tr>
+</table><br>
+
+<!-- tab container -->
+<table class="data" width="100%">
+<tbody>
+<?if($tab < 5) {?>
+<tr> 
+<td valign="middle" class="tdname">File Upload</td>
+<td valign="middle" class="tdvalue"> 
+<input name="filename" type="file" class="filebox" size="35"> 
+</td>
+</tr>
+<?if($tab < 4) {?>
+<tr> 
+<td valign="middle" class="tdname">Current version</td>
+<td valign="middle" class="tdvalue">
+<?echo $_version;?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Last update</td>
+<td valign="middle" class="tdvalue"> 
+<?echo $_lastupdate;?>
+</td>
+</tr>
+<?} // < 4?>
+<?if($tab==4) {?>
+<tr> 
+<td valign="middle" class="tdname">License Id</td>
+<td valign="middle" class="tdvalue"> 
+<?echo mybox_license('pkg');?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">License owner</td>
+<td valign="middle" class="tdvalue"> 
+<?echo mybox_license('org');?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">License released</td>
+<td valign="middle" class="tdvalue"> 
+<?echo date('d-M-Y',$_LR);?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">License expired</td>
+<td valign="middle" class="tdvalue"> 
+<?if($_LE!='none') {
+	echo date('d-M-Y',$_LE);
+} else {
+	echo "No expiration";
+}
+?>
+</td>
+</tr>
+<?} // =4 ?>
+<?} // < 5?>
+<?if($tab==5) {
+$db_id=mybox_db_connect($_DB_NAME);
+$result=mybox_db_query("select * from misc where name like \"update_%\"",$db_id);
+$_udate=2;
+$_ustat=0;
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_name=$row['name'];
+		$_val=$row['val'];
+		if($_name=='update_stat') $_ustat=$_val;
+		if($_name=='update_date') $_udate=$_val;
+		if($_name=='update_do') $_udatedo=$_val;
+		if($_name=='update_speed') $_udatesp=$_val;
+	}
+}
+mybox_db_close($db_id); 
+?>
+<tr> 
+<td valign="middle" class="tdname">Enable Auto update</td>
+<td valign="middle" class="tdvalue"><input type=checkbox name=ustat <?if($_ustat==1)echo "checked";?>> Enable/Disable</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname" id='dd'>Check and update every</td>
+<td valign="middle" class="tdvalue"> 
+<select name="udate" size=1 class=valbox>
+<?for($x=1;$x<31;$x++) {
+	$t=$x;
+	if(strlen($x)==1)$t="0$x";
+	if($_udate==$x) {
+		echo "<option value='$x' selected>$t</option>";
+	} else {
+		echo "<option value='$x'>$t</option>";
+	}
+}?>
+</select> day(s)&nbsp; at 
+<select name="udatedo" size=1 class=valbox>
+<?
+for($x=0;$x<25;$x++) {
+	$t=$x;
+	if(strlen($x)==1)$t="0$x";
+	if($_udatedo==$x) {
+		echo "<option value='$x' selected>$t:00</option>";
+	} else {
+		echo "<option value='$x'>$t:00</option>";
+	}
+}?>
+</select> hour(s)
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Limit I/O bandwidth</td>
+<td valign="middle" class="tdvalue"><input name="udatesp" type="text" class="valbox" size="5" value="<?echo $_udatesp;?>">  KBytes per second</td>
+</tr>
+<?}?>
+</tbody>
+</table>
+<table align=right>
+<tbody>
+<tr>
+<td>
+<input name="btsave" value="Update" type="button" class=button onclick="do_upload();">
+</td> 
+</tr> 
+</tbody>
+</table>
+<!-- end tab container -->
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value='<?echo $tab;?>'>
+</form>
+<script type='text/javascript'>page_kill();</script>
+</body>
+</html>
+
+<?flush();?>

@@ -1,0 +1,609 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+chk_session();
+
+write_nocache();
+
+$_SYSID="vpn_pptp";
+
+$db_id=db_connect($_DB_NAME);
+
+if(chk_pri($_LOGIN['auth_id'],1)==1) {
+	if($tab==1) {
+		if(isset($do_save)&&$do_save==1) {
+			if($stat!='') $stat=1;
+			if($stat=='') $stat=0;
+			if($usead!='') $usead=1;
+			if($usead=='') $usead=0;
+			if($speed=='') $speed='115200';
+			$dnswin=trim($dnswin);
+			$mswins=trim($mswins);
+			$netbiosname=trim($netbiosname);
+			if($usewins!='') $usewins=1;
+			if($usewins=='') $usewins=0;
+			if(isip_exists($localip)==0) {
+				if(db_query("update pptp set localip='$localip',listen='$listen',ipstart='$ipstart',ipend='$ipend',stat='$stat',speed='$speed',usewins='$usewins'",$db_id)) {
+					db_query("update pptp set dnswin='$dnswin'",$db_id);
+					if($mswins!='') db_query("update pptp set mswins='$mswins'",$db_id);
+					if($workgroup!='') db_query("update pptp set workgroup='$workgroup'",$db_id);
+					db_query("update pptp set netbiosname='$netbiosname'",$db_id);
+					$msg="Setting updated!.";
+				}
+			} else {
+				$msg="$localip already owned by someone else";
+			}
+		}
+		if(isset($do_id)&&$do_id=='apply_chg') {
+			echo_query("pptp-restart");
+			$msg="<script>waitcount();</script>";
+		}
+	}
+	if($tab==2) {
+		if($col==1) {
+			if(isset($do_id)&&$do_id=='apply_chg') {
+				echo_query("pptp-restart");
+				$msg="<script>waitcount();</script>";
+			}
+			if(isset($do_save)&&$do_save==1) {
+				if(count($id)!=0) {
+					foreach($id as $_pid => $_rest) {
+						$_name=$name[$_pid];
+						$_ip=$ip[$_pid];
+						$_passwd=$passwd[$_pid];
+						$_stat=$stat[$_pid];
+						if($_name=='' || $_passwd=='') continue;
+						if($_ip=='') $_ip='any';
+						if($_stat!='') $_stat='1';
+						if($_stat=='') $_stat='0';
+						if($_pid!='new') {
+							db_query("update pptpuser set name='$_name' where id='$_pid'",$db_id);
+							db_query("update pptpuser set ip='$_ip' where id='$_pid'",$db_id);
+							db_query("update pptpuser set stat='$_stat' where id='$_pid'",$db_id);
+							if($_passwd!='[-- hidden --]') {
+								db_query("update pptpuser set passwd='$_passwd' where id='$_pid'",$db_id);
+							}
+						} else {
+							$result=db_query("select * from pptpuser where name='$_name'",$db_id);
+							if(db_num_rows($result)==0) {
+								db_query("insert into pptpuser (name,passwd,ip,stat) values ('$_name','$_passwd','$_ip','$_stat')",$db_id);
+							} else {
+								$msg="User already exist!";
+							}
+						}
+					}
+				}
+			}
+			if(isset($do_save)&&$do_save==2) {
+				if(count($del)!=0) {
+					foreach($del as $id) {
+						if($id!='') db_query("delete from pptpuser where id='$id'",$db_id);
+					}
+				}
+			}
+			if(isset($do_id)&&$do_id==del) {
+				if($id!='') db_query("delete from pptpuser where id='$id'",$db_id);
+			}
+		}
+		if($col==2) {
+			if(isset($do_save)&&$do_save==1) {
+				if($usead!='') $usead=1;
+				if($usead=='') $usead=0;
+				$adpass=trim($adpass);
+				db_query("update pptp set usead='$usead'",$db_id);
+				if($adip!='') db_query("update pptp set adip='$adip'",$db_id);
+				if($addomain!='') db_query("update pptp set addomain='$addomain'",$db_id);
+				if($adadmin!='') db_query("update pptp set adadmin='$adadmin'",$db_id);
+				if($adpass!='[-- hidden --]' && $adpass!='' ) {
+					db_query("update pptp set adpass='$adpass'",$db_id);
+				}
+				$msg="Setting updated!.";
+				
+			}
+			if(isset($do_id)&&$do_id=='apply_chg') {
+				echo_query("pptp-restart");
+				$msg="<script>waitcount();</script>";
+			}
+		}
+	}
+	if($tab==3) {
+		if(isset($do_id)&&$do_id=='close') {
+			exec_cmd("kill -9 $id");
+			chk_pptpuser();
+		}
+		if(isset($do_save)&&$do_save==2) {
+			if(count($del)!=0) {
+				foreach($del as $id) {
+					exec_cmd("kill -9 $id");
+				}
+				chk_pptpuser();
+			}
+		}
+	}
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied!.";
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+if(!isset($col)||$col=='') $col=1;
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script language="javascript" src="<?echo $_URL_PATH;?>/j/strings.js"></script>
+<script language="javascript">
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+</script>
+<script language="javascript">
+	function chkdel() {
+		var x='0';
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					if(document.f.elements[i].checked) x++;
+    				}	
+			}
+  		}
+		if(x==0) return false;
+		return true;
+	}
+	function do_delete() {
+		if(chkdel()!=false) {
+			if(confirm('Are you sure you want to proceed?')) {
+				document.f.do_save.value='2';
+				document.f.submit();
+			}
+		}
+	}
+var k=0;
+function waitcount() { 
+ 	k=k+2;
+	if(k <= 100) {
+    		msg.innerHTML='Reloading.. Please wait..'+k+'%'; 
+    		setTimeout(waitcount,200);  
+	} else {
+		self.location.href='<?echo "$_URL_PATH/vpn_pptp.exh?tab=$tab&col=$col&col2=$col2";?>';
+	}
+}
+</script>
+</head>
+<body scroll=auto>
+<form name=f method=post action="<?echo "$_URL_PATH/vpn_pptp.exh";?>" onsubmit="return do_submit();">
+<table border="0" cellpadding="4" cellspacing="4" width="700" align=center>
+<tr>
+<td align=center>
+
+<!-- main -->
+<fieldset>
+<legend>&nbsp;&nbsp;&nbsp;&nbsp;
+VPN: PPTP
+&nbsp;&nbsp;&nbsp;&nbsp;</legend>
+
+<table valign=top border=0>
+<tr>
+<td>
+<table border=0 cellpadding="2" cellspacing="2">
+<tr>
+<td align=center valign=middle>
+
+<table width="650" border="0" cellpadding="0" cellspacing="0">
+<tr><td>
+<ul id="tabnav">
+<li class="<?if($tab==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=1) { echo "<a href=\"$_URL_PATH/vpn_pptp.exh?tab=1\">"; }?>Setting<?if($tab!=1) { echo "</a>"; }?></li>
+<li class="<?if($tab==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=2) { echo "<a href=\"$_URL_PATH/vpn_pptp.exh?tab=2\">"; }?>Authentication<?if($tab!=2) { echo "</a>"; }?></li>
+<li class="<?if($tab==3) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=3) { echo "<a href=\"$_URL_PATH/vpn_pptp.exh?tab=3\">"; }?>Connections<?if($tab!=3) { echo "</a>"; }?></li>
+
+</ul>
+</td></tr>
+<tr> 
+<td class="tabcont">
+<?if($tab==1) { 
+
+$result=db_query("select * from pptp",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_listen=$row['listen'];
+		$_localip=$row['localip'];
+		$_ipstart=$row['ipstart'];
+		$_ipend=$row['ipend'];
+		$_stat=$row['stat'];
+		$_wins=trim($row['mswins']);
+		$_dnswin=trim($row['dnswin']);
+		$_session=$row['stimeout'];
+		$_speed=$row['speed'];
+		$_workgroup=trim($row['workgroup']);
+		$_netbiosname=trim($row['netbiosname']);
+		$_usewins=$row['usewins'];
+		if($_stat==1) $_stat1='checked';
+		if($_usewins==1) $_usewins1='checked';
+	}
+}
+?>
+<script language="javascript">
+	function do_submit() {
+		document.f.btsubmit.disabled=true;
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	}
+</script>
+<?if($msg!='') {?>
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span id=msg class=notice><?echo "$msg";?></span></td></tr>
+</table><br>
+<? }?>
+<table width="600" border="0" cellpadding="6" cellspacing="0">
+<tr> 
+<td width="30%" valign="middle" class="tdcelltop">Enable PPTP VPN</td>
+<td width="70%" valign="middle" class="mtabletop"> 
+<input type=checkbox name=stat <?echo $_stat1;?>>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Speed</td>
+<td width="70%" valign="middle" class="mtable">
+<input name="speed" type="text" class="textbox" size="10" value="<?echo $_speed;?>"> speed for the PPP daemon to talk at
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Session timeout</td>
+<td width="70%" valign="middle" class="mtable">
+<input name="session" type="text" class="textbox" size="10" value="<?echo $_session;?>"> seconds, on starting ctrl connection
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Accept on Address</td>
+<td width="70%" valign="middle" class="mtable">
+<input name="listen" type="text" class="textbox" size="35" value="<?echo $_listen;?>"> leave blank for any
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Server address</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="localip" type="text" class="textbox" size="35" value="<?echo $_localip;?>">
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Remote address range</td>
+<td width="70%" valign="middle" class="mtable">
+<table border=0 cellspacing=2 cellpadding=2>
+<tr>
+<td>From</td><td><input name="ipstart" type="text" class="textbox" size="20" value="<?echo $_ipstart;?>"></td>
+<td>To</td><td><input name="ipend" type="text" class="textbox" size="4" value="<?echo $_ipend;?>" maxlength=3></td>
+</tr></table>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Workgroup</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="workgroup" type="text" class="textbox" size="35" value="<?echo $_workgroup;?>">
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Netbios Name</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="netbiosname" type="text" class="textbox" size="35" value="<?echo $_netbiosname;?>">
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Use built-in WINS</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input type=checkbox name=usewins <?echo $_usewins1;?> onclick='if(this.checked==true){document.f.mswins.disabled=true;}else{document.f.mswins.disabled=false;};'> Act as WINS server
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="top" class="tdcell">Client WINS Server</td>
+<td width="70%" valign="middle" class="mtable"> 
+<textarea name="mswins" class="textbox" cols=40 rows=3>
+<?
+$list=preg_split('/\s+/',$_wins);
+if(count($list)!=0) {
+	foreach($list as $ip) {
+		echo "$ip ";
+	}
+} else {
+	if($_wins!='') echo "$_wins";
+}
+unset($list,$ip);	
+?>
+</textarea> Separate by space
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="top" class="tdcell">Client DNS Server</td>
+<td width="70%" valign="middle" class="mtable"> 
+<textarea name="dnswin" class="textbox" cols=40 rows=3>
+<?
+$list=preg_split('/\s+/',$_dnswin);
+if(count($list)!=0) {
+	foreach($list as $ip) {
+		echo "$ip ";
+	}
+} else {
+	if($_dnswin!='') echo "$_dnswin";
+}	
+?>
+</textarea> Separate by space
+</td>
+</tr>
+</table>
+<tr><td align=right valign=top><input name=btapply type="button" value="Apply changes" class="button" onclick="self.location.href='<?echo $_URL_PATH;?>/vpn_pptp.exh?tab=1&do_id=apply_chg'"><input name=btsubmit type="submit" value="Save" class="button"></td></tr>
+
+<?if($_usewins==1) {?>
+<script language="javascript">
+document.f.mswins.disabled=true;
+</script>
+
+<? } ?>
+<? } // tab==1 ?>
+
+<?if($tab==2) {?>
+<script language="javascript">
+	function do_submit() {
+		document.f.btsubmit.disabled=true;
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	}
+	function dotoggle() {
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					document.f.elements[i].checked = !(document.f.elements[i].checked);
+    				}	
+			}
+  		}
+	}
+	function chkdel() {
+		var x='0';
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					if(document.f.elements[i].checked) x++;
+    				}	
+			}
+  		}
+		if(x==0) return false;
+		return true;
+	}
+	function do_delete() {
+		if(chkdel()!=false) {
+			if(confirm('Are you sure you want to proceed?')) {
+				document.f.do_save.value='2';
+				document.f.submit();
+			}
+		}
+	}
+</script>
+<table width=100% border=0 cellpadding="2" cellspacing="2" class=tablist>
+<tr><td>
+<ul id="tabnav">
+<li class="<?if($col==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($col!=1) { echo "<a href=\"$_URL_PATH/vpn_pptp.exh?tab=2&col=1\">"; }?>Built-in user<?if($col!=1) { echo "</a>"; }?></li>
+<li class="<?if($col==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($col!=2) { echo "<a href=\"$_URL_PATH/vpn_pptp.exh?tab=2&col=2\">"; }?>Active Directory<?if($col!=2) { echo "</a>"; }?></li>
+</ul>
+</td></tr>
+<tr> 
+<td class="tabcont">
+<?if($col==1) {?>
+<?if($msg!='') {?>
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span id=msg class=notice><?echo "$msg";?></span></td></tr>
+</table><br>
+<? }?>
+<table width="600" border=0 cellpadding="1" cellspacing="2" class=tablist align=center>
+      <tr class=bgcolor3>
+        <td class=tdlistop>#</td>
+	<td class=tdlistop>Login</td>
+	<td class=tdlistop>Secret</td>
+        <td class=tdlistop>IP Address</td>
+	<td class=tdlistop>Active</td>
+	<td class=tdlistop>Opt</td>
+      </tr>
+<?
+	$result=db_query("select * from pptpuser",$db_id);
+	$x=1;
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_id=$row['id'];
+			$_name=$row['name'];
+			$_passwd=trim($row['passwd']);
+			$_ip=$row['ip'];
+			$_stat=$row['stat'];
+			if($_stat==1) $_stat='checked';
+			if($_passwd!='') $_passwd='[-- hidden --]';
+	echo "
+      <tr>
+        <td class=tdlist><input type=hidden name=id[$_id] value='id'>$x</td>
+        <td class=tdlist><input type=text name=name[$_id] value='$_name' size=20 class='textbox'></td>
+        <td class=tdlist><input type=password name=passwd[$_id] value='$_passwd' size=20 class='textbox'></td>
+        <td class=tdlist><input type=text name=ip[$_id] value='$_ip' size=20 class='textbox'></td>
+        <td class=tdlist align=center><input type=checkbox name=stat[$_id] $_stat></td>
+        <td class=tdlist align=right valign=middle><a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='$_URL_PATH/vpn_pptp.exh?tab=2&col=1&do_id=del&id=$_id';\">{$_PNG['delete']}</a><input type=checkbox name=del[$_id] value=$_id></td>
+
+      </tr>";
+		$x++;
+		}
+	}
+if(isset($do_id)&&$do_id=='add_new' && chk_pri($_LOGIN['auth_id'],1)==1) {
+	echo "
+      <tr>
+        <td class=tdlist><input type=hidden name=id[new] value='new'>$x</td>
+        <td class=tdlist><input type=text name=name[new] value='' size=20 class='textbox'></td>
+        <td class=tdlist><input type=password name=passwd[new] value='' size=20 class='textbox'></td>
+        <td class=tdlist><input type=text name=ip[new] value='' size=20 class='textbox'></td>
+        <td class=tdlist align=center><input type=checkbox name=stat[new]></td>
+	<td class=tdlist></td>
+      </tr>";
+}
+if($x > 1) {
+?>
+<tr>
+<td align=right valign=top class=tdlist colspan=6><a href="#" onclick='do_delete();'>Delete</a> / <a href="#" onclick='dotoggle();'>Toggle</a> <?echo $_PNG['arrow_rtr'];?></td>
+</tr>
+<? } ?>
+<tr><td align=right valign=top colspan=6><input name=btapply type="button" value="Apply changes" class="button-small" onclick="self.location.href='<?echo $_URL_PATH;?>/vpn_pptp.exh?tab=2&col=1&do_id=apply_chg';"><input name=btsubmit type="submit" value="Save" class="button-small"><input name=btadd type="button" value="Add New" class="button-small" onclick="self.location.href='<?echo $_URL_PATH;?>/vpn_pptp.exh?tab=2&col=1&do_id=add_new';"></td></tr>
+</table>
+<? } //col==1 ?>
+
+<?if($col==2) {
+$result=db_query("select * from pptp",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_usead=$row['usead'];
+		$_adip=$row['adip'];
+		$_addomain=$row['addomain'];
+		$_adadmin=$row['adadmin'];
+		$_adpass=trim($row['adpass']);
+		if($_usead==1) $_usead1='checked';
+	}
+}
+?>
+<script language="javascript">
+	function do_submit() {
+		document.f.btsubmit.disabled=true;
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	}
+	function chkad() {
+		if(document.f.usead.checked==true) {
+			document.f.adip.disabled=false;
+			document.f.addomain.disabled=false;
+			document.f.adadmin.disabled=false;
+			document.f.adpass.disabled=false;
+		} else {
+			document.f.adip.disabled=true;
+			document.f.addomain.disabled=true;
+			document.f.adadmin.disabled=true;
+			document.f.adpass.disabled=true;
+		}
+	}
+</script>
+<?if($msg!='') {?>
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span id=msg class=notice><?echo "$msg";?></span></td></tr>
+</table><br>
+<? }?>
+<table width="600" border="0" cellpadding="6" cellspacing="0">
+<tr> 
+<td width="30%" valign="middle" class="tdcelltop">Enable</td>
+<td width="70%" valign="middle" class="mtabletop"> 
+<input type=checkbox name=usead <?echo $_usead1;?> onclick='chkad();'> Use a Active Directory server for authentication
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">AD Server</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="adip" type="text" class="textbox" size="35" value="<?echo $_adip;?>">
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">AD Domain</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="addomain" type="text" class="textbox" size="35" value="<?echo $_addomain;?>">
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">AD User Admin</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="adadmin" type="text" class="textbox" size="35" value="<?echo $_adadmin;?>">
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">AD Admin secret</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="adpass" type="password" class="textbox" size="35" value="[-- hidden --]">
+</td>
+</tr>
+<tr><td align=right valign=top colspan=2><input name=btapply type="button" value="Apply changes" class="button" onclick="self.location.href='<?echo $_URL_PATH;?>/vpn_pptp.exh?tab=2&col=2&do_id=apply_chg'"><input name=btsubmit type="submit" value="Save" class="button"></td></tr>
+
+</table>
+
+<? } ?>
+</td>
+</tr>
+</table>
+<?if($_usead!=1){?>
+<script language="javascript">
+document.f.adip.disabled=true;
+document.f.addomain.disabled=true;
+document.f.adadmin.disabled=true;
+document.f.adpass.disabled=true;
+</script>
+<? } ?>
+<? } // tab==2 ?>
+
+<?if($tab==3) {?>
+<?if($msg!='') {?>
+<table width="400" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span id=msg class=notice><?echo "$msg";?></span></td></tr>
+</table><br>
+<? }?>
+<table width="400" border=0 cellpadding="2" cellspacing="2" class=tablist>
+      <tr class=bgcolor3>
+        <td class=tdlistop>#</td>
+	<td class=tdlistop>User</td>
+        <td class=tdlistop>Device</td>
+        <td class=tdlistop>IP Address</td>
+        <td class=tdlistop>Logon</td>
+	<td class=tdlistop></td>
+      </tr>
+<?
+	$_user_array=array();
+	if(file_exists("/var/sys/pptpvpnusers")) {
+		$_user_array=unserialize(file_get_contents("/var/sys/pptpvpnusers"));
+	}
+	$x=1;
+	if(count($_user_array)!=0) {
+		foreach($_user_array as $list) {
+			list($user,$tty,$ip,$pid,$time)=preg_split("/\|/",$list);
+	echo "
+      <tr>
+        <td class=tdlist>$x</td>
+        <td class=tdlist>$user</td>
+        <td class=tdlist>$tty</td>
+        <td class=tdlist>$ip</td>
+        <td class=tdlist>$time</td>
+        <td class=tdlist align=right valign=middle><a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='$_URL_PATH/vpn_pptp.exh?tab=3&do_id=close&id=$pid';\">{$_PNG['exit']}</a><input type=checkbox name=del[] value=$pid></td>
+      </tr>";
+		$x++;	
+		}
+		if($x >=1) {
+	echo "<tr>
+	<td align=right valign=top class=tdlist colspan=6>[ <a href='#' onclick='do_delete();'>Delete</a> / <a href='#' onclick='dotoggle();'>Toggle</a> ] {$_PNG['arrow_rtr']}</td>
+	</tr>";
+		}
+	}
+?>
+</table>
+<? } // tab==3 ?>
+</td>
+</tr>
+
+</table>
+
+</td>
+</tr>
+</table>
+
+<!-- end main -->
+
+</td>
+</tr>
+</table>
+</fieldset><br><br>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?echo $tab;?>>
+<input type=hidden name=col value=<?echo $col;?>>
+</form>
+</body>
+</html>
+
+<?db_close($db_id); flush();?>

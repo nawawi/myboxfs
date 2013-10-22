@@ -1,0 +1,5 @@
+//#!/usr/local/bin/php
+<?
+phpinfo();
+?>
+<a href="/index1.exh">aaa</a>

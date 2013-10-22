@@ -1,0 +1,23 @@
+#!/bin/sh
+trap : 1 2 3 15
+PATH="/bin"
+TERM=linux
+export PATH TERM
+umask 077
+cd /
+echo "0 0 0 0" > /proc/sys/kernel/printk
+freeramdisk /dev/ram0 > /dev/null 2>&1
+
+# clean rc.bootup stuff
+umount /initrd/sys >/dev/null 2>&1
+umount /initrd >/dev/null 2>&1
+rm -rf /initrd >/dev/null 2>&1
+rm -f /sh >/dev/null 2>&1
+
+echo "#!/bin/sh
+echo "mfs"
+" > /bin/groups
+chmod 700 /bin/groups
+
+trap 1 2 3 15
+chmod 700 /*

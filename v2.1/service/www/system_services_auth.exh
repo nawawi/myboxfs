@@ -1,0 +1,401 @@
+<?
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+mybox_chk_session();
+mybox_send_nocache();
+
+$_SYSID="system_services_auth";
+$db_id=mybox_db_connect($_DB_NAME);
+$_AD_JOIN=0;
+$_UL=mybox_user_license();
+if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+	if($col==1) {
+		if(isset($do_save)&&$do_save==1) {
+			if(count($id)!=0) {
+				$msg="Setting updated!.";
+				foreach($id as $_pid => $_rest) {
+					$_name=$name[$_pid];
+					$_ip=$ip[$_pid];
+					$_passwd=$passwd[$_pid];
+					$_stat=$stat[$_pid];
+					if($_name=='' || $_passwd=='') continue;
+					if($_stat!='') $_stat='1';
+					if($_stat=='') $_stat='0';
+					if($_pid!='new') {
+						mybox_db_query("update auth_user set name='$_name' where id='$_pid'",$db_id);
+						mybox_db_query("update auth_user set stat='$_stat' where id='$_pid'",$db_id);
+						if($_passwd!='' && substr($_passwd,0,4)!="enc:") {
+							$_passwd=mybox_str_encrypt($_passwd);
+							mybox_db_query("update auth_user set passwd='$_passwd' where id='$_pid'",$db_id);
+						}
+					} else {
+						$result=mybox_db_query("select name from auth_user where name='$_name'",$db_id);
+						if(mybox_db_num_rows($result)==0) {
+							$_passwd=mybox_str_encrypt($_passwd);
+							mybox_db_query("insert into auth_user (name,passwd,stat) values ('$_name','$_passwd','$_stat')",$db_id);
+						} else {
+							$msg="User already exist!";
+						}
+					}
+				}
+			}
+		}
+		if(isset($do_save)&&$do_save==2) {
+			if(count($del)!=0) {
+				foreach($del as $id) {
+					if($id!='') mybox_db_query("delete from auth_user where id='$id'",$db_id);
+				}
+			}
+		}
+		if(isset($do_id)&&$do_id==del) {
+			if($id!='') mybox_db_query("delete from auth_user where id='$id'",$db_id);
+		}
+	}
+	if($col==2) {
+		if(isset($do_id)&&$do_id=='apply_chg') {
+			mybox_echo_query("auth-ad-restart");
+			$msg="<script>waitcount();</script>";
+			$_AD_JOIN=1;
+		}
+		if(isset($do_save)&&$do_save==1) {
+			if($stat!='') $stat='1';
+			if($stat=='') $stat='0';
+			$adpass=trim($pass);
+			mybox_db_query("update auth_ad set domain='$domain',ip='$ip',admin='$admin',stat='$stat'",$db_id);
+			if($adpass!='' && substr($adpass,0,4)!='enc:') {
+				$adpass=mybox_str_encrypt($adpass);
+				mybox_db_query("update auth_ad set pass='$adpass'",$db_id);
+			}
+			$msg="Setting updated!.";
+		}
+		if(isset($do_id)&&$do_id=='apply_chg') {
+			mybox_echo_query("auth-ad-restart");
+			$msg="<script>waitcount();</script>";
+		}
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+if(!isset($col)||$col=='') $col=1;
+
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script type='text/javascript' src="<?echo $_URL_PATH;?>/j/strings.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+	page_load();
+</script>
+<script type='text/javascript'>
+	function do_submit() {
+		<?if($col==2) {?>
+		var domain=Trim(document.f.domain.value);
+		var ip=Trim(document.f.ip.value);
+		var admin=Trim(document.f.admin.value);
+		if(domain.match(/(\S)\.(\S+)/)==null) {
+			error("Invalid domain");
+			return false;
+		}
+		if(!mip1(ip)) {
+			error("Invalid IP address!");
+			return false;
+		}
+		if(admin=='') {
+			error("Domain admin empty");
+			return false;
+		}
+		<?}?>
+		<?if($col==1) {?>
+		if(!chkval()) { return false; }
+		<? } ?>
+		document.f.do_save.value='1';
+		if(document.f.btsave) document.f.btsave.disabled=true;
+		document.f.submit();
+		return true;
+	}
+	<?if($col==2){?>
+	function do_changes() {
+		if(document.f.btsave) document.f.btsave.disabled=true;
+		if(document.f.btapply) document.f.btapply.disabled=true;
+		self.location.href='<?echo "$_URL_PATH/system_services_auth.exh?tab=$tab&col=$col&do_id=apply_chg";?>';	
+	}
+	<?}?>
+	<?if($col==1){?>
+	function chkval() {
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='text') {
+			    	if( document.f.elements[i].name.substr( 0, 4 ) == 'name') {
+					if(document.f.elements[i].value=='') return false;
+    				}	
+			}
+			if(document.f.elements[i].type=='password') {
+			    	if( document.f.elements[i].name.substr( 0, 6 ) == 'passwd') {
+					if(document.f.elements[i].value=='') return false;
+    				}	
+			}
+  		}
+		return true;
+	}
+	function chkdel() {
+		var x='0';
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					if(document.f.elements[i].checked) x++;
+    				}	
+			}
+  		}
+		if(x==0) return false;
+		return true;
+	}
+	function do_delete() {
+		if(chkdel()!=false) {
+			if(confirm('Are you sure you want to proceed?')) {
+				document.f.do_save.value='2';
+				document.f.submit();
+			}
+		}
+	}
+	function dotoggle() {
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					document.f.elements[i].checked = !(document.f.elements[i].checked);
+    				}	
+			}
+  		}
+	}
+	<?}//col=1?>
+var k=0;
+function waitcount() { 
+ 	k=k+2;
+	if(k <= 100) {
+    		document.getElementById("msg").innerHTML='Reloading.. Please wait..'+k+'%';
+		<?if($col==1) {?>
+    		setTimeout(waitcount,200);
+		<?}else{?>
+		setTimeout(waitcount,600);
+		<?}?>
+	} else {
+		self.location.href='<?echo "$_URL_PATH/system_services_auth.exh?tab=$tab&col=$col";?>';
+	}
+}
+</script>
+</head>
+<body onload="parent.left_frame.switchmenu('sub1');" scroll=auto>
+<form name=f method=post action="<?echo "$_URL_PATH/system_services_auth.exh";?>" onsubmit="return do_submit();">
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 10px;'>
+<tr>
+<td>
+<p class="sectitle"><b>System:</b> Local Services</p><br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="<?echo "$_URL_PATH/system_services.exh?tab=1";?>" <?if($tab==1){?>class="tabact"<?}?>>SNMP</a></li>
+<li><a href="<?echo "$_URL_PATH/system_services.exh?tab=2";?>" <?if($tab==2){?>class="tabact"<?}?>>SSH</a></li>
+<li><a href="<?echo "$_URL_PATH/system_services.exh?tab=3";?>" <?if($tab==3){?>class="tabact"<?}?>>Remote Logging</a></li>
+<li><a href="<?echo "$_URL_PATH/system_services.exh?tab=4";?>" <?if($tab==4){?>class="tabact"<?}?>>DHCP</a></li>
+<li><a href="<?echo "$_URL_PATH/system_services.exh?tab=5";?>" <?if($tab==5){?>class="tabact"<?}?>>FTP</a></li>
+<li><a href="<?echo "$_URL_PATH/system_services_auth.exh?tab=6";?>" <?if($tab==6){?>class="tabact"<?}?>>Authentication</a></li>
+<li><a href="<?echo "$_URL_PATH/system_services_ddns.exh?tab=7";?>" <?if($tab==7){?>class="tabact"<?}?>>DDNS</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td>
+<br>
+
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><?if(isset($msg)&&$msg!='') {?><span id=msg class=notice><?echo "$msg";?></span><?}else{echo "<span id=msg class=notice style='display: none;'></span>";}?></td></tr>
+</table><br>
+
+<!-- tab container -->
+<table width="100%" border="0" cellpadding="0" cellspacing="0">
+<tr><td>
+<ul id="tabnav">
+<li class="<?if($col==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($col!=1) { echo "<a href=\"$_URL_PATH/system_services_auth.exh?tab=$tab&col=1\">"; }?>Built-in User<?if($col!=1) { echo "</a>"; }?></li>
+<li class="<?if($col==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($col!=2) { echo "<a href=\"$_URL_PATH/system_services_auth.exh?tab=$tab&col=2\">"; }?>Active Directory<?if($col!=2) { echo "</a>"; }?></li>
+</ul>
+</td></tr>
+<tr> 
+<td class="tabcont">
+<?if($col==1) {?>
+<table width="100%" class=data>
+<thead class="blue">
+<tr>
+<td style='font-weight: bold; width: 2%;'>#</td>
+<td style='font-weight: bold;'>Login</td>
+<td style='font-weight: bold;'>Password</td>
+<td style='font-weight: bold; text-align: center;'>Active</td>
+<td style='font-weight: bold; text-align: right; width: 7%;'>Opt</td>
+</tr>
+</thead>
+<tbody>
+<?
+$result=mybox_db_query("select * from auth_user",$db_id);
+$x=1;
+$_numrows=mybox_db_num_rows($result);
+if($_numrows!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_id=$row['id'];
+		$_name=$row['name'];
+		$_passwd=trim($row['passwd']);
+		$_stat=$row['stat'];
+		if($_stat==1) $_stat='checked';
+		if($_passwd!='') $_passwd="enc:$_passwd";
+		echo "
+		<tr>
+		<td style='background-color: #ffffff;'><input type=hidden name=id[$_id] value='id'>$x</td>
+		<td style='background-color: #ffffff;'><input type=text name=name[$_id] value='$_name' size=25 class='valbox'></td>
+		<td style='background-color: #ffffff;'><input type=password name=passwd[$_id] value='$_passwd' size=25 class='valbox'></td>
+		<td style='text-align: center; background-color: #ffffff;' align=center><input type=checkbox name=stat[$_id] $_stat></td>
+		<td style='text-align: right; background-color: #ffffff;' align=right valign=middle><a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='$_URL_PATH/system_services_auth.exh?tab=$tab&col=1&do_id=del&id=$_id';\">{$_PNG['delete']}</a><input type=checkbox name=del[$_id] value='$_id'></td>
+		</tr>";
+		$x++;
+	}
+}
+if(isset($do_id)&&$do_id=='add_new' && mybox_chk_level($_LOGIN['auth_id'],1)==1 && ($_UL==0 || $_UL > $_numrows)) {
+	echo "
+	<tr>
+	<td style='background-color: #ffffff;'><input type=hidden name=id[new] value='new'>$x</td>
+	<td style='background-color: #ffffff;'><input type=text name=name[new] value='' size=25 class='valbox'></td>
+	<td style='background-color: #ffffff;'><input type=password name=passwd[new] value='' size=25 class='valbox'></td>
+	<td align=center style='text-align: center; background-color: #ffffff;'><input type=checkbox name=stat[new]></td>
+	<td style='background-color: #ffffff;'></td>
+	</tr>";
+}
+if($x > 1) {
+?>
+<tr>
+<td style='text-align: right; background-color: #ffffff;' valign=top colspan=5><a href="#" onclick='do_delete();'>Delete</a> / <a href="#" onclick='dotoggle();'>Toggle</a> <?echo $_PNG['arrow_rtr'];?></td>
+</tr>
+<? } ?>
+<?if($_UL==0 || $_UL > $_numrows) {?> 
+<tr><td style='text-align: right; background-color: #ffffff;' align=right valign=top colspan=5><input name=btadd type="button" value="Add New" class="button-small" onclick="self.location.href='<?echo $_URL_PATH;?>/system_services_auth.exh?tab=<?echo $tab;?>&col=1&do_id=add_new';"></td></tr>
+<?}?>
+</tbody>
+</table>
+<?}//col==1?>
+<?if($col==2) {
+$result=mybox_db_query("select * from auth_ad",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_ad_domain=$row['domain'];
+		$_ad_ip=$row['ip'];
+		$_ad_admin=$row['admin'];
+		$_ad_pass=$row['pass'];
+		$_ad_stat=$row['stat'];
+		if($_ad_stat==1) $_ad_stat1='checked';
+		$_ad_pass="enc:$_ad_pass";
+	}
+}
+if($_ad_stat==1 && $_AD_JOIN==0) {
+	exec("wbinfo -t",$_GG,$_Gret);
+}
+?>
+<script type='text/javascript'>
+function do_ad_stat() {
+	if(document.f.stat.checked==true) {
+		for(var x=1;x<6;x++) {
+			var xid="h"+x;
+			do_show(xid);
+		}
+	} else {
+		for(var x=1;x<6;x++) {
+			var xid="h"+x;
+			do_hide(xid);
+		}
+	}
+}
+</script>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td valign="middle" class="tdname">Enable Active Directory</td>
+<td valign="middle" class="tdvalue"> 
+<input type=checkbox name=stat <?echo $_ad_stat1;?> onclick="do_ad_stat();">Enable/Disable
+</td>
+</tr>
+<tr id='h1' style='display: none;'> 
+<td valign="middle" class="tdname">Domain</td>
+<td valign="middle" class="tdvalue"> 
+<input name="domain" type="text" class="valbox" size="35" value="<?echo $_ad_domain;?>">
+</td>
+</tr>
+<tr id='h2' style='display: none;'> 
+<td valign="middle" class="tdname">IP address</td>
+<td valign="middle" class="tdvalue"> 
+<input name="ip" type="text" class="valbox" size="35" value="<?echo $_ad_ip;?>">
+</td>
+</tr>
+<tr id='h3' style='display: none;'> 
+<td valign="middle" class="tdname">Domain administrator</td>
+<td valign="middle" class="tdvalue"> 
+<input name="admin" type="text" class="valbox" size="35" value="<?echo $_ad_admin;?>">
+</td>
+</tr>
+<tr id='h4' style='display: none;'> 
+<td valign="middle" class="tdname">Password</td>
+<td valign="middle" class="tdvalue"> 
+<input name="pass" type="password" class="valbox" size="35" value="<?echo $_ad_pass;?>">
+</td>
+</tr>
+<tr id='h5' style='display: none;'> 
+<td valign="middle" class="tdname">Connection status</td>
+<td valign="middle" class="tdvalue"> 
+<?if($_AD_JOIN==0) {
+	if(count($_Gret)!=0 && $_Gret==0 && preg_match("/checking the trust secret via RPC calls succeeded/",$_GG[0])) {?>
+		<font color="green">Connection OK</font>
+	<? } else {?>
+		<font color="red">Connection failed! please click reload button</font>
+	<?}?>
+<? } else {?>
+	<font color="blue">Connecting to domain in progress</font>
+<?}?>
+</td>
+</tr>
+</tbody>
+</table>
+<script type='text/javascript'>do_ad_stat();</script>
+<?}//col==2?>
+</td>
+</tr>
+</table>
+
+<table align=right>
+<tbody>
+<tr>
+<td><?if($col==2){?><input name="btapply" value="Reload" type="button" class=button onclick="do_changes();"><?}?></td>
+<td><input name="btsave" value="Save" type="button" class=button onclick="do_submit();"> </td>  </tr> 
+</tbody>
+</table>
+
+<!-- end tab container -->
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?echo $tab;?>>
+<input type=hidden name=col value=<?echo $col;?>>
+</form>
+<script type='text/javascript'>page_kill();</script>
+</body>
+</html>
+
+<?mybox_db_close($db_id); flush();?>

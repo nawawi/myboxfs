@@ -1,0 +1,190 @@
+#!/bin/php -Cq
+<?
+// auth.init - last update 11-Dec-2006
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+putenv("PATH=/bin:/service/tools:/service/init");
+
+if(!file_exists("/bin/nmbd") || !file_exists("/bin/winbindd")) {
+	echo "Cannot execute auth.init. Internal error!\n";
+	mybox_slog("ERROR","Cannot execute auth.init. Internal error!");
+	exit(1);
+}
+
+$_QUIET=0;
+$_DEBUG=0;
+
+
+function auth_ad_start() {
+	global $_DB_NAME, $_QUIET, $_DEBUG, $_INIT_DIR;
+	$db_id=mybox_db_connect($_DB_NAME);
+	$result=mybox_db_query("select * from auth_ad",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_ad_domain=$row['domain'];
+			$_ad_ip=$row['ip'];
+			$_ad_admin=$row['admin'];
+			$_ad_pass=mybox_str_decrypt($row['pass']);
+			$_ad_stat=$row['stat'];
+		}
+	}
+	if($_ad_stat==0) {
+		if($_QUIET==0) {
+			echo "* AD authentication disabled\n";
+			mybox_slog("INFO","AD authentication disabled");
+		}
+		exit(1);
+	}
+	$_hostname=mybox_fget_contents("/proc/sys/kernel/hostname");
+	if($_hostname=='' || $_hostname=='(none)') {
+		$_hostname="mfs.mybox.lo";
+		$_host="mfs";
+	} else {
+		list($_host,)=preg_split("/\./",$_hosname);
+	}
+
+	$_ad_ACL=mybox_set_smb_acl($db_id,$_ad_ip);
+	if(!is_dir("/etc/samba")) mybox_mkdirr("/etc/samba");
+
+	list($_workgroup,)=preg_split("/\./",$_ad_domain);
+
+	if($fi=fopen("/etc/samba/smb.conf.tmp","w")) {
+		fwrite($fi,"workgroup = ".strtoupper($_workgroup)."\n");
+		fwrite($fi,"server string = authservice\n");
+		fwrite($fi,"client use spnego = yes\n");
+		fwrite($fi,"socket options = TCP_NODELAY SO_RCVBUF=8192 SO_SNDBUF=8192\n");
+		fwrite($fi,"realm = ".strtoupper($_ad_domain)."\n");
+		fwrite($fi,"security = ads\n");
+		fwrite($fi,"winbind uid = 10000-20000\n");
+		fwrite($fi,"winbind gid = 10000-20000\n");
+		fwrite($fi,"winbind cache time = 10\n");
+		fwrite($fi,"winbind separator = +\n");
+		if($_ad_ACL!=null) {
+			fwrite($fi,"interfaces = $_ad_ACL\n");
+		}
+		fwrite($fi,"domain master = no\n");
+		fwrite($fi,"dns proxy = no\n");
+		fwrite($fi,"netbios name = $_host\n");
+		fwrite($fi,"local master = no\n");
+		fwrite($fi,"preferred master = no\n");
+		fwrite($fi,"load printers = no\n");
+		fwrite($fi,"syslog = 3\n");
+		fwrite($fi,"syslog only = yes\n");
+		fclose($fi);
+		@rename("/etc/samba/smb.conf.tmp","/etc/samba/smb.conf");
+		@mybox_save_to_file("/var/sys/ad_domain","$_ad_domain");
+	}
+	if($fi=fopen("/etc/krb5.conf.tmp","w")) {
+		fwrite($fi,"[libdefaults]\n");
+		fwrite($fi,"default_realm = ".strtoupper($_ad_domain)."\n");
+		fwrite($fi,"dns_lookup_kdc = false\n");
+		fwrite($fi,"dns_lookup_realm = false\n");
+		fwrite($fi,"[domain_realm]\n");
+		fwrite($fi,".".strtolower($_ad_domain)."=".strtoupper($_ad_domain)."\n");
+		fwrite($fi,"".strtolower($_ad_domain)."=".strtoupper($_ad_domain)."\n");
+		fwrite($fi,"[realms]\n");
+		fwrite($fi,"".strtoupper($_ad_domain)." = {\n");
+		fwrite($fi,"default_domain = ".strtolower($_ad_domain)."\n");
+		fwrite($fi,"kdc = $_ad_ip\n");
+		fwrite($fi,"}\n");
+		fclose($fi);
+		@rename("/etc/krb5.conf.tmp","/etc/krb5.conf");
+	}
+	@mybox_save_to_file("/etc/resolv.conf","nameserver $_ad_ip\nnameserver 127.0.0.1\n");
+	if($_QUIET==0) {
+		echo "* Starting AD authentication\n";
+		mybox_slog("INFO","Starting AD authentication");
+	}
+	if(mybox_exec_cmd("winbindd")==0) {
+		echo "* Starting WINS agent\n";
+		mybox_slog("INFO","Starting WINS agent");
+		if(mybox_execq_cmd("net ads join -w $_ad_domain -S $_ad_ip -U$_ad_admin%$_ad_pass >/var/log/adjoin.log 2>&1")==0) {
+			if($_QUIET==0) {
+				$_bb=mybox_fget_contents("/var/log/adjoin.log");
+				mybox_slog("INFO","$_bb");
+				@unlink("/var/log/adjoin.log");
+				echo "* Join to AD Domain\n";
+				mybox_slog("INFO","Join to AD Domain");
+			}
+			@touch("/usr/smb/private/smbpasswd");
+			if($_QUIET==0) {
+				echo "* Starting Netbios agent\n";
+				mybox_slog("INFO","Starting Netbios agent");
+			}
+			mybox_exec_cmd("nmbd -D");	
+		} else {
+			if($_QUIET==0) {
+				echo "* Join to AD Domain failed\n";
+				mybox_slog("INFO","Join to AD Domain failed");
+			}
+		}
+	} else {
+		if($_QUIET==0) {
+			$_bb=mybox_fget_contents("/var/log/adjoin.log");
+			mybox_slog("INFO","$_bb");
+			@unlink("/var/log/adjoin.log");
+			echo "* AD authentication failed\n";
+			mybox_slog("INFO","AD authentication failed");
+		}
+	}
+	mybox_db_close($db_id);
+	@touch("/var/sys/chk_nmbd");
+	@touch("/var/sys/chk_winbindd");
+	return 0;
+}
+
+function auth_ad_stop() {
+	global $_QUIET;
+	@unlink("/var/sys/chk_nmbd");
+	@unlink("/var/sys/chk_winbindd");
+	if(mybox_killall("winbindd")==0) {
+		if($_QUIET==0) {
+			echo "* Shutting down WINS agent\n";
+			mybox_slog("INFO","Shutting down WINS agent");
+		}
+	} else {
+		if($_QUIET==0) {
+			echo "* Shutting down WINS agent failed!\n";
+			mybox_slog("INFO","Shutting down WINS agent failed");
+		}
+	}
+	if(mybox_killall("nmbd")==0) {
+		if($_QUIET==0) {
+			echo "* Shutting down Netbios agent\n";
+			mybox_slog("INFO","Shutting down Netbios agent");
+		}
+	} else {
+		if($_QUIET==0) {
+			echo "* Shutting down Netbios agent failed\n";
+			mybox_slog("INFO","Shutting down Netbios agent failed");
+		}
+	}
+	@mybox_save_to_file("/etc/resolv.conf","nameserver 127.0.0.1\n");
+	mybox_rmdir("/etc/samba");
+	return 1;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+if($_SERVER["argv"][2]=='debug') $_DEBUG=1;
+switch($_SERVER["argv"][1]) {
+	case 'ad_start':
+		$ret=auth_ad_start();
+		break;
+	case 'ad_stop':
+		$ret=auth_ad_stop();
+		break;
+	case 'ad_restart':
+		$ret=auth_ad_stop();
+		sleep(2);
+		$ret=auth_ad_start();
+		break;
+	default:
+		echo "Usage: $_app [ad_start/ad_stop/ad_restart]\n";
+		break;
+}
+flush();
+exit($ret);
+?>

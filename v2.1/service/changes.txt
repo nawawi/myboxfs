@@ -1,0 +1,50 @@
+25/08/2005
+fw> sqlite /strg/mybox/db/system.db "INSERT INTO misc VALUES('local_logs',0)"
+fw> sqlite /strg/mybox/db/system.db "INSERT INTO misc VALUES('blacklist_block',0)"
+fw> sqlite /strg/mybox/db/system.db "INSERT INTO misc VALUES('blacklist_line',50)"
+fw> sqlite /strg/mybox/db/system.db "INSERT INTO misc VALUES('local_news',0)"
+
+06/09/2005
+create table service_dhcp (
+stat int not null,
+dev varchar not null,
+range_start varchar not null,
+range_end varchar not null,
+default_lease varchar not null,
+max_lease varchar not null,
+netbios varchar not null,
+deny int not null
+);
+INSERT INTO service_dhcp VALUES(1,'LAN1','192.168.1.200','192.168.1.254',7200,86400,'',0);
+
+08/09/2005
+INSERT INTO misc VALUES('domainname','mybox.net');
+
+11/09/2005
+create table dhcp_hosts (
+id integer primary key,
+ip varchar not null,
+mac varchar not null,
+stat int not null,
+note varchar not null
+);
+
+12/09/2005
+create table alert_email (
+id integer primary key,
+email varchar not null,
+stat int not null,
+note varchar not null
+);
+
+create table alert_setting (
+stat int not null,
+report_min int not null,
+report_title varchar not null,
+report_logs int not null,
+report_strg int not null,
+report_mem int not null,
+report_sys int not null,
+report_names varchar not null
+);
+INSERT INTO alert_setting VALUES(1,60,'Mybox System Notification',1,1,1,1,'auth,system,firewall,httpd,sshd,ips,portscan,dhcpd');

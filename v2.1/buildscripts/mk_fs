@@ -1,0 +1,195 @@
+#!/bin/bash -e
+
+START_POINT=$(pwd)
+cd $START_POINT
+ROOT_DIR=$START_POINT/rootfs
+BUSYBOX_SRC=$START_POINT/src/busybox
+KERNEL_BASE=$START_POINT/kernel_base
+BINARY_LIST="/sbin/insmod
+		/sbin/modprobe
+		/sbin/lsmod
+		/sbin/rmmod
+		/sbin/ip
+		/usr/bin/openssl
+		/bin/gzip
+		/bin/zcat
+		/sbin/depmod
+		/sbin/microcode_ctl
+		/bin/rrdtool
+		src/dhcp-*/work.linux-2.2/server/dhcpd
+		src/net-tools-*/arp
+		src/php-*/sapi/cgi/php
+		src/sysklogd-*/syslogd
+		src/sysklogd-*/klogd
+		src/ucd-snmp-*/agent/snmpd
+		src/shttpd-*/src/httpsd
+		src/dropbear-*/sshd
+		src/dropbear-*/sshdkey
+		src/vsftpd-*/ftpd
+		src/inadyn/bin/linux/ddnsd
+		src/procinfo-*/procinfo
+		src/wget-*/src/wget
+		src/bind-*/bin/named/named
+		/usr/sbin/ntpdate
+		/sbin/ethtool"
+
+SKELS_PATH=$START_POINT/skells
+ZENDLIB=/usr/local/Zend/lib/Optimizer-3.2.0/php-5.2.x/ZendOptimizer.so
+MYBOX_UTIL=$START_POINT/src/mybox
+#KERNEL_MODULES="iptables.bz2 keymaps.bz2 kmods_base.bz2 kmods_iptables.bz2 zoneinfo.bz2"
+
+rm -rfv $ROOT_DIR
+mkdir -p $ROOT_DIR
+cp -av $SKELS_PATH/* $ROOT_DIR
+
+for t in /lib/libnss*_files*; do
+        cp -av $t $ROOT_DIR/lib
+        [ ! -L "$t" ] && strip $ROOT_DIR/lib/$(basename $t)
+done
+for t in /lib/libnss*_dns*; do
+        cp -av $t $ROOT_DIR/lib
+        [ ! -L "$t" ] && strip $ROOT_DIR/lib/$(basename $t)
+done
+
+# linux 2.6.x
+cp -av /lib/ld-linux.so.2 $ROOT_DIR/lib
+LDLNX="$(readlink /lib/ld-linux.so.2)"
+cp -av /lib/$LDLNX $ROOT_DIR/lib
+strip $ROOT_DIR/lib/$LDLNX
+
+
+for x in $BINARY_LIST; do
+	if [ -x "$x" ]; then
+		if [ "$x" = "/bin/ping" ]; then
+        		sh $START_POINT/cp_bin "$x" "$ROOT_DIR" "1"
+		else
+        		sh $START_POINT/cp_bin "$x" "$ROOT_DIR"
+		fi
+	else
+		echo "WARNING ==> $x not found"
+        fi
+done
+
+upx-kernel -d $ROOT_DIR/bin/syslogd
+upx-kernel -d $ROOT_DIR/bin/klogd
+upx-kernel -d $ROOT_DIR/bin/ntpdate
+upx-kernel -d $ROOT_DIR/bin/dhcpd
+
+# PROT_EXEC|PROT_WRITE failed. -> force execve
+upx-bin --best --force-execve $ROOT_DIR/bin/syslogd
+upx-bin --best --force-execve $ROOT_DIR/bin/klogd
+upx-bin --best --force-execve $ROOT_DIR/bin/ntpdate
+upx-bin --best --force-execve $ROOT_DIR/bin/dhcpd
+
+#rename
+mv -v $ROOT_DIR/bin/named $ROOT_DIR/bin/dns_resolver
+
+if [ ! -f "$ZENDLIB" ]; then
+	echo "$ZENDLIB not found"
+	exit
+else
+	cp -v $ZENDLIB $ROOT_DIR/lib
+	strip $ROOT_DIR/lib/$(basename $ZENDLIB)
+	# zendoptimizer 3.2
+	cp -av /mfs-gcc/lib/libgcc_s.so.1 $ROOT_DIR/lib
+fi
+
+
+if [ ! -x "$BUSYBOX_SRC/busybox" ]; then
+	echo "busybox not compile yet"
+	exit
+else
+        BUSYBOXLINK="$(cat $BUSYBOX_SRC/busybox.links |sed -e 's/\/sbin\///g' -e 's/\/bin\///g' |grep -v '^\/')"
+        sh $START_POINT/cp_bin "$BUSYBOX_SRC/busybox" "$ROOT_DIR"
+        cd $ROOT_DIR/bin
+	for b in $BUSYBOXLINK; do
+                ln -sfv busybox $b
+		echo "/bin/$b" >>/tmp/bbl
+        done
+fi
+
+
+if [ ! -d "$MYBOX_UTIL" ]; then
+	echo "mybox utilities not compile yet"
+	exit	
+else
+        sh $START_POINT/cp_bin "$MYBOX_UTIL/mybox" "$ROOT_DIR"
+	cd $ROOT_DIR/bin
+	ln -s mybox logtail
+	ln -s mybox getkey
+	ln -s mybox login
+	ln -s mybox lcdd
+	ln -s mybox iosh
+	ln -s mybox failoverd
+	ln -s mybox chkprog
+	ln -s mybox initrc
+	ln -s mybox bootdown
+	ln -s mybox basename
+	ln -s mybox sqlite
+	ln -s mybox pwd
+	ln -s mybox ping
+	ln -s mybox arpscan
+	ln -s mybox top
+	ln -s mybox ps
+	ln -s mybox clear
+	ln -s mybox reset
+	ln -s mybox uptime
+	ln -s mybox sync
+	ln -s mybox mkdir
+	ln -s mybox mkdev
+	ln -s mybox sleep
+	ln -s mybox usleep
+	ln -s mybox true
+	ln -s mybox false
+	cd $ROOT_DIR
+	ln -s bin/mybox bootup
+	cd $START_POINT
+fi
+
+
+
+cd $START_POINT
+
+cp -v $KERNEL_BASE/*.bz2 $ROOT_DIR/tmp
+
+dos2unix $START_POINT/bootscript/*
+mkdir -p $ROOT_DIR/etc/rc.sysctl
+mkdir -p $ROOT_DIR/etc/rc.start
+#cp -v $START_POINT/bootscript/rc.bootup $ROOT_DIR/sh
+#cp -v $START_POINT/bootscript/rc.init $ROOT_DIR/etc/rc.init/sh
+#cp -v $START_POINT/bootscript/rc.shutdown $ROOT_DIR/etc/rc.shutdown/sh
+cp -v $START_POINT/bootscript/rc.start $ROOT_DIR/etc/rc.start/sh
+chmod 700 $START_POINT/bootscript/rc.start $ROOT_DIR/etc/rc.start/sh
+cp -v $START_POINT/bootscript/rc.sysctl $ROOT_DIR/etc/rc.sysctl/sh
+
+#shc -r -T -f $ROOT_DIR/sh
+#mv -v $ROOT_DIR/sh.x $ROOT_DIR/sh && rm -f $ROOT_DIR/sh.x.c
+#upx-kernel --best $ROOT_DIR/sh && chmod 700 $ROOT_DIR/sh
+
+#shc -r -T -f $ROOT_DIR/etc/rc.init/sh
+#mv -v $ROOT_DIR/etc/rc.init/sh.x $ROOT_DIR/etc/rc.init/sh && rm -f $ROOT_DIR/etc/rc.init/sh.x.c
+#upx-kernel --best $ROOT_DIR/etc/rc.init/sh && chmod 700 $ROOT_DIR/etc/rc.init/sh
+
+#shc -r -T -f $ROOT_DIR/etc/rc.shutdown/sh
+#mv -v $ROOT_DIR/etc/rc.shutdown/sh.x $ROOT_DIR/etc/rc.shutdown/sh && rm -f $ROOT_DIR/etc/rc.shutdown/sh.x.c
+#upx-kernel --best $ROOT_DIR/etc/rc.shutdown/sh && chmod 700 $ROOT_DIR/etc/rc.shutdown/sh
+
+#shc -r -T -f $ROOT_DIR/etc/rc.start/sh
+#mv -v $ROOT_DIR/etc/rc.start/sh.x $ROOT_DIR/etc/rc.start/sh && rm -f $ROOT_DIR/etc/rc.start/sh.x.c
+#upx-kernel --best $ROOT_DIR/etc/rc.start/sh && chmod 700 $ROOT_DIR/etc/rc.start/sh
+
+shc -r -T -f $ROOT_DIR/etc/rc.sysctl/sh
+mv -v $ROOT_DIR/etc/rc.sysctl/sh.x $ROOT_DIR/etc/rc.sysctl/sh && rm -f $ROOT_DIR/etc/rc.sysctl/sh.x.c
+upx-kernel --best $ROOT_DIR/etc/rc.sysctl/sh && chmod 700 $ROOT_DIR/etc/rc.sysctl/sh
+
+cd $START_POINT
+sh mk_enc
+cp -av service_enc/* $ROOT_DIR/service/
+
+#cp -v $KERNEL_BASE/System.map $ROOT_DIR
+cd $START_POINT
+sh mk_modules
+
+cp -av $START_POINT/build/tools $ROOT_DIR/tmp
+cp -av $START_POINT/build/modules $ROOT_DIR/tmp
+

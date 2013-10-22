@@ -1,0 +1,344 @@
+<?
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+
+function check_login($password) {
+	global $_DB_NAME, $_SERVER;
+	$db_id=db_connect($_DB_NAME);
+	$result=db_query("select * from auth_login where name!='console' and pass=md5('$password')",$db_id);
+	$_uname='';
+	if(db_num_rows($result)!=0) {
+		//$auth_addr=getenv("REMOTE_ADDR");
+		if(isset($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+			$auth_addr=$_SERVER['HTTP_X_FORWARDED_FOR'];
+		} elseif (isset($_SERVER['HTTP_CLIENT_IP'])) {
+			$auth_addr=$_SERVER['HTTP_CLIENT_IP']; 
+		} else {
+			$auth_addr=$_SERVER['REMOTE_ADDR']; 
+		}
+		if(strstr($auth_addr,",")) {
+			list($auth_addr,)=preg_split("/,/",$auth_addr);
+			$auth_addr=trim($auth_addr);
+		}
+		while($row=db_fetch_array_assoc($result)) {
+			$_uname=$row['name'];	
+		}
+	}
+	if($_uname!='') {
+		$result=db_query("select * from misc where name='www_session'",$db_id);
+		if(db_num_rows($result)!=0) {
+			$_timeout=db_fetch_single($result);
+		}
+		if($_timeout!=0) {
+			$_session=time()+60*$_timeout;
+			$_page_check=(60 * $_timeout) * 1000; // milisecond
+		} else {
+			$_session=$_timeout;
+			$_page_check=1800000; // 1800000 milisecond = 30 minute
+		}
+		@session_start();
+		$sess=session_id();
+		$_SESSION['login']['auth_id']=$_uname;
+		$_SESSION['login']['auth_addr']=$auth_addr;
+		$_SESSION['login']['page_timeout']=$_session;
+		$_SESSION['login']['page_check']=$_page_check;
+		session_force_logout($sess,$auth_addr);
+	}
+	db_close($db_id);
+}
+
+function session_force_logout($sess,$auth_addr) {
+	$spath=session_save_path();
+	if(glob("$spath/sess_*")!=FALSE) {
+		foreach(glob("$spath/sess_*") as $fl) {
+			$fb=basename($fl);
+			if(preg_match("/sess_$sess/",$fb)) continue;
+			save_to_file("$fl.f","$auth_addr");
+		}
+	}
+}
+
+function chk_session() {
+	global $_LOGIN, $_URL_PATH;
+	@session_start();
+	$mm=md5(rand().time());
+	$sess_file=session_save_path()."/sess_".session_id();
+	$_SESSION['mfs_license_id']="$mm";
+	if(mfs_license()==-1) {
+		header("Location: $_URL_PATH/license.exh?msgid=1&h=$mm");
+		exit;
+	}
+	if(mfs_license()==-2) {
+		header("Location: $_URL_PATH/license.exh?msgid=2&h=$mm");
+		exit;
+	}
+	if(mfs_license()==-3) {
+		header("Location: $_URL_PATH/license.exh?msgid=3&h=$mm");
+		exit;
+	}
+
+	$_LOGIN['auth_id']=$_SESSION['login']['auth_id'];
+	$_LOGIN['auth_addr']=$_SESSION['login']['auth_addr'];
+	$_LOGIN['page_timeout']=$_SESSION['login']['page_timeout'];
+	$_LOGIN['page_check']=$_SESSION['login']['page_check'];
+
+	if(file_exists("$sess_file.f")) {
+		$by=trim(file_get_contents("$sess_file.f"));
+		ulog("Session force logout by $by.");
+		@session_unset();
+		@session_destroy();
+		@session_write_close();
+		@unlink("$sess_file.f");
+		header("Location: $_URL_PATH/?msgid=7&by=$by");
+		exit;
+	}
+	if($_LOGIN['page_timeout']!='' && $_LOGIN['page_timeout']!=0) {
+		if(time() >= $_LOGIN['page_timeout']) {
+			ulog("Session expired.");
+			@session_unset();
+			@session_destroy();
+			@session_write_close();
+			header("Location: $_URL_PATH/?msgid=2");
+			//write_href("$_URL_PATH/?msgid=2","self");
+			exit;
+		}
+	}
+	// if no session created, return false
+	if($_LOGIN['auth_id']=='') {
+		@session_unset();
+		@session_destroy();
+		@session_write_close();
+		index_login();
+		exit;
+	}
+}
+
+
+// clean all session variable and file.
+function do_logout() {
+	global $_DOWNLOAD_PATH;
+	$sess=session_id();
+	$filesave="tmp.$filesave.$sess";
+	exec_cmd("rm -f $_DOWNLOAD_PATH/tmp.*.$sess");
+	@session_start();
+	@session_unset();
+	@session_destroy();
+	@session_write_close();
+}
+
+function update_session($session) {
+	if($session!=0) {
+		@session_start();
+		$www_session=time()+60*$session;
+		$_SESSION['login']['page_timeout']=$www_session;
+	}
+}
+
+function write_nocache() {
+	if(!headers_sent()) { 
+       		header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
+       		header("Last-Modified: " . gmdate("D, d M Y H:i:s") . " GMT");
+       		header("Cache-Control: no-store, no-cache, must-revalidate");
+       		header("Cache-Control: post-check=0, pre-check=0",false);
+       		header("Pragma: no-cache");
+	}
+}
+
+function write_href($where,$opt) {
+	echo "<script language='javascript'>";
+	echo "$opt.location.href='$where';";
+	echo "</script>";
+	echo "<noscript><meta http-equiv='Refresh' content='0; URL=$where'></noscript>";
+	exit;
+}
+
+function write_callback($buffer) {
+	return (preg_replace("/\n|\r|\t/",'',$buffer));
+}
+
+function write_nobrk() {
+	ob_start('write_callback');
+}
+
+function chk_pri($auth,$opt) {
+	global $_ERROR;
+	if($opt==1) {
+		if($auth=='admin') return 1;
+	}
+	if($opt==2) {
+		if($auth=='admin' || $auth=='look') return 1;
+	}
+	$_ERROR='Access Restricted!';
+	return 0;
+}
+
+function index_login() {
+global $_URL_PATH, $PHP_SELF;
+extract($_GET);
+if(isset($msgid)&&$msgid!='') {
+	$msg_reply='';
+	if($msgid==1) {
+		$msg_reply="Password failed";
+	} else if($msgid==2) {
+		$msg_reply="Session timeout";
+	} else if($msgid==3) {
+		$msg_reply="Logout";
+	} else if($msgid==4) {
+		$msg_reply="Invalid login request.";
+	} else if($msgid==5) {
+		$msg_reply="The system is rebooting now.";
+	} else if($msgid==6) {
+		$msg_reply="Please wait. System shutdown.";
+	} else if($msgid==7) {
+		$msg_reply="Force logout by $by.";
+	}
+}
+if(isset($PHP_SELF)&&$PHP_SELF=="/login.exh") {
+	$msg_reply="Password incorrect.";
+	ulog($msg_reply);
+}
+
+echo <<<_END_
+<html>
+<head>
+<title>MyBox Firewall - Authorization Required</title>
+<LINK REL=StyleSheet HREF="$_URL_PATH/c/blue.css" TYPE="text/css">
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="$_URL_PATH/favicon.ico" type="image/x-icon" />
+<script language="javascript">
+	defaultStatus="Mybox Firewall - Authorization Required";
+	if(top.frames.length!=0) { top.location=self.document.location; };
+	function chk_this() {
+		if(document.f.passwd.value=='') {
+			document.f.passwd.focus();
+			return false;
+		}
+		return true;
+	}
+</script>
+</head>
+<body class=bgcolor1 oncontextmenu="return false" scroll="no" onload='document.f.passwd.focus();'>
+<br>
+<br>
+<br>
+<center>
+_END_;
+if(isset($msg_reply)&&$msg_reply!='') {
+	echo "\n<span class=notice>$msg_reply</span>\n";
+} 
+echo <<<_END_
+<br>
+<br>
+<table border=0 cellspacing=0 cellpadding=0 width=98% valign=middle>
+<tr>
+<td align=center valign=middle>
+<form method=post action="$_URL_PATH/login.exh" autocomplete=off name=f onsubmit="return chk_this();">
+<table bgcolor=#ffffff border="0" cellpadding="2" cellspacing="0" width="40%" class=block>
+<tr><td>
+<table bgcolor="#eeeeee" border="0" cellpadding="2" cellspacing="0" width="100%" class=block> 
+<tr><td bgcolor="#e7e9f2" align="center">
+<table border="0" cellspacing="6" cellpadding="6" bgcolor="ffffff" width="100%">
+<tr bgcolor="#ffffff">
+<td align="center">
+<img src="$_URL_PATH/i/login_logo.png" nosave border=0>
+<table border="0" cellpadding="4" cellspacing="0" bgcolor="#e7e9f2" class=block>
+<tr><td align="right" bgcolor="#e7e9f2" nowrap>Password:</td>
+<td class=bgcolor2><input name="passwd" type="password" size="30" maxlength="30" class=textbox></td>
+<td><input class=button type="submit" value="Login"></td>
+</tr>
+</tr>
+</table><br>
+<font>
+_END_;
+echo <<<_END_
+</font>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</td></tr></table>
+</td></tr></table>
+<span class=footnote>
+Copyright &copy; <a class=footnote href="http://www.tracenetwork.com.my" target="_blank">Tracenetwork Corporation Sdn Bhd</a>. All Rights Reserved
+</span>
+<input type=hidden name=just_login value=1>
+</form>
+</td>
+</tr>
+</table>
+</center>
+</body>
+</html>
+_END_;
+flush();
+exit;
+}
+
+function index_frame() {
+global $_LOGIN, $_URL_PATH;
+
+echo <<<_END_
+<html>
+<head>
+<title>MyBox Firewall - Logged on as {$_LOGIN['auth_id']}</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="$_URL_PATH/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="$_URL_PATH/c/blue.css" TYPE="text/css">
+<script language="javascript">
+	defaultStatus="MyBox Firewall - Logged on as {$_LOGIN['auth_id']}";
+</script>
+</head>
+<frameset rows='58,*' cols='*' framespacing='0' frameborder='0' border='0' style='border-style: solid;border-width: 0px'>
+<frame name='top_frame' src='$_URL_PATH/index_top.exh' scrolling='no' marginwidth='0' marginheight='0' noresize frameborder='no'>
+<frame name='main_frame' src='$_URL_PATH/index_main.exh' marginwidth='0' marginheight='0' noresize frameborder='no'>
+</frameset>
+<noframes>
+<body bgcolor='#FFFFFF'>
+<p>Mybox is more friendly with a <b>frames-capable</b> browser.</p>
+</body>
+</noframes>
+</html>
+_END_;
+flush();
+exit;
+}
+
+function index_about() {
+global $_LOGIN, $_URL_PATH, $_PNG;
+
+$version=trim(shell_exec("uname -v"));
+echo <<<_END_
+<html><head><title>About</title>
+<style type="text/css">
+td,textarea {font-size: 9px; font-family: verdana,tahoma; }
+body {font-size: 9px; font-family: verdana,tahoma; margin-left: 1px; margin-right: 1px; margin-top: 1px; margin-bottom: 0px; background: #ffffff; }
+but {font-size: 10px; border-width: 1px; padding-left: 6px; padding-right: 6px; padding-top: 1px; padding-bottom: 1px;}
+</style>
+<script language="javascript">
+function onTop() {setTimeout('self.focus()',1);}
+</script>
+</head>
+<body oncontextmenu="return false" scroll=no style="border-width: 0px" onblur="onTop();" onload="self.focus();">
+<table with="100%" border=0 style="table-layout: fixed;">
+<tr><td align=center>{$_PNG['tracelogo']}<br><br></tr></td>
+<tr><td align=center>
+<table border=0 cellpadding=2 cellspacing=2>
+<tr><td width="212" valign=top align=center>
+MYBOX FIREWALL SYSTEM<br>
+$version<br><br>
+&copy Tracenetwork Corporation Sdn. Bhd.
+</td>
+<td width="200" valign=top>
+For more information about Mybox Firewall System products, and technical support, please visit our website at <a href="http://www.mybox.net.my/" target=_blank>http://www.mybox.net.my/</a>
+</td></tr>
+</table>
+</td></tr>
+</table></body></html>
+_END_;
+flush();
+exit;
+}
+
+?>
+

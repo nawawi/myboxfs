@@ -1,0 +1,187 @@
+<?
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+
+function mybox_save_ips_setting() {
+	global $_DB_IPS;	
+	$db_id=mybox_db_connect($_DB_IPS);
+	$result=mybox_db_query("select sid,log,block,stat from policy_ips",$db_id);
+	$fi=@fopen("/tmp/ipsdb.tmp","w");
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_sid=$row['sid'];
+			$_log=$row['log'];
+			$_block=$row['block'];
+			$_stat=$row['stat'];
+			@fwrite($fi,"update policy_ips set log='$_log',block='$_block',stat='$_stat' where sid='$_sid';\n");
+		}
+	}
+	@fclose($fi);
+	mybox_db_close($db_id);
+}
+function mybox_load_ips_setting($db_id) {
+	if(file_exists("/tmp/ipsdb.tmp")) {
+		if($fi=fopen("/tmp/ipsdb.tmp","r")) {
+			while($buff=fgets($fi,1024)) {
+				$buff=trim($buff);
+				mybox_db_query("$buff",$db_id);
+			}
+			fclose($fi);
+		}
+		@unlink("/tmp/ipsdb.tmp");
+	}
+}
+
+function mybox_save_blacklist_setting() {
+	global $_DB_BLACKLIST;
+	$db_id=mybox_db_connect($_DB_BLACKLIST);
+	$result=mybox_db_query("select id,log,stat from policy_blacklist",$db_id);
+	$fi=@fopen("/tmp/blacklistdb.tmp","w");
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_id=$row['sid'];
+			$_log=$row['log'];
+			$_stat=$row['stat'];
+			@fwrite($fi,"update policy_blacklist set log='$_log',stat='$_stat' where id='$_id';\n");
+		}
+	}
+	@fclose($fi);
+	mybox_db_close($db_id);
+}
+function mybox_load_blacklist_setting($db_id) {
+	if(file_exists("/tmp/blacklist.tmp")) {
+		if($fi=fopen("/tmp/blacklist.tmp","r")) {
+			while($buff=fgets($fi,1024)) {
+				$buff=trim($buff);
+				mybox_db_query("$buff",$db_id);
+			}
+			fclose($fi);
+		}
+		@unlink("/tmp/blacklist.tmp");
+	}
+}
+
+function mybox_chk_update() {
+	global $_UPDATE;
+	$mm='';$mm1='';
+	if($_UPDATE['url']=='none') return;
+	if(mybox_isdomainresolves($_UPDATE['url'])) {
+		if(file_exists("/etc/updates")) {
+			$mm1=mybox_fget_contents("/etc/updates");
+		}
+		if(mybox_chkconnect('tcp',$_UPDATE['url'],80,5)!=0) {
+			$_url="http://{$_UPDATE['url']}/updates.html?chk=1";
+			$mm=mybox_fget_contents($_url);
+		} 
+		if($mm=='') $mm=$mm1;
+		file_put_contents("/etc/updates","$mm\n");
+	}
+}
+
+function mybox_update_firmware($file) {
+	if(!is_dir("/firmware")) @mkdir("/firmware",0700);
+	$dev="/dev/hda1";
+	$fs="ext3";
+	if(file_exists("/var/sys/.mount_boot")) {
+		$strg=mybox_fget_contents("/var/sys/.mount_boot");
+		list($dev,$fs)=preg_split("/:/",$strg);
+		$dev=trim($dev);$fs=trim($fs);
+	}
+	exec("mount -t $fs -o rw,noatime $dev /firmware",$out,$ret);
+	if($ret==0) {
+		if(file_exists("/firmware/myboxsys.bin")) {
+			if((rename("/firmware/myboxsys.bin","/firmware/myboxsys.bin.old")==1) &&
+			(rename("/firmware/myboxos.bin","/firmware/myboxos.bin.old")==1)) {
+				if(mybox_execq_cmd("tar -C /firmware -zxf $file")==1) {
+					rename("/firmware/myboxsys.bin.old","/firmware/myboxsys.bin");
+					rename("/firmware/myboxos.bin.old","/firmware/myboxos.bin");
+					mybox_execq_cmd("umount /firmware");
+					@unlink("$file");
+					return 1;
+				}
+				@unlink("/firmware/myboxsys.bin_fallback");
+				@rename("/firmware/myboxsys.bin.old","/firmware/myboxsys.bin_fallback");
+				@unlink("/firmware/myboxos.bin_fallback");
+				@rename("/firmware/myboxos.bin.old","/firmware/myboxos.bin_fallback");
+			} else {
+				return 1;
+			}
+		}
+		if(file_exists("/firmware/post-update.exc")) {
+			@mybox_exec_cmd("/firmware/post-update.exc");
+		}
+		if(mybox_execq_cmd("umount /firmware")==0) {
+			@rmdir("/firmware");
+		}
+		@unlink("$file");
+		file_put_contents("$_RTMP_PATH/firmware_lastupdate",time());
+		@touch("/var/sys/updates_need_reboot");
+		return 0;
+	}
+	return 1;
+}
+
+function mybox_update_ips_sig($file) {
+	global $_DB_PATH, $_DB_IPS, $_SQLITE_BINARY, $_RTMP_PATH;
+	$ret=1;
+	if(preg_match("/myboxOS\.v\S+\.ips\.(\d+)\.bin/",$file,$mm)) {
+		@mybox_save_ips_setting();
+		@rename("$_DB_PATH/$_DB_IPS","$_DB_PATH/$_DB_IPS.bak");
+		if(mybox_execq_cmd("zcat $file |$_SQLITE_BINARY $_DB_PATH/$_DB_IPS")==0) {
+			$_time=time();
+			$db_id=@mybox_db_connect($_DB_IPS);
+			@mybox_db_query("update policy_ips_info set updates='$_time' where id='1'",$db_id);
+			@mybox_load_ips_setting($db_id);
+			@mybox_db_close($db_id);
+			file_put_contents("$_RTMP_PATH/ips_lastupdate","$_time");
+			unset($db_id,$_time);
+			$ret=0;
+		} else {
+			@rename("$_DB_PATH/$_DB_IPS.bak","$_DB_PATH/$_DB_IPS");
+			$ret=1;
+		}
+	}
+	@unlink($file);
+	return $ret;
+}
+
+function mybox_update_blacklist($file) {
+	global $_DB_PATH, $_DB_BLACKLIST, $_SQLITE_BINARY, $_RTMP_PATH;
+	$ret=1;
+	if(preg_match("/blacklist\.(\d+)\.zip/",$file,$mm)) {
+		@mybox_save_blacklist_setting();
+		@rename("$_DB_PATH/$_DB_BLACKLIST","$_DB_PATH/$_DB_BLACKLIST.bak");
+		if(mybox_execq_cmd("zcat $file |$_SQLITE_BINARY $_DB_PATH/$_DB_BLACKLIST")==0) {
+			$_time=time();
+			$db_id=@mybox_db_connect($_DB_BLACKLIST);
+			@mybox_db_query("update policy_blacklist_info set updates='$_time' where id='1'",$db_id);
+			@mybox_load_blacklist_setting($db_id);
+			@mybox_db_close($db_id);
+			@file_put_contents("$_RTMP_PATH/blacklist_lastupdate","$_time");
+			unset($db_id,$_time);
+			$ret=0;
+		} else {
+			@rename("$_DB_PATH/$_DB_BLACKLIST.bak","$_DB_PATH/$_DB_BLACKLIST");
+			$ret=0;
+		}
+	}
+	@unlink($file);
+	return $ret;
+}
+
+function mybox_update_license($file) {
+	global $_LICENSE_PATH;
+	$ret=1;
+	if($file=="mfs-license.exc") {
+		@rename("$_LICENSE_PATH","$_LICENSE_PATH.bak");
+		if(copy("$file","$_LICENSE_PATH")) {
+			$ret=0;
+		} else {
+			@rename("$_LICENSE_PATH.bak","$_LICENSE_PATH");
+			$ret=1;
+		}
+	}
+	@unlink($file);
+	return $ret;
+}
+
+?>

@@ -1,0 +1,16 @@
+#!/bin/php -f
+<?
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+putenv("PATH=/bin:/service/tools:/service/init");
+
+$_app=basename($_SERVER["argv"][0]);
+$_dev=basename($_SERVER["argv"][1]);
+if($_app=="ip-up") {
+	$_mtu=mybox_fget_contents("/var/sys/pptp_mtu");
+	if($_mtu!='' && $_dev!='') {
+		mybox_exec_cmd("ifconfig $_dev mtu $_mtu");
+	}
+}
+?>

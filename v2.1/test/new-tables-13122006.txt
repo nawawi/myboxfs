@@ -1,0 +1,253 @@
+drop table auth_ad;
+create table auth_ad (
+domain varchar not null,
+ip varchar not null,
+admin varchar not null,
+pass varchar not null,
+stat int not null
+);
+INSERT INTO auth_ad VALUES('ad.tracenetwork.com.my','192.168.0.10','administrator',123456,1);
+
+drop table auth_user;
+create table auth_user (
+id integer primary key,
+name varchar not null,
+passwd varchar not null,
+stat int not null
+);
+
+INSERT INTO auth_user VALUES(1,'awie','hjlSDv4o3A==',1);
+INSERT INTO auth_user VALUES(2,'anuwa','hSpaXvks3w==',1);
+
+drop table pptp_vpn;
+create table pptp_vpn (
+listen varchar not null,
+localip varchar not null,
+ipstart varchar not null,
+ipend varchar not null,
+bcrelay varchar not null,
+mswins varchar not null,
+dnswin varchar not null,
+mtu varchar not null,
+grp varchar not null,
+usead int not null,
+stat int not null
+);
+INSERT INTO pptp_vpn VALUES('','192.168.0.100','192.168.0.245',254,'eth2','192.168.0.10 192.168.0.5','192.168.0.5','1400','',0,1);
+
+drop table service_dhcp;
+create table service_dhcp (
+stat int not null,
+dev varchar not null,
+range_start varchar not null,
+range_end varchar not null,
+default_lease varchar not null,
+max_lease varchar not null,
+deny int not null
+);
+INSERT INTO service_dhcp VALUES(1,'LAN','192.168.0.100','192.168.0.254',7200,86400,0);
+
+drop table ipscan_policy;
+create table ipscan_policy (
+stat int not null,
+dev varchar not null,
+range_start varchar not null,
+range_end varchar not null,
+default_lease varchar not null,
+max_lease varchar not null,
+netbios varchar not null,
+deny int not null
+);
+INSERT INTO service_dhcp VALUES(1,'LAN','192.168.0.100','192.168.0.254',7200,86400,'    ',0);
+
+create table ipscan_hosts (
+id integer primary key,
+ip varchar not null,
+mac varchar not null,
+host varchar not null,
+note varchar not null,
+stat int not null
+);
+
+drop table def_services;
+create table def_services (
+id integer primary key,
+name varchar not null,
+val varchar not null,
+note varchar not null,
+stat int not null
+);
+INSERT INTO def_services VALUES(0,'any','any','matches any port',1);
+INSERT INTO def_services VALUES(1,'HTTP',80,'HTTP port',1);
+INSERT INTO def_services VALUES(2,'HTTPS',443,'HTTPS port',1);
+INSERT INTO def_services VALUES(3,'FTP',21,'FTP port',1);
+INSERT INTO def_services VALUES(4,'FTP-DATA',20,'FTP-DATA port',1);
+INSERT INTO def_services VALUES(5,'SSH',22,'SSH port',1);
+INSERT INTO def_services VALUES(6,'TELNET',23,'TELNET port',1);
+INSERT INTO def_services VALUES(7,'SMTP',25,'SMTP port',1);
+INSERT INTO def_services VALUES(8,'POP3',110,'POP3 port',1);
+INSERT INTO def_services VALUES(9,'IMAP',143,'IMAP port',1);
+INSERT INTO def_services VALUES(10,'SNMP',161,'SNMP port',1);
+INSERT INTO def_services VALUES(11,'PPTP',1723,'PPTP port',1);
+INSERT INTO def_services VALUES(12,'NETBIOS','137:139','NETBIOS port',1);
+INSERT INTO def_services VALUES(13,'AD-LDAP',389,'AD-LDAP port',1);
+INSERT INTO def_services VALUES(14,'AD-AUTHENTICATION',10260,'AD-Authentication port',1);
+INSERT INTO def_services VALUES(15,'DNS',53,'DNS port',1);
+INSERT INTO def_services VALUES(16,'NTP',123,'NTP port',1);
+INSERT INTO def_services VALUES(17,'KERBEROS',88,'KERBEROS port',1);
+INSERT INTO def_services VALUES(18,'DCOM','5000:5500','DCOM port',1);
+INSERT INTO def_services VALUES(19,'MICROSOFT DS',445,'MICROSOFT DS port',1);
+INSERT INTO def_services VALUES(20,'KPASSWORD',464,'KPassword port',1);
+INSERT INTO def_services VALUES(21,'PRINTER',515,'Printer port',1);
+INSERT INTO def_services VALUES(22,'LDAP-SSL',636,'LDAP-SSL port',1);
+INSERT INTO def_services VALUES(23,'LOTUS-NOTES',1352,'Lotus-Notes port',1);
+INSERT INTO def_services VALUES(24,'MICROSOFT-SQL',1433,'Microsoft-SQL port',1);
+INSERT INTO def_services VALUES(25,'MICROSOFT-SQL-MONITOR',1434,'Microsoft-SQL-Monitor port',1);
+INSERT INTO def_services VALUES(26,'PRINTING-PORT',9100,'Printing-Port port',1);
+
+
+drop table def_networks;
+create table def_networks (
+id integer primary key,
+name varchar not null,
+val varchar not null,
+note varchar not null,
+stat int not null
+);
+INSERT INTO def_networks VALUES(0,'any','any','matches any ip/network',1);
+
+drop table def_times;
+create table def_times (
+id integer primary key,
+name varchar not null,
+val varchar not null,
+val2 varchar not null,
+val3 varchar not null,
+note varchar not null,
+stat int not null
+);
+INSERT INTO def_times VALUES(0,'any','any','','','matches any times/dates/days',1);
+
+drop table site_certificate;
+create table site_certificate (
+country varchar not null,
+state varchar not null,
+city varchar not null,
+organization varchar not null,
+section varchar not null,
+email varchar not null,
+hostname varchar not null,
+certstat int not null,
+cert varchar not null
+);
+INSERT INTO site_certificate VALUES('my','selangor d.e','p.j','tracenetwork','tracenetwork','admin@tracenetwork.com.my','192.168.0.1',0,'');
+
+drop table policy_inbound;
+create table policy_inbound (
+id int not null,
+proto varchar not null,
+srcn int not null,
+src varchar not null,
+srcp varchar not null,
+dstn int not null,
+dst varchar not null,
+dstp varchar not null,
+action varchar not null,
+usetime int not null,
+timet varchar not null,
+timeday varchar not null,
+timestart varchar not null,
+timeend varchar not null,
+log int not null,
+stat int not null,
+note varchar not null
+);
+INSERT INTO policy_inbound VALUES(3,'any',0,'any','any',0,'any','any','PASS',0,'','','','',0,1,'');
+INSERT INTO policy_inbound VALUES(2,'IPP2P',0,'any','any',0,'any','any','DROP',0,'','','','',0,1,'');
+INSERT INTO policy_inbound VALUES(1,'TCP',0,'192.168.0.22 192.168.0.23 192.168.0.24 192.168.0.25','any',0,'any','any','PASS',0,'','','','',0,1,'');
+
+drop table policy_outbound;
+create table policy_outbound (
+id int not null,
+proto varchar not null,
+srcn int not null,
+src varchar not null,
+srcp varchar not null,
+dstn int not null,
+dst varchar not null,
+dstp varchar not null,
+action varchar not null,
+usetime int not null,
+timet varchar not null,
+timeday varchar not null,
+timestart varchar not null,
+timeend varchar not null,
+log int not null,
+stat int not null,
+note varchar not null
+);
+INSERT INTO policy_outbound VALUES(3,'any',0,'any','any',0,'any','any','PASS',0,'','','','',0,1,'');
+INSERT INTO policy_outbound VALUES(2,'IPP2P',0,'any','any',0,'any','any','DROP',0,'','','','',0,1,'');
+INSERT INTO policy_outbound VALUES(1,'any',0,'192.168.0.22 192.168.0.23 192.168.0.24 192.168.0.25','any',0,'any','any','PASS',0,'','','','',0,1,'');
+
+drop table policy_dnat;
+create table policy_dnat (
+id int not null,
+proto varchar not null,
+src varchar not null,
+dst varchar not null,
+dstp varchar not null,
+fwd varchar not null,
+fwdp varchar not null,
+usetime int not null,
+timet varchar not null,
+timeday varchar not null,
+timestart varchar not null,
+timeend varchar not null,
+log int not null,
+stat int not null,
+note varchar not null
+);
+INSERT INTO policy_dnat VALUES(1,'TCP','any','WAN',222,'192.168.0.5','SSH',0,'','','','',0,1,'');
+INSERT INTO policy_dnat VALUES(2,'TCP','any','WAN','HTTP','192.168.0.4','HTTP',0,'','','','',0,0,'');
+INSERT INTO policy_dnat VALUES(3,'TCP','any','WAN','SSH','192.168.0.4','SSH',0,'','','','',0,1,'');
+INSERT INTO policy_dnat VALUES(4,'TCP','any','WAN','FTP','192.168.0.5','FTP',0,'','','','',0,1,'');
+INSERT INTO policy_dnat VALUES(5,'TCP/UDP','any','WAN','DNS','192.168.0.4','DNS',0,'','','','',0,0,'');
+INSERT INTO policy_dnat VALUES(6,'TCP','any','WAN',10000,'192.168.0.4',10000,0,'','','','',0,0,'');
+
+drop table policy_snat;
+create table policy_snat (
+id int not null,
+proto varchar not null,
+src varchar not null,
+dst varchar not null,
+dstp varchar not null,
+fwd varchar not null,
+fwdp varchar not null,
+usetime int not null,
+timet varchar not null,
+timeday varchar not null,
+timestart varchar not null,
+timeend varchar not null,
+log int not null,
+stat int not null,
+note varchar not null
+);
+
+drop table policy_netmap;
+create table policy_netmap (
+id int not null,
+type int not null,
+src varchar not null,
+dst varchar not null,
+fwd varchar not null,
+usetime int not null,
+timet varchar not null,
+timeday varchar not null,
+timestart varchar not null,
+timeend varchar not null,
+stat int not null,
+note varchar not null
+);
+
+vacuum;

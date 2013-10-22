@@ -1,0 +1,578 @@
+<?
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+mybox_chk_session();
+mybox_send_nocache();
+
+$_SYSID="system_backup";
+
+$db_id=mybox_db_connect($_DB_NAME);
+
+if(isset($winftp)&&$winftp=='2') {
+	exit;
+} elseif(isset($winftp)&&$winftp=='1')  {
+	if($fname=='' || $type=='' || $bname=='') exit;
+	include_once('ftp.exl');
+	echo "<html><head><title>MyBox Firewall</title>";
+	echo "<script language='javascript'>";
+	echo "function do_scroll() {";
+	echo "if (scrolling) { window.scroll(1,500000);}";
+	echo "window.setTimeout('do_scroll()', 100);";
+	echo "}";
+	echo "scrolling = true;";
+	echo "do_scroll();";
+	echo "</script>";
+	echo "</head><body oncontextmenu='return false' scroll=auto onfocus='scrolling=false' onblur='scrolling=true;self.focus();' style='border: 0px; background: #F0F0F0;white-space: pre; font-size: 11px;font-family: courier new, courier;table-layout: fixed;'>";
+	echo "<pre style='border: 0px; background: #F0F0F0; white-space: pre; font-size: 11px;font-family: courier new, courier; table-layout: fixed;'>";
+	mybox_backup_restore_ftp($type,$fname,$bname);
+	echo "</pre><script>scrolling=false;</script></body></html>";
+	exit;
+}
+
+if(!isset($bname)||$bname=='') $bname=0;
+if($bname==0) {
+	$_DBS=$_DB_NAME;
+	$_DBN="system";
+} elseif($bname==1) {
+	$_DBS=$_DB_IPS;
+	$_DBN="ips";
+} elseif($bname==2) {
+	$_DBS=$_DB_BLACKLIST;
+	$_DBN="blacklist";
+} else {
+	$_DBS=$_DB_NAME;
+}
+
+if($tab==1) {
+	if(mybox_chk_level($_LOGIN['auth_id'],2)==1) {
+		if(isset($do_save)&&$do_save==1) {
+			$date=date('Ymd');
+			if($filename=='') {
+				if($bname==0) {
+					$filename="system_db$date";
+				} elseif($bname==1) {
+					$filename="ips_db$date";
+				} elseif($bname==2) {
+					$filename="blacklist_db$date";
+				}
+			}
+			if(file_exists("$_DB_PATH/$_DBS")) {
+				@unlink("$_DOWNLOAD_PATH/$filename.mfs");
+				if(mybox_execq_cmd("$_SQLITE_BINARY $_DB_PATH/$_DBS .dump |gzip -9 > $_DOWNLOAD_PATH/$filename.mfs")==0) {
+					if(file_exists("$_DOWNLOAD_PATH/$filename.mfs")) {
+						if($btype=='download') {
+							$fdownload="/d/$filename.mfs";
+							mybox_auditlog("BACKUP","{$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}","download -> $filename.mfs");
+						}
+						if($btype=='localsave') {
+							if(!is_dir("$_LOCAL_SAVE_PATH/$_DBN")) @mybox_mkdirr("$_LOCAL_SAVE_PATH/$_DBN");
+							@copy("$_DOWNLOAD_PATH/$filename.mfs","$_LOCAL_SAVE_PATH/$_DBN/$filename.mfs");
+							@unlink("$_DOWNLOAD_PATH/$filename.mfs");
+							mybox_auditlog("BACKUP","{$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}","localsave -> $filename.mfs");
+							$fdownload='';
+							$msg="Localsave backup done";
+						}
+						if($btype=='ftp') {
+							if($ftpserver!='') mybox_db_query("update misc set val='$ftpserver' where name='ftp_server'",$db_id);
+							if($ftpuser!='') mybox_db_query("update misc set val='$ftpuser' where name='ftp_user'",$db_id);
+							if($ftppass!='' && substr($ftppass,0,4)!="enc:") {
+								$ftppass=mybox_str_encrypt($ftppass);
+								mybox_db_query("update misc set val='$ftppass' where name='ftp_pass'",$db_id);
+							}
+							if($ftppassive!='') mybox_db_query("update misc set val='$ftppassive' where name='ftp_passive'",$db_id);
+							$fdownload="ftp_win($tab,'$filename.mfs','$bname');";
+							mybox_auditlog("BACKUP","{$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}","ftp -> $filename.mfs");
+						}
+					}
+				}
+			}
+		}
+	} else {
+		if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+			$msg="Permission denied!.";
+			mybox_auditlog("EXECUTE","UI","BACKUP: $msg");
+		}
+	}
+}
+if($tab==2) {
+	if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+		if(isset($do_save)&&$do_save==1) {
+			if($btype=='upload') {
+				if(@move_uploaded_file("$filename","$_DOWNLOAD_PATH/$filename_name")) {
+					@copy("$_DB_PATH/$_DBS","$_DB_PATH/$_DBS".".bak");
+					@unlink("$_DB_PATH/$_DBS");
+					if(mybox_execq_cmd("zcat $_DOWNLOAD_PATH/$filename_name |$_SQLITE_BINARY $_DB_PATH/$_DBS")==0) {
+						$msg='Restore succeed';
+						mybox_auditlog("RESTORE","{$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}","Upload -> $filename_name, restore succeed.");
+						@unlink("$_DOWNLOAD_PATH/$filename_name");
+						@unlink("$_DB_PATH/$_DBS".".bak");
+					} else {
+						@copy("$_DB_PATH/$_DBS".".bak","$_DB_PATH/$_DBS");
+					}
+				}
+				if($msg=='') {
+					$msg='Restore failed';
+					mybox_auditlog("RESTORE","{$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}","Upload -> $filename_name, restore failed.");
+				}
+			}
+			if($btype=='localsave') {
+				if(file_exists("$_LOCAL_SAVE_PATH/$_DBN/$filename")) {
+					@copy("$_DB_PATH/$_DBS","$_DB_PATH/$_DBS".".bak");
+					@unlink("$_DB_PATH/$_DBS");
+					if(mybox_execq_cmd("zcat $_LOCAL_SAVE_PATH/$_DBN/$filename |$_SQLITE_BINARY $_DB_PATH/$_DBS")==0) {
+						$msg='Restore succeed';
+						mybox_auditlog("RESTORE","{$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}","Localsave -> $filename_name, restore succed.");
+						@unlink("$_DB_PATH/$_DBS".".bak");
+					} else {
+						@copy("$_DB_PATH/$_DBS".".bak","$_DB_PATH/$_DBS");
+					}
+				}
+				if($msg=='') {
+					$msg='Restore failed';
+					mybox_auditlog("RESTORE","{$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}","Localsave -> $filename_name, restore failed.");
+				}
+			}
+			if($btype=='ftp') {
+				if($ftpserver!='') mybox_db_query("update misc set val='$ftpserver' where name='ftp_server'",$db_id);
+				if($ftpuser!='') mybox_db_query("update misc set val='$ftpuser' where name='ftp_user'",$db_id);
+				if($ftppass!='' && substr($ftppass,0,4)!="enc:") {
+					$ftppass=mybox_str_encrypt($ftppass);
+					mybox_db_query("update misc set val='$ftppass' where name='ftp_pass'",$db_id);
+				}
+				$fdownload="ftp_win($tab,'$filename','$bname');";
+			}
+		}
+		if($do_id=='local_del') {
+			if(file_exists("$_LOCAL_SAVE_PATH/$_DBN/$f")) {
+				@unlink("$_LOCAL_SAVE_PATH/$_DBN/$f");
+				$msg="$f removed";
+			}
+		}
+	} else {
+		if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+			$msg="Permission denied!.";
+			mybox_auditlog("EXECUTE","UI","RESTORE: $msg");
+		}
+	}
+}
+if(!isset($tab)||$tab=='') $tab=1;
+$_bnm_array=array("System"=>"0","IPS Signature"=>"1","Blacklist DB"=>"2");
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script type='text/javascript' src="<?echo $_URL_PATH;?>/j/strings.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+</script>
+<script type='text/javascript'>
+function do_submit() {
+	<?if($tab==2) {?>
+	if(!chk_filename(document.f.filename.value)) { return false; }
+	if(!confirm("Are you sure, you want to proceed?")) { return false; }
+	<?}?>
+	if(document.f.btsave) document.f.btsave.disabled=true;
+	document.f.do_save.value='1';
+	document.f.submit();
+	return true;
+}
+function chk_filename(file) {                                                                                            
+        var m=/(\S+)\.mfs$/;                                                                                
+        if(file.match(m)==null) { error("Invalid file type '"+file+"'"); return false; }                       
+        return true;                                                                                                                
+}  
+
+function do_change(val) {
+	sname=document.f.bname.options[document.f.bname.selectedIndex].value;
+	<?if($tab==1) {?>
+		fname=document.f.filename.value;
+		self.location.href='<?echo "$_URL_PATH/system_backup.exh?tab=$tab&do_id=shift_type"?>&filename='+fname+'&btype='+val+'&bname='+sname;
+	<? } else {?>
+		self.location.href='<?echo "$_URL_PATH/system_backup.exh?tab=$tab&do_id=shift_type";?>&btype='+val+'&bname='+sname;
+	<? } ?>
+}
+function do_change1(sname) {
+	val=document.f.btype.options[document.f.btype.selectedIndex].value;
+	<?if($tab==1) {?>
+		fname=document.f.filename.value;
+		self.location.href='<?echo "$_URL_PATH/system_backup.exh?tab=$tab&do_id=shift_type"?>&filename='+fname+'&btype='+val+'&bname='+sname;
+	<? } else {?>
+		self.location.href='<?echo "$_URL_PATH/system_backup.exh?tab=$tab&do_id=shift_type";?>&btype='+val+'&bname='+sname;
+	<? } ?>
+}
+function del_local() {
+	var fname=document.f.filename.options[document.f.filename.selectedIndex].value;
+	if(fname!='') {
+		self.location.href='<?echo "$_URL_PATH/system_backup.exh?tab=$tab&do_id=local_del&btype=$btype&bname=$bname";?>&f='+fname;
+	} else {
+		error("You must select file first");
+		return false;
+	}
+}
+<?if($btype=='ftp') {?>
+function ftp_win(type,fname,bname) {
+	document.getElementById("ftpid").style.display='';
+	document.getElementById('ftpupload').src='system_backup.exh?type='+type+'&fname='+fname+'&winftp=1&bname='+bname;
+}
+<? } ?>
+</script>
+</head>
+<body scroll=auto onload="parent.left_frame.switchmenu('sub1');" scroll=auto>
+<form name=f method=post action="<?echo "$_URL_PATH/system_backup.exh";?>" enctype="multipart/form-data">
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 10px;'>
+<tr>
+<td>
+<p class="sectitle"><b>System:</b> Backup/Restore</p><br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="<?echo "$_URL_PATH/system_backup.exh?tab=1";?>" <?if($tab==1){?>class="tabact"<?}?>>Backup</a></li>
+<li><a href="<?echo "$_URL_PATH/system_backup.exh?tab=2";?>" <?if($tab==2){?>class="tabact"<?}?>>Restore</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td> 
+<br>
+
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><?if(isset($msg)&&$msg!='') {?><span id=msg class=notice><?echo "$msg";?></span><?}else{echo "<span id=msg class=notice style='display: none;'></span>";}?></td></tr>
+</table><br>
+
+<!-- tab container -->
+<?if($tab==1) {
+if($btype=='') $btype='download';
+$date=date('Ymd');
+if($bname==0) {
+	$filename="system_db$date";
+} elseif($bname==1) {
+	$filename="ips_db$date";
+} elseif($bname==2) {
+	$filename="blacklist_db$date";
+}
+
+if($btype=='ftp') {
+	$val=array();
+	$result=mybox_db_query("select * from misc where name like \"ftp_%\"",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			$_val=$row['val'];
+			$val[$_name]=$_val;
+		}
+	}
+	if($ftpserver=='') $ftpserver=$val['ftp_server'];
+	if($ftpuser=='') $ftpuser=$val['ftp_user'];
+	if($ftppass=='') {
+		$ftppass=$val['ftp_pass'];
+		$ftppass="enc:$ftppass";
+	}
+	if($ftppath=='') $ftppath=$val['ftp_path'];
+	if($ftppassive=='') $ftppassive=$val['ftp_passive'];
+}
+?>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Backup type</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<select name=btype size=1 class=valbox onchange='do_change(this.value);'>
+<?
+$_opptype[0]="download";
+$_opptype[1]="localsave";
+$_opptype[2]="ftp";
+$doftp=0;
+foreach($_opptype as $bt) {
+	if($btype==$bt) {
+		echo "<option value='$bt' selected>$bt</option>";
+		if($bt=='ftp') $doftp=1;
+	} else {
+		echo "<option value='$bt'>$bt</option>";
+	}
+}
+?>
+</select>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Backup name</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<select name=bname size=1 class=valbox onchange='do_change1(this.value);'>
+<?
+foreach($_bnm_array as $bn => $bc) {
+	if($bname==$bc) {
+		echo "<option value='$bc' selected>$bn</option>";
+	} else {
+		echo "<option value='$bc'>$bn</option>";
+	}
+}
+?>
+</select>
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdname">Save as Filename</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="filename" type="text" class="valbox" size="35" value="<?echo $filename;?>"> 
+</td>
+</tr>
+<?if($doftp==1) {?>
+<tr> 
+<td width="30%" valign="middle" class="tdname">FTP Server</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="ftpserver" type="text" class="valbox" size="35" value="<?echo $ftpserver;?>"> 
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">FTP User</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="ftpuser" type="text" class="valbox" size="35" value="<?echo $ftpuser;?>"> 
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">FTP Password</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="ftppass" type="password" class="valbox" size="35" value="<?echo $ftppass;?>"> 
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Tranfer mode</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<select name=ftp_passive size=1 class=valbox>
+<?
+foreach(array('passive on'=>'TRUE','passive off'=>'FALSE') as $ops => $opt) {
+	if($opt==$ftppassive) {
+		echo "<option value='$opt' selected>$ops</option>";
+	} else {
+		echo "<option value='$opt'>$ops</option>";
+	}
+}
+?>
+</select>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Remote path</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="ftppath" type="text" class="valbox" size="35" value="<?echo $ftppath;?>"> 
+</td>
+</tr>
+<tr id='ftpid' style='display: none;'>
+<td colspan=2 align=right style='text-align: left;'>
+<iframe id="ftpupload" src="system_backup.exh?winftp=2" scrolling="auto" frameborder="0" marginwidth='0' marginheight='0' noresize width="610" height="200" style='border-style: solid;border-width: 0px; table-layout: fixed; overflow-x: hidden;'></iframe>
+<br><br>[ <a href="#" onclick="document.getElementById('ftpid').style.display='none';">Close</a> ]
+</td>
+</tr>
+<? } //bt=ftp ?>
+</tbody>
+</table>
+<? } // tab==1 ?>
+
+<?if($tab==2) {
+if($btype=='') $btype='upload';
+$date=date('Ymd');
+if($bname==0) {
+	$filename="system_db$date.mfs";
+} elseif($bname==1) {
+	$filename="ips_db$date.mfs";
+} elseif($bname==2) {
+	$filename="blacklist_db$date.mfs";
+}
+if($btype=='ftp') {
+	$val=array();
+	$result=mybox_db_query("select * from misc where name like \"ftp_%\"",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			$_val=$row['val'];
+			$val[$_name]=$_val;
+		}
+	}
+	if($ftpserver=='') $ftpserver=$val['ftp_server'];
+	if($ftpuser=='') $ftpuser=$val['ftp_user'];
+	if($ftppass=='') {
+		$ftppass=$val['ftp_pass'];
+		$ftppass="enc:$ftppass";
+	}
+	if($ftppath=='') $ftppath=$val['ftp_path'];
+	if($ftppassive=='') $ftppassive=$val['ftp_passive'];
+}
+
+$lsave='';
+$_dirarray=mybox_dir2array("$_LOCAL_SAVE_PATH/$_DBN/*.mfs");
+if(count($_dirarray)!=0) {
+	foreach($_dirarray as $entry) {
+		$entry=basename($entry);
+		$lsave .="<option value='$entry'>- $entry</option>"; 
+	}
+
+}
+?>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Restore type</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<select name=btype size=1 class=valbox onchange='do_change(this.value);'>
+<?
+$_opptype[0]="upload";
+$_opptype[1]="localsave";
+$_opptype[2]="ftp";
+$doftp=0;
+foreach($_opptype as $bt) {
+	if($lsave=='' && $bt=='localsave') continue;
+	if($btype==$bt) {
+		echo "<option value='$bt' selected>$bt</option>";
+		if($bt=='ftp') $doftp=1;
+	} else {
+		echo "<option value='$bt'>$bt</option>";
+	}
+}
+?>
+</select>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Backup name</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<select name=bname size=1 class=valbox onchange='do_change1(this.value);'>
+<?
+foreach($_bnm_array as $bn => $bc) {
+	if($bname==$bc) {
+		echo "<option value='$bc' selected>$bn</option>";
+	} else {
+		echo "<option value='$bc'>$bn</option>";
+	}
+}
+?>
+</select>
+</td>
+</tr>
+<?if($btype=='upload') {?>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Upload file</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="filename" type="file" class="filebox" size="35"> 
+</td>
+</tr>
+<? } ?>
+<?if($btype=='localsave' && $lsave!='') {?>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Restore from File</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<select name=filename size=1 style='height: 16px; font-size: 10px;' class=valbox>
+<option value=''>select</option>
+<?
+echo "$lsave";
+?>
+</select>&nbsp;<input type=button value='Delete' class=link-button onclick='del_local();'>
+</td>
+</tr>
+<? } ?>
+<?if($doftp==1) {?>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Filename</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="filename" type="text" class="valbox" size="35" value="<?echo $filename;?>"> 
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">FTP Server</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="ftpserver" type="text" class="valbox" size="35" value="<?echo $ftpserver;?>"> 
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">FTP User</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="ftpuser" type="text" class="valbox" size="35" value="<?echo $ftpuser;?>"> 
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">FTP Password</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="ftppass" type="password" class="valbox" size="35" value="<?echo $ftppass;?>"> 
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Tranfer mode</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<select name=ftp_passive size=1 class=valbox>
+<?
+foreach(array('passive on'=>'TRUE','passive off'=>'FALSE') as $ops => $opt) {
+	if($opt==$ftppassive) {
+		echo "<option value='$opt' selected>$ops</option>";
+	} else {
+		echo "<option value='$opt'>$ops</option>";
+	}
+}
+?>
+</select>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Remote path</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="ftppath" type="text" class="valbox" size="35" value="<?echo $ftppath;?>"> 
+</td>
+</tr>
+<tr id='ftpid' style='display: none;'>
+<td colspan=2 align=right style='text-align: left;'>
+<iframe id="ftpupload" src="system_backup.exh?winftp=2" scrolling="auto" frameborder="0" marginwidth='0' marginheight='0' noresize width="610" height="200" style='border-style: solid;border-width: 0px; table-layout: fixed; overflow-x: hidden;'></iframe>
+<br>[ <a href="#" onclick="document.getElementById('ftpid').style.display='none';">Close</a> ]
+</td>
+</tr>
+<? } //bt=ftp ?>
+
+</tbody>
+</table>
+<? }//tab=2 ?>
+
+<table align=right>
+<tbody>
+<tr>
+<td><input name="btsave" value="<?if($tab==1){echo "Backup";}else{echo "Restore";}?>" type="button" class=button onclick="do_submit();"> </td>  </tr> 
+</tbody>
+</table>
+<!-- end tab container -->
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+<?if($fdownload!='') {
+	echo "<script language='javascript'>";
+	if(strpos($fdownload,"ftp")!==FALSE) {
+		echo "$fdownload";
+	} else {
+		echo "self.location.href='$fdownload';";
+	}
+	echo "</script>";
+}?>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value='<?echo $tab;?>'>
+<input type=hidden name=doftp value='<?echo $doftp;?>'>
+<input type=hidden name=dopasv value='<?echo $ftp_passive;?>'>
+<!--
+<input type=hidden name=btype value='<?echo $btype;?>'>
+<input type=hidden name=dbs value='<?echo $_DBS;?>'>
+-->
+</form>
+</body>
+</html>
+
+<?mybox_db_close($db_id); flush();?>

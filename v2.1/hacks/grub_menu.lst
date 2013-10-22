@@ -1,0 +1,14 @@
+serial --unit=0 --speed=9600 --word=8 --parity=no --stop=1
+terminal serial
+default=0
+fallback=1
+timeout=0
+hiddenmenu
+title Mybox Firewall System
+root (hd0,0)
+kernel /myboxos.bin rw root=/dev/ram0 dev_boot=/dev/hdc1:ext3 dev_swap=/dev/hdc2:swap dev_strg=/dev/hdc3:ext3 console=ttyS0,9600n8 quiet
+initrd /myboxsys.bin
+title Mybox Firewall System fallback
+root (hd0,0)
+kernel /myboxos.bin_fallback rw root=/dev/ram0 dev_boot=/dev/hdc1:ext3 dev_swap=/dev/hdc2:swap dev_strg=/dev/hdc3:ext3 console=ttyS0,9600n8 quiet
+initrd /myboxsys.bin_fallback

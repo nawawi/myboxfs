@@ -1,0 +1,345 @@
+#!/bin/php -Cq
+<?
+// misc.init - last update 30-Jun-2006
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+putenv("PATH=/bin:/service/tools:/service/init");
+if(!file_exists("/bin/hwclock") || !file_exists("/bin/date")) {
+	echo "Cannot execute misc.init. Internal error!\n";
+	mybox_slog("ERROR","Cannot execute misc.init. Internal error!");
+	exit(1);
+}
+$_QUIET=0;
+
+function init_chk_services_stat() {
+	global $_DB_NAME;
+	$_prog=array();
+	$_prog['shaper']=0;
+	$_prog['snmp']=0;
+	$_prog['ips']=0;
+	$_prog['auth_ad']=0;
+	$_prog['pptp']=0;
+	$_prog['dhcp']=0;
+	$_prog['ftp']=0;
+	$_prog['ssh']=0;
+	$db_id=mybox_db_connect($_DB_NAME);
+	
+	if(mybox_license('ITS')==1) {
+		$result=mybox_db_query("select * from htb_client",$db_id);
+		if(mybox_db_num_rows($result)==0) $_prog['shaper']=0;
+		unset($result);
+	}
+	$result=mybox_db_query("select stat from service_snmp",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		$_prog['snmp']=mybox_db_fetch_single($result);
+	}
+	unset($result);
+	if(mybox_license('IPS')==1) {
+		$result=mybox_db_query("select val from misc where name='ids_stat'",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			$_prog['ips']=mybox_db_fetch_single($result);
+		}
+		unset($result);
+	}
+	if(mybox_license('PPTP')==1) {
+		$result=mybox_db_query("select stat from pptp_vpn",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			$_prog['pptp']=mybox_db_fetch_single($result);
+		}
+		unset($result);
+	}
+	$result=mybox_db_query("select stat from service_dhcp",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		$_prog['dhcp']=mybox_db_fetch_single($result);
+	}
+	unset($result);
+	$result=mybox_db_query("select stat from service_ftp",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		$_prog['ftp']=mybox_db_fetch_single($result);
+	}
+	unset($result);
+	$result=mybox_db_query("select stat from service_ssh",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		$_prog['ssh']=mybox_db_fetch_single($result);
+	}
+	unset($result);
+	$result=mybox_db_query("select stat from auth_ad",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		$_prog['auth_ad']=mybox_db_fetch_single($result);
+	}
+	unset($result);
+	$ret='';
+	foreach($_prog as $n => $s) {
+		if($s==0) continue;
+		$ret .="$n ";
+	}
+	return $ret;
+}
+
+function set_clock_timezone() {
+	global $_DB_NAME, $_QUIET;
+
+	$db_id=mybox_db_connect($_DB_NAME);
+	$_TIMEZONE='';
+	$_TIMEUTC='';
+	$_CLOCK_OPT='-s';
+	$result=mybox_db_query("select * from misc where name like \"time_%\"",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_val=$row['val'];
+			$_name=$row['name'];
+			if($_name=='time_zone') $_TIMEZONE="$_val";
+			if($_name=='time_utc') $_TIMEUTC="$_val";
+		}
+	}
+	if($_TIMEUTC==1) $_TIMEZONE='UTC';
+	if($_TIMEZONE=='') exit(1);
+
+	$_BASE=basename($_TIMEZONE);
+	$_DIR=trim(dirname($_TIMEZONE),'.');
+
+	if($_DIR!='') $_DIR="$_DIR/";
+	$_TIMEZONE="$_DIR$_BASE.gz";
+
+	if($_TIMEUTC==1) {
+		$_CLOCK_OPT="$_CLOCK_OPT -u";
+	} else {
+		$_CLOCK_OPT="$_CLOCK_OPT -l";
+	}
+
+	if($_QUIET==0) echo "* Loading Time Setting\n";
+
+	if(file_exists("/usr/share/zoneinfo/$_TIMEZONE")) {
+		@unlink("/etc/localtime");
+		@shell_exec("zcat /usr/share/zoneinfo/$_TIMEZONE > /etc/localtime");
+		$_BASE=str_replace('_',' ',$_BASE);
+		if($_QUIET==0) echo "* Setting timezone to $_BASE\n";
+	}
+
+	mybox_exec_cmd("hwclock $_CLOCK_OPT");
+	if($_QUIET==0) {
+		$date=trim(shell_exec("date"));
+		echo "* Setting clock to $date\n";
+		mybox_slog("INFO","Setting system clock");
+	}
+	mybox_db_close($db_id);
+	return 0;
+}
+
+function set_dns_host() {
+	global $_DB_NAME, $_QUIET;
+
+	$db_id=mybox_db_connect($_DB_NAME);
+
+	$_DNS_NAME=array();
+	$_hostname='';
+
+	$_adip='';
+	$result1=mybox_db_query("select ip,stat from auth_ad where stat='1'",$db_id);
+	if(mybox_db_num_rows($result1)!=0) {
+		while($row=mybox_db_fetch_assoc($result1)) {
+			$_DNS_NAME[]=$row['ip'];
+			$_stat=$row['stat'];
+		}
+	}
+	unset($result1);
+
+	$result=mybox_db_query("select name from dns_name",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_DNS_NAME[]=$row['name'];
+		}
+	}
+	unset($result);
+	$result1=mybox_db_query("select * from misc",$db_id);
+	if(mybox_db_num_rows($result1)!=0) {
+		while($row=mybox_db_fetch_assoc($result1)) {
+			$_name=$row['name'];
+			$_val=$row['val'];
+			if($_name=="hostname") $_hostname="$_val";
+		}
+	}
+	unset($result1);
+	if($_hostname=='') $_hostname='mfs.mybox.net.my';
+
+	@unlink("/var/sys/dnslist");
+	@unlink("/var/sys/dnslist.tmp");
+	if(count($_DNS_NAME)!=0) {
+		@unlink("/var/sys/nodnslist");
+		if($fi=fopen("/etc/resolv.conf.tmp","w")) {
+			foreach($_DNS_NAME as $dns) {
+				$dns=trim($dns);
+				if($dns=='') continue;
+				$test=0;
+				if(mybox_chkconnect('tcp',"$dns","53",1)!=0) {
+					fwrite($fi,"nameserver $dns\n");
+					$test=1;
+				}
+				if($test==0) {
+					if(mybox_chkconnect('udp',"$dns","53",1)!=0) {
+						fwrite($fi,"nameserver $dns\n");
+						$test=1;
+					}
+				}
+				if($test==0) mybox_append_to_file("/var/sys/dnslist","$dns\n");
+			}
+			fclose($fi);
+			@rename("/etc/resolv.conf.tmp","/etc/resolv.conf");
+			if($_QUIET==0) {
+				echo "* Setting DNS Resolver\n";
+				mybox_slog("INFO","Setting DNS Resolver");
+			}
+		}
+	} else {
+		@touch("/var/sys/nodnslist");
+	}
+
+	if(file_exists("/proc/sys/kernel/hostname")) {
+		mybox_save_to_file("/proc/sys/kernel/hostname","$_hostname\n");
+		if($_QUIET==0) {
+			echo "* Setting Hostname: $_hostname\n";
+			mybox_slog("INFO","Setting system hostname");
+		}
+	}
+
+	if(file_exists("/etc/hosts.tmp")) @copy("/etc/hosts.tmp","/etc/hosts");
+	$result2=mybox_db_query("select * from hosts",$db_id);
+	if(mybox_db_num_rows($result2)!=0) {
+		while($row=mybox_db_fetch_assoc($result2)) {
+			$_ip=$row['ip'];
+			$_host=$row['host'];
+			mybox_append_to_file("/etc/hosts","$_ip\t\t$_host\n");
+		}
+	}
+	mybox_db_close($db_id);
+	@touch("/var/sys/dnschkrestart");
+	return 0;
+}
+
+function update_keymap($_KEYMAP) {
+	$_KEY=trim(shell_exec("find /usr/share/kbd/ -name $_KEYMAP"));
+	if(file_exists("$_KEY")) {
+		$_TMPFILE="/tmp/keymap.".time();
+		@shell_exec("cat $_KEY |gzip -d > $_TMPFILE && loadkmap < $_TMPFILE && rm -f $_TMPFILE");
+		if(!file_exists("$_TMPFILE")) return 0;
+	}
+	return 1;
+}
+
+function set_keymap($_kmap) {
+	global $_DB_NAME;
+	$_KEYMAP='';
+	$db_id=mybox_db_connect($_DB_NAME);
+	//echo "$_kmap\n";
+	if($_kmap=="load") {
+		$result=mybox_db_query("select val from misc where name='kbdmap'",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			$_KEYMAP=mybox_db_fetch_single($result);
+		}
+		mybox_db_close($db_id);
+		if($_KEYMAP=='') $_KEYMAP="us";
+		$_KEYMAP="$_KEYMAP.bmap.gz";
+		if(update_keymap($_KEYMAP)==0) {
+			$_KEYMAP=basename($_KEYMAP,".bmap.gz");
+			echo "* Setting keymap to $_KEYMAP\n";
+			return 0;
+		}
+	} elseif($_kmap=="show") {
+		if(file_exists("/usr/share/kbd/KBDLIST.TXT")) {
+			system("more /usr/share/kbd/KBDLIST.TXT");
+			return 0;
+		}
+	} else {
+		if($_kmap!="show" && $_kmap!="0" && $_kmap!='') {
+			mybox_db_query("update misc set val='$_kmap' where name='kbdmap'",$db_id);
+			mybox_db_close($db_id);
+			$_KEYMAP="$_kmap";
+			if($_KEYMAP=='') $_KEYMAP="us";
+			$_KEYMAP="$_KEYMAP.bmap.gz";
+			if(update_keymap($_KEYMAP)==0) {
+				$_KEYMAP=basename($_KEYMAP,".bmap.gz");
+				echo "* Updating keymap to $_KEYMAP\n";
+				return 0;
+			}
+		}
+	}
+	return 1;
+}
+
+function mfsrestart() {
+	global $_QUIET;
+	$time=time();
+	mybox_save_to_file("/var/sys/chkprog_wait","$time");
+	mybox_killall("mfs-query.exc");
+	sleep(1);
+	$ppid=mybox_get_progpid("mfs-query.exc");
+	if($ppid!='') mybox_killall("mfs-query.exc");
+	sleep(1);
+	@unlink("/var/sys/chkprog_wait");
+	if($_QUIET==0) {
+		echo "* Restarting mfs-query.exc agent\n";
+		mybox_slog("INFO","Starting mfs-query.exc agent");
+	}
+	return 0;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+$_firm=trim($_SERVER["argv"][2]);
+$_firm2=trim($_SERVER["argv"][3]);
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+
+switch($_SERVER["argv"][1]) {
+	case 'clock':
+		$ret=set_clock_timezone();
+		break;
+	case 'dnshost':
+		$ret=set_dns_host();
+		break;
+	case 'compresslog':
+		mybox_compress_log();
+		$ret=0;
+		break;
+	case 'queryreload':
+		$ret=mfsrestart();
+		break;
+	case 'keymap':
+		if(isset($_firm) && $_firm!='') {
+			$_kmap="$_firm";
+		} else {
+			$_kmap="load";
+		}
+		$ret=set_keymap($_kmap);
+		break;
+	case 'mybox_slog':
+		if(isset($_firm) && $_firm!='' && isset($_firm2) && $_firm2!='') {
+			mybox_slog($_firm,$_firm2);
+		} else {
+			echo "Usage: $_app mybox_slog [text]\n";
+		}
+		$ret=0;
+		break;
+	case 'staticarp':
+		@mybox_staticarp();
+		$ret=0;
+		break;
+	case 'init_chk_services_stat':
+		echo init_chk_services_stat();
+		$ret=0;
+		break;
+	default:
+		echo "Usage: $_app:\n";
+		echo "------ clock \n";
+		echo "------ dnshost \n";
+		echo "------ compresslog\n";
+		echo "------ keymap <keymap>|<show> - blank for reload current setting\n";
+		echo "------ queryreload\n";
+		echo "------ mybox_slog [WARNING|INFO|ERROR] [text]\n";
+		break;
+}
+
+flush();
+exit($ret);
+
+?>

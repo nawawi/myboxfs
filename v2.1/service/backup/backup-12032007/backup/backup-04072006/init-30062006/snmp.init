@@ -1,0 +1,141 @@
+#!/bin/php -Cq
+<?
+// snmp.init - last update 11-Oct-2005
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+
+putenv("PATH=/bin:/service/tools:/service/init");
+
+if(!file_exists("/bin/snmpd")) {
+	echo "! snmpd binary not found or cannot execute\n";
+	slog("INIT: snmpd binary not found or cannot execute");
+	exit(1);
+}
+
+$db_id=db_connect($_DB_NAME);
+$_SNMP_STAT=0;
+$_SNMP_PORT=161;
+$_SNMP_COMMUNITY='public';
+$_SNMP_LOCATION='/';
+$_SNMP_CONTACT='mfs';
+
+$result=db_query("select * from service_snmp",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_SNMP_STAT=$row['stat'];
+		$_SNMP_PORT=$row['port'];
+		$_SNMP_COMMUNITY=$row['comm'];
+		$_SNMP_LOCATION=trim(unescape_str($row['location']));
+		$_SNMP_CONTACT=trim(unescape_str($row['contact']));
+	}
+}
+db_close($db_id);
+
+function snmp_config() {
+	global $_SNMP_PORT, $_SNMP_COMMUNITY;
+	global $_SNMP_LOCATION, $_SNMP_CONTACT;
+	if(file_exists("/etc/services.lst")) {
+		@shell_exec("cat /etc/services.lst > /etc/services.tmp");
+		append_to_file("/etc/services.tmp","snmp\t\t$_SNMP_PORT/udp");
+		//@shell_exec("echo -e \"snmp\t\t$_SNMP_PORT/udp\" >> /etc/services.tmp");
+		@copy("/etc/services.tmp","/etc/services");
+		@unlink("/etc/services.tmp");
+	}
+	if($fi=fopen("/etc/snmpd.conf","w")) {
+		fwrite($fi,"rocommunity $_SNMP_COMMUNITY\n");
+		fwrite($fi,"syslocation $_SNMP_LOCATION\n");
+		fwrite($fi,"syscontact $_SNMP_CONTACT\n");
+		fclose($fi);
+	}
+	echo "* Writing SNMP config..\n";
+	slog("INIT: Writing SNMP config");
+	return 0;
+}
+
+function snmp_status() {
+	$pid=get_progpid("snmpd");
+	if($pid!='') {
+		echo "* snmpd (pid $pid) is running...\n";
+		return 0;
+	}
+	echo "* snmpd not running..\n";
+	return 1;
+}
+
+function snmp_start() {
+	global $_SNMP_STAT;
+	@snmp_config();
+	if($_SNMP_STAT==0) {
+		echo "* SNMP agent disabled\n";
+		slog("INIT: SNMP agent disabled");
+		exit(1);
+	}
+	if(@snmp_status()==1) {
+		if(exec_cmd("snmpd -l /dev/null -c /etc/snmpd.conf")==0) {
+			echo "* Starting SNMP agent\n";
+			slog("INIT: Starting SNMP agent");
+			@touch("/var/sys/chk_snmpd");
+			return 0;
+		}
+	}
+	echo "* Starting SNMP agent failed\n";
+	slog("INIT: Starting SNMP agent failed");
+	return 1;
+}
+
+function snmp_stop() {
+	if(killall("snmpd")==0) {
+		echo "* Shutting down SNMP agent\n";
+		slog("INIT: Shutting down SNMP agent");
+		@unlink("/var/sys/chk_snmpd");
+		return 0;
+	}
+	echo "* Shutting down SNMP agent failed\n";
+	slog("INIT: Shutting down SNMP agent failed");
+	return 1;
+}
+
+function snmp_active($set) {
+	global $db_id;
+	db_query("update service_snmp set stat='$set'",$db_id);
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=snmp_start();
+		break;
+	case 'stop':
+		$ret=snmp_stop();
+		break;
+	case 'restart':
+		$ret=snmp_stop();
+		sleep(2);
+		$ret=snmp_start();
+		break;
+	case 'status':
+		$ret=snmp_status();
+		break;
+	case 'config':
+		$ret=snmp_config();
+		break;
+	case 'enable':
+		snmp_active('1');
+		echo "* SNMP agent enabled.\n";
+		slog("INIT: SNMP agent enabled.");
+		$ret=0;
+		break;
+	case 'disable':
+		snmp_active('0');
+		echo "* SNMP agent disabled.\n";
+		slog("INIT: SNMP agent disabled.");
+		$ret=0;
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/status/config/{enable,disable}]\n";
+		break;
+}
+flush();
+exit($ret);
+?>

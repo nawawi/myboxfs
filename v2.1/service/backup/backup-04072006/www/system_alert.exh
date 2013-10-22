@@ -1,0 +1,531 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+chk_session();
+write_nocache();
+
+$_SYSID="system_alert";
+
+$db_id=db_connect($_DB_NAME);
+
+if($tab==1) {
+	if(chk_pri($_LOGIN['auth_id'],1)==1) {
+		if(isset($do_save)&&$do_save==1) {
+			if($stat!='') $stat=1;
+			if($stat=='') $stat=0;
+			db_query("update alert_setting set stat='$stat'",$db_id);
+			if($stat==1) {
+				if($report_logs!='') $report_logs=1;
+				if($report_logs=='') $report_logs=0;
+				if($report_strg!='') $report_strg=1;
+				if($report_strg=='') $report_strg=0;
+				if($report_mem!='') $report_mem=1;
+				if($report_mem=='') $report_mem=0;
+				if($report_sys!='') $report_sys=1;
+				if($report_sys=='') $report_sys=0;
+				if($usesmtp!='') $usesmtp=1;
+				if($usesmtp=='') $usesmtp=0;
+				$pass=trim($pass);$user=trim($user);$smtphost=trim($smtphost);$pophost=trim($pophost);
+				if($report_min!='' && $report_min < 5) {
+					$msg="Notification interval cannot below than 5 minutes"; 
+				} else {
+					if($report_title=='') $report_title="Mybox System Notification";
+					$report_title=escape_str($report_title);
+				
+					if($report_min!='') db_query("update alert_setting set report_min='$report_min'",$db_id);
+					db_query("update alert_setting set report_title='$report_title'",$db_id);
+					db_query("update alert_setting set report_logs='$report_logs'",$db_id);
+					db_query("update alert_setting set report_strg='$report_strg'",$db_id);
+					db_query("update alert_setting set report_mem='$report_mem'",$db_id);
+					db_query("update alert_setting set report_sys='$report_sys'",$db_id);
+					db_query("update alert_setting set usesmtp='$usesmtp'",$db_id);
+					if($smtphost!='') db_query("update alert_setting set smtphost='$smtphost'",$db_id);
+					if($pophost!='') db_query("update alert_setting set pophost='$pophost'",$db_id);
+					if($user!='') db_query("update alert_setting set user='$user'",$db_id);
+					if($mailfrom!='') db_query("update alert_setting set mailfrom='$mailfrom'",$db_id);
+					if($pass!='' && substr($pass,0,4)!="enc:") {
+						$pass=str_encrypt($pass);
+						db_query("update alert_setting set pass='$pass'",$db_id);
+					}
+					if($report_logs==1) {
+						$_list='';
+						if(count($report_names)!=0) {
+							foreach($report_names as $list) $_list .="$list,";
+							$_list=trim($_list,",");
+							db_query("update alert_setting set report_names='$_list'",$db_id);
+						}
+					}
+					$msg="Setting updated!.";
+					echo_query("cron-restart");
+				}
+			} else {
+				$msg="Notification Disabled!.";
+				echo_query("cron-restart");
+			} 
+		}
+	} else {
+		if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+			$msg="Permission denied!.";
+		}
+	}
+}
+if($tab==2) {
+	if(chk_pri($_LOGIN['auth_id'],1)==1) {
+		if(isset($do_save)&&$do_save==1) {
+			if(count($aid)!=0) {
+				foreach($aid as $id) {
+					$email=$aemail[$id];
+					$stat=$astat[$id];
+					$note=escape_str($anote[$id]);
+					if($stat=='') {
+						$stat=0;
+					} else {
+						$stat=1;
+					}
+					if($id!='new') {
+						db_query("update alert_email set email='$email',stat='$stat',note='$note' where id='$id'",$db_id);
+					} else {
+						$result=db_query("select * from alert_email where email='$email'",$db_id);
+						if(db_num_rows($result)==0) {
+							db_query("insert into alert_email (email,stat,note) values ('$email','$stat','$note')",$db_id);
+						} else {
+							$msg="Email Address already exist!.";
+						}
+					}
+				}
+			}
+			echo_query("cron-restart");
+		}
+		if(isset($do_save)&&$do_save==3) {
+			if(count($del)!=0) {
+				foreach($del as $id) {
+					if($id!='') db_query("delete from alert_email where id='$id'",$db_id);
+				}
+			}
+		}
+		if(isset($do_save)&&$do_save==4) {
+			if(isset($do_id)&&$do_id==del) {
+				if($id!='') db_query("delete from alert_email where id='$id'",$db_id);
+			}
+		}
+	} else {
+		if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+			$msg="Permission denied!.";
+		}
+	}
+}
+if(!isset($tab)||$tab=='') $tab=1;
+
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script language="javascript" src="<?echo $_URL_PATH;?>/j/strings.js"></script>
+<script language="javascript">
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+</script>
+<script language="javascript">
+<?if($tab==2){?>
+	function chkvalidemail() {
+		var email1='';
+		var email2='';
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='text') {
+			    	if( document.f.elements[i].name.substr( 0, 6 ) == 'aemail') {
+					email1=document.f.elements[i].value;
+					if(!check_valid_email(email1)) {
+						error("Invalid Email Address '"+email1+"'");
+						return false;
+					} 
+					if(email1=='' && email2=='') {
+						return false;
+					}
+					if(email1==email2) {
+						error("Email '"+email1+"' already exist");
+						return false;
+					}
+					email1=email2;
+    				}	
+			}
+  		}
+		return true;
+	}
+	function dotoggle() {
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					document.f.elements[i].checked = !(document.f.elements[i].checked);
+    				}	
+			}
+  		}
+	}
+	function chkdel() {
+		var x='0';
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					if(document.f.elements[i].checked) x++;
+    				}	
+			}
+  		}
+		if(x==0) return false;
+		return true;
+	}
+	function do_delete() {
+		if(chkdel()!=false) {
+			if(confirm('Are you sure you want to proceed?')) {
+				document.f.do_save.value='3';
+				document.f.submit();
+			}
+		}
+	}
+<?}?>
+function do_submit() {
+	<?if($tab==1){?>
+	if(Trim(document.f.report_min.value)=='') {
+		document.f.report_min.value='';
+		document.f.report_min.focus();
+		return false;
+	}
+	if(Trim(document.f.report_title.value)=='') {
+		document.f.report_title.value='';
+		document.f.report_title.focus();
+		return false;
+	}
+	if(Trim(document.f.mailfrom.value)=='') {
+		document.f.mailfrom.value='';
+		document.f.mailfrom.focus();
+		return false;
+	}
+	<? } ?>
+	<?if($tab==2){?>
+	if(!chkvalidemail()) {return false;}
+	<?}?>
+	document.f.btsave.disabled=true;
+	document.f.do_save.value='1';
+	document.f.submit();
+	return true;
+}
+
+</script>
+</head>
+<body onload="parent.left_frame.switchmenu('sub1');" scroll=auto>
+<form name=f method=post action="<?echo "$_URL_PATH/system_alert.exh";?>">
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 10px;'>
+<tr>
+<td>
+<p class="sectitle"><b>System:</b> Notification</p><br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="<?echo "$_URL_PATH/system_alert.exh?tab=1";?>" <?if($tab==1){?>class="tabact"<?}?>>Setting</a></li>
+<li><a href="<?echo "$_URL_PATH/system_alert.exh?tab=2";?>" <?if($tab==2){?>class="tabact"<?}?>>Receiver</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td> 
+<br>
+
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><?if(isset($msg)&&$msg!='') {?><span id=msg class=notice><?echo "$msg";?></span><?}else{echo "<span id=msg class=notice style='display: none;'></span>";}?></td></tr>
+</table><br>
+
+<!-- tab container -->
+<?if($tab==1) {
+$result=db_query("select * from alert_setting",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_stat=$row['stat'];
+		$_report_min=$row['report_min'];
+		$_report_title=$row['report_title'];
+		$_report_logs=$row['report_logs'];
+		$_report_strg=$row['report_strg'];
+		$_report_mem=$row['report_mem'];
+		$_report_sys=$row['report_sys'];
+		$_report_title=unescape_str($_report_title);
+		$_report_namess=$row['report_names'];
+		$_usesmtp=$row['usesmtp'];
+		$_smtphost=$row['smtphost'];
+		$_pophost=$row['pophost'];
+		$_user=$row['user'];
+		$_pass=$row['pass'];
+		$_pass="enc:$_pass";
+		$_from=$row['mailfrom'];
+	}
+	$_pp=preg_split("/,/",$_report_namess);
+	$_report_names=array();
+	if(count($_pp)!=0) {
+		foreach($_pp as $_p) $_report_names[$_p]=1;
+	}
+}
+?>
+<script language="javascript">
+function chkact() {
+	if(document.f.report_logs.checked==false || document.f.stat.checked==false) {
+		var act=0;
+	} else {
+		var act=1;
+	}
+
+	  for(var i = 0; i < document.f.elements.length; i++) {
+		if(document.f.elements[i].type=='checkbox') {
+		    	if( document.f.elements[i].name.substr( 0, 11 ) == 'report_name') {
+				if(act==1) {
+					document.f.elements[i].disabled=false;
+				} else {
+					document.f.elements[i].disabled=true;
+				}
+			}	
+		}
+	}
+	if(act==1) {
+		document.getElementById("sh2").style.display='';
+	} else {
+		document.getElementById("sh2").style.display='none';
+	}
+	return true;
+}
+
+function chk_set() {
+	if(document.f.stat.checked==false) {
+		document.f.report_min.disabled=true;
+		document.f.report_title.disabled=true;
+		document.f.report_logs.disabled=true;
+		document.f.report_strg.disabled=true;
+		document.f.report_mem.disabled=true;
+		document.f.report_sys.disabled=true;
+		document.f.usesmtp.disabled=true;
+		document.f.smtphost.disabled=true;
+		document.f.user.disabled=true;
+		document.f.pass.disabled=true;
+		document.f.pophost.disabled=true;
+		document.f.mailfrom.disabled=true;
+	} else {
+		document.f.report_min.disabled=false;
+		document.f.report_title.disabled=false;
+		document.f.report_logs.disabled=false;
+		document.f.report_strg.disabled=false;
+		document.f.report_mem.disabled=false;
+		document.f.report_sys.disabled=false;
+		document.f.usesmtp.disabled=false;
+		document.f.smtphost.disabled=false;
+		document.f.user.disabled=false;
+		document.f.pass.disabled=false;
+		document.f.pophost.disabled=false;
+		document.f.mailfrom.disabled=false;
+	}
+	chkact();
+	chksmtp();
+}
+function chksmtp() {
+	if(document.f.usesmtp.checked==false) {
+		document.f.smtphost.disabled=true;
+		document.f.user.disabled=true;
+		document.f.pass.disabled=true;
+		document.f.pophost.disabled=true;
+	} else {
+		document.f.smtphost.disabled=false;
+		document.f.user.disabled=false;
+		document.f.pass.disabled=false;
+		document.f.pophost.disabled=false;
+	}
+	if(document.f.usesmtp.checked==false || document.f.stat.checked==false) {
+		document.getElementById("sh1").style.display='none';
+	} else {
+		document.getElementById("sh1").style.display='';
+	}
+}
+</script>
+
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td valign="middle" class="tdname">Enable this notification</td>
+<td valign="middle" class="tdvalue"> 
+<input name="stat" type="checkbox" value='<?echo $_stat;?>' onclick='chk_set();' <?if($_stat==1) echo "checked";?>>  Enable.
+
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Notification interval</td>
+<td valign="middle" class="tdvalue"> 
+<input name="report_min" type="text" class="valbox" size="5" value="<?echo $_report_min;?>"> minutes
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Notification header</td>
+<td valign="middle" class="tdvalue"> 
+<input name="report_title" type="text" class="valbox" size="35" value="<?echo $_report_title;?>"> 
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Notification Sender</td>
+<td valign="middle" class="tdvalue"> 
+<input name="mailfrom" type="text" class="valbox" size="35" value="<?echo $_from;?>"> 
+</td>
+</tr>
+<tr> 
+<td valign="top" class="tdname">Use SMTP</td>
+<td valign="top" class="tdvalue"> 
+<input name="usesmtp" type="checkbox" value='<?echo $_usesmtp;?>' <?if($_usesmtp==1) echo "checked";?> onclick='return chksmtp();'>  Enable.
+<table class="data" width="100%" id=sh1 style='display: none;'>
+<tr>
+<td style='border-right: 0px; border-bottom: 0px;'><b>SMTP Host</b></td><td style='border-left: 0px; border-bottom: 0px;'><input name="smtphost" type="text" class="valbox" size="35" value="<?echo $_smtphost;?>"></td>
+</tr><tr>
+<td colspan=2 style='border-top: 0px;'>Host of the SMTP server to relay, like "smtp.aaa.com"<br><br></td>
+</tr><tr>
+<td style='border-right: 0px; border-bottom: 0px;'><b>SMTP User</b></td><td style='border-left: 0px; border-bottom: 0px;'><input name="user" type="text" class="valbox" size="35" value="<?echo $_user;?>"></td>
+</tr><tr>
+<td colspan=2 style='border-top: 0px;'>User name if the server requires authetication.<br><br></td>
+</tr><tr>
+<td style='border-right: 0px; border-bottom: 0px;'><b>SMTP Pass</b></td><td style='border-left: 0px; border-bottom: 0px;'><input name="pass" type="password" class="valbox" size="35" value="<?echo $_pass;?>"></td>
+</tr><tr>
+<td colspan=2 style='border-top: 0px;'>The authetication password.<br><br></td>
+</tr><tr>
+<td style='border-right: 0px; border-bottom: 0px;'><b>POP3 Host</b></td><td style='border-left: 0px; border-bottom: 0px;'><input name="pophost" type="text" class="valbox" size="35" value="<?echo $_pophost;?>"></td>
+</tr><tr>
+<td colspan=2 style='border-top: 0px;'>Set this if SMTP server requires prior POP3 authentication.<br></td>
+</tr>
+</table>
+</td>
+</tr>
+<?if(!file_exists("/var/sys/nolog")) {?>
+<tr> 
+<td valign="top" class="tdname">Send local logs summary</td>
+<td valign="top" class="tdvalue"> 
+<input name="report_logs" type="checkbox" value='<?echo $_report_logs;?>' <?if($_report_logs==1) echo "checked";?> onclick='return chkact();'>  Enable.
+<table class="data" width="100%" id=sh2 style='display: none;'>
+<tr>
+<?
+$x=1;
+foreach($_LOG_NAME as $_LIST) {
+	list($_title,$lgname)=preg_split("/\|/",$_LIST);
+	echo "<td style='border: 0px;'><input name='report_names[]' type='checkbox' value='$lgname'";
+	if($_report_names[$lgname]==1) {
+		echo "checked>&nbsp;";
+	} else {
+		echo ">&nbsp;";
+	}
+	echo "$_title</td>";
+	if($x==3) { echo "</tr><tr>"; $x=0; }
+	$x++;
+}
+?>
+</table>
+</td>
+</tr>
+<? } // nolog ?>
+<tr> 
+<td valign="middle" class="tdname">Send storage status</td>
+<td valign="middle" class="tdvalue"> 
+<input name="report_strg" type="checkbox" value='<?echo $_report_strg;?>' <?if($_report_strg==1) echo "checked";?>>  Enable.
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Send memory status</td>
+<td valign="middle" class="tdvalue"> 
+<input name="report_mem" type="checkbox" value='<?echo $_report_mem;?>' <?if($_report_mem==1) echo "checked";?>>  Enable.
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Send system status</td>
+<td valign="middle" class="tdvalue"> 
+<input name="report_sys" type="checkbox" value='<?echo $_report_sys;?>' <?if($_report_sys==1) echo "checked";?>>  Enable.
+</td>
+</tr>
+</tbody>
+</table>
+<script>chk_set();</script>
+<?}//tab==1?>
+<?if($tab==2) {?>
+<table class="data" width="100%">
+<thead class="blue"> 
+<tr>
+<td style='font-weight: bold;'>#</td> 
+<td style='font-weight: bold;'>Email Address</td>
+<td style='font-weight: bold;'>Active</td>
+<td style='font-weight: bold;'>Description</td>
+<td style='font-weight: bold;'>Opt</td>
+</tr></thead>
+<tbody>
+<?
+$x=1;
+$result=db_query("select * from alert_email",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_id=$row['id'];
+		$_email=$row['email'];
+		$_stat=$row['stat'];
+		$_note=unescape_str($row['note']);
+		if($_stat==1) { 
+			$_stat1='checked';
+		} else {
+			$_stat='';
+			$_stat1='';
+		}
+	echo "
+      <tr>
+        <td><input type=hidden name=aid[$_id] value='$_id'>$x</td>
+        <td><input type=text name=aemail[$_id] value='$_email' size=40 class='valbox'></td>
+	<td align=center><input type=checkbox name=astat[$_id] $_stat1></td>
+        <td><input type=text name=anote[$_id] value='$_note' size=30 class='valbox'></td>
+        <td valign=middle align=right style='text-align: right;'><a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='$_URL_PATH/system_alert.exh?tab=2&do_save=4&do_id=del&id=$_id';\">{$_PNG['delete']}</a><input type=checkbox name=del[$_id] value=$_id></td>
+      </tr>";
+	$x++;
+	}
+}
+	if(isset($do_id)&&$do_id==add && chk_pri($_LOGIN['auth_id'],1)==1) {
+	echo "
+      <tr>
+        <td><input type=hidden name=aid[new] value='new'>$x</td>
+        <td><input type=text name=aemail[new] value='' size=40 class='valbox'></td>
+	<td align=center><input type=checkbox name=astat[new]></td>
+        <td><input type=text name=anote[new] value='' size=30 class='valbox'></td>
+        <td></td>
+      </tr>";
+	}
+
+if($x > 1) {
+?>
+<tr>
+<td style='text-align: right;' align=right valign=top colspan=5><a href="#" onclick='do_delete();'>Delete</a> / <a href="#" onclick='dotoggle();'>Toggle</a> <?echo $_PNG['arrow_rtr'];?></td>
+</tr>
+<? } ?>
+<tr><td style='text-align: right;' align=right valign=top colspan=5><input name=btadd type="button" value="Add New" class="button-small" onclick="self.location.href='<?echo "$_URL_PATH/system_alert.exh?tab=2&id=$_id&do_id=add";?>';"></td></tr>
+
+</tbody>
+</table>
+<?}//tab==2?>
+<table align=right>
+<tbody>
+<tr>
+<td><input name="btsave" value="Save & Apply Changes" type="button" class=button onclick="do_submit();"> </td>  </tr> 
+</tbody>
+</table>
+<!-- end tab container -->
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?echo $tab;?>>
+</form>
+</body>
+</html>
+
+<?db_close($db_id); flush();?>

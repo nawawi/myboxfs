@@ -1,0 +1,47 @@
+--- sysklogd-1.4.1rh/syslogd.c.siginterrupt	2004-08-02 18:02:35.000000000 -0400
++++ sysklogd-1.4.1rh/syslogd.c	2004-12-01 13:21:34.751046000 -0500
+@@ -724,7 +724,7 @@
+ char	LocalHostName[MAXHOSTNAMELEN+1];	/* our hostname */
+ char	*LocalDomain;		/* our local domain name */
+ int	InetInuse = 0;		/* non-zero if INET sockets are being used */
+-int	finet = -1;		/* Internet datagram socket */
++int	finet= -1;		/* Internet datagram socket */
+ int	LogPort;		/* port number for INET connections */
+ int	Initialized = 0;	/* set when we have initialized ourselves */
+ int	MarkInterval = 20 * 60;	/* interval between marks in seconds */
+@@ -998,7 +998,15 @@
+ 	(void) signal(SIGALRM, domark);
+ 	(void) signal(SIGUSR1, Debug ? debug_switch : SIG_IGN);
+ 	(void) alarm(TIMERINTVL);
+-
++	
++	/* By default, signal() now specifies SA_RESTART, so system calls
++         * will NOT now return EINTR when a signal arrives during them.
++	 * This makes things like recvfrom potentially hang forever...
++	 * Hence we need to add siginterrupt calls:
++	 */
++	siginterrupt(SIGTERM,1);
++	siginterrupt(SIGALRM,1);
++	
+ 	/* Create a partial message table for all file descriptors. */
+ 	num_fds = getdtablesize();
+ 	dprintf("Allocated parts table for %d file descriptors.\n", num_fds);
+@@ -1906,6 +1914,7 @@
+ 		(void) signal(SIGTERM, SIG_DFL);
+ 		(void) alarm(0);
+ 		(void) signal(SIGALRM, endtty);
++		siginterrupt(SIGALRM,1);
+ #ifndef SYSV
+ 		(void) signal(SIGTTOU, SIG_IGN);
+ 		(void) sigsetmask(0);
+@@ -2087,8 +2096,9 @@
+ 		}
+ 	}
+ 	}
+-	(void) signal(SIGALRM, domark);
++	(void) signal(SIGALRM, domark);	
+ 	(void) alarm(TIMERINTVL);
++	siginterrupt(SIGALRM,1);
+ }
+ 
+ void debug_switch()

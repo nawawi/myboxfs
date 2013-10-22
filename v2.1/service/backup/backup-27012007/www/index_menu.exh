@@ -1,0 +1,29 @@
+<?
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+mybox_chk_session();
+mybox_send_nocache();
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+</script>
+</head>
+<frameset cols='165,*' framespacing='0' frameborder='0' border='0' style='border-style: solid;border-width: 0px'>
+<frame name='left_frame' src='<?echo $_URL_PATH;?>/index_left.exh' marginwidth='0' marginheight='0' noresize frameborder='no'>
+<frame name='right_frame' src='<?echo $_URL_PATH;?>/system_general.exh' marginwidth='0' marginheight='0' noresize frameborder='no'>
+</frameset>
+<noframes>
+<body bgcolor='#FFFFFF'>
+<p>Mybox is more friendly with a <b>frames-capable</b> browser.</p>
+</body>
+</noframes>
+</html>
+<?flush();?>

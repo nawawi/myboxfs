@@ -1,0 +1,902 @@
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once("clib.exl");
+putenv("PATH=/bin:/service/tools:/service/init");
+@chdir("/config");
+## variable setting
+$_ttype['1']="ext";
+$_ttype['2']="dmz";
+$_ttype['3']="int";
+$_sstat['0']="off";
+$_sstat['1']="on";
+$_enab['0']="disabled";
+$_enab['1']="enabled";
+
+function print_error($txt) {
+	echo "% $txt\n";
+}
+function cunescape_str($str) {
+	if($str!='') {
+		return str_replace(array('&#039;','&quot;'),array('"',"'"),$str);
+	}
+	return $str;
+}
+function cstrip_hostip($buf) {
+	$str="abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ.-";
+        $ret='';
+        $txt='';
+	for($x=0;$x < strlen($buf)+1;$x++) {
+		$txt=$buf{$x};
+               	if($txt=='') continue;
+		$cc='';$i=0;
+               	for($i=0;$i<strlen($str)+1;$i++) {
+                       	$cc=$str{$i};
+			if($cc=='') continue;
+			if($cc==$txt) {
+				$ret .="$txt";
+			}
+		}
+	}
+	return trim($ret);
+}
+
+###### cmd_ipaddr start ######
+function _cmd_ipaddr_help($no) {
+	if($no==0) {
+		$_cmd_ipaddr_help=array();
+		$_cmd_ipaddr_help["print"]="show configuration";
+		$_cmd_ipaddr_help["add"]="add new network interface";
+		$_cmd_ipaddr_help["del"]="delete network interface";
+		$_cmd_ipaddr_help["edit"]="edit network interface";
+		$_cmd_ipaddr_help["reload"]="activate configuration";
+
+		foreach($_cmd_ipaddr_help as $a => $b) {
+			printf(" %-17s\t\t%s\r\n",$a,$b);
+		}
+	}
+	if($no==1) {
+		echo " <name>.. = network interface name, result return from print option\n";
+	}
+	if($no==2) {
+		echo " name=<name> dev=<dev> ip=<ip> nmask=<mask> mtu=<mtu> type=<type> <on/off> note=<note>\n";
+		echo " --------------------------------------------------\n";
+		echo " <name> = device name\n";
+		echo " <dev> = network interface device (eth0,eth1,eth2..)\n";
+		echo " <ip> = valid ipv4 ip address\n";
+		echo " <nmask> = netmask (default: 255.255.255.0)\n";
+		echo " <mtu> = mtu value (default: 1500)\n";
+		echo " <type> = device type ext,dmz,int (default: int)\n";
+		echo " <enable/disable> = enable or disable interface (default: disable)\n";
+		echo " <note> = note\n";
+	}
+}
+
+function _cmd_ipaddr($line) {
+	global $_DB_NAME, $_CLASSIP, $_ttype, $_sstat, $_enab;
+	$db_id=db_connect($_DB_NAME);
+
+	list($cmd,$option)=preg_split("/\s+/",$line);
+
+	if($option=='') {
+		_cmd_ipaddr_help(0);
+		return;
+	}
+
+	if($option=='add') {
+		$ok=0;
+		$_name='';$_dev='';$_ip='';$_mask='255.255.255.0';$_mtu='1500';$_type='3';$_stat='0';$_note='';
+
+		$buff=" $line ";
+		if(preg_match("/\s+name=(.*?)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$val=strip_devname($val);
+				$val=strtoupper($val);
+				$test=db_query("select name from ipaddr where name='$val'",$db_id);
+				if(db_num_rows($test)!=0) {
+					print_error("interface name '$val' already exists");
+					@db_close($db_id);return;
+				}
+				$_name="$val";
+				unset($test);
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+dev=(.*?)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$test=db_query("select dev from ipaddr where dev='$val'",$db_id);
+				if(db_num_rows($test)!=0) {
+					print_error("interface device '$val' already exists");
+					@db_close($db_id);return;
+				}
+				if(!preg_match("/^eth(\d+)/",$val,$mm)) {
+					print_error("Invalid interface device '$val'");
+					@db_close($db_id);return;
+				}
+				$_dev="$val";
+				unset($test);
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+ip=(.*?)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$test=db_query("select ip from ipaddr where ip='$val'",$db_id);
+				if(db_num_rows($test)!=0) {
+					print_error("IP Address '$val' already exists");
+					@db_close($db_id);return;
+				}
+				if(!check_ipv4($val)) {
+					print_error("Invalid IP Address '$val'");
+					@db_close($db_id);return;
+				}
+				$_ip="$val";
+				unset($test);
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+nmask=(.*?)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				if(count($_CLASSIP)!=0) {
+					foreach($_CLASSIP as $_mmask) {
+						if($_mmask==$val) {
+							$_mask="$val";
+						}
+					}
+				}
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+mtu=(\d+)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$_mtu="$val";
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+type=(EXT|DMZ|INT|ext|dmz|int)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$val=strtolower($val);
+				foreach($_ttype as $tl => $tt) {
+					$tt=strtolower($tt);
+					if($tt==$val) {
+						$_type="$tl";
+					}
+				}
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+(enable|disable|ena|dis)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$val=strtolower($val);
+				foreach($_enab as $i => $b) {
+					$b=strtolower($b);
+					if($b=="$val") $_stat=$i;
+					
+				}
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+note=\"(.*?)\"\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$_note=escape_str($val);$ok++;
+			}
+		}
+		if($_note=='') {
+			if(preg_match("/\s+note=(.*?)\s+/",$buff,$mm)) {
+				$val=trim($mm[1]);
+				if($val!='') {
+					$_note=escape_str($val);$ok++;
+				}
+			}
+		}
+		if($ok!=0 && $_dev!='' && $_name!='' && $_ip!='') {
+			db_query("insert into ipaddr (name,dev,ip,mask,mtu,type,onboot,note) values ('$_name','$_dev','$_ip','$_mask','$_mtu','$_type','$_stat','$_note')",$db_id);
+			@db_close($db_id);
+		} else {
+			_cmd_ipaddr_help(2);return;
+		}
+		return;
+	} elseif($option=='edit') {
+		$ok=0;
+		$_name='';$opt='';
+
+		$buff=" $line ";
+		if(preg_match("/\s+name=(.*?)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$val=strip_devname($val);
+				$val=strtoupper($val);
+				$test=db_query("select name from ipaddr where name='$val'",$db_id);
+				if(db_num_rows($test)==0) {
+					print_error("interface name '$val' not exists");
+					@db_close($db_id);return;
+				}
+				$_name="$val";
+				unset($test);
+				$ok++;
+			}
+		}
+		if($_name=='') {
+			_cmd_ipaddr_help(2);return;
+		}
+		if(preg_match("/\s+dev=(.*?)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$test=db_query("select dev from ipaddr where dev='$val'",$db_id);
+				if(db_num_rows($test)!=0) {
+					print_error("interface device '$val' already exists");
+					@db_close($db_id);return;
+				}
+				if(!preg_match("/^eth(\d+)/",$val,$mm)) {
+					print_error("Invalid interface device '$val'");
+					@db_close($db_id);return;
+				}
+				$_opt .="dev='$val',";
+				unset($test);
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+ip=(.*?)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$test=db_query("select ip from ipaddr where ip='$val'",$db_id);
+				if(db_num_rows($test)!=0) {
+					print_error("IP Address '$val' already exists");
+					@db_close($db_id);return;
+				}
+				if(!check_ipv4($val)) {
+					print_error("Invalid IP Address '$val'");
+					@db_close($db_id);return;
+				}
+				$_opt .="ip='$val',";
+				unset($test);
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+nmask=(.*?)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				if(count($_CLASSIP)!=0) {
+					foreach($_CLASSIP as $_mmask) {
+						if($_mmask==$val) {
+							$_mask="$val";
+						}
+					}
+				}
+				$_opt .="nmask='$val',";
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+mtu=(\d+)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$_opt .="mtu='$val',";
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+type=(EXT|DMZ|INT|ext|dmz|int)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$val=strtolower($val);
+				foreach($_ttype as $tl => $tt) {
+					$tt=strtolower($tt);
+					if($tt==$val) {
+						$_type="$tl";
+					}
+				}
+				$_opt .="type='$val',";
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+(enable|disable|ena|dis)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$val=strtolower($val);
+				foreach($_enab as $i => $b) {
+					$b=strtolower($b);
+					if($b=="$val") $_opt .="onboot='$i',";
+					
+				}
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+note=\"(.*?)\"\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$_note=escape_str($val);$ok++;
+				$_opt .="note='$_note',";
+			}
+		}
+		if($_note=='') {
+			if(preg_match("/\s+note=(.*?)\s+/",$buff,$mm)) {
+				$val=trim($mm[1]);
+				if($val!='') {
+					$_note=escape_str($val);$ok++;
+					$_opt .="note='$_note',";
+				}
+			}
+		}
+		$_opt=trim($_opt,',');
+		if($ok!=0 && $_opt!='') {
+			db_query("update ipaddr set $_opt where name='$_name'",$db_id);
+			@db_close($db_id);
+		} else {
+			_cmd_ipaddr_help(2);return;
+		}
+		return;
+	} elseif($option=='del') {
+		$line=trim($line);
+		if(preg_match("/^$cmd\s+$option\s+(.*)/",$line,$nn)) {
+			if($nn[1]!='') {
+				$nm=preg_split("/\s+/",$nn[1]);
+				if(count($nm)!=0) {
+					foreach($nm as $ln) {
+						$ln=strtoupper($ln);
+						if($ln=='WAN' || $ln=='LAN' || $ln=='DMZ') continue;
+						db_query("delete from ipaddr where name='$ln'",$db_id);
+					}
+					@db_close($db_id);
+				}
+			}
+		} else {
+			_cmd_ipaddr_help(1);return;
+		}
+		return;
+	} elseif($option=='print') {
+		list($cmd,$option,$start,$end)=preg_split("/\s+/",$line);
+		if($start=='') $start=0;
+		if($end=='') $end=50;
+		$_int=if_dev_up_array();
+		$_opr['0']="ERR";
+		$_opr['1']="OK";
+		$_cnt=1;$_tac=0;
+		$result=db_query("select * from ipaddr limit $start, $end",$db_id);
+		if(db_num_rows($result)!=0) {
+			while($row=db_fetch_array_assoc($result)) {
+				$_id=$row['id'];
+				$_name=strtoupper($row['name']);
+				$_dev=$row['dev'];
+				$_ip=$row['ip'];
+				$_mask=$row['mask'];
+				$_mtu=$row['mtu'];
+				$_type=$row['type'];
+				$_onboot=$row['onboot'];
+				$_note=cunescape_str($row['note']);
+				$_stat='';
+				$_oper=0;
+				if($_int[$_dev]==1) {
+					$_oper=1;
+				}
+				$_stat=$_enab[$_onboot];
+				if($_note!='') $_note="note=\"$_note\"";
+				$buff="name=$_name dev=$_dev ip=$_ip nmask=$_mask mtu=$_mtu type={$_ttype[$_type]} $_note $_stat [{$_opr[$_oper]}]";
+				$buff=preg_replace("/\s+/"," ",$buff);
+				echo "$buff\n";
+			}
+		}
+		@db_close($db_id);
+		return;
+	} elseif($option=='printv') {
+		$_int=if_dev_up_array();
+		if(count($_int)!=0) {
+			foreach($_int as $inn => $iin) {
+				system("/bin/ifconfig $inn");
+			}
+		}
+		return;
+	} elseif($option=='reload') {
+		echo "%% Reloading configuration..\n";
+		exec_cmd("/service/init/network.init restart");
+		return;
+	} elseif($option=='?' || $option=='help') {
+		_cmd_ipaddr_help(0);
+		return;
+	}
+	print_error("$option: command not found");
+	@db_close($db_id);
+}
+
+###### cmd_ipaddr end ######
+
+###### cmd_acl start ######
+function _cmd_acl_help($no) {
+	if($no==0) {
+		$_cmd_acl_help=array();
+		$_cmd_acl_help["print"]="show configuration";
+		$_cmd_acl_help["add"]="add new accesslist ip";
+		$_cmd_acl_help["del"]="delete accesslist ip";
+		$_cmd_acl_help["passwd"]="access password";
+		$_cmd_acl_help["reload"]="activate configuration";
+		
+		foreach($_cmd_acl_help as $a => $b) {
+			printf(" %-17s\t\t%s\r\n",$a,$b);
+		}
+
+	}
+	if($no==1) {
+		echo " ip=<ip> https=<on/of> ssh=<on/of> ftp=<on/off> note=<note> <enable/disable>\n";
+		echo " ip=<ip> all=<on/off> note=<note> <enable/disable>\n";
+	}
+	if($no==2) {
+		echo " <ip> = accesslist ip\n";
+	}
+	if($no==3) {
+		echo " type=<admin|look|console|ssh> passwd=<password>\n";
+	}
+}
+
+function _cmd_acl($line) {
+	global $_DB_NAME, $_sstat, $_enab;
+	$db_id=db_connect($_DB_NAME);
+
+	list($cmd,$option)=preg_split("/\s+/",$line);
+
+	if($option=='') {
+		_cmd_acl_help(0);
+		return;
+	}
+
+	if($option=='add') {
+		$ok=0;
+		$_ip='';$_https=0;$_ssh=0;$_stat='0';$_ftp='0';$_note='';
+
+		$buff=" $line ";
+		if(preg_match("/\s+ip=(.*?)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$test=db_query("select ip from accesslist where ip='$val'",$db_id);
+				if(db_num_rows($test)!=0) {
+					print_error("IP Address '$val' already exists");
+					@db_close($db_id);return;
+				}
+				if(!check_ipv4($val)) {
+					print_error("Invalid IP Address '$val'");
+					@db_close($db_id);return;
+				}
+				$_ip="$val";
+				unset($test);
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+https=(on|off|On|Off|ON|OFF)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$val=strtolower($val);
+				foreach($_sstat as $i => $b) {
+					$b=strtolower($b);
+					if($b=="$val") $_https=$i;
+					
+				}
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+ssh=(on|off|On|Off|ON|OFF)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$val=strtolower($val);
+				foreach($_sstat as $i => $b) {
+					$b=strtolower($b);
+					if($b=="$val") $_ssh=$i;
+					
+				}
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+ftp=(on|off|On|Off|ON|OFF)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$val=strtolower($val);
+				foreach($_sstat as $i => $b) {
+					$b=strtolower($b);
+					if($b=="$val") $_ftp=$i;
+					
+				}
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+all=(on|off|On|Off|ON|OFF)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$val=strtolower($val);
+				foreach($_sstat as $i => $b) {
+					$b=strtolower($b);
+					if($b=="$val") {
+						$_https=$i;$_ssh=$i;$_ftp=$i;
+					}
+				}
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+(enable|disable|ena|dis)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$val=strtolower($val);
+				foreach($_enab as $i => $b) {
+					$b=strtolower($b);
+					if($b=="$val") $_stat=$i;
+					
+				}
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+note=\"(.*?)\"\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$_note=escape_str($val);$ok++;
+			}
+		}
+		if($_note=='') {
+			if(preg_match("/\s+note=(.*?)\s+/",$buff,$mm)) {
+				$val=trim($mm[1]);
+				if($val!='') {
+					$_note=escape_str($val);$ok++;
+				}
+			}
+		}
+		if($ok!=0 && $_ip!='') {
+			db_query("insert into accesslist (ip,ssh,https,ftp,stat,note) values ('$_ip','$_ssh','$_https','$_ftp','$_stat','$_note')",$db_id);
+			@db_close($db_id);
+		} else {
+			_cmd_acl_help(1);return;
+		}
+		return;
+	} elseif($option=='print') {
+		$result=db_query("select * from accesslist",$db_id);
+		if(db_num_rows($result)!=0) {
+			while($row=db_fetch_array_assoc($result)) {
+				$_id=$row['id'];
+				$_ip=$row['ip'];
+				$_ssh=$row['ssh'];
+				$_https=$row['https'];
+				$_ftp=$row['ftp'];
+				$_stat=$row['stat'];
+				$_note=cunescape_str($row['note']);
+				$_stat=$_enab[$_stat];
+				$_https=$_sstat[$_https];
+				$_ftp=$_sstat[$_ftp];
+				$_ssh=$_sstat[$_ssh];
+				if($_note!='') $_note="note=\"$_note\"";
+				$buff="ip=$_ip https=$_https ssh=$_ssh ftp=$_ftp $_note $_stat";
+				$buff=preg_replace("/\s+/"," ",$buff);
+				echo "$buff\n";
+			}
+		}
+		@db_close($db_id);
+		return;
+	} elseif($option=='passwd') {
+		$ok=0;
+		$ptype='';
+
+		$buff=" $line ";
+		if(preg_match("/\s+type=(admin|look|console|ssh)\s+passwd=(.*?)\s+/",$buff,$mm)) {
+			$ptype=trim($mm[1]);
+			$pass=trim($mm[2]);
+			if($ptype!='' && $pass!='') {
+				$ptype=strtolower($ptype);
+				$_ssh_pass='';
+				$_ssh_pass2=crypt($pass,$pass);
+
+				$result=db_query("select pass from service_ssh",$db_id);
+				if(db_num_rows($result)!=0) {
+					$_ssh_pass=db_fetch_single($result);
+				}
+
+				if($ptype=='admin') {
+					$result=db_query("select * from auth_login where pass=md5('$pass') and name!='admin'",$db_id);
+					if(db_num_rows($result)==0 && $_ssh_pass!=$_ssh_pass2) {
+						db_query("update auth_login set pass=md5('$pass') where name='admin'",$db_id);$ok++;
+					}		
+				}
+				if($ptype=='look') {
+					$result=db_query("select * from auth_login where pass=md5('$pass') and name!='look'",$db_id);
+					if(db_num_rows($result)==0 && $_ssh_pass!=$_ssh_pass2) {
+						db_query("update auth_login set pass=md5('$pass') where name='look'",$db_id);$ok++;
+					}
+				}
+				if($ptype=='console') {
+					$result=db_query("select * from auth_login where pass=md5('$pass') and name!='console'",$db_id);
+					if(db_num_rows($result)==0 && $_ssh_pass!=$_ssh_pass2) {
+						db_query("update auth_login set pass=md5('$pass') where name='console'",$db_id);$ok++;
+					}
+				}
+				if($ptype=='ssh') {
+					$result=db_query("select pass from auth_login where pass=md5('$pass')",$db_id);
+					if(db_num_rows($result)==0) {
+						db_query("update service_ssh set pass=php('crypt','$pass','$passwd1')",$db_id);$ok++;
+						echo_query("ssh-passwd");
+					}
+				}
+				if($ok!=0) {
+					@db_close($db_id);return;
+				} else {
+					print_error("Password already used!.");
+					@db_close($db_id);return;
+				}
+			} else {
+				@db_close($db_id);
+				_cmd_acl_help(3);return;
+			}
+		} else {
+			_cmd_acl_help(3);return;
+		}
+	} elseif($option=='del') {
+		$line=trim($line);
+		if(preg_match("/^$cmd\s+$option\s+(.*)/",$line,$nn)) {
+			if($nn[1]!='') {
+				$nm=preg_split("/\s+/",$nn[1]);
+				if(count($nm)!=0) {
+					foreach($nm as $ln) {
+						db_query("delete from accesslist where ip='$ln'",$db_id);
+					}
+					@db_close($db_id);
+				}
+			}
+		} else {
+			_cmd_acl_help(2);return;
+		}
+		return;
+	} elseif($option=='reload') {
+		echo "%% Reloading configuration..\n";
+		exec_cmd("/service/init/policy.init restart");
+		return;
+	} elseif($option=='?' || $option=='help') {
+		_cmd_acl_help(0);
+		return;
+	}
+	print_error("$option: command not found");
+	@db_close($db_id);
+}
+
+###### cmd_acl end ######
+
+###### cmd_print start ######
+
+function _cmd_print($line) {
+	$_cmd_print_help=array();
+	$_cmd_print_help["date"]="Show system date";
+	$_cmd_print_help["dir"]="Directory listing";
+	$_cmd_print_help["diskfree"]="Display storage status";
+	$_cmd_print_help["memory"]="Display memory status";
+
+	list($cmd,$option)=preg_split("/\s+/",$line);
+	if($option=='date') {
+		system("/bin/date 2>/dev/null");
+		return;
+	} elseif($option=='diskfree') {
+		system("/bin/df -kh 2>/dev/null");
+		return;
+	} elseif($option=='memory') {
+		system("/bin/cat /proc/meminfo 2>/dev/null");
+		return;
+	} elseif($option=='dir') {
+		passthru("/bin/ls -lash . * 2>/dev/null |grep -v .ash_history |grep -v .sqlite_history |grep -v .ssh");
+	} else {
+		foreach($_cmd_print_help as $a => $b) {
+			printf(" %-17s\t\t%s\r\n",$a,$b);
+		}
+		return;
+	}
+}
+
+###### cmd_print end ######
+
+###### cmd_exec start ######
+function _cmd_ping($line) {
+	list($mcmd,$cmd,$option,$c)=preg_split("/\s+/",$line);
+	$cnt="-c 5";
+	if($c!='' && preg_match("/^(\d+)$/",$c)) $cnt="-c $c";
+	if($option!='') {
+		$ret=cstrip_hostip($option);
+		if($ret!='') {
+			passthru("/bin/ping $cnt $ret");
+		} else {
+			print_error("Invalid options");return;
+		}
+	} else {
+		echo " <ip/host> [cnt] \n";
+		return;
+	}
+	
+}
+
+function _cmd_telnet($line) {
+	list($mcmd,$cmd,$option,$p)=preg_split("/\s+/",$line);
+	$port='';
+	if($p!='' && preg_match("/^(\d+)$/",$p)) $port="$p";
+	if($option!='') {
+		$ret=cstrip_hostip($option);
+		if($ret!='') {
+			passthru("/bin/telnet $ret $port");
+		} else {
+			print_error("Invalid options");return;
+		}
+	} else {
+		echo " <ip/host> [port] \n";
+		return;
+	}	
+}
+
+function _cmd_ssh($line) {
+	list($mcmd,$cmd,$option,$u,$p)=preg_split("/\s+/",$line);
+	$port='';
+	$user='';
+	if($p!='' && preg_match("/^(\d+)$/",$p)) $port="-p $p";
+	if($u!='') $user="$u";
+	if($option!='') {
+		$ret=cstrip_hostip($option);
+		if($ret!='' && $user!='') {
+			passthru("/bin/ssh -l $user $ret $port");
+		} else {
+			print_error("Invalid options");return;
+		}
+	} else {
+		echo " <ip/host> <user> [port]\n";
+		return;
+	}	
+}
+
+function _cmd_scp_get($line) {
+	list($mcmd,$cmd,$option,$u,$f,$p)=preg_split("/\s+/",$line);
+	$port='';
+	$user='';
+	$file='';
+	if($p!='' && preg_match("/^(\d+)$/",$p)) $port="-P $p";
+	if($u!='') $user="$u";
+	if($f!='') $file="$f";
+	if($option!='') {
+		$ret=cstrip_hostip($option);
+		if($ret!='' && $user!='' && $file!='') {
+			passthru("/bin/scp $port -rp $user@$ret:$file .");
+		} else {
+			print_error("Invalid options");return;
+		}
+	} else {
+		echo " <ip/host> <user> [port] <file>\n";
+		return;
+	}	
+}
+
+function _cmd_scp_put($line) {
+	list($mcmd,$cmd,$option,$u,$f,$d,$p)=preg_split("/\s+/",$line);
+	$port='';
+	$user='';
+	$file='';
+	$dest='';
+	if($p!='' && preg_match("/^(\d+)$/",$p)) $port="-P $p";
+	if($u!='') $user="$u";
+	if($f!='' && file_exists("/config/$f")) $file="$f";
+	if($d!='') $dest="$d";
+	if($option!='') {
+		$ret=cstrip_hostip($option);
+		if($ret!='' && $user!='' && $file!='') {
+			passthru("/bin/scp $port -rp /config/$file $user@$ret:$dest");
+		} else {
+			print_error("Invalid host/ip/user/file");return;
+		}
+	} else {
+		echo " <ip/host> <user> <source_file> <dest_file> [port]\n";
+		return;
+	}	
+}
+
+function _cmd_vi($line) {
+	list($mcmd,$cmd,$option)=preg_split("/\s+/",$line);
+	if($option!='') {
+		$option=basename($option);
+		if(file_exists("/config/$option")) {
+			passthru("/bin/vi $option");
+		} else {
+			print_error("Invalid file or file not exist");return;
+		}
+	} else {
+		echo " <file>\n";
+		return;
+	}	
+}
+
+function _cmd_ftp($opt,$line) {
+	list($mcmd,$cmd,$option,$u,$pa,$f1,$po)=preg_split("/\s+/",$line);
+	$port='';
+	if($po!='' && preg_match("/^(\d+)$/",$po)) $port="-P $po";
+	if($option!='') {
+		$ret=cstrip_hostip($option);
+		if($ret!='' && $u!='' && $pa!='' && $f1!='') {
+			if($opt==1) passthru("/bin/ftpput -v -u $u -p $pa $option $f1 $f1 $port");
+			if($opt==2) passthru("/bin/ftpget -v -u $u -p $pa $option $f1 $f1 $port");
+		} else {
+			print_error("Invalid options");return;
+		}
+	} else {
+		if($opt==1) echo " <ip/host> <user> <password> <local-file> [port]\n";
+		if($opt==2) echo " <ip/host> <user> <password> <remote-file> [port]\n";
+		return;
+	}	
+}
+
+function _cmd_del($line) {
+	list($mcmd,$cmd,$option)=preg_split("/\s+/",$line);
+	if($option!='') {
+		passthru("/bin/rm -rf /config/$option");
+	} else {
+		echo " <file>/<dir>\n";
+		return;
+	}	
+}
+
+function _cmd_exec($line) {
+	$_cmd_exec_help=array();
+	$_cmd_exec_help["ping"]="send ICMP ping";
+	$_cmd_exec_help["telnet"]="TELNET user interface";
+	$_cmd_exec_help["ssh"]="SSH user interface";
+	$_cmd_exec_help["scpget"]="Retrieve a remote file via SCP";
+	$_cmd_exec_help["scpput"]="Store a local file on a remote machine via SCP";
+	$_cmd_exec_help["ftpget"]="Retrieve a remote file via FTP";
+	$_cmd_exec_help["ftpput"]="Store a local file on a remote machine via FTP";
+	$_cmd_exec_help["vi"]="File editor";
+	$_cmd_exec_help["del"]="Delete file/directory";
+	list($cmd,$option)=preg_split("/\s+/",$line);
+	if($option=='telnet') {
+		_cmd_telnet($line);return;
+	} elseif($option=='ping') {
+		_cmd_ping($line);return;
+	} elseif($option=='ssh') {
+		_cmd_ssh($line);return;
+	} elseif($option=='scpget') {
+		_cmd_scp_get($line);return;
+	} elseif($option=='scpput') {
+		_cmd_scp_put($line);return;
+	} elseif($option=='vi') {
+		_cmd_vi($line);return;
+	} elseif($option=='ftpput') {
+		_cmd_ftp('1',$line);return;
+	} elseif($option=='ftpget') {
+		_cmd_ftp('2',$line);return;
+	} elseif($option=='del') {
+		_cmd_del($line);return;
+	} else {
+		foreach($_cmd_exec_help as $a => $b) {
+			printf(" %-17s\t\t%s\r\n",$a,$b);
+		}
+		return;
+	}
+}
+
+###### cmd_exec end ######
+
+function cmd_processor($line) {
+	list($cmd,$option)=preg_split("/\s+/",$line);
+        switch(strtolower($cmd)) {
+                case '?':case 'help':  
+			_cmd_help();
+			break;
+                case 'ipaddr': 
+			_cmd_ipaddr($line);
+			break;
+                case 'acl': 
+			_cmd_acl($line);
+			break;
+                case 'exec': 
+			_cmd_exec($line);
+			break;
+		case 'print':
+			_cmd_print($line);
+			break;
+		default:
+			print_error("$cmd: command not found");
+			break;
+        }
+
+}
+
+if(isset($_SERVER["argv"][1]) && $_SERVER["argv"][1]!='') {
+	$buff=trim($_SERVER["argv"][1]);
+	cmd_processor($buff);
+}
+exit(0);
+?>

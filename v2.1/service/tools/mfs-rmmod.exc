@@ -1,0 +1,43 @@
+#!/bin/php -f
+<?
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once("clib.exl");
+putenv("PATH=/bin:/service/tools:/service/init");
+
+$_fignore['ip_queue']=1;
+$_fignore['parport']=1;
+$_fignore['parport_pc']=1;
+$_fignore['parport_serial']=1;
+
+if(file_exists("/proc/modules")) {
+	$_nic=array();
+	if(file_exists("/lib/modules/drivers.txt")) {
+		$buff=file("/lib/modules/drivers.txt");
+		if(count($buff)!=0) {
+			foreach($buff as $line) {
+				$line=trim($line);
+				if(strpos($line,"kernel/drivers/net")===FALSE) continue;
+				$line=basename($line);
+				$line=basename($line,".ko");
+				$_nic[$line]=1;
+			}
+		}
+	}
+	unset($buff,$line);
+	$buff=file("/proc/modules");
+	if(count($buff)!=0) {
+		foreach($buff as $line) {
+			$line=trim($line);
+			list($mods,$p1,$p2,$tmp)=preg_split("/\s+/",$line);
+			if($p2!=0) continue;
+			if($_fignore[$mods]==1) continue;
+			if($_nic[$mods]==1) continue;
+			mybox_exec_cmd("modprobe --remove $mods");
+		}
+	}
+	unset($buff,$line);
+}
+
+?>

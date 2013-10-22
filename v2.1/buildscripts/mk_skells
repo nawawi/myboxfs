@@ -1,0 +1,56 @@
+#!/bin/bash -e 
+
+START_POINT=$(pwd)
+
+SYS_DIR="
+ramd dev proc tmp bin lib etc service/tools strg \
+service/www var/spool/cron/crontabs \
+var/spool/mqueue var/sys var/run var/log sys"
+
+TERMLIST="
+/usr/share/terminfo/x/xterm
+/usr/share/terminfo/l/linux
+/usr/share/terminfo/v/vt100
+/usr/share/terminfo/d/dumb
+/usr/share/rrdtool/fonts/DejaVuSansMono-Roman.ttf
+"
+
+rm -rfv $START_POINT/skells
+
+for f in $SYS_DIR; do
+	mkdir -pv $START_POINT/skells/$f
+done
+
+for l in $TERMLIST; do
+        lb=$(dirname $l)
+        mkdir -vp $START_POINT/skells/$lb
+        cp -v $l $START_POINT/skells/$lb
+done
+
+cp -av /usr/share/tabset $START_POINT/skells/usr/share
+
+#chmod 700 *
+#cd $START_POINT/etc
+#chmod -R 600 *
+#cd ..
+touch $START_POINT/skells/var/sys/mfsque
+chmod 600 $START_POINT/skells/var/sys/mfsque
+mkfifo $START_POINT/skells/var/log/kernel -m 600
+mkfifo $START_POINT/skells/var/log/system -m 600
+
+MAKEDEV -d $START_POINT/skells/dev -x console
+MAKEDEV -d $START_POINT/skells/dev -x ram0
+MAKEDEV -d $START_POINT/skells/dev -x null
+MAKEDEV -d $START_POINT/skells/dev -x "ttyS0"
+
+#mknod $START_POINT/skells/dev/console c 5 1
+#mknod $START_POINT/skells/dev/ram0 b 1 0
+#mknod $START_POINT/skells/dev/null c 1 3
+
+cd $START_POINT
+#ln -s /etc/profile $START_POINT/.bashrc
+touch $START_POINT/skells/etc/mtab
+cp -av $START_POINT/configs/etc $START_POINT/skells/
+cd $START_POINT/skells/etc
+rm -f mtab
+ln -s ../proc/mounts mtab

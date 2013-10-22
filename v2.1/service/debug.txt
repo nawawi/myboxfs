@@ -1,0 +1,7 @@
+Sep 27 16:07:43 fw1 vsftpd: Wed Sep 27 16:07:43 2006 [pid 5695] CONNECT: Client "192.168.0.5"
+Sep 27 16:07:48 fw1 vsftpd: Wed Sep 27 16:07:48 2006 [pid 5694] [mfs] OK LOGIN: Client "192.168.0.5"
+Sep 27 16:08:00 fw1 dropbear[5731]: Child connection from 192.168.0.22:3258
+Sep 27 16:08:01 fw1 dropbear[5731]: password auth succeeded for 'mfs' from 192.168.0.22:3258
+Sep 27 16:08:46 fw1 vsftpd: Wed Sep 27 16:08:46 2006 [pid 5844] CONNECT: Client "192.168.0.5"
+Sep 27 16:08:49 fw1 vsftpd: Wed Sep 27 16:08:49 2006 [pid 5843] [mfs] OK LOGIN: Client "192.168.0.5"
+Sep 27 16:08:55 fw1 vsftpd: Wed Sep 27 16:08:55 2006 [pid 5851] [mfs] OK UPLOAD: Client "192.168.0.5", "/ll", 20646 bytes, 167.56Kbyte/sec

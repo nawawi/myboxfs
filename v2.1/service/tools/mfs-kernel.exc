@@ -1,0 +1,224 @@
+#!/bin/php -f
+<?
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once("clib.exl");
+putenv("PATH=/bin:/service/tools:/service/init");
+
+$_DISABLE=0;
+$_DUPMSG='';
+
+if(mybox_license()==-1) $_DISABLE=1;
+if(mybox_license()==-2) $_DISABLE=1;
+if(mybox_license()==-3) $_DISABLE=1;
+
+function parse_log($str) {
+	global $_LOG_PATH, $_DUPMSG;
+	$thisyear=date('Y');
+
+	$_KMSG=array();
+	$_IPP2P_INBOUND=array();
+	$_IPP2P_OUTBOUND=array();
+	
+	$_KMSG=unserialize(mybox_fget_contents("/var/sys/fwmsg"));
+	$_IPP2P_INBOUND=unserialize(mybox_fget_contents("/var/sys/ipp2pimsg"));
+	$_IPP2P_OUTBOUND=unserialize(mybox_fget_contents("/var/sys/ipp2pomsg"));
+
+	$pat1="(\w+)\s+(\d+)\s+(\S+)\s+(\S+)\s+kernel\:\s*F:(\S+):(\S+):(\S+)";
+	$pat2="(\w+)\s+(\d+)\s+(\S+)\s+(\S+)\s+kernel\:\s+IPP2P.debug\:(\S+)-match\:\s+(\d+)\s+from:\s+(\S+)\s+to:\s+(\S+)\s+Length\:\s+(\d+)";
+	$pat3="(\w+)\s+(\d+)\s+(\S+)\s+(\S+)\s+kernel\:\s+(\S+)\:\s+(\S+)\:\s+(\S+)\:\s+(.*)";
+ 
+	if(preg_match("/$pat3/",$str,$match)) {
+		$ldate=strtotime("{$match[1]} {$match[2]} {$match[3]} $thisyear");
+		$date=date('d/m/Y H:i:s',$ldate);
+		$logname=date('Ymd',$ldate);
+		$type1='';$type='';
+		if(preg_match("/NIC Link is (Up|Down)/",$match[8],$mm)) {
+			$type1=$mm[1];
+			if($type1=="Up") $type="INFO";
+			if($type1=="Down") $type="ERROR";
+		}
+		if($type=='') return 0;
+		$str="{$match[6]} {$match[8]}";
+		$msg="[$date] TYPE=$type MSG=$str";
+		if($msg==$_DUPMSG) return 0;
+		$_DUPMSG="$msg";
+		$msgx="<1> TYPE=INFO MSG=$str";
+		if($msg!='' && $msgx!='') {
+			if(mybox_chk_nolog()==0) mybox_append_to_file("$_LOG_PATH/system-$logname.log","$msg\n");
+			mybox_send_remotelog($time,$msgx);
+		}
+		return 0;
+	} elseif(preg_match("/$pat1/",$str,$match)) {
+		$ldate=strtotime("{$match[1]} {$match[2]} {$match[3]} $thisyear");
+		$date=date('d/m/Y H:i:s',$ldate);
+		$logname=date('Ymd',$ldate);
+
+		$type1=$match[5];
+		$action=$match[6];
+		$id=$match[7];
+		$note=$_KMSG[$type1][$id];
+
+		$mac='';$src='';$dst='';$src_po='';$dst_po='';$proto='';
+		unset($match);
+		if(preg_match("/MAC=(\S+)/",$str,$match)) {
+			$mac=$match[1];
+			unset($match);
+		}
+		if(preg_match("/SRC=(\S+)/",$str,$match)) {
+			$src=$match[1];
+			unset($match);
+		}
+		if(preg_match("/DST=(\S+)/",$str,$match)) {
+			$dst=$match[1];
+			unset($match);
+		}
+		if(preg_match("/SPT=(\S+)/",$str,$match)) {
+			$src_po=$match[1];
+			unset($match);
+		}
+		if(preg_match("/DPT=(\S+)/",$str,$match)) {
+			$dst_po=$match[1];
+			unset($match);
+		}
+
+		if(preg_match("/PROTO=(\S+)/",$str,$match)) {
+			$proto=$match[1];
+			unset($match);
+		}
+
+		if($type1=='I') {
+			$type='Inbound';
+		} elseif($type1=='O') {
+			$type='Outbound';
+		} elseif($type1=='dnat') {
+			$type='DNAT';
+		} elseif($type1=='snat') {
+			$type='SNAT';
+		} elseif($type1=='B') {
+			$type='Blacklist';
+		} elseif($type1=='E') {
+			$type='System';
+		}
+		$msg=trim("[$date] PROTO=$proto TYPE=$type ACTION=$action DESCRIPTION=$note SRC=$src SRC_PORT=$src_po DST=$dst DST_PORT=$dst_po MAC=$mac");
+		$msgx=trim("<3> PROTO=$proto TYPE=$type ACTION=$action DESCRIPTION=$note SRC=$src SRC_PORT=$src_po DST=$dst DST_PORT=$dst_po MAC=$mac");
+		if($msg==$_DUPMSG) return 0;
+		$_DUPMSG="$msg";
+		if($msg!='') {
+			mybox_append_to_file("$_LOG_PATH/firewall-$logname.log","$msg\n");
+			mybox_send_remotelog($ldate,$msgx);
+		}
+		return 0;
+	} elseif(preg_match("/$pat2/",$str,$match)) {
+		$ldate=strtotime("{$match[1]} {$match[2]} {$match[3]} $thisyear");
+		$date=date('d/m/Y H:i:s',$ldate);
+		$logname=date('Ymd',$ldate);
+		$proto=$match[5];
+		list($src,$srcp)=preg_split("/:/",$match[7]);
+		list($dst,$dstp)=preg_split("/:/",$match[8]);
+		$msg='';
+		if($_IPP2P_INBOUND[$src][$dst]!='') {
+			$list=$_IPP2P_INBOUND[$src][$dst];
+			list($note,$action)=preg_split("/\|/",$list);
+			$msg=trim("[$date] PROTO=IPP2P-$proto TYPE=Inbound ACTION=$action DESCRIPTION=$note SRC=$src SRC_PORT=$srcp DST=$dst DST_PORT=$dstp MAC=");
+		} elseif($_IPP2P_INBOUND['any'][$dst]!='') {
+			$list=$_IPP2P_INBOUND['any'][$dst];
+			list($note,$action)=preg_split("/\|/",$list);
+			$msg=trim("[$date] PROTO=IPP2P-$proto TYPE=Inbound ACTION=$action DESCRIPTION=$note SRC=$src SRC_PORT=$srcp DST=$dst DST_PORT=$dstp MAC=");
+		}  elseif($_IPP2P_INBOUND[$src]['any']!='') {
+			$list=$_IPP2P_INBOUND[$src]['any'];
+			list($note,$action)=preg_split("/\|/",$list);
+			$msg=trim("[$date] PROTO=IPP2P-$proto TYPE=Inbound ACTION=$action DESCRIPTION=$note SRC=$src SRC_PORT=$srcp DST=$dst DST_PORT=$dstp MAC=");
+		} elseif($_IPP2P_INBOUND['any']['any']!='') {
+			$list=$_IPP2P_INBOUND['any']['any'];
+			list($note,$action)=preg_split("/\|/",$list);
+			$msg=trim("[$date] PROTO=IPP2P-$proto TYPE=Inbound ACTION=$action DESCRIPTION=$note SRC=$src SRC_PORT=$srcp DST=$dst DST_PORT=$dstp MAC=");
+		}
+
+		if($_IPP2P_OUTBOUND[$src][$dst]!='') {
+			$list=$_IPP2P_OUTBOUND[$src][$dst];
+			list($note,$action)=preg_split("/\|/",$list);
+			$msg=trim("[$date] PROTO=IPP2P-$proto TYPE=Outbound ACTION=$action DESCRIPTION=$note SRC=$src SRC_PORT=$srcp DST=$dst DST_PORT=$dstp MAC=");
+		} elseif($_IPP2P_OUTBOUND['any'][$dst]!='') {
+			$list=$_IPP2P_OUTBOUND['any'][$dst];
+			list($note,$action)=preg_split("/\|/",$list);
+			$msg=trim("[$date] PROTO=IPP2P-$proto TYPE=Outbound ACTION=$action DESCRIPTION=$note SRC=$src SRC_PORT=$srcp DST=$dst DST_PORT=$dstp MAC=");
+		}  elseif($_IPP2P_OUTBOUND[$src]['any']!='') {
+			$list=$_IPP2P_OUTBOUND[$src]['any'];
+			list($note,$action)=preg_split("/\|/",$list);
+			$msg=trim("[$date] PROTO=IPP2P-$proto TYPE=Outbound ACTION=$action DESCRIPTION=$note SRC=$src SRC_PORT=$srcp DST=$dst DST_PORT=$dstp MAC=");
+		} elseif($_IPP2P_OUTBOUND['any']['any']!='') {
+			$list=$_IPP2P_OUTBOUND['any']['any'];
+			list($note,$action)=preg_split("/\|/",$list);
+			$msg=trim("[$date] PROTO=IPP2P-$proto TYPE=Outbound ACTION=$action DESCRIPTION=$note SRC=$src SRC_PORT=$srcp DST=$dst DST_PORT=$dstp MAC=");
+		}
+		if($msg==$_DUPMSG) return 0;
+		$_DUPMSG="$msg";
+		if($msg!='') {
+			mybox_append_to_file("$_LOG_PATH/firewall-$logname.log","$msg\n");
+        		if(preg_match("/^\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]\s+/",$msg,$mm)) {
+                		$time1=strtotime("{$mm[2]}/{$mm[1]}/{$mm[3]} {$mm[4]}:{$mm[5]}:{$mm[6]}");
+                		$msgx=preg_replace("/^\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]\s+/","<3> ",$msg);
+				mybox_send_remotelog($time1,$msgx);
+        		}
+		}
+		return 0;
+	}
+	return 0;
+}
+
+function parse_arplog($str) {
+	global $_LOG_PATH, $_DUPMSG;
+	$thisyear=date('Y');
+	if(preg_match("/(\w+)\s+(\d+)\s+(\S+)\s+(\S+)\s+kernel\:\s+ARP_ANTIDOTE\:\s+(.*)/",$str,$match)) {
+		$ldate=strtotime("{$match[1]} {$match[2]} {$match[3]} $thisyear");
+		$date=date('d/m/Y H:i:s',$ldate);
+		$logname=date('Ymd',$ldate);
+		$txt=trim($match[5]);
+		$msg=trim("[$date] $txt");
+		mybox_append_to_file("$_LOG_PATH/arp-$logname.log","$msg\n");
+		$msgx=preg_replace("/^\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]\s+/","<12> ",$msg);
+		mybox_send_remotelog($ldate,$msgx);
+	}
+}
+
+function read_kernel_log($file) {
+	global $_LOG_PATH, $_KMSG, $_DISABLE, $_DUPMSG;
+	$txt='';
+	if($fi=fopen("$file","r")) {
+		$buff=fgets($fi,4096);
+		$buff=trim($buff);
+		if($buff!='') {
+			if($buff!=$txt) {
+				if($_DISABLE!=1) {
+					if(preg_match("/ARP_ANTIDOTE\:/",$buff)) {
+						parse_arplog($buff);
+					} else {
+						parse_log($buff);
+					}
+				}
+				$txt=$buff;
+			}
+		}
+		fclose($fi);
+	}
+}
+
+function main_loop() {
+	if(mybox_daemon()==0) {
+		mybox_slog("ERROR","mfs-kernel.exc running in background failed");
+		return 1;
+	}
+	while(1) {
+		if(file_exists("/var/log/kernel")) {
+			usleep(500000);
+			read_kernel_log("/var/log/kernel");
+		}
+	}
+}
+
+main_loop();
+exit(0);
+
+?>

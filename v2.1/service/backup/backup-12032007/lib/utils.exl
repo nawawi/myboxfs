@@ -1,0 +1,735 @@
+<?
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+
+function mybox_exec_cmd($cmd) {
+	$ret=1;
+	if($cmd!='') system("$cmd >/dev/null 2>&1", $ret);
+	return $ret;
+}
+
+function mybox_execq_cmd($cmd) {
+	$ret=1;
+	if($cmd!='') system("$cmd", $ret);
+	return $ret;
+}
+
+function procps_scan() {
+        $buff=mybox_dir2array("/proc/*/stat");
+        $ret=array();
+        if(count($buff)!=0) {
+                foreach($buff as $line) {
+			$fl=$line;
+                        list(,,$pid,)=explode("/",$fl);
+			if($pid <= 9) continue;
+                        if(preg_match("/^$pid\s+\((\S+)\)\s+/",mybox_fget_contents($line),$mm)) {
+				$prog=$mm[1];
+				if(preg_match("/^\d+$/",$prog)) $prog='';
+			}
+                        $argv=mybox_fget_contents("/proc/$pid/cmdline");
+                        $argv=preg_replace("/\\0/"," ",$argv);
+			$proc=trim("$prog $argv");
+			$ret[$pid]="$proc";
+		}
+	}
+	return $ret;
+}
+
+function mybox_get_pid($xpid) {
+	$proc=procps_scan();
+	$ret='';
+	if(count($proc)!=0) {
+		foreach($proc as $pid => $prog) {
+			if($pid=='') continue;
+			if($pid=="$xpid") return trim($pid);
+		}
+	}
+	return;
+}
+
+function mybox_get_progpid($match1,$match2='') {
+	$proc=procps_scan();
+	$ret='';
+	if(count($proc)!=0) {
+		foreach($proc as $pid => $prog) {
+			if($pid=='') continue;
+			if($match2!='') {
+				if((strpos("$prog","$match1") !== FALSE) && (strpos("$prog","$match2") !== FALSE)) $ret .="$pid ";
+			} else {
+				if(strpos("$prog","$match1") !== FALSE) $ret .="$pid ";
+			}
+		}
+	}
+	return trim($ret);
+}
+
+function mybox_kill($ppid,$signal) {
+	$ret=1;
+	$p_array=preg_split("/\s+/",$ppid);
+	if(count($p_array)!=0) {
+		foreach($p_array as $pid) {
+			if(posix_kill("$pid",$signal)) $ret=0;
+		}
+	} else {
+		$ppid=trim($ppid);
+		if(posix_kill("$ppid",$signal)) $ret=0;
+	}
+	return $ret;
+}
+
+function mybox_killall($match) {
+	$ppid='';$ret=1;
+	$ppid=mybox_get_progpid($match);
+   	if($ppid!='') {
+		$p_array=preg_split("/\s+/",$ppid);
+		if(count($p_array)!=0) {
+			foreach($p_array as $pid) {
+				if(posix_kill("$pid",9)) $ret=0;
+			}
+		} else {
+			$ppid=trim($ppid);
+			if(posix_kill("$ppid",9)) $ret=0;
+		}
+	}
+	return $ret;
+}
+
+function mybox_exec_bg($cmd) {
+	$ret=1;
+	if($cmd!='') system("$cmd >/dev/null 2>&1 &", $ret); //$ret=pclose(popen("$cmd >/dev/null 2>&1 &","r"));
+	return $ret;
+}
+
+function mybox_echo_query($cmd) {
+	mybox_append_to_file("/var/sys/mfsque","$cmd\n");
+}
+
+function mybox_escape_str($str) {
+	if($str!='') {
+		return htmlentities($str,ENT_QUOTES);
+	}
+	return $str;
+}
+
+function mybox_unescape_str($str) {
+	if($str!='') {
+		return str_replace(array('\&#039','\&quot'),array('&#039','&quot'),$str);
+	}
+	return $str;
+}
+
+function mybox_uptime() {
+	if(!file_exists("/proc/uptime")) {
+		return("unknown");
+	}
+	$dirty=file("/proc/uptime");
+	$ticks=trim(strtok($dirty[0], " "));
+	$minutes=$ticks / 60;
+	$hours=$minutes  / 60; 
+	$days=floor($hours / 24);
+	$hours=floor($hours - ($days * 24));
+	$minutes=floor($minutes  - ($days * 60 * 24) - ($hours * 60));
+	if($days <= 1) {$writeDays = "day";} else {$writeDays = "days";}
+	if($hours <= 1) {$writeHours = "hour"; } else {$writeHours = "hours";}
+	if($minutes <= 1) {$writeMins = "minute";} else {$writeMins = "minutes";}
+	if($days!=0) {
+		$since=date('D M d Y',strtotime("-$days days"));
+		$since="Since $since";
+	}
+	return	"$days $writeDays, $hours $writeHours, $minutes $writeMins. $since";
+}
+function mybox_space_used($dir) {
+	$_strglogstotal=0;
+	if(is_dir($dir)) {
+ 		if($dh=opendir($dir)) {
+  			while(($file = readdir($dh)) !== false) {
+   				if(is_dir($dir.$file) && $file != '.' && $file != '..') {
+    					mybox_space_used($dir.$file.'/');
+   				} else {
+    					$_strglogstotal += sprintf("%u", filesize($dir.$file));
+					clearstatcache();
+   				}
+  			}
+ 			closedir($dh);
+		 }
+	}
+	return $_strglogstotal;
+}
+
+function mybox_size_readable($size, $unit = null, $retstring = null) {
+	$sizes = array('B', 'kB', 'MB', 'GB', 'TB');
+	$ii = count($sizes) - 1;
+	$unit = array_search((string) $unit, $sizes);
+	if($unit === null || $unit === false) {
+		$unit = $ii;
+	}
+    	if($retstring === null) {
+		$retstring = '%01.2f %s';
+	}
+	$i = 0;
+	while ($unit != $i && $size >= 1024 && $i < $ii) {
+		$size /= 1024;
+		$i++;
+	}
+	return sprintf($retstring, $size, $sizes[$i]);
+}
+
+// updated: 24-Nov-2006
+function mybox_save_to_file($filename,$text) {
+	if(extension_loaded('dio')) {
+		if($fp=dio_open($filename, O_RDWR | O_CREAT | O_TRUNC)) {
+ 			dio_write($fp,$text,strlen($text));
+			dio_close($fp);
+			@chmod($filename,0600);
+		}
+	} else {
+		if($fp=fopen($filename,"w")) {
+ 			fwrite($fp,$text);
+			fclose($fp);
+		}
+	}
+}
+
+// updated: 24-Nov-2006
+function mybox_append_to_file($filename,$text) {
+	if(extension_loaded('dio')) {
+		if($fp=dio_open($filename, O_RDWR | O_CREAT | O_APPEND)) {
+ 			dio_write($fp,$text,strlen($text));
+			dio_close($fp);
+			@chmod($filename,0600);
+		}
+	} else {
+		if($fp=fopen($filename,"a")) {
+ 			fwrite($fp,$text);
+			fclose($fp);
+		}
+	}
+}
+
+function mybox_copydir($src,$new) {
+	if($src==$new) return 0;
+	if(!is_dir($new)) mybox_mkdirr($new);
+	$d=dir($src);
+        while(($entry=$d->read())) {
+                if(is_file("$src/$entry")) {
+			copy("$src/$entry", "$new/$entry");
+                }
+        }
+        $d->close();
+	return 1;
+}
+
+function mybox_rmdir($dirname,$dirr='') {
+	if(!file_exists($dirname)) {
+		return 1;
+	}
+    	if(is_file($dirname)) {
+        	return unlink($dirname);
+    	}
+	if(!is_dir($dirname)) return 1;
+   	$dir = dir($dirname);
+	while(false !== $entry = $dir->read()) {
+        	if($entry == '.' || $entry == '..') {
+			continue;
+		}
+		mybox_rmdir("$dirname/$entry",$dirr);
+	}
+	$dir->close();
+	if($dirname!=$dirr) return rmdir($dirname);
+}
+
+function mybox_str_add_break($txt,$length) {
+	// html must use stylesheet table-layout: fixed;
+	if(preg_match("/^(\S+)$/",$txt)) {
+		$txt=chunk_split($txt, $length, " ");
+	} else {
+		$txx=preg_split("/\s+/",$txt);
+		if(count($txx)!=0) {
+			$txt1='';
+			foreach($txx as $tx) {
+				$txt1 .=chunk_split($tx, $length, " ");
+			}
+			$txt=$txt1;
+		}
+	}
+	return $txt;
+}
+
+function mybox_file2array($file) {
+	$lines=array();
+	if(strpos($file,".gz") !== FALSE) {
+		if($fd=fopen("compress.zlib://$file", "r")) {
+			while(!feof($fd)) {
+  				$buffer=fgets($fd, 4096);
+				$buffer=trim($buffer);
+				if($buffer!='') $lines[]=$buffer;
+			}
+			fclose($fd);
+			return $lines;
+		}
+	} else {
+		if($fd=fopen($file, "r")) {
+			while(!feof($fd)) {
+  				$buffer=fgets($fd, 4096);
+				$buffer=trim($buffer);
+				if($buffer!='') $lines[]=$buffer;
+			}
+			fclose($fd);
+			return $lines;
+		}
+	}
+	return array();
+}
+
+function mybox_get_pptpuser_loip($ip) {
+	$buff=procps_scan();
+	if(count($buff)!=0) {
+		foreach($buff as $lx) {
+			if(preg_match("/\s+(\d+\.\d+\.\d+\.\d+)\:(\d+\.\d+\.\d+\.\d+)\s+ipparam\s+$ip\s+/",$lx,$mm)) {
+				return $mm[2];
+			}
+		}
+	}
+	return;
+}
+
+function mybox_chk_pptpuser() {
+	global $_LOG_PATH;
+	$logname=date('Ymd');
+	$date=date('d/m/Y H:i:s');
+	$ldate=time();
+	$_user_array=array();
+	if(!file_exists("/var/log/wtmp")) return 1;
+	if(file_exists("/var/sys/pptpvpnusers")) {
+		$_user_array=unserialize(mybox_fget_contents("/var/sys/pptpvpnusers"));
+		if(count($_user_array)!=0) {
+			for($x=0;$x<=count($_user_array);$x++) {
+				$list=$_user_array[$x];
+				list($user,$tty,$ip,$pid,$time,$lip)=preg_split("/\|/",$list);
+				$pid='';
+				if($ip!='') {
+					$pid=mybox_get_progpid("$ip","pptpd");
+					if($pid=='') {
+						$msg="[$date] TYPE=pptp USER=$user IP=$ip MSG=connection closed on $tty ($lip)";
+						$msgx="<0> TYPE=pptp USER=$user IP=$ip MSG=connection closed on $tty ($lip)";
+						mybox_append_to_file("$_LOG_PATH/auth-$logname.log","$msg\n");
+						mybox_send_remotelog($ldate,$msgx);
+						unset($_user_array[$x]);
+					}
+				}
+				unset($list);
+			}
+		}
+	}
+	$pid='';
+	$txt1='';
+
+	// modified last command
+	exec("/bin/last",$last,$ret);
+	if($ret==0) {
+		if(count($last)!=0) {
+			foreach($last as $line) {
+				list($user,$tty,$ip,$time,$lip)=preg_split("/\|/",$line);
+				if($ip!='' && mybox_check_ipv4($ip)) {
+					$pid=mybox_get_progpid("$ip","pptpd");
+					$xlip=mybox_get_pptpuser_loip($ip);
+					if($pid!='') {
+						$txt="$user|$tty|$ip|$pid|$time";
+						if($txt!=$txt1) {
+							$_user_array[]="$user|$tty|$ip|$pid|$time|$xlip";
+							$msg="[$date] TYPE=pptp USER=$user IP=$ip MSG=connection accepted on $tty ($xlip)";
+							$msgx="<0> TYPE=pptp USER=$user IP=$ip MSG=connection accepted on $tty ($xlip)";
+							mybox_append_to_file("$_LOG_PATH/auth-$logname.log","$msg\n");
+							mybox_send_remotelog($ldate,$msgx);
+							$txt1=$txt;
+						}
+					}
+				}
+			}
+		}
+	}
+	file_put_contents("/var/sys/pptpvpnusers",serialize($_user_array));
+	@unlink("/var/log/wtmp");
+	@touch("/var/log/wtmp");
+	@unlink("/var/run/utmp");
+	@touch("/var/run/utmp");
+	return 0;
+}
+// used at fw_rules
+function mybox_reorder_policy($db_id,$_table) {
+	mybox_db_query("update $_table set id = id+1 where 1 > 0",$db_id);
+	$_res=mybox_db_query("select * from $_table order by id ASC",$db_id);
+	if(mybox_db_num_rows($_res)!=0) {
+		$x=1;
+		while($row=mybox_db_fetch_assoc($_res)) {
+			$_id=$row['id'];
+			mybox_db_query("update $_table set id='$x' where id='$_id'",$db_id);
+			$x++;
+		}
+	}
+}
+
+function mybox_utc2local($time) {
+	$o=date('O');
+	$z=date('Z');
+	$o1=$o{0};
+	switch($o1) {
+		case "-": $zone=$time - $z;
+		break;
+		case "+": $zone=$time + $z;
+		break;
+	} 
+	return $zone;
+}
+
+function mybox_ipname_array($db_id) {
+	if(file_exists("/var/sys/ipname.cache")) {
+		return unserialize(mybox_fget_contents("/var/sys/ipname.cache"));
+	}
+	$list_array[]='any';
+	$result=mybox_db_query("select name from ipaddr",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			$list_array[]="$_name";
+			$list_array[]="$_name"."-net";
+		}
+	}
+	unset($result);
+	$result=mybox_db_query("select ip from ipalias",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_ip=$row['ip'];
+			$list_array[]="$_ip";
+		}
+	}
+	if(count($list_array)!=0) file_put_contents("/var/sys/ipname.cache",serialize($list_array));
+	return $list_array;
+}
+
+function mybox_name2dev_array($db_id) {
+	if(file_exists("/var/sys/name2dev.cache")) {
+		return unserialize(mybox_fget_contents("/var/sys/name2dev.cache"));
+	}
+	$list_array=array();
+	$result=mybox_db_query("select * from ipaddr",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_ipaddrname=$row['name'];
+			$_ipaddrip=$row['ip'];
+			$_ipaddrmask=$row['mask'];
+			$_ipaddrdev=$row['dev'];
+			$_name="$_ipaddrname"."-net";
+			$ret=mybox_ipcalc($_ipaddrip,$_ipaddrmask);
+			$_ipnet=$ret['network'];
+			$_ippref=$ret['prefix'];
+			$list_array[$_name]="$_ipnet/$_ippref";
+			$list_array[$_ipaddrname]="$_ipaddrip";
+		}
+	}
+	unset($result);
+	$result=mybox_db_query("select ip from ipalias",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_ip=$row['ip'];
+			$list_array[$_ip]="$_ip";
+		}
+	}
+	if(count($list_array)!=0) file_put_contents("/var/sys/name2dev.cache",serialize($list_array));
+	return $list_array;
+}
+
+function mybox_shaperclass_array($db_id) {
+	if(file_exists("/var/sys/shaperclass.cache")) {
+		return unserialize(mybox_fget_contents("/var/sys/shaperclass.cache"));
+	}
+	$list_array=array();
+	$result=mybox_db_query("select cname from htb_class where stat='1'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_cname=$row['cname'];
+			$list_array[]="$_cname";
+		}
+		file_put_contents("/var/sys/shaperclass.cache",serialize($list_array));
+	}
+	unset($result);
+	return $list_array;	
+}
+
+function mybox_isdomainresolves($domain) {
+	return gethostbyname($domain)!=$domain;
+}
+
+// 09-Nov-2006
+function mybox_send_hup($prog) {
+	$pid='';$ret=1;
+	$pid=mybox_get_progpid($prog);
+	if($pid!='') $ret=mybox_kill("$pid","1");
+	return $ret;
+}
+
+// 24-Nov-2006
+function mybox_dir2array($dir) {
+	if(glob($dir)!=FALSE) {
+		return glob($dir);
+	}
+	return array();
+}
+
+// 24-Nov-2006
+function mybox_str2array($str,$dem) {
+	return preg_split("/$dem/",$str);
+}
+
+// 18-Dec-2006
+function mybox_deftimes_array($db_id) {
+	$list_array=array();
+	if(file_exists("/var/sys/deftime.cache")) {
+		return unserialize(mybox_fget_contents("/var/sys/deftime.cache"));
+	}
+	$result=mybox_db_query("select * from def_times where stat='1'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			if($_name=='any') continue;
+			$_val=$row['val'];
+			$_val2=$row['val2'];
+			$_val3=$row['val3'];
+			$_ret=trim("$_val|$_val2|$_val3");
+			$list_array[$_name]="$_ret";
+		}
+		file_put_contents("/var/sys/deftime.cache",serialize($list_array));
+	}
+	return $list_array;
+}
+function mybox_defservices_array($db_id) {
+	$list_array=array();
+	if(file_exists("/var/sys/defservice.cache")) {
+		return unserialize(mybox_fget_contents("/var/sys/defservice.cache"));
+	}
+	$result=mybox_db_query("select * from def_services where stat='1'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			$_val=$row['val'];
+			$list_array[$_name]="$_val";
+		}
+		file_put_contents("/var/sys/defservice.cache",serialize($list_array));
+	}
+	return $list_array;
+}
+function mybox_defnetwork_array($db_id) {
+	$list_array=array();
+	if(file_exists("/var/sys/defnetwork.cache")) {
+		return unserialize(mybox_fget_contents("/var/sys/defnetwork.cache"));
+	}
+	$result=mybox_db_query("select * from def_networks where stat='1'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			if($_name=='any') continue;
+			$_val=$row['val'];
+			$list_array[$_name]="$_val";
+		}
+		file_put_contents("/var/sys/defnetwork.cache",serialize($list_array));
+	}
+	return $list_array;
+}
+
+function mybox_send_logout($url,$time,$msg) {
+	mybox_save_to_file("/var/sys/logout_msg$time","$msg");
+	mybox_go_url($url);
+}
+
+function mybox_go_url($url) {
+	// stupid ie7
+	if(isset($_SERVER["HTTP_USER_AGENT"]) && strpos($_SERVER["HTTP_USER_AGENT"],"MSIE 7")!==FALSE) {
+		echo "<script language='javascript'>";
+		echo "self.location.href='$url';";
+		echo "</script>";
+		echo "<noscript><meta http-equiv='Refresh' content='0; URL=$url'></noscript>";
+	} else {
+		if(!headers_sent()) {
+			header("Location: $url");
+		} else {
+			echo "<script language='javascript'>";
+			echo "self.location.href='$url';";
+			echo "</script>";
+			echo "<noscript><meta http-equiv='Refresh' content='0; URL=$url'></noscript>";
+		}
+	}
+}
+
+function mybox_gzip($file) {
+	if(file_exists("$file")) {
+		if(copy($file, "compress.zlib://$file.gz")) {
+			@unlink($file);
+			return 1;
+		}
+	}
+	return 0;
+}
+
+function mybox_chk_ssh_logout($opt,$pid,$ldate,$ip='') {
+	$_ID=unserialize(mybox_fget_contents("/var/sys/ssh.session"));
+	if($opt==1) {
+		$_ID[$pid]="$ip";
+		file_put_contents("/var/sys/ssh.session",serialize($_ID));
+		$console="ssh_{$pid}_{$ip}_".date('d:m:Y_H:i:s',$ldate);
+		@touch("/tmp/console.session/$console");
+	}
+	if($opt==2) {
+		if($_ID[$pid]!='') {
+			$ip=$_ID[$pid];
+			$console="ssh_{$pid}_{$ip}_";
+			mybox_exec_cmd("rm -f /tmp/console.session/$console*");
+			unset($_ID[$pid]);
+			file_put_contents("/var/sys/ssh.session",serialize($_ID));
+			return $ip;
+		}
+	}
+	return;
+}
+
+function mybox_chk_ftp_logout($opt,$pid='',$pid2='',$ldate='',$ip='') {
+	$_ID=unserialize(mybox_fget_contents("/var/sys/ftp.session"));
+	if($opt==1) {
+		$_ID[$pid]="$ip|$pid2";
+		file_put_contents("/var/sys/ftp.session",serialize($_ID));
+		$console="ftp_{$pid}_{$ip}_".date('d:m:Y_H:i:s',$ldate);
+		@touch("/tmp/console.session/$console");
+	}
+	if($opt==2) {
+		if(is_array($_ID) && count($_ID)!=0) {
+			foreach($_ID as $pid => $lx) {
+				if(@mybox_get_pid($pid)=='') {
+					list($ip,$pid2)=preg_split("/\|/",$lx);
+					unset($_ID[$pid]);
+					$console="ftp_{$pid}_{$ip}";
+					mybox_exec_cmd("rm -f /tmp/console.session/$console*");
+					mybox_session_kmsg("ftp","ftp1",$ip);
+				}
+			}
+		}
+	}
+	if($opt==3) {
+		if($_ID[$pid]!='') {
+			$lx=$_ID[$pid];
+			list($ip,$pid2)=preg_split("/\|/",$lx);
+			$console="ftp_{$pid}_{$ip}_";
+			mybox_exec_cmd("rm -f /tmp/console.session/$console*");
+			unset($_ID[$pid]);
+		}
+	}
+	file_put_contents("/var/sys/ftp.session",serialize($_ID));
+}
+
+function mybox_session_print() {
+	if(!is_dir("/tmp/console.session")) return 1;
+	$dir=mybox_dir2array("/tmp/console.session/*");
+	if(count($dir)!=0) {
+		printf("%-6s %-9s %-15s %-10s %s\n","PID","TYPE","FROM","DATE","TIME");
+		printf("%-6s %-9s %-15s %-10s %s\n","------","---------","---------------","----------","--------");
+		foreach($dir as $ln) {
+			$lx=basename($ln);
+			if(preg_match("/(\S+)\_(\S+)\_(\S+)\_(\S+)\_(\S+)/",$lx,$mm)) {
+				$date=preg_replace("/:/","/",$mm[4]);
+				if($mm[1]=="console") {
+					if($mm[2]==1) {
+						$pid=mybox_get_progpid("iosh console");
+						if($pid!='') {
+							printf("%-6s %-9s %-15s %s %s\n",$pid,$mm[1],$mm[3],$date,$mm[5]);
+							$console=str_replace("console_{$mm[2]}_","console_{$pid}_",$ln);
+							rename($ln,$console);
+						}
+					} else {
+						if(mybox_get_pid($mm[2])!='') {
+							printf("%-6s %-9s %-15s %s %s\n",$mm[2],$mm[1],$mm[3],$date,$mm[5]);
+						} else {
+							@unlink($ln);
+						}
+					}
+				} elseif($mm[1]=="ssh") {
+					if(mybox_get_pid($mm[2])!='') {
+						printf("%-6s %-9s %-15s %s %s\n",$mm[2],$mm[1],$mm[3],$date,$mm[5]);
+					} else {
+						@unlink($ln);
+					}
+				} elseif($mm[1]=="https") {
+					$_ID=unserialize(mybox_fget_contents("/var/sys/https.session"));
+					if(!is_array($_ID)) $_ID=array();
+					$sess=array_search($mm[2],$_ID);
+					if($sess!='' && file_exists("/tmp/sessions/sess_{$sess}")) {
+						printf("%-6s %-9s %-15s %s %s\n",$mm[2],$mm[1],$mm[3],$date,$mm[5]);
+					} else {
+						@unlink($ln);
+					}
+				} elseif($mm[1]=="ftp") {
+					if(mybox_get_pid($mm[2])!='') {
+						printf("%-6s %-9s %-15s %s %s\n",$mm[2],$mm[1],$mm[3],$date,$mm[5]);
+					} else {
+						@unlink($ln);
+					}
+				}
+			}
+		}
+	}
+}
+
+function mybox_session_kmsg($type,$auth,$auth_addr,$status="Session logout.") {
+	global $_LOG_PATH;
+	$time=time();
+	$logname=date('Ymd',$time);
+	$date=date('d/m/Y H:i:s',$time);
+	$msg="[$date] TYPE=$type USER=$auth IP=$auth_addr MSG=$status";
+	$msgx="<0> TYPE=$type USER=$auth IP=$auth_addr MSG=$status";
+	if(mybox_chk_nolog()==0) mybox_append_to_file("$_LOG_PATH/auth-$logname.log","$msg\n");
+	mybox_send_remotelog($time,$msgx);
+}
+
+function mybox_session_kill($xpid) {
+	if(!is_dir("/tmp/console.session")) return 1;
+	$dir=mybox_dir2array("/tmp/console.session/*_{$xpid}_*");
+	if(count($dir)!=0) {
+		foreach($dir as $ln) {
+			$lx=basename($ln);
+			if(preg_match("/(\S+)\_($xpid)\_(\S+)\_(\S+)\_(\S+)/",$lx,$mm)) {
+				if(preg_match("/MY(\d+)/i",$xpid)) {
+					$_ID=unserialize(mybox_fget_contents("/var/sys/https.session"));
+					if(!is_array($_ID)) $_ID=array();
+					$sess=array_search($xpid,$_ID);
+					@unlink("/tmp/sessions/sess_{$sess}");
+					@mybox_session_kmsg("https","admin",$mm[3]);
+					unset($_ID[$sess]);
+					file_put_contents("/var/sys/https.session",serialize($_ID));
+				} else {
+					if($mm[1]=="ssh") {
+						@mybox_kill($xpid,9);
+						mybox_chk_ssh_logout('2',$xpid,time());
+						@mybox_session_kmsg("ssh","mfs",$mm[3]);
+					}
+					if($mm[1]=="ftp") {
+						$_ID=unserialize(mybox_fget_contents("/var/sys/ftp.session"));
+						if(!is_array($_ID)) $_ID=array();
+						$lx=$_ID[$xpid];
+						list($ip,$pid2)=preg_split("/\|/",$lx);
+						@mybox_kill("$xpid $pid2",9);
+						mybox_chk_ftp_logout('3',$xpid,time());
+						@mybox_session_kmsg("ftp","ftp1",$mm[3]);
+					}
+				}
+				@unlink($ln);
+			}
+		}
+	}
+	mybox_session_print();
+	return 1;
+}
+
+function mybox_user_license() {
+	$_UL=mybox_license('UL');
+	if($_UL==-1) $_UL=0;
+	if($_UL!=0) mybox_save_to_file("/var/sys/chk_bawal",$_UL);
+	return $_UL;
+}
+
+?>

@@ -1,0 +1,225 @@
+<?
+	// leave this here.
+	if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+
+	// variables setting
+	// please check rc.bootup rc.init rc.start before change this setting
+	$_HTDOCS_PATH="/service/www";
+	$_ROOT_DIR="/strg/mybox";
+	$_DB_PATH="$_ROOT_DIR/db";
+	$_GRAPH_PATH="$_HTDOCS_PATH/g";
+	$_LOG_PATH="$_ROOT_DIR/logs";
+	$_LOCAL_SAVE_PATH="$_ROOT_DIR/localsave";
+	$_DOWNLOAD_PATH="$_ROOT_DIR/download";
+	$_MODULES_PATH="$_ROOT_DIR/modules";
+	$_TOOLS_PATH="$_ROOT_DIR/tools";
+	$_LICENSE_PATH="$_ROOT_DIR/mfs-license.exc";
+	$_SQLITE_BINARY="/bin/sqlite";
+	$_INIT_DIR="/service/init";
+	$_URL_PATH="";
+	$_ZONELIST="/usr/share/zoneinfo/ZONELIST.TXT";
+	$_DB_DEBUG=0; // 0 = disable 1 = enable
+	$_DB_NAME="system.db";
+	$_DB_BLACKLIST="blacklist.db";
+	$_DB_IPS="ips.db";
+	$_UPDATE['url']="updates.mybox.net.my";
+	// dl@updates.mybox.net.my pass 14DgWSB6a64Lw
+	$_UPDATE['name']="gyJ7Hr9+jqrSqJAzmhySqcnVktNyAs7gMTREZ1dTQjZhNjRMdw==";
+
+	$_LOG_NAME[]="Authentication|auth";
+	$_LOG_NAME[]="System activites|system";
+	$_LOG_NAME[]="Firewall rules|firewall";
+	$_LOG_NAME[]="HTTPS agent|httpsd";
+	$_LOG_NAME[]="SSH agent|sshd";
+	$_LOG_NAME[]="PPTP VPN|pptpvpn";
+	$_LOG_NAME[]="IPS agent|ips";
+	$_LOG_NAME[]="Portscan detector|portscan";
+	$_LOG_NAME[]="DHCP agent|dhcpd";
+	$_LOG_NAME[]="Audit|audit";
+
+	$_PORT_ARRAY['any']='any';
+	$_PORT_ARRAY['HTTP']='80';
+	$_PORT_ARRAY['HTTPS']='443';
+	$_PORT_ARRAY['FTP']='21';
+	$_PORT_ARRAY['FTP-DATA']='20';
+	$_PORT_ARRAY['SSH']='22';
+	$_PORT_ARRAY['TELNET']='23';
+	$_PORT_ARRAY['SMTP']='25';
+	$_PORT_ARRAY['POP3']='110';
+	$_PORT_ARRAY['IMAP']='143';
+	$_PORT_ARRAY['SNMP']='161';
+	$_PORT_ARRAY['PPTP']='1723';
+	$_PORT_ARRAY['NETBIOS']='137:139';
+	$_PORT_ARRAY['AD-LDAP']='389';
+	$_PORT_ARRAY['AD-Authentication']='10260';
+	$_PORT_ARRAY['DNS']='53';
+	$_PORT_ARRAY['NTP']='123';
+	$_PORT_ARRAY['KERBEROS']='88';
+	$_PORT_ARRAY['DCOM']='135';
+	$_PORT_ARRAY['SNMP']='161';
+	$_PORT_ARRAY['MICROSOFT DS']='445';
+	$_PORT_ARRAY['KPassword']='464';
+	$_PORT_ARRAY['Printer']='515';
+	$_PORT_ARRAY['LDAP-SSL']='636';
+	$_PORT_ARRAY['Lotus-Notes']='1352';
+	$_PORT_ARRAY['Microsoft-SQL']='1433';
+	$_PORT_ARRAY['Microsoft-SQL-Monitor']='1434';
+	$_PORT_ARRAY['DCOM']='5000:5500';
+	$_PORT_ARRAY['Printing-Port']='9100';
+
+	$_CLASSIP[]="255.255.255.255";
+	$_CLASSIP[]="255.255.255.254";
+	$_CLASSIP[]="255.255.255.252";
+	$_CLASSIP[]="255.255.255.248";
+	$_CLASSIP[]="255.255.255.240";
+	$_CLASSIP[]="255.255.255.224";
+	$_CLASSIP[]="255.255.255.192";
+	$_CLASSIP[]="255.255.255.128";
+	$_CLASSIP[]="255.255.255.0";
+	$_CLASSIP[]="255.255.254.0";
+	$_CLASSIP[]="255.255.252.0";
+	$_CLASSIP[]="255.255.248.0";
+	$_CLASSIP[]="255.255.240.0";
+	$_CLASSIP[]="255.255.224.0";
+	$_CLASSIP[]="255.255.192.0";
+	$_CLASSIP[]="255.255.128.0";
+	$_CLASSIP[]="255.255.0.0";
+	$_CLASSIP[]="255.254.0.0";
+	$_CLASSIP[]="255.252.0.0";
+	$_CLASSIP[]="255.248.0.0";
+	$_CLASSIP[]="255.240.0.0";
+	$_CLASSIP[]="255.224.0.0";
+	$_CLASSIP[]="255.192.0.0";
+	$_CLASSIP[]="255.128.0.0";
+	$_CLASSIP[]="255.0.0.0";
+	$_CLASSIP[]="254.0.0.0";
+	$_CLASSIP[]="252.0.0.0";
+	$_CLASSIP[]="248.0.0.0";
+	$_CLASSIP[]="240.0.0.0";
+	$_CLASSIP[]="224.0.0.0";
+	$_CLASSIP[]="192.0.0.0";
+	$_CLASSIP[]="128.0.0.0";
+
+	$_MONTH['01']='January';
+	$_MONTH['02']='February';
+	$_MONTH['03']='March';
+	$_MONTH['04']='April';
+	$_MONTH['05']='May';
+	$_MONTH['06']='June';
+	$_MONTH['07']='July';
+	$_MONTH['08']='August';
+	$_MONTH['09']='September';
+	$_MONTH['10']='October';
+	$_MONTH['11']='November';
+	$_MONTH['12']='December';
+
+	// image
+	if(isset($_ENV['GATEWAY_INTERFACE'])) {
+		$_PNG_YESNO['0']="<img src='$_URL_PATH/i/no.png' border=0 alt='disabled' title='disabled'>";
+		$_PNG_YESNO['1']="<img src='$_URL_PATH/i/yes.png' border=0 alt='enabled' title='enabled'>";
+		$_PNG['edit']="<img src='$_URL_PATH/i/edit.png' border='0' alt='edit' title='edit'>";
+		$_PNG['delete']="<img src='$_URL_PATH/i/delete.png' border='0' alt='delete' title='delete'>";
+		$_PNG['arrow_up']="<img src='$_URL_PATH/i/arrow_up.png' border='0' alt='up' title='up'>";
+		$_PNG['arrow_down']="<img src='$_URL_PATH/i/arrow_down.png' border='0' alt='down' title='down'>";
+		$_PNG['arrow_right']="<img src='$_URL_PATH/i/arrow_right.png' border='0'>";
+		$_PNG['arrow_left']="<img src='$_URL_PATH/i/arrow_left.png' border='0'>";
+		$_PNG['arrow_rtr']="<img src='$_URL_PATH/i/arrow_rtr.png' border='0'>";
+		$_PNG['arrow_ltr']="<img src='$_URL_PATH/i/arrow_ltr.png' border='0'>";
+		$_PNG['file']="<img src='$_URL_PATH/i/file.png' border='0' alt='file' title='file'>";
+		$_PNG['zip']="<img src='$_URL_PATH/i/zip.png' border='0' alt='zip' title='zip'>";
+		$_PNG['desc']="<img src='$_URL_PATH/i/darrow.png' border='0' alt='descending' title='descending'>";
+		$_PNG['asc']="<img src='$_URL_PATH/i/uarrow.png' border='0' alt='ascending' title='ascending'>";
+		$_PNG['print']="<img src='$_URL_PATH/i/print.png' border='0' alt='print' title='print'>";
+		$_PNG['exit']="<img src='$_URL_PATH/i/exit.png' border='0' alt='exit' title='exit'>";
+		$_PNG['df_open']="<img src='$_URL_PATH/i/dfolder_open.png' border='0'>";
+		$_PNG['df_close']="<img src='$_URL_PATH/i/dfolder_close.png' border='0'>";
+		$_PNG['df_up']="<img src='$_URL_PATH/i/dfolder_up.png' border='0'>";
+		$_PNG['zoomin']="<img src='$_URL_PATH/i/zoomIn.png' border='0'>";
+		$_PNG['zoomout']="<img src='$_URL_PATH/i/zoomOut.png' border='0'>";
+		$_PNG['first']="<img src='$_URL_PATH/i/first.png' border='0'>";
+		$_PNG['last']="<img src='$_URL_PATH/i/last.png' border='0'>";
+		$_PNG['prev']="<img src='$_URL_PATH/i/prev.png' border='0'>";
+		$_PNG['next']="<img src='$_URL_PATH/i/next.png' border='0'>";
+		$_PNG_NIC['0']="<img src='$_URL_PATH/i/nicko.png' border=0 alt='Down' title='Down'>";
+		$_PNG_NIC['1']="<img src='$_URL_PATH/i/nicok.png' border=0 alt='Up' title='Up'>";
+		$_PNG_DOT['0']="<img src='$_URL_PATH/i/red.png' border=0>";
+		$_PNG_DOT['1']="<img src='$_URL_PATH/i/green.png' border=0>";
+		$_PNG['tracelogo']="<img src='$_URL_PATH/i/tracelogo.png' border='0'>";
+		$_PNG['rarrow']="<img src='$_URL_PATH/i/rarrow.png' border='0'>";
+		$_PNG['dmarrow']="<img src='$_URL_PATH/i/dmarrow.png' border='0'>";
+		$_PNG['rmarrow']="<img src='$_URL_PATH/i/rmarrow.png' border='0'>";
+		$_PNG['info']="<img src='$_URL_PATH/i/info.png' border='0'>";
+		$_PNG['time']="<img src='$_URL_PATH/i/time.png' border='0'>";
+		$_PNG['gbarrow']="<img src='$_URL_PATH/i/gbarrow.png' border='0'>";
+		$_PNG['grarrow']="<img src='$_URL_PATH/i/grarrow.png' border='0'>";
+	}
+
+	// misc dir
+	if(!function_exists("mkdirr")) {
+		function mkdirr($pathname, $mode = 0700) {
+			if(is_dir($pathname) || empty($pathname)) return true;
+    			if(is_file($pathname)) return false;
+    			$next_pathname = substr($pathname, 0, strrpos($pathname, DIRECTORY_SEPARATOR));
+    			if(mkdirr($next_pathname, $mode)) {
+        			if(!file_exists($pathname)) {
+					return mkdir($pathname, $mode);
+        			}
+    			}
+    			return false;
+		}
+	}
+	function str_encrypt($string, $epad='!5047a88a7963275e43790ee796dcb7ec!') {
+    		$pad=base64_decode($epad);
+    		$encrypted='';
+		for($i=0;$i<strlen($string);$i++) {
+			$encrypted .= chr(ord($string[$i]) ^ ord($pad[$i]));
+		}
+		return base64_encode($encrypted);
+	}
+
+	function str_decrypt($string, $epad='!5047a88a7963275e43790ee796dcb7ec!') {
+		$pad=base64_decode($epad);
+		$encrypted=base64_decode($string);
+		$decrypted='';
+		for($i=0;$i<strlen($encrypted);$i++) {
+			$decrypted .= chr(ord($encrypted[$i]) ^ ord($pad[$i]));
+		}
+		return $decrypted;
+	}
+	// mfs_license
+	function mfs_license($id='') {
+		global $_LICENSE_PATH, $_AWIE_CODE;
+		global $_UPDATE;
+
+		if(!file_exists($_LICENSE_PATH)) return -1;
+		$_MYBOX_LICENSE=array();
+		$_MFS_KEY='';
+
+		@include("$_LICENSE_PATH");
+		if($_MFS_KEY != '5047a88a7963275e43790ee796dcb7ec') return -2;
+		if(isset($_MYBOX_LICENSE['url']) && $_MYBOX_LICENSE['url']!='') {
+			$_UPDATE['url']=$_MYBOX_LICENSE['url'];
+		}
+		if(isset($_MYBOX_LICENSE['expired']) && $_MYBOX_LICENSE['expired']!='none') {
+			$_expired=strtotime($_MYBOX_LICENSE['expired']);
+			if(strlen($_expired) > 8) {
+				if(time() > $_expired) {
+					$_time=date('d/m/Y',$_expired);
+					return -3;
+				} 
+			}
+			unset($_time,$_expired);
+		}
+		if($_MYBOX_LICENSE[$id]!='') {
+			return $_MYBOX_LICENSE[$id];
+		}
+	}
+
+	if(!is_dir("/tmp/sessions")) @mkdirr("/tmp/sessions");
+	if(!is_dir($_DOWNLOAD_PATH)) @mkdirr("$_DOWNLOAD_PATH");
+	if(!is_dir($_LOCAL_SAVE_PATH)) @mkdirr("$_LOCAL_SAVE_PATH");
+	if(!is_dir($_LOG_PATH)) @mkdirr("$_LOG_PATH");
+	if(!is_dir($_GRAPH_PATH)) @mkdirr("$_GRAPH_PATH");
+	if(!is_link("$_HTDOCS_PATH/d")) @symlink("$_DOWNLOAD_PATH","$_HTDOCS_PATH/d");
+	if(!is_link("$_HTDOCS_PATH/l")) @symlink("$_LOG_PATH","$_HTDOCS_PATH/l");
+?>

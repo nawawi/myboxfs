@@ -1,0 +1,93 @@
+#!/bin/bash -e
+
+START_POINT=$(pwd)
+cd $START_POINT
+ROOT_DIR=$START_POINT/rootfs
+BUSYBOX_SRC=$START_POINT/src/busybox
+KERNEL_BASE=$START_POINT/kernel_base
+BINARY_LIST="/sbin/insmod
+		/sbin/modprobe
+		/sbin/lsmod
+		/sbin/rmmod
+		/sbin/depmod
+		/usr/bin/dialog
+		/sbin/sfdisk
+		/sbin/grub"
+
+SKELS_PATH=$START_POINT/skells
+ZENDLIB=/usr/local/Zend/lib/Optimizer-2_6_2/php-5.1.x/ZendOptimizer.so
+
+rm -rfv $ROOT_DIR
+mkdir -p $ROOT_DIR
+cp -av $SKELS_PATH/* $ROOT_DIR
+
+for t in /lib/libnss*_files*; do
+        cp -av $t $ROOT_DIR/lib
+        [ ! -L "$t" ] && strip $ROOT_DIR/lib/$(basename $t)
+done
+for t in /lib/libnss*_dns*; do
+        cp -av $t $ROOT_DIR/lib
+        [ ! -L "$t" ] && strip $ROOT_DIR/lib/$(basename $t)
+done
+
+# linux 2.6.x
+cp -av /lib/ld-linux.so.2 $ROOT_DIR/lib
+cp -av /lib/$(readlink /lib/ld-linux.so.2) $ROOT_DIR/lib
+strip $ROOT_DIR/lib/ld-2.3.6.so
+
+
+for x in $BINARY_LIST; do
+	if [ -x "$x" ]; then
+        	sh $START_POINT/cp_bin "$x" "$ROOT_DIR"
+	else
+		echo "WARNING ==> $x not found"
+        fi
+done
+
+#if [ ! -f "$ZENDLIB" ]; then
+#        echo "$ZENDLIB not found"
+#        exit
+#else
+#        cp -v $ZENDLIB $ROOT_DIR/lib
+#        strip $ROOT_DIR/lib/$(basename $ZENDLIB)
+#fi
+
+if [ ! -x "$BUSYBOX_SRC/busybox" ]; then
+	echo "busybox not compile yet"
+	exit
+else
+        BUSYBOXLINK="$(cat $BUSYBOX_SRC/busybox.links |sed -e 's/\/sbin\///g' -e 's/\/bin\///g' |grep -v '^\/')"
+        sh $START_POINT/cp_bin "$BUSYBOX_SRC/busybox" "$ROOT_DIR"
+        cd $ROOT_DIR/bin
+	for b in $BUSYBOXLINK; do
+                ln -sfv busybox $b
+        done
+fi
+
+
+cd $START_POINT
+
+cp -v $KERNEL_BASE/*.bz2 $ROOT_DIR/tmp
+
+dos2unix $START_POINT/bootscript/*
+
+mkdir -p $ROOT_DIR/init
+mkdir -p $ROOT_DIR/install
+
+cp -v $START_POINT/bootscript/linuxrc $ROOT_DIR/sh
+cp -v $START_POINT/bootscript/init $ROOT_DIR/init/sh
+cp -v $START_POINT/bootscript/install $ROOT_DIR/install/sh
+
+shc -r -T -f $ROOT_DIR/sh
+mv -v $ROOT_DIR/sh.x $ROOT_DIR/sh && rm -f $ROOT_DIR/sh.x.c
+upx-kernel --best $ROOT_DIR/sh && chmod 700 $ROOT_DIR/sh
+
+shc -r -T -f $ROOT_DIR/init/sh
+mv -v $ROOT_DIR/init/sh.x $ROOT_DIR/init/sh && rm -f $ROOT_DIR/init/sh.x.c
+upx-kernel --best $ROOT_DIR/init/sh && chmod 700 $ROOT_DIR/init/sh
+
+shc -r -T -f $ROOT_DIR/install/sh
+mv -v $ROOT_DIR/install/sh.x $ROOT_DIR/install/sh && rm -f $ROOT_DIR/install/sh.x.c
+upx-kernel --best $ROOT_DIR/install/sh && chmod 700 $ROOT_DIR/install/sh
+
+cp -v $START_POINT/configs/grub.tgz $ROOT_DIR/etc

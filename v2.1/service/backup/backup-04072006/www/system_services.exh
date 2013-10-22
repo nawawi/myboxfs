@@ -1,0 +1,929 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+chk_session();
+write_nocache();
+
+$_SYSID="system_services";
+
+$db_id=db_connect($_DB_NAME);
+
+if(!isset($tab)||$tab=='') $tab=1;
+if(!isset($col)||$col=='') $col=1;
+
+if($tab==1) {
+	if(isset($do_save)&&$do_save==1 && chk_pri($_LOGIN['auth_id'],1)==1) {
+		if($port=='') $port='161';
+		if($comm=='') $comm='mybox';
+		if($stat=='') $stat=0;
+		$location=trim(escape_str($location));
+		$contact=trim(escape_str($contact));
+		db_query("update service_snmp set port='$port',comm='$comm',stat='$stat',location='$location',contact='$contact'",$db_id);
+		$msg="SNMP service updated!.";
+		echo_query("snmp-restart");
+	} else {
+		if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+			$msg="Permission denied!.";
+		}
+	}
+	$result=db_query("select * from service_snmp",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_port=$row['port'];
+			$_stat=$row['stat'];
+			$_comm=$row['comm'];
+			$_location=$row['location'];
+			$_contact=$row['contact'];
+		}	
+	}
+}
+if($tab==2) {
+	if(isset($do_save)&&$do_save==1 && chk_pri($_LOGIN['auth_id'],1)==1) {
+		if($port=='') $port='22';
+		if($stat!='') $stat=1;
+		if($stat=='') $stat=0;
+		db_query("update service_ssh set port='$port',stat='$stat'",$db_id);
+		$msg="SSH service updated!.";
+		echo_query("ssh-restart");
+	} else {
+		if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+			$msg="Permission denied!.";
+		}
+	}
+	$result=db_query("select * from service_ssh",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_port=$row['port'];
+			$_stat=$row['stat'];
+		}	
+	}
+}
+if($tab==3) {
+	if(isset($do_save)&&$do_save==1 && chk_pri($_LOGIN['auth_id'],1)==1) {
+		if($iplist!='') {
+			$iplist=trim($iplist);
+			$list=explode(" ",$iplist);
+			if(count($list)!=0) {
+				db_query("delete from logger",$db_id);
+				foreach($list as $ipx) {
+					if(preg_match("/(\S+)\:(\S+)\/(\d+)/",$ipx,$mm)) {
+						$ip=$mm[1];
+						$proto=$mm[2];
+						$port=$mm[3];
+					} else {
+						$ip="$ipx";
+						$proto="udp";
+						$port="514";
+					}
+					db_query("insert into logger (ip,proto,port) values ('$ip','$proto','$port')",$db_id);
+				}
+			} else {
+				if(preg_match("/(\S+)\:(\S+)\/(\d+)/",$iplist,$mm)) {
+					$ip=$mm[1];
+					$proto=$mm[2];
+					$port=$mm[3];
+				} else {
+					$ip="$iplist";
+					$proto="udp";
+					$port="514";
+				}
+				db_query("insert into logger (ip,proto,port) values ('$ip','$proto','$port')",$db_id);
+			}
+		}
+		if($logger_stat!='') $logger_stat=1;
+		if($logger_stat=='') $logger_stat=0;
+		db_query("update misc set val='$logger_stat' where name='logger_stat'",$db_id);
+		db_query("update misc set val='$logger_priority' where name='logger_priority'",$db_id);
+		db_query("update misc set val='$logger_facility' where name='logger_facility'",$db_id);
+		$msg="Setting updated.!";
+		echo_query("syslog-restart");
+	} else {
+		if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+			$msg="Permission denied!.";
+		}
+	}
+}
+
+if($tab==4) {
+	if(isset($do_save)&&$do_save==1 && chk_pri($_LOGIN['auth_id'],1)==1) {
+		if($stat!='') $stat=1;
+		if($stat=='') $stat=0;
+		if($deny!='') $deny=1;
+		if($deny=='') $deny=0;
+		if(!isset($default_lease)||$default_lease=='') $default_lease='7200';
+		if(!isset($max_lease)||$max_lease=='') $max_lease='86400';
+
+		if(isset($dev)&&$dev!='') db_query("update service_dhcp set dev='$dev'",$db_id);
+		if(isset($range_start)&&$range_start!='') db_query("update service_dhcp set range_start='$range_start'",$db_id);
+		if(isset($range_end)&&$range_end!='') db_query("update service_dhcp set range_end='$range_end'",$db_id);
+		if(isset($default_lease)&&$default_lease!='') db_query("update service_dhcp set default_lease='$default_lease'",$db_id);
+		if(isset($max_lease)&&$max_lease!='') db_query("update service_dhcp set max_lease='$max_lease'",$db_id);
+		db_query("update service_dhcp set netbios='$netbios',deny='$deny',stat='$stat'",$db_id);
+
+		$msg="<script>waitcount();</script>";
+		echo_query("dhcp-restart");
+	} elseif(isset($do_save)&&$do_save==2 && chk_pri($_LOGIN['auth_id'],1)==1) {
+		echo_query("dhcp-restart");
+		sleep(1);
+	} elseif(isset($do_save)&&$do_save==3 && chk_pri($_LOGIN['auth_id'],1)==1) {
+		if(count($aid)!=0) {
+			$result=db_query("select range_start,range_end from service_dhcp",$db_id);
+			if(db_num_rows($result)!=0) {
+				while($row=db_fetch_array_assoc($result)) {
+					$_range_start=$row['range_start'];
+					$_range_end=$row['range_end'];
+				}
+			}
+			foreach($aid as $id) {
+				$ip=$aip[$id];
+				if($ip=='' || check_ipv4($ip)==0) continue;
+				if((ip2long($ip) >= ip2long($_range_start)) && (ip2long($ip) <= ip2long($_range_end)) ) {
+					$msg="Static Address cannot lie within dynamic client range";
+					break; 
+				}
+				$mac=trim($amac[$id]);
+				if($mac=='') continue;
+				$mac=str_replace("-",":",$mac);
+				if(!preg_match("/(\S\S)\:(\S\S)\:(\S\S)\:(\S\S)\:(\S\S)\:(\S\S)/",$mac)) {
+					$msg="Invalid MAC Address";
+					break;
+				}
+				$mac=strtoupper($mac);
+				$stat=$astat[$id];
+				$note=escape_str($anote[$id]);
+				if($stat=='') {
+					$stat=0;
+				} else {
+					$stat=1;
+				}
+				if($id!='new') {
+					db_query("update dhcp_hosts set ip='$ip',mac='$mac',stat='$stat',note='$note' where id='$id'",$db_id);
+				} else {
+					$result=db_query("select * from dhcp_hosts where ip='$ip'",$db_id);
+					if(db_num_rows($result)==0) {
+						$result1=db_query("select * from dhcp_hosts where mac='$mac'",$db_id);
+						if(db_num_rows($result1)!=0) {
+							$msg="MAC Address already exist!.";
+						} else {
+							db_query("insert into dhcp_hosts (ip,mac,stat,note) values ('$ip','$mac','$stat','$note')",$db_id);
+						}
+					} else {
+						$msg="IP Address already exist!.";
+					}
+				}
+			}
+		}
+	} elseif(isset($do_save)&&$do_save==4 && chk_pri($_LOGIN['auth_id'],1)==1) {
+		if(isset($do_id)&&$do_id=='del') {
+			db_query("delete from dhcp_hosts where id='$id'",$db_id);
+		} else {
+			if(count($del)!=0) {
+				foreach($del as $id) {
+					if($id!='') db_query("delete from dhcp_hosts where id='$id'",$db_id);
+				}
+			}
+		}
+	} else {
+		if(isset($do_save)&&$do_save!='') {
+			$msg="Permission denied!.";
+		}
+	}
+}
+
+
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script language="javascript" src="<?echo $_URL_PATH;?>/j/strings.js"></script>
+<script language="javascript">
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+</script>
+<script language="javascript">
+	function do_submit() {
+		document.f.do_save.value='1';
+		document.f.btsave.disabled=true;
+		document.f.submit();
+		return true;
+	}
+var k=0;
+function waitcount() { 
+ 	k=k+2;
+	if(k <= 100) {
+    		document.getElementById("msg").innerHTML='Reloading.. Please wait..'+k+'%';  
+    		setTimeout(waitcount,200);  
+	} else {
+		self.location.href='<?echo "$_URL_PATH/system_services.exh?tab=$tab&col=$col&ddev=$ddev";?>';
+	}
+}
+</script>
+</head>
+<body onload="parent.left_frame.switchmenu('sub1');" scroll=auto>
+<form name=f method=post action="<?echo "$_URL_PATH/system_services.exh";?>" onsubmit="return do_submit();">
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 10px;'>
+<tr>
+<td>
+<p class="sectitle"><b>System:</b> Local Services</p><br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="<?echo "$_URL_PATH/system_services.exh?tab=1";?>" <?if($tab==1){?>class="tabact"<?}?>>SNMP</a></li>
+<li><a href="<?echo "$_URL_PATH/system_services.exh?tab=2";?>" <?if($tab==2){?>class="tabact"<?}?>>SSH</a></li>
+<li><a href="<?echo "$_URL_PATH/system_services.exh?tab=3";?>" <?if($tab==3){?>class="tabact"<?}?>>Remote Logging</a></li>
+<li><a href="<?echo "$_URL_PATH/system_services.exh?tab=4";?>" <?if($tab==4){?>class="tabact"<?}?>>DHCP</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td>
+<br>
+
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><?if(isset($msg)&&$msg!='') {?><span id=msg class=notice><?echo "$msg";?></span><?}else{echo "<span id=msg class=notice style='display: none;'></span>";}?></td></tr>
+</table><br>
+
+<!-- tab container -->
+<?if($tab==1) {?>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Port service</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="port" type="text" class="valbox" size="30" value="<?echo $_port;?>"> 
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">System Location</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="location" type="text" class="valbox" size="30" value="<?echo $_location;?>"> 
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">System Contact</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="contact" type="text" class="valbox" size="30" value="<?echo $_contact;?>"> 
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Community Name</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="community" type="text" class="valbox" size="30" value="<?echo $_comm;?>"> 
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Active</td>
+<td width="70%" valign="middle" class="tdvalue">
+<input name="stat" type="checkbox" value="1" <?if($_stat==1) echo "checked";?>></td>
+</td>
+</tr>
+</tbody>
+</table>
+<?}//tab==1?>
+<?if($tab==2) {?>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Port service</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="port" type="text" class="valbox" size="30" value="<?echo $_port;?>"> 
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Active</td>
+<td width="70%" valign="middle" class="tdvalue">
+<input name="stat" type="checkbox" value="1" <?if($_stat==1) echo "checked";?>></td>
+</td>
+</tr>
+</tbody>
+</table>
+<?}//tab==2?>
+<?if($tab==3) {
+$_FACILITY=array();
+$_FACILITY['auth']=4;
+$_FACILITY['daemon']=3;
+$_FACILITY['kern']=0;
+$_FACILITY['security']=4;
+$_FACILITY['syslog']=5;
+$_FACILITY['user']=1;
+$_FACILITY['local0']=16;
+$_FACILITY['local1']=17;
+$_FACILITY['local2']=18;
+$_FACILITY['local3']=19;
+$_FACILITY['local4']=20;
+$_FACILITY['local5']=21;
+$_FACILITY['local6']=22;
+$_FACILITY['local7']=23;
+$_PRIORITY=array();
+$_PRIORITY['alert']=1;
+$_PRIORITY['crit']=2;
+$_PRIORITY['debug']=7;
+$_PRIORITY['emerg']=0;
+$_PRIORITY['err']=3;
+$_PRIORITY['info']=6;
+$_PRIORITY['notice']=5;
+$_PRIORITY['warning']=4;
+$logger_stat=0;
+$logger_facility=1;
+$logger_priority=5;
+$result=db_query("select * from misc where name like \"logger_%\"",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_name=$row['name'];
+		$_val=$row['val'];
+		if($_name=="logger_stat") $logger_stat=$_val;
+		if($_name=="logger_facility") $logger_facility=$_val;
+		if($_name=="logger_priority") $logger_priority=$_val;
+	}
+}
+if($logger_stat=='1') $_stat1='checked';
+?>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Enable logging</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input type=checkbox name=logger_stat value="<?echo "$logger_stat;";?>" <?echo "$_stat1";?> onclick="if(this.checked==true) { document.f.iplist.disabled=false; } else { document.f.iplist.disabled=true; }"> Enable this service
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Facility</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<select name=logger_facility size=1 class=valbox>
+<?
+if(count($_FACILITY)!=0) {
+	foreach($_FACILITY as $fn => $fp) {
+		if($fp=="$logger_facility") {
+			echo "<option value='$fp' selected>$fn</option>";
+		} else {
+			echo "<option value='$fp'>$fn</option>";
+		}
+	}
+}
+?>
+</select>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Severity</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<select name=logger_priority size=1 class=valbox>
+<?
+if(count($_PRIORITY)!=0) {
+	foreach($_PRIORITY as $pn => $pp) {
+		if($pp=="$logger_priority") {
+			echo "<option value='$pp' selected>$pn</option>";
+		} else {
+			echo "<option value='$pp'>$pn</option>";
+		}
+	}
+}
+?>
+</select>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="top" class="tdname">Syslog Server</td>
+<td width="70%" valign="middle" class="tdvalue">
+<table class="data" style='border: 0px;'>
+<tr><td valign=top style='border: 0px;'> 
+<textarea class=valbox cols=40 rows=3 style='height: 50px;' name=iplist disabled>
+<?
+$result=db_query("select ip,proto,port from logger",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_ip=trim($row['ip']);
+		$_proto=trim($row['proto']);
+		$_port=trim($row['port']);
+		if($_ip!='') {
+			if($_proto!='' && $_port!='') {
+				echo "$_ip:$_proto/$_port ";
+			} else {
+				echo "$_ip ";
+			}
+		}	
+	}
+}
+?>
+</textarea>
+</td>
+<td valign=bottom style='border: 0px;'>Each IP/Host separate by space. If you want to use other port and protocol, you can enter with this format ip:protocol/port.
+</td></tr></table>
+</td>
+</tr>
+<?if($logger_stat=='1') {?>
+<script>document.f.iplist.disabled=false;</script>
+<? }?>
+</tbody>
+</table>
+<?}//tab==3?>
+<?if($tab==4) {?>
+
+
+<table width="100%" border="0" cellpadding="0" cellspacing="0">
+<tr><td>
+<ul id="tabnav">
+<li class="<?if($col==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($col!=1) { echo "<a href=\"$_URL_PATH/system_services.exh?tab=$tab&col=1&ddev=$ddev\">"; }?>Setting<?if($col!=1) { echo "</a>"; }?></li>
+<li class="<?if($col==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($col!=2) { echo "<a href=\"$_URL_PATH/system_services.exh?tab=$tab&col=2&ddev=$ddev\">"; }?>Static Address<?if($col!=2) { echo "</a>"; }?></li>
+<li class="<?if($col==3) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($col!=3) { echo "<a href=\"$_URL_PATH/system_services.exh?tab=$tab&col=3&ddev=$ddev\">"; }?>DHCP Leases<?if($col!=3) { echo "</a>"; }?></li>
+</ul>
+</td></tr>
+<tr> 
+<td class="tabcont">
+
+<?if($col==1) {
+	$result=db_query("select * from service_dhcp",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_stat=$row['stat'];
+			$_dev=$row['dev'];
+			$_range_start=$row['range_start'];
+			$_range_end=$row['range_end'];
+			$_default_lease=$row['default_lease'];
+			$_max_lease=$row['max_lease'];
+			$_netbios=$row['netbios'];
+			$_deny=$row['deny'];
+		}
+	}
+	$result=db_query("select * from ipaddr where name!='WAN'",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_name=$row['name'];
+			$_ip=$row['ip'];
+			$_mask=$row['mask'];
+			$_dev1=$row['dev'];
+			$_devv[]="$_name";
+			$_nm=ipcalc($_ip,$_mask);
+			if(count($_nm)!=0) {
+				$_network=$_nm['network'];
+				$_bcast=$_nm['broadcast'];
+				$_deev[$_name]="$_ip|$_mask|$_network|$_bcast|$_dev1";
+			}
+		}
+	}
+	unset($_network,$_bcast,$_ip,$_mask,$_dev1);
+	if(!isset($ddev)||$ddev=='') {
+		list($_ip,$_mask,$_network,$_bcast,$_dev1)=preg_split("/\|/",$_deev[$_dev]);
+	} else {
+		list($_ip,$_mask,$_network,$_bcast,$_dev1)=preg_split("/\|/",$_deev[$ddev]);
+		$_dev=$ddev;
+	}
+
+?>
+<script language="javascript">
+function do_active() {
+	if(document.f.stat.checked==false) {
+		document.f.dev.disabled=true;
+		document.f.range_start.disabled=true;
+		document.f.range_end.disabled=true;
+		document.f.default_lease.disabled=true;
+		document.f.max_lease.disabled=true;
+		document.f.netbios.disabled=true;
+		document.f.deny.disabled=true;		
+	} else {
+		document.f.dev.disabled=false;
+		document.f.range_start.disabled=false;
+		document.f.range_end.disabled=false;
+		document.f.default_lease.disabled=false;
+		document.f.max_lease.disabled=false;
+		document.f.netbios.disabled=false;
+		document.f.deny.disabled=false;	
+	}
+};
+function do_ddev(dd) {
+	document.f.ddev.value=dd;
+	self.location.href="<?echo "$_URL_PATH/system_services.exh?tab=$tab&col=1&ddev=";?>"+dd;
+}
+
+</script>
+<table width="100%" class=data>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Enable</td>
+<td width="70%" valign="middle" class="tdvalue">
+<input name="stat" type="checkbox" value="1" <?if($_stat==1) echo "checked";?> onclick='do_active();'> Enable this service
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Enable on device</td>
+<td width="70%" valign="middle" class="tdvalue">
+<select name=dev class="valbox" size=1 onchange="do_ddev(this.value);">
+<?
+if(count($_devv)!=0) {
+	foreach($_devv as $_list) {
+		if($_dev==$_list) {
+			echo "<option name='$_list' selected>$_list</option>";
+		} else {
+			echo "<option name='$_list'>$_list</option>";
+		}
+	}
+}
+?>
+</select>
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdname">Network</td>
+<td width="70%" valign="middle" class="tdvalue">
+<?echo $_network;?>
+<input type=hidden name=network value="<?echo $_network;?>">
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdname">Netmask</td>
+<td width="70%" valign="middle" class="tdvalue">
+<?echo $_mask;?>
+<input type=hidden name=mask value="<?echo $_mask;?>">
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdname">Available range</td>
+<td width="70%" valign="middle" class="tdvalue">
+<?echo "$_network - $_bcast";?>
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdname">Setting range</td>
+<td width="70%" valign="middle" class="tdvalue">
+<input type=text name=range_start value="<?echo $_range_start;?>" size=20 class='valbox'> to 
+<input type=text name=range_end value="<?echo $_range_end;?>" size=20 class='valbox'>
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdname">Default lease lifetime</td>
+<td width="70%" valign="middle" class="tdvalue">
+<input name="default_lease" type="text" class="valbox" size="10" value="<?echo $_default_lease;?>"> second(s)
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdname">Maximum lease lifetime</td>
+<td width="70%" valign="middle" class="tdvalue">
+<input name="max_lease" type="text" class="valbox" size="10" value="<?echo $_max_lease;?>"> second(s)
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="top" class="tdname">WINS server(s)</td>
+<td width="70%" valign="top" class="tdvalue">
+<textarea cols=40 rows=2 style='height: 40px;' class=valbox name=netbios>
+<?echo "$_netbios ";?>
+</textarea> Separate by space
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdname">Deny unknown clients</td>
+<td width="70%" valign="middle" class="tdvalue">
+<input name="deny" type="checkbox" value="1" <?if($_deny==1) echo "checked";?>> Only Static address client will get DHCP lease.
+</td>
+</tr>
+
+</table>
+
+<? } // col==1 
+if($col==2) {?>
+<script language="javascript">
+	function do_savedhcp() {
+		if(!chkvalidip()) { return false; };
+		if(!chkvalidmac()) { return false; };
+		document.f.do_save.value='3';
+		document.f.bt4.disabled=true;
+		document.f.submit();
+		return true;
+	}
+	function dotoggle() {
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					document.f.elements[i].checked = !(document.f.elements[i].checked);
+    				}	
+			}
+  		}
+	}
+	function chkdel() {
+		var x='0';
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					if(document.f.elements[i].checked) x++;
+    				}	
+			}
+  		}
+		if(x==0) { return false; };
+		return true;
+	}
+	function do_delete() {
+		if(chkdel()!=false) {
+			if(confirm('Are you sure you want to proceed?')) {
+				document.f.do_save.value='4';
+				document.f.submit();
+			}
+		}
+	}
+	function chkvalidip() {
+		var ip1='';
+		var ip2='';
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='text') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'aip') {
+					ip1=document.f.elements[i].value;
+					if(!mip1(ip1)) {
+						error("Invalid IP Address '"+ip1+"'");
+						return false;
+					};
+					if(ip1=='' && ip2=='' ) {
+						return false;
+					};
+					if(ip1==ip2) {
+						error("IP Address '"+ip1+"' already exist");
+						return false;
+					};
+					ip2=ip1;
+    				}	
+			}
+  		}
+		return true;
+	}
+	function chkvalidmac() {
+		var ip1='';
+		var ip2='';
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='text') {
+			    	if( document.f.elements[i].name.substr( 0, 4 ) == 'amac') {
+					ip1=document.f.elements[i].value;
+					if(!mmac(ip1)) {
+						error("Invalid MaC Address '"+ip1+"'");
+						return false;
+					}
+					if(ip1=='' && ip2=='' ) {
+						return false;
+					}
+					if(ip1==ip2) {
+						error("MAC Address '"+ip1+"' already exist");
+						return false;
+					}
+					ip2=ip1;
+    				}	
+			}
+  		}
+		return true;
+	}
+</script>
+
+<table width="100%" class=data>
+<thead class="blue">
+      <tr>
+        <td style='font-weight: bold;'>#</td> 
+        <td style='font-weight: bold;'>IP Address</td>
+	<td style='font-weight: bold;'>MAC Address</td>
+	<td style='font-weight: bold;'>Active</td>
+	<td style='font-weight: bold;'>Description</td>
+        <td style='font-weight: bold;'>Opt</td>
+      </tr>
+</thead>
+<tbody>
+<?
+$x=1;
+$result=db_query("select * from dhcp_hosts",$db_id);
+if(@db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_id=$row['id'];
+		$_ip=$row['ip'];
+		$_mac=strtoupper($row['mac']);
+		$_stat=$row['stat'];
+		$_note=unescape_str($row['note']);
+		if($_stat==1) { 
+			$_stat1='checked';
+		} else {
+			$_stat='';
+			$_stat1='';
+		}
+	echo "
+      <tr>
+        <td style='background-color: #ffffff;'><input type=hidden name=aid[$_id] value='$_id'>$x</td>
+        <td style='background-color: #ffffff;'><input type=text name=aip[$_id] value='$_ip' size=25 class='valbox'></td>
+        <td style='background-color: #ffffff;'><input type=text name=amac[$_id] value='$_mac' size=25 class='valbox'></td>
+	<td style='background-color: #ffffff; text-align: center;' align=center><input type=checkbox name=astat[$_id] $_stat1></td>
+        <td style='background-color: #ffffff;'><input type=text name=anote[$_id] value='$_note' size=35 class='valbox'></td>
+        <td style='background-color: #ffffff; text-align: right;' valign=middle align=right><a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='$_URL_PATH/system_services.exh?tab=$tab&col=2&do_id=del&do_save=4&id=$_id&ddev=$ddev';\">{$_PNG['delete']}</a><input type=checkbox name=del[$_id] value=$_id></td>
+      </tr>";
+	$x++;
+	}
+}
+	if(isset($do_id)&&$do_id==add && chk_pri($_LOGIN['auth_id'],1)==1) {
+	echo "
+      <tr>
+        <td style='background-color: #ffffff;'><input type=hidden name=aid[new] value='new'>$x</td>
+        <td style='background-color: #ffffff;'><input type=text name=aip[new] value='' size=25 class='valbox'></td>
+        <td style='background-color: #ffffff;'><input type=text name=amac[new] value='' size=25 class='valbox'></td>
+	<td style='background-color: #ffffff; text-align: center;' align=center><input type=checkbox name=astat[new]></td>
+        <td style='background-color: #ffffff;'><input type=text name=anote[new] value='' size=35 class='valbox'></td>
+        <td style='background-color: #ffffff;'></td>
+      </tr>";
+	}
+
+if($x > 1) {
+?>
+<tr>
+<td style='text-align: right; background-color: #ffffff;' valign=top colspan=6><a href="#" onclick='do_delete();'>Delete</a> / <a href="#" onclick='dotoggle();'>Toggle</a> <?echo $_PNG['arrow_rtr'];?></td>
+</tr>
+<? } ?>
+<tr>
+<td style='text-align: right; background-color: #ffffff;' valign=top colspan=6>
+<?if($x > 1 || $do_id=='add'){?><input name=bt4 type="button" value="Save" class="button-small" onclick='return do_savedhcp();'><?}?><input name=btadd type="button" value="Add New" class="button-small" onclick="self.location.href='<?echo "$_URL_PATH/system_services.exh?tab=$tab&col=$col&ddev=$ddev";?>&&do_id=add'">
+</td>
+</tr>
+</tbody>
+</table>
+
+<? } //col==2
+if($col==3) {
+
+function get_dhcp_lease() {
+	$leases=array();
+	if($fp=@fopen("/var/state/dhcp/dhcpd.leases","r")) {
+		$return=array();
+		while($line=fgets($fp))	{
+			$matches="";
+			if(preg_match("/^\s*[\r|\n]/", $line, $matches[0]) ||
+				preg_match("/^([^\"#]*)#.*$/", $line, $matches[1]) ||
+				preg_match("/^([^\"]*)\/\/.*$/", $line, $matches[2]) ||
+				preg_match("/\s*#(.*)/", $line, $matches[3]) ||
+				preg_match("/\\\"\176/", $line, $matches[4]) ) {
+				$line="";
+				continue;
+			}
+
+			if(preg_match("/(.*)#(.*)/", $line, $matches)) $line=$matches[0];
+			do {
+				if(preg_match("/^\s*\"([^\"]*)\"(.*)$/", $line, $matches)) {
+					$line=$matches[2];
+					$return[]=array($matches[1], 0);
+				} else if(preg_match("/^\s*([{};])(.*)$/", $line, $matches)) {
+					$line=$matches[2];
+					$return[]=array($matches[0], 1);
+				} else if(preg_match("/^\s*([^{}; \t]+)(.*)$/", $line, $matches)) {
+					$line=$matches[2];
+					$return[]=array($matches[1], 0);
+				} else {
+					break;
+				}
+			} while($line);
+			$lines++;
+		}
+		fclose($fp);
+		$i=0;
+		while($data=array_shift($return)) {
+			if($data[0]=="next") $d=array_shift($return);
+			if($data[0]=="lease") {
+				$d=array_shift($return);
+				$leases[$i]['ip']=$d[0];
+			}
+			if($data[0]=="client-hostname") {
+				$d=array_shift($return);
+				$leases[$i]['hostname']=$d[0];
+			}
+			if($data[0]=="hardware") {
+				$d=array_shift($return);
+				if($d[0]=="ethernet") {
+					$d=array_shift($return);
+					$leases[$i]['mac']=$d[0];
+				}
+			} else if($data[0]=="starts") {
+				$d=array_shift($return);
+				$d=array_shift($return);
+				$leases[$i]['start']=$d[0];
+				$d=array_shift($return);
+				$leases[$i]['start'] .= " " . $d[0];
+			} else if($data[0]=="ends") {
+				$d=array_shift($return);
+				$d=array_shift($return);
+				$leases[$i]['end']=$d[0];
+				$d=array_shift($return);
+				$leases[$i]['end'] .= " " . $d[0];
+			} else if($data[0]=="binding") {
+				$d=array_shift($return);
+				if($d[0]=="state") {
+					$d=array_shift($return);
+					$leases[$i]['act']=$d[0];
+				}
+			} else if(($data[0]=="}")&&($data[1]==1)) {
+				$i++;
+			}
+		}
+	}
+	return $leases;
+}
+?>
+<script language="javascript">
+function do_lease(lease) {
+	self.location.href='<?echo "$_URL_PATH/system_services.exh?tab=$tab&col=3&ddev=$ddev&lease=";?>'+lease;
+	return true;
+}
+	function do_flush() {
+		document.f.do_save.value='2';
+		document.f.bt3.disabled=true;
+		document.f.submit();
+		return true;
+	}
+</script>
+<table width="100%" class=data>
+<thead class="blue"> 
+<tr>
+<td style='font-weight: bold;'>#</td>
+<td style='font-weight: bold;'>IP address</td>
+<td style='font-weight: bold;'>MAC address</td>
+<td style='font-weight: bold;'>Hostname</td>
+<td style='font-weight: bold;'>Obtained</td>
+<td style='font-weight: bold;'>Expires</td>
+</tr></thead>
+<tbody>
+<?
+$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff;cursor: hand;'";
+if(!isset($lease)||$lease=='') $lease=0;
+
+if(count(get_dhcp_lease())!=0) {
+	$x=0;
+	foreach(get_dhcp_lease() as $data) {
+		$is='';$ie='';
+		if(($data['act']!="active")&&($lease==0)) continue;
+		if(($data['act']!= "active")&&($lease==1)) {
+			$is="<i>";
+			$ie="</i>";
+		}
+		$x++;
+		$date_start=date('d/m/Y h:i:s A',utc2local(strtotime($data['start'])));
+		$date_end=date('d/m/Y h:i:s A',utc2local(strtotime($data['end'])));
+		echo "<tr $lt>\n";
+		echo "<td style='background-color: #ffffff;' valign=middle>$is$x$ie</td>\n";
+		echo "<td style='background-color: #ffffff;' valign=middle>$is{$data['ip']}$ie</td>\n";
+		echo "<td style='background-color: #ffffff;' valign=middle>$is".strtoupper($data['mac'])."$ie</td>\n";
+		echo "<td style='background-color: #ffffff;' valign=middle>$is{$data['hostname']}$ie</td>\n";
+		echo "<td style='background-color: #ffffff;' valign=middle>$is$date_start$ie</td>\n";
+		echo "<td style='background-color: #ffffff;' valign=middle>$is$date_end$ie</td>\n";
+		echo "</tr>\n";
+	}
+}
+?>
+</tbody>
+</table>
+
+<? } // col==3?>
+</td>
+</tr>
+<?if($col==1) {?>
+<script>do_active();</script>
+<? } //col==1 ?>
+</table>
+<?}//tab==4?>
+<br>
+<table align=right>
+<tbody>
+<tr>
+<?if($col!=3){?>
+<td><input name="btsave" value="<?if($col==1){echo "Save & Apply changes";}else{echo "Apply changes";}?>" type="button" class=button onclick="do_submit();"></td>
+<?} else {?>
+<td><input name=bt3 type="button" value="Flush" class="button" onclick="return do_flush();"></td>
+<td><input name=bt1 type="button" value="Show active leases only" class="button" onclick="return do_lease('0');"><input name=bt2 type="button" value="Show active and expired leases" class="button" onclick="return do_lease('1');"></td>
+<? } ?>
+</tr> 
+</tbody>
+</table>
+
+</td>
+</tr>
+</table>
+
+
+<!-- end tab container -->
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?echo $tab;?>>
+<input type=hidden name=col value=<?echo $col;?>>
+<input type=hidden name=ddev value="<?echo $_dev;?>">
+</form>
+</body>
+</html>
+
+<?db_close($db_id); flush();?>

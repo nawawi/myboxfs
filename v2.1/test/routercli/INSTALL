@@ -1,0 +1,47 @@
+GNU RouterCli is free software for replacement a shell on diskless and one-floppy systems, 
+therefore should be started with root privileges.
+Privileges are necessary at start of system and for functions, such as Òing,hostname,etc.
+For test routercli  you can comment some lines in cli.conf with "!" at the start of line.
+
+ATTENTION: ROUTERCLI is NOT ROUTER OS, it`s ONLY SMALL SHELL REPLACEMENT!
+
+INSTALL:
+    You need kernel version > 2.4.x
+    Type 'make', then 'make install'.
+    Next, see /etc/routercli/cli.conf.sample, change and rename it to cli.conf 
+    (routercli carries out cli.conf at start with ). 
+    If the config is not present, not terribly, then you can give a command 
+    "show running-config" and "write mem" if you need save this system configuration.
+    For diskless or one-floppy you can initialize cli.conf data with "routercli -s" 
+    at system startup (type "routercli -h" for help), then for diskless replace 
+    "/usr/sbin/routercli" with sh in inittab.
+RIP:    
+    Ripd daemon (routed) started if you type "host(config) router rip".
+    If needed, you can change "/etc/routercli/ripd.conf" by hands for system startup
+    or use "host(config-router) network ..." command. Ripd.conf is used instead of /etc/gateways
+    in this case. For example: "host(config-router) network 192.168.9.0 192.168.2.1 1 active".
+    See routed docs for details. After that you need restart ripd,
+    type "host(config) no router rip", then start it. 
+ACLS:    
+    Standard access-list (through iptables libiptc library) now supported:
+    Example usage:
+    1.	host(config)# access-list 22 permit 192.168.9.0 0.0.0.3
+    2.  host(config)# access-list 22 permit host 192.168.11.2
+    3.  host(config)# access-list 22 deny any
+    4.  host(config-if)# ip access-group 22 in
+    It`s ~ iptables FORWARD chains. For managing network access to router,
+    use "access-class" command:
+    1.	host(config)# access-list 1 permit 192.168.3.0 0.0.0.7
+    2.  host(config)# access-list 1 permit host 192.168.190.22
+    3.  host(config)# access-list 1 deny any
+    4.  host(config-line)# access-class 1 in
+    It`s ~ iptables INPUT chains. 
+    You can use this with your own iptables script (better), or without (in this case 
+    don`t remember load iptables module at startup).
+    Note, command "no ip access-group" or "no access-class" remove all rules.
+    Extended acls may be supported later.
+Bla-bla:
+    You can leave in shell, having typed a command "host# shell".
+        
+Alex Eremin
+07072004

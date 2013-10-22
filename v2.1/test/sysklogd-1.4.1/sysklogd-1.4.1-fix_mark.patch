@@ -1,0 +1,33 @@
+--- sysklogd-1.4.1rh/syslogd.c.fix_mark	2005-05-19 11:30:39.379441000 -0400
++++ sysklogd-1.4.1rh/syslogd.c	2005-05-19 11:38:36.107236000 -0400
+@@ -1122,10 +1122,18 @@
+ 			init();
+ 			continue;
+ 		}
++
++		if ( alarm_signal )
++		{
++			domark();
++			alarm_signal = 0;
++		}
++
+ 		if (nfds == 0) {
+ 			dprintf("No select activity.\n");
+ 			continue;
+ 		}
++
+ 		if (nfds < 0) {
+ 			if (errno != EINTR)
+ 				logerror("select");
+@@ -1211,11 +1219,6 @@
+ 		  }
+ 
+ #endif
+-		if ( alarm_signal )
+-		{
+-			domark();
+-			alarm_signal = 0;
+-		}
+ 	}
+ }
+ 

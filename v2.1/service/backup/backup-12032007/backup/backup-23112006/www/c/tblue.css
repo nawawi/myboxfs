@@ -1,0 +1,7 @@
+html {overflow-x: hidden;overflow-y: hidden;}
+td,a {font-family: Verdana, Arial, Helvetica, sans-serif; font-size: 9px; }
+table { margin-left: 1px;}
+.left_menu {cursor: pointer; margin: 5px; background-color: #e7e9f2; color: #003399; width: 135px; border:1px solid #ccc; padding: 2px; text-align: left; font-weight: bold; font-size: 10px; padding-left: 0px; margin-left: 0px; }
+.left_submenu {width: 133px; font-size: 9px; padding-top: 5px; padding-bottom: 5px; padding-left: 5px; padding-right: 0px; border: 1px solid #C3D9FF; text-align: left;}
+.left_submenu a {color: #003399; text-decoration: none; font-weight: normal; }
+.left_submenu a:hover {color: #FF6600; text-decoration: none; font-style: solid; font-weight: normal;}

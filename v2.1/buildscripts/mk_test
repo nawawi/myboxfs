@@ -1,0 +1,19 @@
+rm -f /tmp/list
+rm -f /tmp/list2
+rm -f /tmp/bbl
+sh mk_fs
+#sh preload.list.sh >> rootfs/preload
+#cat /tmp/bbl >> rootfs/preload
+
+sh mk_img
+rm -fv /boot/mybox*.bin
+cp -v build/myboxsys.bin build/myboxos.bin /boot
+#rm -rfv /mybox/modules
+#rm -rfv /mybox/tools
+#cp -av build/tools /mybox/
+#cp -av build/modules /mybox/
+
+
+rm -f /tmp/list
+rm -f /tmp/list2
+rm -f /tmp/bbl

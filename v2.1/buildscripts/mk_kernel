@@ -1,0 +1,113 @@
+#!/bin/sh -e
+
+START=$(pwd)
+CONFIG="$START/configs/kernel.config-2.6.18"
+
+KERNEL_SOURCE=/usr/src/linux
+REL_DIR=$START/kernel_base
+REL_MOD=$REL_DIR/modules
+VMXNET_SRC=$KERNEL_SOURCE/extra/vmxnet-only
+ARPSTAR_SRC=$KERNEL_SOURCE/extra/arpstar
+
+if [ ! -d "$KERNEL_SOURCE" ]; then
+	echo "$KERNEL_SOURCE not found"
+	exit;
+fi
+
+if [ ! -f "$CONFIG" ]; then
+	echo "$CONFIG not found"
+	exit;
+fi
+
+TIME=$(date +%H:%M:%S)
+MYBOX_INFO="
+#undef UTS_SYSNAME
+#define UTS_SYSNAME \"MyBoxOS\"
+#undef UTS_VERSION
+#define UTS_VERSION \"v2.1 BUILD:20070312\"
+#undef LINUX_COMPILE_BY
+#define LINUX_COMPILE_BY \"mfs\"
+#undef LINUX_COMPILE_HOST 
+#define LINUX_COMPILE_HOST \"devel.mybox.net.my\"
+#undef LINUX_COMPILE_DOMAIN
+#define LINUX_COMPILE_DOMAIN \"mybox.net.my\"
+#undef UTS_MACHINE
+#define UTS_MACHINE \"i386\"
+"
+
+rm -rf $REL_DIR
+mkdir -p $REL_MOD
+
+cd $KERNEL_SOURCE
+make distclean
+make clean
+make mrproper
+sync
+cat $CONFIG > $KERNEL_SOURCE/.config
+echo "$MYBOX_INFO" > $KERNEL_SOURCE/include/linux/mybox.h
+sync
+make oldconfig
+
+make INSTALL_MOD_PATH=$REL_MOD
+make INSTALL_MOD_PATH=$REL_MOD modules_install
+#exit
+cd $START
+
+K_VER=$(ls $REL_MOD/lib/modules)
+if [ -f "$KERNEL_SOURCE/arch/i386/boot/bzImage" ]; then
+	cp -v $KERNEL_SOURCE/arch/i386/boot/bzImage $REL_DIR/mfs-kernel
+	upx-kernel -9 $REL_DIR/mfs-kernel
+	du -hc $REL_DIR/$KVER
+fi
+
+mkdir -p $REL_MOD/lib/modules/$K_VER/kernel
+
+
+cd $START
+find kernel_base/modules/lib/modules/*/kernel/drivers/* -name '*.ko' |sed -e 's/kernel_base\/modules//g' >> $REL_MOD/lib/modules/drivers.txt
+
+rm -fv $REL_MOD/lib/modules/$K_VER/build 
+rm -fv $REL_MOD/lib/modules/$K_VER/source
+rm -fv $REL_MOD/lib/modules/$K_VER/modules.ccwmap
+rm -fv $REL_MOD/lib/modules/$K_VER/modules.ieee1394map
+rm -fv $REL_MOD/lib/modules/$K_VER/modules.inputmap
+rm -fv $REL_MOD/lib/modules/$K_VER/modules.isapnpmap
+rm -fv $REL_MOD/lib/modules/$K_VER/modules.usbmap
+
+cd $REL_MOD
+
+# add 17/01/2006
+# ppp/pptp modules
+tar -jcvf $REL_DIR/kmods_ppp.bz2 lib/modules/$K_VER/kernel/drivers/net/ppp* |sort
+rm -rfv lib/modules/$K_VER/kernel/drivers/net/ppp*
+
+# ipv4/iptables
+tar -jcvf $REL_DIR/kmods_iptables.bz2 lib/modules/$K_VER/kernel/net/ipv4 lib/modules/$K_VER/kernel/net/netfilter |sort
+rm -rfv lib/modules/$K_VER/kernel/net/ipv4 lib/modules/$K_VER/kernel/net/netfilter
+
+# Qos
+tar -jcvf $REL_DIR/kmods_qos.bz2 lib/modules/$K_VER/kernel/net/sched |sort
+rm -rfv lib/modules/$K_VER/kernel/net/sched
+
+# add 24/04/2006
+# scsi modules
+tar -jcvf $REL_DIR/kmods_scsi.bz2 lib/modules/$K_VER/kernel/drivers/scsi |sort 
+rm -rfv lib/modules/$K_VER/kernel/drivers/scsi
+
+# base
+tar -jcvf $REL_DIR/kmods_base.bz2 lib |sort
+
+cd $START
+if [ ! -f "$REL_DIR/iptables.bz2" ]; then
+	sh mk_iptables
+fi
+
+if [ ! -f "$REL_DIR/keymaps.bz2" ]; then
+	sh mk_keymaps
+fi
+
+if [ ! -f "$REL_DIR/zoneinfo.bz2" ]; then
+	sh mk_zoneinfo
+fi
+
+cp -v $KERNEL_SOURCE/System.map $REL_DIR

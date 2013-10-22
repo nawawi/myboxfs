@@ -1,0 +1,19 @@
+2004-05-26 
+General command generation was changed and command completion was implemented. 
+    alexander <xyxyx@rambler.ru>
+    
+2004-06-03 
+A number of commands is added and support of a config-file is included.
+    alexander <xyxyx@rambler.ru>
+
+2004-06-07 
+The bugs with default-route and record of a config is corrected.
+    alexander <xyxyx@rambler.ru>
+
+2004-06-15 
+The set of remarks is eliminated at compilation,syntax is checked up. 
+Many thanks bypo <bypo@users.sourceforge.net>!
+    alexander <xyxyx@rambler.ru>
+2004-07-06
+Standard access-lists,ripd,short commands is included.
+    alexander <xyxyx@rambler.ru>              

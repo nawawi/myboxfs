@@ -1,0 +1,33 @@
+#!/bin/php -f
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once("clib.exl");
+putenv("PATH=/bin:/service/tools:/service/init");
+
+
+// global
+$pid=pcntl_fork();
+if($pid==-1) {
+	slog("Query: mfs-graph fork failed!");
+	return 1;
+} else if($pid) {
+	exit;
+} else {
+	$time=time();
+	$rrd_lastupdate=date('D d M H:i:s T Y',get_rrd_lastupdate());
+	get_traffic_graph();
+	get_loadavg_graph();
+	get_cpu_graph();
+	get_mem_graph();
+	get_realmem_graph();
+	get_realswap_graph();
+	get_strgroot_graph();
+	get_strgfix_graph();
+	get_strglogs_graph();
+	get_ips_graph();
+	$last_update=time();
+	save_to_file("/var/sys/rrd_lastupdate",$last_update);
+	exit;
+}
+exit;
+?>

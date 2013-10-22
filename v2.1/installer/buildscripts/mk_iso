@@ -1,0 +1,14 @@
+rm -fv *.iso
+VER=$(cat ../build/latest-firmware)
+cd cdrom/data
+rm -f db.dat os.dat
+cp -av ../../../build/db/db.dat .
+cp -av ../../../build/{myboxos.bin,myboxsys.bin} .
+tar -zcvf os.dat myboxos.bin myboxsys.bin
+sync
+rm -fv *.bin
+cd ../
+mkisofs -o ../$VER.iso \
+-publisher "$VER" -J -b isolinux/isolinux.bin -c isolinux/boot.cat \
+-no-emul-boot -boot-load-size 4  \
+-boot-info-table .

@@ -1,0 +1,176 @@
+#!/bin/php -Cq
+<?
+// ssh.init - last update 30-Jun-2006
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+
+putenv("PATH=/bin:/service/tools:/service/init");
+
+if(!file_exists("/bin/sshd") || !file_exists("/bin/sshdkey")) {
+	echo "! sshd or sshdkey binary not found or cannot execute\n";
+	slog("sshd or sshdkey binary not found or cannot execute");
+	exit(1);
+}
+
+$_SSH_STAT=0;
+$_SSH_PORT=5052;
+$_SSH_PASSWORD=crypt('123456','123456');
+$_FTP_PASSWORD='';
+$_QUIET=0;
+
+$db_id=db_connect($_DB_NAME);
+$result=db_query("select * from service_ssh",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_SSH_STAT=$row['stat'];
+		$_SSH_PORT=$row['port'];
+		$_SSH_PASSWORD=trim($row['pass']);
+	}
+}
+unset($result);
+$result=db_query("select pass from service_ftp",$db_id);
+if(db_num_rows($result)!=0) {
+	$_FTP_PASSWORD=db_fetch_single($result);
+}
+db_close($db_id);
+
+if($_SSH_PASSWORD=='') {
+	$_SSH_PASSWORD=crypt('123456','123456');	
+}
+
+function ssh_key() {
+	global $_QUIET;
+	@unlink("/etc/rsa_host_key");
+	@unlink("/etc/dss_host_key");
+	if(exec_cmd("sshdkey -t rsa -f /etc/rsa_host_key >> /dev/null 2>&1")==0) {
+		if($_QUIET==0) {
+			echo "* Generating SSH RSA key..\n";
+			slog("Generating SSH RSA key");
+		}
+	}
+	if(exec_cmd("sshdkey -t dss -f /etc/dss_host_key >> /dev/null 2>&1")==0) {
+		if($_QUIET==0) {
+			echo "* Generating SSH DSS key..\n";
+			slog("Generating SSH DSS key");
+		}
+	}
+	return 0;
+}
+
+function ssh_passwd() {
+	global $_SSH_PASSWORD, $_FTP_PASSWORD;
+	global $_QUIET;
+	if($_FTP_PASSWORD=='') {
+		$_FTP_PASSWORD=crypt('ftp123','ftp123');	
+	}
+	@copy("/etc/passwd","/etc/passwd.bak");
+	if($fi=fopen("/etc/passwd","w")) {
+		fwrite($fi,"mfs:$_SSH_PASSWORD:0:0:mfs:/config:/bin/sh\n");
+		fwrite($fi,"ftp1:$_FTP_PASSWORD:0:0:ftp1:/config:/bin/sh\n");
+		fwrite($fi,"nobody:x:0:0:nobody:/:/bin/none\n");
+		fwrite($fi,"pcap:x:0:0:pcap:/:/bin/none\n");
+		fclose($fi);
+		if($_QUIET==0) {
+			echo "* Generating SSH access password\n";
+			slog("Generating SSH access password");
+		}
+		@unlink("/etc/passwd.bak");
+		return 0;
+	}
+	@rename("/etc/passwd.bak","/etc/passwd");
+	if($_QUIET==0) {
+		echo "* Generating SSH access password failed\n";
+		slog("Generating SSH access password failed");
+	}
+	return 1;
+}
+
+function ssh_status() {
+	global $_QUIET;
+	$pid=get_progpid("sshd");
+	if($pid!='' && $_QUIET==0) {
+		echo "* sshd (pid $pid) is running...\n";
+		return 0;
+	}
+	return 1;
+}
+
+function ssh_start() {
+	global $_SSH_PORT, $_SSH_STAT;
+	global $_QUIET;
+	$_SSH_OPT='';
+	$_QUIET=1;
+	if($_SSH_STAT==0) {
+		echo "* SSH agent disabled\n";
+		@unlink("/var/sys/chk_sshd");
+		return 1;
+	}
+	if(!file_exists("/etc/rsa_host_key") || !file_exists("/etc/dss_host_key")) {
+		@ssh_key();
+	}
+	ssh_passwd();
+	if($_SSH_PORT!='5052') $_SSH_OPT="-p $_SSH_PORT";
+	if(@ssh_status()==1) {
+		if(exec_cmd("sshd $_SSH_OPT")==0) {
+			if($_QUIET==0) {
+				echo "* Starting SSH agent\n";
+				slog("Starting SSH agent");
+			}
+			@touch("/var/sys/chk_sshd");
+			return 0;
+		}
+	} 
+	if($_QUIET==0) {
+		echo "* Starting SSH agent failed\n";
+		slog("Starting SSH agent failed");
+	}
+	return 1;
+}
+
+function ssh_stop() {
+	global $_QUIET;
+	if(killall("sshd")==0) {
+		if($_QUIET==0) {
+			echo "* Shutting down SSH agent\n";
+			slog("Shutting down SSH agent");
+		}
+		@unlink("/var/sys/chk_sshd");
+		return 0;
+	}
+	echo "* Shutting down SSH agent failed\n";
+	slog("Shutting down SSH agent failed");
+	return 1;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=ssh_start();
+		break;
+	case 'stop':
+		$ret=ssh_stop();
+		break;
+	case 'restart':
+		$ret=ssh_stop();
+		sleep(2);
+		$ret=ssh_start();
+		break;
+	case 'status':
+		$ret=ssh_status();
+		break;
+	case 'passwd':
+		$ret=ssh_passwd();
+		break;
+	case 'key':
+		$ret=ssh_key();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/status/passwd/key]\n";
+		break;
+}
+flush();
+exit($ret);
+?>

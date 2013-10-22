@@ -1,0 +1,51 @@
+<?
+// from client if news update enable or if autoupdate enable
+// query: updates.html?chk=2&v=$cversion&f=$firmware_version&i=$ips_version&b=$blacklist_version
+if(isset($chk)&&$chk!='' && isset($v)&&$v!='') {
+	if(file_exists("$v.config.php")) {
+		@include_once("$v.config.php");
+	} else {
+		exit;
+	}
+	$buff='';
+	if(file_exists("news.txt")) {
+		$buff .=file_get_contents("news.txt");
+	}
+	if($v!=$current_version) exit;
+	$_varray=array();
+	if(isset($f)&&$f!='') {
+		list($fversion,$fmd5)=preg_split("/\|/",$firmware_version);
+		$fmdate=strtotime($fversion);
+		$fudate=strtotime($f);
+		if($fudate < $fmdate) {
+			$buff .="* Firmware version $fversion available for update\n";
+			$_varray["firmware"]="$firmware_version";
+		}
+	}
+	if(isset($i)&&$i!='') {
+		list($iversion,$imd5)=preg_split("/\|/",$ips_version);
+		$imdate=strtotime($iversion);
+		$iudate=strtotime($i);
+		if($iudate < $imdate) {
+			$buff .="* IPS signature version $iversion available for update\n";
+			$_varray["ips"]="$ips_version";
+		}
+	}
+	if(isset($b)&&$b!='') {
+		list($bversion,$bmd5)=preg_split("/\|/",$blacklist_version);
+		$bmdate=strtotime($bversion);
+		$budate=strtotime($b);
+		if($budate < $bmdate) {
+			$buff .="* Blacklist database version $bversion available for update\n";
+			$_varray["blacklist"]="$blacklist_version";
+		}
+	}
+	$_sv=serialize($_varray);
+	if($chk==1) {
+		echo "$_sv";
+	} elseif($chk==2) {
+		echo "<!--[$_sv=]-->";
+		echo "$buff";
+	}
+        exit;
+}

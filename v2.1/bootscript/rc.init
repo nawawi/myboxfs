@@ -1,0 +1,144 @@
+#!/bin/sh
+# +-----------------------------------------------------------------------------+
+# | Copyright (c) 2002-2006 Tracenetwork Corporation Sdn. Bhd.           	|
+# +-----------------------------------------------------------------------------+
+# | This source file is belongs to nawawi, the author.                    	|
+# | Any changes/use of the source, please email to the author.           	|
+# +-----------------------------------------------------------------------------+
+# | Authors: nawawi, Mohd nawawi Mohamad Jamili <nawawi@tracenetwork.com.my 	|
+# +-----------------------------------------------------------------------------+
+#
+# post scripts:
+#	1. /strg/mybox/post-boot 		<-- extra for boot
+#	2. /strg/mybox/post-rules 		<-- extra for policy execute in /service/init/policy.init
+#
+
+trap : 1 2 3 15
+PATH="/bin"
+TERM=linux
+export PATH TERM
+umask 077
+
+cd /
+DO_SINGLE=0
+[ -f "/strg/.nostrg" ] && rm -f /strg/.nostrg && DO_SINGLE=1
+echo "0 0 0 0" > /proc/sys/kernel/printk
+freeramdisk /dev/ram0 > /dev/null 2>&1
+lcdd_msg() {
+	[ -f "/bin/lcdd" -a -c "/dev/lcd" ] && /bin/lcdd "$1" "$2"	
+}
+# clean rc.bootup stuff
+umount /initrd/sys >/dev/null 2>&1
+umount /initrd >/dev/null 2>&1
+rm -rf /initrd >/dev/null 2>&1
+rm -f /sh >/dev/null 2>&1
+
+echo "#!/bin/sh
+echo "mfs"
+" > /bin/groups
+chmod 700 /bin/groups
+
+# dummy function to show if we have correct driver.
+network_touch() {
+	local pt="0"
+	echo -e "127.0.0.1\t\tlocalhost.localdomain localhost" > /etc/hosts
+	NET_DEVICE=$(awk -F: '/eth.:/{print $1}' /proc/net/dev)
+	if [ -n "$NET_DEVICE" ]; then
+		echo -n "* Detecting network interfaces: "
+		lcdd_msg "SYSTEM LOADING.." "-> CHECKING NIC"
+		for x in $NET_DEVICE; do
+			ip link set $x up >/dev/null 2>&1
+			if [ $? = 0 ]; then
+				echo -n "$x "
+				ip link set $x down >/dev/null 2>&1
+				let pt=pt+1	
+			fi
+		done
+		ip route flush cache >/dev/null 2>&1
+		ip route flush table main >/dev/null 2>&1
+		echo ""
+		[ "$pt" -lt "4" ] && pt=4;
+		echo "$pt" > /var/sys/numnet
+	else
+		echo "* No network device found"
+		lcdd_msg "SYSTEM LOADING.." "-> NO NIC FOUND"
+		touch /var/sys/nonetwork
+	fi
+}
+
+if [ -d "/tmp/tools" ]; then
+	echo -n "-> Extracting helper tools.."
+	for f in /tmp/tools/*.bz2;do
+		tar -C / -jxf $f
+		echo -n "."; usleep 0; wait
+	done
+	echo -e "                                  \r* Extracting helper tools. Done."
+fi
+
+if [ -d "/tmp/modules" ]; then
+	echo -n "-> Extracting system modules.."
+	for f in /tmp/modules/*.bz2;do
+		tar -C / -jxf $f
+		echo -n "."; usleep 0; wait
+	done
+	echo -e "                                  \r* Extracting system modules. Done."
+fi
+
+[ -f "/etc/microcode.dat" ] && /bin/microcode_ctl -Qui >/dev/null 2>&1 
+
+network_touch
+
+# default domain
+echo "fw.mybox.local" > /proc/sys/kernel/hostname
+
+chmod 700 /service/www/*.html >/dev/null 2>&1
+chmod 700 /service/tools/*.exc >/dev/null 2>&1
+
+if [ -f "/etc/rc.start/sh" -a "$DO_SINGLE" = "0" ]; then
+	chmod 700 /service/init/* >/dev/null 2>&1
+	/etc/rc.start/sh
+fi
+
+if [ -f "/strg/mybox/post-boot" -a "$DO_SINGLE" = "0" ]; then
+	chmod 700 /strg/mybox/post-boot >/dev/null 2>&1
+	/strg/mybox/post-boot >>/dev/null 2>&1
+	if [ $? = 0 ]; then
+		echo "* Executing post-boot: /strg/mybox/post-boot"
+	fi
+fi
+
+
+
+# clean. save space
+rm -f /etc/inittab /etc/microcode.dat /bin/microcode_ctl /strg/mybox/download/* /var/sys/init_no_restart >/dev/null 2>&1
+rm -rf /etc/rc.init /etc/rc.start /tmp/* /usr/share/fonts /var/sys/init_start >/dev/null 2>&1
+
+# clean unuse modules
+[ -f "/service/tools/mfs-rmmod.exc" ] && /bin/php -f /service/tools/mfs-rmmod.exc >> /dev/null 2>&1
+if [ -f "/etc/rc.sysctl/sh" ]; then
+	/etc/rc.sysctl/sh >>/dev/null 2>&1
+	echo "* Setting kernel parameters. Done."
+	lcdd_msg "SYSTEM LOADING.." "-> SET KERNEL"
+fi
+# console session
+mkdir -p /tmp/console.session
+
+[ -d "/strg/mybox/" ] && dmesg -c -s 131072 > /strg/mybox/boot.msg
+exec >/dev/console </dev/console 2>&1
+trap 1 2 3 15
+
+[ "$DO_SINGLE" = 1 ] && /bin/sh --login
+[ "$DO_SINGLE" = 1 ] && /bin/reboot
+lcdd_msg "SYSTEM LOADING.." "SET STORAGE"
+mount --bind /strg/mybox/download /config/download >/dev/null 2>&1
+mount --bind /strg/mybox/localsave /config/localsave >/dev/null 2>&1
+mount --bind /strg/mybox/logs /config/logs >/dev/null 2>&1
+echo "6 0 0 0" > /proc/sys/kernel/printk
+chmod 700 /*
+if [ -c "/dev/lcd" ]; then
+	if [ -f "/bin/lcdd" ]; then
+		/bin/lcdd
+		touch /var/sys/chk_lcdd
+	
+	fi 
+fi

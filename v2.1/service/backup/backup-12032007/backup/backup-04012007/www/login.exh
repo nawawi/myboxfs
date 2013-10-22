@@ -1,0 +1,65 @@
+<?
+	if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+	$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+	include_once('clib.exl');
+
+	if(isset($just_login)&&$just_login==1) {
+		mybox_chk_login($passwd);
+		mybox_chk_session();
+		$ErrorMsg='';
+		if($_LOGIN['auth_id']!='admin' && $_LOGIN['auth_id']!='look') {
+			mybox_authlog("Password incorrect");
+			go_url("$_URL_PATH/?msgid=1");
+			exit;
+		} 
+		mybox_authlog("Access granted");
+		go_url("$_URL_PATH/");
+		exit;	
+	}
+	if(isset($just_logout)&&$just_logout==1) {
+		mybox_chk_session();
+		mybox_authlog("Session logout.");
+		mybox_session_logout();
+		go_url("$_URL_PATH/?msgid=3");
+		exit;
+	}
+	if(isset($just_logout)&&$just_logout==5) {
+		mybox_chk_session();
+		if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+			$auth=$_LOGIN['auth_id'];
+			if($_LOGIN['auth_addr']=='') {
+				$auth_addr=getenv("REMOTE_ADDR");
+			} else {
+				$auth_addr=$_LOGIN['auth_addr'];
+			}
+			mybox_slog("INFO","User $auth@$auth_addr rebooting the system with reason $rebootreason");
+			mybox_session_logout();
+			mybox_echo_query("mfs-reboot");
+			go_url("$_URL_PATH/?msgid=5");
+		}
+		exit;
+	}
+	if(isset($just_logout)&&$just_logout==6) {
+		mybox_chk_session();
+		if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+			$auth=$_LOGIN['auth_id'];
+			if($_LOGIN['auth_addr']=='') {
+				$auth_addr=getenv("REMOTE_ADDR");
+			} else {
+				$auth_addr=$_LOGIN['auth_addr'];
+			}
+			mybox_slog("INFO","User $auth@$auth_addr shutdown the system with reason $rebootreason");
+			mybox_session_logout();
+			mybox_echo_query("mfs-shutdown");
+			go_url("$_URL_PATH/?msgid=6");
+		}
+		exit;
+	}
+	if(isset($just_logout)&&$just_logout=="about") {
+		mybox_index_about();
+		exit;
+	}
+	mybox_authlog("Invalid login request. Please re-login.");
+	go_url("$_URL_PATH/?msgid=4");
+	exit;
+?>

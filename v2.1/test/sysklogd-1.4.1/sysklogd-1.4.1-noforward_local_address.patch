@@ -1,0 +1,314 @@
+--- sysklogd-1.4.1rh/syslogd.c.noforward_local_address	2005-01-14 14:15:19.374123000 -0500
++++ sysklogd-1.4.1rh/syslogd.c	2005-01-14 14:15:37.996481000 -0500
+@@ -441,6 +441,15 @@
+  *	Don't return a closed fd if `-a' is called with a wrong path.
+  *	Thanks to Bill Nottingham <notting@redhat.com> for providing
+  *	a patch.
++ * Wed Dec 1 18:00:00 EST 2004: Jason Vas Dias <jvdias@redhat.com>
++ *      Use 'siginterrupt(SIGALRM,1)' after each 'signal(SIGALRM,domark)'
++ *      else recvfrom(...) will never be interrupted
++ *      (bugzilla #141983)
++ *
++ * Thu Dec 1 11:00:00 EST 2004: Jason Vas Dias <jvdias@redhat.com>
++ *      Don't allow remote logging host targets like '@localhost'
++ *      (or any name that resolves to the address of a local interface)!!
++ *
+  */
+ 
+ 
+@@ -491,6 +500,8 @@
+ #include <arpa/nameser.h>
+ #include <arpa/inet.h>
+ #include <resolv.h>
++#include <ifaddrs.h>
++
+ #ifndef TESTING
+ #include "pidfile.h"
+ #endif
+@@ -777,6 +788,10 @@
+ static int create_inet_socket();
+ #endif
+ 
++static struct addrinfo *host_ai_list( char *host );
++static int    hosts_equal(struct addrinfo *ai1, struct addrinfo *ai2);
++static struct in_addr *not_local_address( char *host );
++
+ int main(argc, argv)
+ 	int argc;
+ 	char **argv;
+@@ -1667,7 +1682,7 @@
+ 	register int l;
+ 	char line[MAXLINE + 1];
+ 	time_t fwd_suspend;
+-	struct hostent *hp;
++	struct in_addr *ina;
+ #endif
+ 
+ 	dprintf("Called fprintlog, ");
+@@ -1736,7 +1751,7 @@
+ 		fwd_suspend = time((time_t *) 0) - f->f_time;
+ 		if ( fwd_suspend >= INET_SUSPEND_TIME ) {
+ 			dprintf("Forwarding suspension to unknown over, retrying\n");
+-			if ( (hp = gethostbyname(f->f_un.f_forw.f_hname)) == NULL ) {
++			if ( (ina = not_local_address(f->f_un.f_forw.f_hname)) == NULL ) {
+ 				dprintf("Failure: %s\n", sys_h_errlist[h_errno]);
+ 				dprintf("Retries: %d\n", f->f_prevcount);
+ 				if ( --f->f_prevcount < 0 ) {
+@@ -1748,9 +1763,10 @@
+ 			}
+ 			else {
+ 			        dprintf("%s found, resuming.\n", f->f_un.f_forw.f_hname);
+-				memcpy((char *) &f->f_un.f_forw.f_addr.sin_addr, hp->h_addr, hp->h_length);
++				memcpy((char *) &f->f_un.f_forw.f_addr.sin_addr, ina, sizeof(struct in_addr));
+ 				f->f_prevcount = 0;
+ 				f->f_type = F_FORW;
++				free(ina);
+ 				goto f_forw;
+ 			}
+ 		}
+@@ -2454,7 +2470,7 @@
+ 	int ignorepri = 0;
+ 	int syncfile;
+ #ifdef SYSLOG_INET
+-	struct hostent *hp;
++	struct in_addr *ina;
+ #endif
+ 	char buf[MAXLINE];
+ 	char xbuf[200];
+@@ -2612,7 +2628,7 @@
+ #ifdef SYSLOG_INET
+ 		(void) strcpy(f->f_un.f_forw.f_hname, ++p);
+ 		dprintf("forwarding host: %s\n", p);	/*ASP*/
+-		if ( (hp = gethostbyname(p)) == NULL ) {
++		 if ( (ina = not_local_address(p)) == NULL ) {
+ 			f->f_type = F_FORW_UNKN;
+ 			f->f_prevcount = INET_RETRY_MAX;
+ 			f->f_time = time ( (time_t *)0 );
+@@ -2625,7 +2641,10 @@
+ 		f->f_un.f_forw.f_addr.sin_family = AF_INET;
+ 		f->f_un.f_forw.f_addr.sin_port = LogPort;
+ 		if ( f->f_type == F_FORW )
+-			memcpy((char *) &f->f_un.f_forw.f_addr.sin_addr, hp->h_addr, hp->h_length);
++		{
++			memcpy((char *) &f->f_un.f_forw.f_addr.sin_addr, ina, sizeof(struct in_addr));
++			free(ina);
++		}
+ 		/*
+ 		 * Otherwise the host might be unknown due to an
+ 		 * inaccessible nameserver (perhaps on the same
+@@ -2798,6 +2817,215 @@
+ 	return;
+ }
+ 
++/* These functions are for verifying that a remote logging host
++ * '@name' target does NOT resolve to an address attached to a
++ * local interface; as reported by Chuck Mead <csm@redhat.com>,
++ * if this happens, syslogd sends log messages to itself until
++ * the /var partition fills up.
++ * Jason Vas Dias <jvdias@redhat.com>
++ */
++
++
++static void free_host_ai_list( struct addrinfo *ai )
++{ 
++    struct addrinfo *aie=0L, *ain=0L;
++    for(aie = ai; aie != 0L; aie = ain)
++    {
++	ain = aie->ai_next;
++	if(aie->ai_addr != 0L)
++	    free(aie->ai_addr);
++	if(aie->ai_canonname != 0L)
++	    free(aie->ai_canonname);
++	free(aie);
++    }    
++}
++
++static struct addrinfo *new_host_ai_node( struct addrinfo *ai )
++{
++    struct addrinfo *aie =(struct addrinfo *) malloc( sizeof(struct addrinfo) );
++    int len;
++
++    if( aie == 0L )
++	return 0L;
++    if( ai != 0L )
++	memcpy(aie, ai, sizeof(struct addrinfo));
++    aie->ai_addr = 0L;
++    aie->ai_canonname =0L;
++    aie->ai_next = 0L;
++    if( ( ai->ai_addr != 0L ) && (ai->ai_addrlen > 0) )
++    {
++	aie->ai_addr = (struct sockaddr*) malloc( ai->ai_addrlen );
++	if( aie->ai_addr != 0L )
++	    memcpy(aie->ai_addr, ai->ai_addr,  ai->ai_addrlen );
++    }
++    if( ( ai->ai_canonname != 0L) && (*(ai->ai_canonname) != '\0') )
++    {
++	len = strlen(ai->ai_canonname);
++	aie->ai_canonname = (char*) malloc( len + 1);
++	if( aie->ai_canonname != 0L )
++	{
++	    memcpy( aie->ai_canonname, ai->ai_canonname, len );
++	    ai->ai_canonname[len]='\0';
++	}
++    }
++    return aie;
++}
++
++struct addrinfo *host_ai_list( char *host )
++{
++    struct addrinfo *ai=0L, *ail=0L, *aip, *aie, aih;
++    int r;
++    char *n;
++
++    if ( (host == 0L) || (*host == '\0') )
++       return 0L;
++    memset(&aih,'\0',sizeof(struct addrinfo));
++    aih.ai_flags = AI_CANONNAME;
++    aip=0L;
++    if( ((r=getaddrinfo(host, 0L, &aih, &aip)) != 0 ) || (aip == 0L) )
++       return(0L);
++    else
++       for( aie=aip; aie != 0L; aie=aie->ai_next )
++       {
++           if(  (aie->ai_addr == 0L)
++              ||(aie->ai_family == PF_UNSPEC)
++              ||(aie->ai_addrlen <= 0)
++             )
++               continue;
++           if(ai==0L)
++	   {	
++	       if(aie->ai_canonname == 0L)
++		   continue;
++               ai = new_host_ai_node(aie);
++	       ail= ai;
++           }else
++           {
++	       n=0L;
++	       if( aie->ai_canonname == 0L)
++	       {
++		   n = ai->ai_canonname;
++		   aie->ai_canonname = n;
++	       }
++               ai->ai_next=new_host_ai_node(aie);
++               ai=ai->ai_next;
++	       if(n != 0L)
++		   aie->ai_canonname = 0L;
++           }
++           if (aie == aie->ai_next)
++               break;
++           while
++           (
++                 (aie->ai_next != 0L)
++               &&(
++                    ( aie->ai_next->ai_addr == 0L)
++                  ||( aie->ai_addr == aie->ai_next->ai_addr )
++                  ||(  (aie->ai_next->ai_family == aie->ai_family)
++                     &&(aie->ai_next->ai_addrlen == aie->ai_addrlen)
++		     &&(memcmp( aie->ai_next->ai_addr, aie->ai_addr, aie->ai_addrlen)==0)
++                    )
++		)
++            )/* bug: each unique address / name combination is repeated three times! */
++                aie = aie->ai_next;
++    }
++    if ( ai != 0L)
++       ai->ai_next=0L;
++    freeaddrinfo(aip);
++    return ail;
++}
++
++int hosts_equal( struct addrinfo *ai1, struct addrinfo *ai2 )
++{
++    struct addrinfo *ai=0;
++    for(; ai1 != 0L; ai1 = ai1->ai_next)
++       if (( ai1->ai_canonname != 0L) || ( ai1->ai_addr != 0L))
++       {
++           for(ai = ai2; ai != 0L; ai = ai->ai_next)
++           {
++               if(  (  ( ai1->ai_canonname != 0L)
++                     &&( ai->ai_canonname != 0L)
++                     &&( strcmp(ai->ai_canonname, ai1->ai_canonname)==0)
++                    )
++                 || (  ( ai1->ai_addr != 0L)
++                     &&( ai->ai_addr != 0L )
++                     &&( ai1->ai_family == ai->ai_family)
++                     &&( ai1->ai_addrlen == ai->ai_addrlen)
++                     &&( memcmp(ai->ai_addr, ai1->ai_addr, ai->ai_addrlen) == 0)
++                    )
++                 ) break;
++           }
++           if( ai != 0L )
++               break;
++        }
++    return ((ai1 != 0L) && (ai != 0L));
++}
++
++struct in_addr *not_local_address(char *host)
++{
++    char hostname[1024];
++    struct addrinfo *ai1, *ai2, *ai_next=0;
++    struct ifaddrs *ifa=0L;
++    struct in_addr *ina=0L;
++    if ( host == 0L )
++       return 0L;
++    if(  (strcmp(host,"localhost") == 0)
++       ||(strcmp(host,"localhost.localdomain") == 0)
++       ||(strcmp(host,"127.0.0.1") == 0)
++       ||(strcmp(host,"::1") == 0)
++      ) return 0L;
++    if (gethostname(hostname,1024) == 0)
++	if ( strcmp(host, hostname) == 0 )
++	    return 0L;
++    ai1 = host_ai_list(host);
++    ai2 = host_ai_list(hostname);
++    if( hosts_equal(ai1, ai2) )
++	return 0L;
++    free_host_ai_list(ai2);
++    ai2=0L;
++    if( getifaddrs(&ifa) == 0)
++    {
++	for(; (ifa != 0L) && (ifa->ifa_addr != 0L); ifa = ifa->ifa_next )
++	{
++	    if( inet_ntop( ifa->ifa_addr->sa_family,
++                          ((ifa->ifa_addr->sa_family == PF_INET)
++                           ? (void*)&(((struct sockaddr_in*)(ifa->ifa_addr))->sin_addr)
++                           : (ifa->ifa_addr->sa_family == PF_INET6)
++                             ? (void*)&(((struct sockaddr_in6*)(ifa->ifa_addr))->sin6_addr)
++                             : (void*)&(ifa->ifa_addr->sa_data[0])
++                           ),
++                           hostname,
++                           sizeof(hostname)
++                   ) != 0L
++              )
++	    {
++		ai2=host_ai_list(hostname);
++		if( hosts_equal(ai1, ai2) )
++		    break;
++		free_host_ai_list(ai2);
++		ai2=0L;
++	    }
++	}
++    }
++    if( ai2 != 0L )
++    {
++        free_host_ai_list(ai2);
++        return 0L;
++    }
++    for(ai2 = ai1; ai2 != 0L; ai2 = ai_next)
++    {
++        if ( (ai2->ai_addr != 0L) && (ai2->ai_addr->sa_family == PF_INET))
++            break;
++    }
++    if( ai2 != 0L )
++    {
++        ina = (struct in_addr *)malloc(sizeof(struct in_addr));
++        memcpy(ina,&(((struct sockaddr_in*)ai2->ai_addr)->sin_addr), sizeof(struct in_addr));
++        free_host_ai_list(ai1);
++        return ina;
++    }
++    free_host_ai_list(ai1);
++    return 0L;
++}
++
+ /*
+  * Local variables:
+  *  c-indent-level: 8

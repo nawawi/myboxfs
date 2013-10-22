@@ -1,0 +1,56 @@
+#!/bin/bash -e
+
+START_POINT=$(pwd)
+cd $START_POINT
+
+KBD_LIB=/lib/kbd/keymaps/i386
+KBD_INC=/lib/kbd/keymaps/include
+ROOT_DIR=/tmp/keymap
+KERNEL_BASE=$START_POINT/kernel_base
+
+if [ -d "$KBD_LIB" ]; then
+        rm -rfv /tmp/kbd /tmp/keymap
+        mkdir -p /tmp/kbd/$KBD_LIB
+        mkdir -p /tmp/kbd/$KBD_INC
+        cp -av $KBD_LIB/* /tmp/kbd/$KBD_LIB
+        cp -av $KBD_INC/* /tmp/kbd/$KBD_INC
+        for f in $(find /tmp/kbd/lib/* -name '*.*map*');do
+        _dir=$(dirname $f)
+                case $f in *.gz)
+                        #echo "GZIP $f"
+                        gunzip -v $f
+                ;;
+                        *)
+                #echo $f
+                esac
+        done
+        for f in $(find /tmp/kbd/lib/* -name '*.*map*' |sort );do
+                _f=$(echo $f |sed -e 's/\.kmap//g' -e 's/\.map//g')
+                loadkeys -b $f > $_f.bmap
+        done
+        mkdir -p $ROOT_DIR/usr/share
+        cp -av /tmp/kbd/lib/* $ROOT_DIR/usr/share
+
+        echo "creating kbd map list"
+        rm -f $ROOT_DIR/usr/share/kbd/KBDLIST.TXT /tmp/kbd/KBDLIST.TXT
+        for f in $(find $ROOT_DIR/usr/share/kbd/* -name '*.bmap' |sort); do
+		_G=
+                _G=$(echo "$f" |sed -e 's/\.bmap//g' -e 's/\.gz//g') 
+		echo $(basename $_G) >> /tmp/kbd/KBDLIST.TXT
+                gzip -9 $f
+        done
+        mv -v /tmp/kbd/KBDLIST.TXT $ROOT_DIR/usr/share/kbd/KBDLIST.TXT
+        chmod 600 $ROOT_DIR/usr/share/kbd/KBDLIST.TXT
+        cd $ROOT_DIR
+        sync
+        find $ROOT_DIR/usr/share/kbd/* -name '*.kmap' |xargs rm -fv
+        find $ROOT_DIR/usr/share/kbd/* -name '*.map' |xargs rm -fv
+        find $ROOT_DIR/usr/share/kbd/* -name '*.doc' |xargs rm -fv
+        find $ROOT_DIR/usr/share/kbd/* -name '*.inc' |xargs rm -fv
+	rm -rfv $ROOT_DIR/usr/share/kbd/keymaps/include
+        tar -jcvf keymaps.bz2 usr |sort
+        if [ -f "keymaps.bz2" ]; then
+                mv -v keymaps.bz2 $KERNEL_BASE
+        fi
+        rm -rfv /tmp/kbd /tmp/keymap
+fi

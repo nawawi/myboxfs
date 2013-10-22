@@ -1,0 +1,26 @@
+./configure --prefix=/usr/local/proxy \
+--enable-underscores \
+--disable-hostname-checks \
+--enable-linux-netfilter \
+--enable-kill-parent-hack \
+--enable-icmp \
+--enable-gnuregex \
+--enable-auth="ntlm,basic" \
+--enable-external-acl-helpers="wbinfo_group" \
+--enable-async-io 
+--with-pthreads 
+--enable-storeio=ufs,aufs,diskd,null 
+--enable-arp-acl 
+--enable-removal-policies=lru,heap 
+   --enable-useragent-log \
+   --enable-referer-log \
+   --disable-dependency-tracking \
+   --enable-follow-x-forwarded-for
+--enable-poll 
+--enable-cache-digests 
+--enable-underscores 
+--enable-ssl 
+--enable-filters 
+--enable-icap-support 
+--enable-carp 
+--with-large-files i386-mybox-linux

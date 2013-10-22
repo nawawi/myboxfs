@@ -1,0 +1,76 @@
+#!/bin/sh -e
+ldconfig
+function copy_binary() {
+        if [ -z "$1" ]; then
+                echo "Usage: $0 binary root_dir";
+                exit;
+        fi
+       if [ -z "$2" ]; then
+                echo "Usage: $0 binary root_dir";
+                exit;
+        fi
+        file=$1
+	ROOT_DIR=$2
+	UPX0=0
+	[ ! -z "$3" ] && UPX0=$3
+	UPX="upx-kernel -q --best"
+	[ "$UPX0" = "1" ] && UPX="upx-bin -q --best --force-execve"
+ 
+        if [ -x "$file" ]; then
+                dirname=$(dirname $file)
+                basename=$(basename $file)
+                bindir="$ROOT_DIR/bin"
+        else
+                echo "file '$file' not found"
+                exit
+        fi
+	if [ ! -d "$bindir" ]; then
+		mkdir -p $bindir
+	fi
+
+        cp -v $file $bindir
+        chmod -v a-srwx $bindir/$basename
+        chmod -v u+rwx $bindir/$basename
+	./preload.sh $bindir/$basename >>/tmp/list
+        strip --strip-all $bindir/$basename
+        echo "($UPX0) ++ compressing.. $bindir/$basename"
+        $UPX $bindir/$basename >/dev/null
+        LO=$(ldd $file |tr -d '^\t' |sed -e 's/=>//g' |cut -d ' ' -f 3)
+        if [ "$LO" != "" ]; then
+                for f in $LO; do
+                        LS=
+                        if [ -n "$f" ]; then
+                                echo "$f"
+                                fd=
+                                if [ -L "$f" ]; then
+                                        fd=$(dirname $f)
+                                        LS=$(readlink $f)
+                                        LS="$fd/$LS"
+                                else
+                                        LS=$f
+                                fi
+                                if [ -e "$LS" ]; then
+                                        d=$(dirname $f)
+                                        if [ ! -d "$ROOT_DIR/$d" ]; then
+                                                mkdir -vp $ROOT_DIR/lib
+                                        fi
+                                        bd1=$(basename $LS)
+                                        bd2=$(basename $f)
+                                        if [ ! -f "$ROOT_DIR/lib/$bd1" ]; then
+                                                cp -a $LS $ROOT_DIR/lib
+                                                strip --strip-debug $ROOT_DIR/lib/$bd1
+  						#echo "$basename $bd1" >>/tmp/DEBUG
+	                                      fi
+                                        if [ ! -f "$ROOT_DIR/lib/$bd2" ]; then
+                                                cp -a $f $ROOT_DIR/lib
+                                                strip --strip-debug $ROOT_DIR/lib/$bd2
+  						#echo "$basename $bd2" >>/tmp/DEBUG
+                                        fi
+                                fi
+                        fi
+                done
+        fi
+}
+
+copy_binary "$1" "$2" "$3"
+exit 0;

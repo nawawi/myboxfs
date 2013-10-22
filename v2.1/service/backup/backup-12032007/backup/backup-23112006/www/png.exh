@@ -1,0 +1,10 @@
+<?
+if(!isset($p)||$p=='') {
+	header("Content-Type: image/png");
+	exit;
+}
+$fp = fopen("g/$p", 'rb');
+header("Pragma: no-cache");
+header("Content-Type: image/png");
+fpassthru($fp);
+?>

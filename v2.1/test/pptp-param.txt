@@ -1,0 +1,12 @@
+with AD:
+
+17796          676 S   pptpd [219.94.57.136:05ED - 0000]                                                                            
+17797         1024 S   pppd local file /etc/ppp/options.pptpd 115200 192.168.0.100:192.168.0.245 ipparam 219.94.57.136 plugin /
+
+pppd local file /etc/ppp/options.pptpd 115200 192.168.0.1:192.168.0.11 ipparam 219.95.44.43
+
+
+without AD
+
+19087          668 S   pptpd [219.94.57.136:05F8 - 0000]                                                                            
+19088         1160 S   pppd local file /etc/ppp/options.pptpd 115200 192.168.0.100:192.168.0.245 ipparam 219.94.57.136 plugin /

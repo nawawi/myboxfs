@@ -1,0 +1,32 @@
+Version 2.1
+
+update 20061113
+----------------
+- fix chkprog on ftp checking
+- fix fw_ips.exh; missing variable $sig on tab=2&col=2
+- improve policy acl loading
+- improve ips.init loading
+- smb logging under /var/log/smb
+- coding cleanup
+
+update 20061108
+----------------
+- fix policy.init loading, reloading if rules not finish on loading
+- improve statistic graph
+- improve IPS blocking
+- fix MyADMIN DHCP service page, DHCP service disable while click "Apply Changes" button at "Static Address" tab
+- coding cleanup
+- fix IPS configuration, false alarm on ftp access, IPS detected this as a portscanning
+
+
+update 20061006
+----------------
+- fix policy.init if no type '2' ethernet selected, don't execute
+- fix policy.init debug option variable
+- fix Mybox Input Output Shell (IOSH) loading
+
+update 20061005
+----------------
+- added ftp user as 'ftp1' and using own password rather than sharing with ssh
+- fix ftp log and priviledge, only ftp1 user can access
+- chkprog now running under init process

@@ -1,0 +1,24 @@
+#!/bin/php -f
+<?
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once("clib.exl");
+putenv("PATH=/bin:/service/tools:/service/init");
+
+if(mybox_daemon()==0) {
+	mybox_slog("ERROR","mfs-graph.exc fork failed!");
+	exit;
+}
+
+$time=time();
+$rrd_lastupdate=date('D d M H:i:s T Y',get_rrd_lastupdate());
+$rrd_lastupdate=preg_replace("/:/","\\:",$rrd_lastupdate);
+mybox_get_traffic_graph();
+mybox_get_cpu_graph();
+mybox_get_mem_graph();
+mybox_get_storage_graph();
+mybox_get_ips_graph();
+$last_update=time();
+mybox_save_to_file("/var/sys/rrd_lastupdate",$last_update);
+exit;
+?>

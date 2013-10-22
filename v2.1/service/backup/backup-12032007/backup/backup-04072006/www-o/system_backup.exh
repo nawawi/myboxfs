@@ -1,0 +1,436 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+chk_session();
+write_nocache();
+
+$_SYSID="system_backup";
+
+$db_id=db_connect($_DB_NAME);
+$fdownload='';
+if($tab==1) {
+	if(chk_pri($_LOGIN['auth_id'],2)==1) {
+		if(isset($do_save)&&$do_save==1) {
+			$date=date('Ymd');
+			if($filename=='') $filename="mfs_config$date";
+			if(file_exists("$_DB_PATH/$_DB_NAME")) {
+				@unlink("$_DOWNLOAD_PATH/$filename.mfs");
+				if(exec_cmd("$_SQLITE_BINARY $_DB_PATH/$_DB_NAME .dump > $_DOWNLOAD_PATH/$filename.mfs")==0) {
+					if(file_exists("$_DOWNLOAD_PATH/$filename.mfs")) {
+						if($btype=='download') {
+							$fdownload="onload=\"self.location.href='/d/$filename.mfs';\"";
+							slog("BACKUP: ({$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}) download -> $filename.mfs");
+						}
+						if($btype=='localsave') {
+							@copy("$_DOWNLOAD_PATH/$filename.mfs","$_LOCAL_SAVE_PATH/$filename.mfs");
+							@unlink("$_DOWNLOAD_PATH/$filename.mfs");
+							slog("BACKUP: ({$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}) localsave -> $filename.mfs");
+							$fdownload='';
+							$msg='Localsave backup done';
+						}
+						if($btype=='ftp') {
+							if($ftpserver!='') db_query("update misc set val='$ftpserver' where name='ftp_server'",$db_id);
+							if($ftpuser!='') db_query("update misc set val='$ftpuser' where name='ftp_user'",$db_id);
+							if($ftppass!='') db_query("update misc set val='$ftppass' where name='ftp_pass'",$db_id);
+							if($ftppassive!='') db_query("update misc set val='$ftppassive' where name='ftp_passive'",$db_id);
+							$fdownload="onload=\"ftp_win($tab,'$filename.mfs');\"";
+							slog("BACKUP: ({$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}) ftp -> $filename.mfs");
+						}
+					}
+				}
+			}
+		}
+	} else {
+		if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+			$msg="Permission denied!.";
+		}
+	}
+}
+if($tab==2) {
+	if(chk_pri($_LOGIN['auth_id'],1)==1) {
+		if(isset($do_save)&&$do_save==1) {
+			if($btype=='upload') {
+				if(@move_uploaded_file("$filename","$_DOWNLOAD_PATH/$filename_name")) {
+					@copy("$_DB_PATH/$_DB_NAME","$_DB_PATH/$_DB_NAME".".bak");
+					@unlink("$_DB_PATH/$_DB_NAME");
+					if(exec_cmd("cat $_DOWNLOAD_PATH/$filename_name |$_SQLITE_BINARY $_DB_PATH/$_DB_NAME")==0) {
+						$msg='Restore succeed';
+						@unlink("$_DOWNLOAD_PATH/$filename_name");
+						@unlink("$_DB_PATH/$_DB_NAME".".bak");
+					} else {
+						@copy("$_DB_PATH/$_DB_NAME".".bak","$_DB_PATH/$_DB_NAME");
+					}
+				}
+				if($msg=='') $msg='Restore failed';
+			}
+			if($btype=='localsave') {
+				if(file_exists("$_LOCAL_SAVE_PATH/$filename")) {
+					@copy("$_DB_PATH/$_DB_NAME","$_DB_PATH/$_DB_NAME".".bak");
+					@unlink("$_DB_PATH/$_DB_NAME");
+					if(exec_cmd("cat $_LOCAL_SAVE_PATH/$filename |$_SQLITE_BINARY $_DB_PATH/$_DB_NAME")==0) {
+						$msg='Restore succeed';
+						@unlink("$_DB_PATH/$_DB_NAME".".bak");
+					} else {
+						@copy("$_DB_PATH/$_DB_NAME".".bak","$_DB_PATH/$_DB_NAME");
+					}
+				}
+				if($msg=='') $msg='Restore failed';
+			}
+			if($btype=='ftp') {
+				if($ftpserver!='') db_query("update misc set val='$ftpserver' where name='ftp_server'",$db_id);
+				if($ftpuser!='') db_query("update misc set val='$ftpuser' where name='ftp_user'",$db_id);
+				if($ftppass!='' && $ftppass!='[-- hidden --]') db_query("update misc set val='$ftppass' where name='ftp_pass'",$db_id);
+				if($ftppassive!='') db_query("update misc set val='$ftppassive' where name='ftp_passive'",$db_id);
+				$fdownload="onload=\"ftp_win($tab,'$filename');\"";
+				slog("RESTORE: ({$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}) ftp -> $filename");
+			}
+		}
+		if($do_id=='local_del') {
+			if(file_exists("$_LOCAL_SAVE_PATH/$f")) {
+				@unlink("$_LOCAL_SAVE_PATH/$f");
+				$msg="$f removed";
+			}
+		}
+	} else {
+		if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+			$msg="Permission denied!.";
+		}
+	}
+}
+if(!isset($tab)||$tab=='') $tab=1;
+
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script language="javascript" src="<?echo $_URL_PATH;?>/j/strings.js"></script>
+<script language="javascript">
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+</script>
+<script language="javascript">
+function do_submit() {
+	document.f.btsubmit.disabled=true;
+	document.f.do_save.value='1';
+	document.f.submit();
+	return true;
+}
+function do_change(val) {
+	<?if($tab==1) {?>
+		fname=document.f.filename.value;
+		self.location.href='<?echo "$_URL_PATH/system_backup.exh?tab=$tab&do_id=shift_type"?>&filename='+fname+'&btype='+val;
+	<? } else {?>
+		self.location.href='<?echo "$_URL_PATH/system_backup.exh?tab=$tab&do_id=shift_type";?>&btype='+val;
+	<? } ?>
+}
+function del_local() {
+	var fname=document.f.filename.value;
+	self.location.href='<?echo "$_URL_PATH/system_backup.exh?tab=$tab&do_id=local_del&btype=$btype";?>&f='+fname;
+}
+<?if($btype=='ftp') {?>
+function ftp_win(type,fname) {
+	LeftPosition = (screen.width) ? (screen.width-620)/2 : 0;
+	TopPosition = (screen.height) ? (screen.height-530)/2 : 0;
+	settings='width=620,height=530,top='+TopPosition+',left='+LeftPosition+',scrollbars=1,status=1,resizable=1';
+	ffname='system_ftp.exh?type='+type+'&fname='+fname;
+	window.open(ffname,"ftpwin<?echo time();?>",settings);
+	return true;
+}
+<? } ?>
+</script>
+</head>
+<body scroll=auto <?echo $fdownload;?>>
+<form name=f method=post action="<?echo "$_URL_PATH/system_backup.exh";?>" onsubmit="return do_submit();" enctype="multipart/form-data">
+<table border="0" cellpadding="4" cellspacing="4" width="700" align=center>
+<tr>
+<td align=center>
+
+<!-- main -->
+<fieldset>
+<legend>&nbsp;&nbsp;&nbsp;&nbsp;
+SYSTEM: BACKUP/RESTORE
+&nbsp;&nbsp;&nbsp;&nbsp;</legend>
+
+<table valign=top border=0>
+<tr>
+<td>
+<table border=0 cellpadding="2" cellspacing="2">
+<tr>
+<td align=center valign=middle>
+
+<table width="650" border="0" cellpadding="0" cellspacing="0">
+<tr><td>
+<ul id="tabnav">
+<li class="<?if($tab==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=1) { echo "<a href=\"$_URL_PATH/system_backup.exh?tab=1\">"; }?>Backup<?if($tab!=1) { echo "</a>"; }?></li>
+<li class="<?if($tab==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=2) { echo "<a href=\"$_URL_PATH/system_backup.exh?tab=2\">"; }?>Restore<?if($tab!=2) { echo "</a>"; }?></li>
+</ul>
+</td></tr>
+<tr> 
+<td class="tabcont">
+
+<?if($tab==1) {
+if($btype=='') $btype='download';
+$date=date('Ymd');
+if($filename=='') $filename="mfs_config$date";
+if($btype=='ftp') {
+	$val=array();
+	$result=db_query("select * from misc where name like \"ftp_%\"",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_name=$row['name'];
+			$_val=$row['val'];
+			$val[$_name]=$_val;
+		}
+	}
+	if($ftpserver=='') $ftpserver=$val['ftp_server'];
+	if($ftpuser=='') $ftpuser=$val['ftp_user'];
+	if($ftppass=='') $ftppass=$val['ftp_pass'];
+	if($ftppath=='') $ftppath=$val['ftp_path'];
+	if($ftppassive=='') $ftppassive=$val['ftp_passive'];
+}
+if($ftppass!='') $ftppass='[-- hidden --]';
+?>
+
+<?if($msg!='') {?>
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span class=notice><?echo "$msg";?></span></td></tr>
+</table><br>
+<? }?>
+<table width="600" border="0" cellpadding="6" cellspacing="0">
+<tr> 
+<td width="30%" valign="middle" class="tdcelltop">Backup type</td>
+<td width="70%" valign="middle" class="mtabletop"> 
+<select name=btype size=1 class=textbox onchange='do_change(this.value);'>
+<?
+$_opptype[0]="download";
+$_opptype[1]="localsave";
+$_opptype[2]="ftp";
+$doftp=0;
+foreach($_opptype as $bt) {
+	if($btype==$bt) {
+		echo "<option value='$bt' selected>$bt</option>";
+		if($bt=='ftp') $doftp=1;
+	} else {
+		echo "<option value='$bt'>$bt</option>";
+	}
+}
+?>
+</select>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Save as Filename</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="filename" type="text" class="textbox" size="35" value="<?echo $filename;?>"> 
+</td>
+</tr>
+<?if($doftp==1) {?>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">FTP Server</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="ftpserver" type="text" class="textbox" size="35" value="<?echo $ftpserver;?>"> 
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">FTP User</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="ftpuser" type="text" class="textbox" size="35" value="<?echo $ftpuser;?>"> 
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">FTP Password</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="ftppass" type="password" class="textbox" size="35" value="<?echo $ftppass;?>"> 
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Tranfer mode</td>
+<td width="70%" valign="middle" class="mtable"> 
+<select name=ftp_passive size=1 class=textbox>
+<?
+foreach(array('passive on'=>'TRUE','passive off'=>'FALSE') as $ops => $opt) {
+	if($opt==$ftppassive) {
+		echo "<option value='$opt' selected>$ops</option>";
+	} else {
+		echo "<option value='$opt'>$ops</option>";
+	}
+}
+?>
+</select>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Remote path</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="ftppath" type="text" class="textbox" size="35" value="<?echo $ftppath;?>"> 
+</td>
+</tr>
+<? } //bt=ftp ?>
+</table>
+<tr><td align=right valign=top><input name=btsubmit type="submit" value="Backup" class="button"></td></tr>
+
+<? } // tab==1 ?>
+
+<?if($tab==2) {
+if($btype=='') $btype='upload';
+$date=date('Ymd');
+if($filename=='') $filename="mfs_config$date";
+if($btype=='ftp') {
+	$val=array();
+	$result=db_query("select * from misc where name like \"ftp_%\"",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_name=$row['name'];
+			$_val=$row['val'];
+			$val[$_name]=$_val;
+		}
+	}
+	if($ftpserver=='') $ftpserver=$val['ftp_server'];
+	if($ftpuser=='') $ftpuser=$val['ftp_user'];
+	if($ftppass=='') $ftppass=$val['ftp_pass'];
+	if($ftppath=='') $ftppath=$val['ftp_path'];
+	if($ftppassive=='') $ftppassive=$val['ftp_passive'];
+}
+if($ftppass!='') $ftppass='[-- hidden --]';
+
+$lsave='';
+$d=dir($_LOCAL_SAVE_PATH); 
+while (false !== ($entry = $d->read())) {
+	if($entry=='.' || $entry=='..') continue;
+   	$lsave .="<option valie='$entry'>$entry</option>"; 
+} 
+$d->close();
+
+?>
+
+<?if($msg!='') {?>
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span class=notice><?echo "$msg";?></span></td></tr>
+</table><br>
+<? }?>
+<table width="600" border="0" cellpadding="6" cellspacing="0">
+<tr> 
+<td width="30%" valign="middle" class="tdcelltop">Restore type</td>
+<td width="70%" valign="middle" class="mtabletop"> 
+<select name=btype size=1 class=textbox onchange='do_change(this.value);'>
+<?
+$_opptype[0]="upload";
+$_opptype[1]="localsave";
+$_opptype[2]="ftp";
+$doftp=0;
+foreach($_opptype as $bt) {
+	if($lsave=='' && $bt=='localsave') continue;
+	if($btype==$bt) {
+		echo "<option value='$bt' selected>$bt</option>";
+		if($bt=='ftp') $doftp=1;
+	} else {
+		echo "<option value='$bt'>$bt</option>";
+	}
+}
+?>
+</select>
+</td>
+</tr>
+<?if($btype=='upload') {?>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Upload file</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="filename" type="file" class="filebox" size="35"> 
+</td>
+</tr>
+<? } ?>
+<?if($btype=='localsave' && $lsave!='') {?>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Restore from File</td>
+<td width="70%" valign="middle" class="mtable"> 
+<select name=filename size=1 class=textbox>
+<?
+echo "$lsave";
+?>
+</select>&nbsp;<input type=button value='Delete' class=link-button onclick='del_local();'>
+</td>
+</tr>
+<? } ?>
+<?if($doftp==1) {?>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Filename</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="filename" type="text" class="textbox" size="35" value="<?echo $filename;?>"> 
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">FTP Server</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="ftpserver" type="text" class="textbox" size="35" value="<?echo $ftpserver;?>"> 
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">FTP User</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="ftpuser" type="text" class="textbox" size="35" value="<?echo $ftpuser;?>"> 
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">FTP Password</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="ftppass" type="password" class="textbox" size="35" value="<?echo $ftppass;?>"> 
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Tranfer mode</td>
+<td width="70%" valign="middle" class="mtable"> 
+<select name=ftp_passive size=1 class=textbox>
+<?
+foreach(array('passive on'=>'TRUE','passive off'=>'FALSE') as $ops => $opt) {
+	if($opt==$ftppassive) {
+		echo "<option value='$opt' selected>$ops</option>";
+	} else {
+		echo "<option value='$opt'>$ops</option>";
+	}
+}
+?>
+</select>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Remote path</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="ftppath" type="text" class="textbox" size="35" value="<?echo $ftppath;?>"> 
+</td>
+</tr>
+<? } //bt=ftp ?>
+</table>
+<tr><td align=right valign=top><input name=btsubmit type="submit" value="Restore" class="button"></td></tr>
+
+
+<? } // tab==2 ?>
+
+</td>
+</tr>
+
+</table>
+
+</td>
+</tr>
+</table>
+
+<!-- end main -->
+
+</td>
+</tr>
+</table>
+</fieldset>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?echo $tab;?>>
+<input type=hidden name=btype value=<?echo $btype;?>>
+<input type=hidden name=doftp value=<?echo $doftp;?>>
+<input type=hidden name=dopasv value=<?echo $ftp_passive;?>>
+</form>
+</body>
+</html>
+
+<?db_close($db_id); flush();?>

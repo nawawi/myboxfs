@@ -1,0 +1,224 @@
+#!/bin/php -f
+<?
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+putenv("PATH=/bin:/service/tools:/service/init");
+
+function ip_route_flush() {
+	exec_cmd("ip route flush cache");
+}
+function socket_raw_connect($server,$port,$proto) {
+	global $_FA_TIMEOUT;
+	if(chkconnect($proto,$server,$port,$_FA_TIMEOUT)==0) {
+		slog("LINK: Link Error - $server:$proto/$port");
+		return 0;
+	} 
+	slog("LINK: UP - link $server:$proto/$port no error");
+	return 1;
+}
+
+function grep_route($gw) {
+	exec("route -n",$out,$ret);
+	if($ret==0) {
+		unset($out[0]);
+		unset($out[1]);
+		foreach($out as $buff) {
+               		$buff=trim($buff);
+               		list($destination,$gateway,$genmask,$flags,$metric,$ref,$use,$iface)=preg_split('/\s+/',$buff);
+			if($destination=='0.0.0.0' && $gateway=="$gw" && $flags=='UG') {
+				unset($buff);
+				return $gateway;
+			}
+		}
+	}
+	return null;
+}
+
+function ip_route_clean() {
+	exec("route -n |grep UG",$out,$ret);
+	if($ret==0) {
+		if(count($out)!=0) {
+			foreach($out as $buff) {
+               			$buff=trim($buff);
+				list($destination,$gateway,$genmask,$flags,$metric,$ref,$use,$iface)=preg_split('/\s+/',$buff);
+               			if($destination=='0.0.0.0' && $flags=='UG') {
+               				exec_cmd("route del default gw $gateway");
+				}
+			}
+		}
+	}
+	@shell_exec("route -n > /var/sys/routen.cache");
+	ip_route_flush();
+}
+
+function ip_route($gw) {
+	global $_GATEWAY_STATE;
+	exec_cmd("route add default gw $gw metric 1");
+	ip_route_flush();
+	$gw=grep_route($_GATEWAY_STATE);
+	$_GATEWAY_STATE="$gw";
+	@shell_exec("route -n > /var/sys/routen.cache");
+}
+
+function default_route() {
+	global $_GW_DEFAULT, $_GW_STATE;
+	ip_route_clean();
+	ip_route($_GW_DEFAULT);
+	$_GW_STATE="$_GW_DEFAULT";
+	@shell_exec("route -n > /var/sys/routen.cache");
+}
+
+function do_change_route() {
+	global $_GW_DEFAULT, $_GW_FA, $_GW_STATE;
+	$gw=grep_route($_GW_STATE);
+	slog("LINK: DOWN - link via $_GW_STATE broken");
+	if($_GW_STATE=="$_GW_DEFAULT") {
+		$_GW_STATE="$_GW_FA";
+	} elseif($_GW_STATE=="$_GW_FA") {
+		$_GW_STATE="$_GW_DEFAULT";
+	} else {
+		slog("LINK: not found any gateway state - set to $_GW_DEFAULT");
+		$_GW_STATE="$_GW_DEFAULT";
+	}
+	ip_route_clean();
+	slog("LINK: nexthop to $_GW_STATE");
+	slog("LINK: route to gateway $_GW_STATE");
+	slog("LINK: flush routing cache");
+	ip_route($_GW_STATE);
+	return true;
+}
+
+function chk_switch_back() {
+	global $_TIME_BACK, $_FA_SWITCH, $_GW_DEFAULT, $_GW_STATE;
+	$gw=grep_route($_GW_DEFAULT);
+	if((time() >= $_TIME_BACK) && ($gw!="$_GW_DEFAULT")) {
+		slog("LINK: Switching to default ISP - $_GW_DEFAULT");
+		slog("LINK: route to default gw $_GW_DEFAULT");
+		slog("LINK: flush routing cache");
+		ip_route_clean();
+		ip_route($_GW_DEFAULT);
+		$time=time();
+		$_TIME_BACK=$time + 60 * $_FA_SWITCH;
+		$_GW_STATE="$_GW_DEFAULT";
+	}
+}
+
+function main_loop() {
+	global $_TIME_BACK, $_FA_SWITCH, $_GW_DEFAULT;
+	global $_GW_FA, $_FA_TIMEOUT, $_FA_IDLE;
+	global $_FA_LINK, $_GW_STATE;
+	global $_DB_NAME;
+
+	$down_state='0';
+	$is_down='0';
+
+	$db_id=db_connect($_DB_NAME);
+	$result=db_query("select * from misc where name like \"fa_%\" ",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_name=$row['name'];
+			$_val=$row['val'];
+			if($_name=='fa_timeout') $_FA_TIMEOUT=$_val;
+			if($_name=='fa_idle') $_FA_IDLE=$_val;
+			if($_name=='fa_switch') $_FA_SWITCH=$_val;
+			if($_name=='fa_link') $_FA_LINK=trim($_val);
+		}
+		if($_FA_LINK=='') {
+			slog("LINK: Loading configuration failed!");
+			exit(1);
+		}
+		if($_FA_TIMEOUT=='') $_FA_TIMEOUT=10;
+		if($_FA_IDLE=='') $_FA_IDLE=20;
+		if($_FA_SWITCH=='') $_FA_SWITCH=20;
+
+	} else {
+		slog("LINK: Loading configuration failed!");
+		exit(1);
+	}
+	
+	$result=db_query("select * from gateway",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_id=$row['id'];
+			$_ip=$row['ip'];
+			$_stat=$row['stat'];
+			if($_id=='0') {
+				$_wan_ip=$_ip;
+				$_wan_stat=$_stat;
+			}
+			if($_id=='2') {
+				$_fa_ip=$_ip;
+				$_fa_stat=$_stat;
+				$_fa_dev=$_type;
+			}
+		}
+	}
+	db_close($db_id);
+
+	if($_wan_stat==0) {
+		slog("LINK: default gateway $_wan_ip disabled!");
+		exit(1);
+	}
+	if($_fa_stat==0) {
+		slog("LINK: Link failover disabled!");
+		exit(1);
+	}
+	$_GW_DEFAULT=$_wan_ip;
+	$_GW_FA=$_fa_ip;
+
+	default_route();
+
+	slog("LINK: Loading configuration..");
+	slog("LINK: Loading default routing..");
+	slog("LINK: START checking link..\n");
+	for(;;) {
+		sleep($_FA_IDLE);
+		$list=preg_split('/\s+/',$_FA_LINK);
+		if(count($list)!=0) {
+			foreach($list as $link) {
+				$link=trim($link);
+				if(preg_match("/(\S+)\:(\S+)\/(\d+)/",$link,$mm)) {
+					$ip=$mm[1];
+					$proto=$mm[2];
+					$port=$mm[3];
+					slog("LINK: Checking link $ip:$proto/$port via $_GW_STATE");
+					if(socket_raw_connect($ip,$port,$proto)==1) {
+						$down_state++; // one of link is OK
+					} else {
+						$is_down++;
+					}
+				}
+				unset($proto,$ip,$port);
+			}
+		} else {
+			$link=$_FA_LINK;
+			$link=trim($link);
+			if(preg_match("/(\S+)\:(\S+)\/(\d+)/",$link,$mm)) {
+				$ip=$mm[1];
+				$proto=$mm[2];
+				$port=$mm[3];
+				slog("LINK: Checking link $ip:$proto/$port via $_GW_STATE");
+				if(socket_raw_connect($ip,$port,$proto)==1) {
+					$down_state++; // one of link is OK
+				}
+			}
+			unset($proto,$ip,$port);
+		}
+
+		if($down_state==0) {
+			// no link is UP
+			do_change_route();
+		} else {
+			slog("LINK: Link OK - $down_state link(s) up $is_down links(s) down");
+		}
+		$down_state='0'; // counter back reset to zero
+		$is_down='0';
+		chk_switch_back();
+	}
+}
+
+main_loop();
+
+?>

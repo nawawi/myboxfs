@@ -1,0 +1,34 @@
+#!/bin/php -f
+<?
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once("clib.exl");
+putenv("PATH=/bin:/service/tools:/service/init");
+
+function loop_chk() {
+	global $_LOG_PATH;
+	for(;;) {
+		sleep(1);
+		if(file_exists("/var/sys/chkadsjoin")) {
+			$time=trim(file_get_contents("/var/sys/chkadsjoin"));
+			if($time!='') {
+				if(time() >= $time) {
+					killall("net join");
+					@unlink("/var/sys/chkadsjoin");
+					$logname=date('Ymd');
+					$date=date('d/m/Y H:i:s');
+					$ldate=time();
+					$msg="[$date] Join AD domain timeout";
+					$msgx="<6> Join AD domain timeout";
+					append_to_file("$_LOG_PATH/pptpvpn-$logname.log","$msg\n");
+					send_remotelog($ldate,$msgx);
+					exit(0);
+				}
+			}
+		}
+	}
+}
+
+loop_chk();
+exit(0);
+?>

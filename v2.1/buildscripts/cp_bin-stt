@@ -1,0 +1,44 @@
+#!/bin/sh -e
+ldconfig
+function copy_binary() {
+        if [ -z "$1" ]; then
+                echo "Usage: $0 binary root_dir";
+                exit;
+        fi
+       if [ -z "$2" ]; then
+                echo "Usage: $0 binary root_dir";
+                exit;
+        fi
+        file=$1
+	ROOT_DIR=$2
+	UPX0=0
+	[ ! -z "$3" ] && UPX0=$3
+	UPX="upx-kernel -q --best"
+	[ "$UPX0" = "1" ] && UPX="upx-bin -q --best --force-execve"
+ 
+        if [ -x "$file" ]; then
+                dirname=$(dirname $file)
+                basename=$(basename $file)
+                bindir="$ROOT_DIR/bin"
+        else
+                echo "file '$file' not found"
+                exit
+        fi
+	if [ ! -d "$bindir" ]; then
+		mkdir -p $bindir
+	fi
+
+        cp -v $file $bindir
+        chmod -v a-srwx $bindir/$basename
+        chmod -v u+rwx $bindir/$basename
+	./preload.sh $bindir/$basename >>/tmp/list
+	DIR="$ROOT_DIR/lib"
+	mkdir -p $DIR
+	mklibs -L /mfs-gcc/lib --ldlib /usr/bin/ldd -v -d $DIR $bindir/$basename 
+        strip --strip-all $bindir/$basename
+        echo "($UPX0) ++ compressing.. $bindir/$basename"
+        $UPX $bindir/$basename >/dev/null
+}
+
+copy_binary "$1" "$2" "$3"
+exit 0;

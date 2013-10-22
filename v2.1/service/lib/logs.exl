@@ -1,0 +1,440 @@
+<?
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+
+// Log id:
+// 0 - auth
+// 1 - system
+// 3 - firewall
+// 4 - https
+// 5 - ssh
+// 6 - pptp
+// 7 - ips
+// 8 - portscan
+// 9 - dhcp
+// 10 - audit
+// 11 - ftp
+// 12 - arp
+
+function mybox_cntlogfile($name) {
+	global $_LOG_PATH;
+	$cnt=0;
+	$size=0;
+	$_dirarray=mybox_dir2array("$_LOG_PATH/*$name*");
+	if(count($_dirarray)!=0) {
+		foreach($_dirarray as $file) {
+			if(preg_match("/(\.offset|\.sum)/",$file)) continue;
+			$size +=sprintf("%u",filesize("$file"));
+			clearstatcache();
+			$cnt++;
+		}
+	}
+	clearstatcache();
+	return "$cnt|$size";
+}
+
+function mybox_getlogfile($name) {
+	global $_LOG_PATH;
+	$size=0;
+	$_file_array=array();
+	$_dirarray=mybox_dir2array("$_LOG_PATH/*$name*");
+	if(count($_dirarray)!=0) {
+		foreach($_dirarray as $file) {
+			if(preg_match("/(\.offset|\.sum)/",$file)) continue;
+			$stat=stat("$file");
+			$mtime=$stat[9];
+			$size = sprintf("%u",$stat[7]);
+			$file=basename($file);
+			$_file_array[]="$file|$size|$mtime";
+			clearstatcache();
+		}
+	}
+	clearstatcache();
+	return $_file_array;
+}
+
+function mybox_cntmonthlogfile($name,$year,$month) {
+	global $_LOG_PATH;
+	$cnt=0;
+	$_dirarray=mybox_dir2array("$_LOG_PATH/*$name*");
+	if(count($_dirarray)!=0) {
+		foreach($_dirarray as $file) {
+			$file=basename($file);
+			if(preg_match("/(\.offset|\.sum)/",$file)) continue;
+			if(preg_match("/$name"."-(\d+)\.log/",$file,$mm)) {
+				$date=date('l d/m/Y',strtotime($mm[1]));
+				$year1=date('Y',strtotime($mm[1]));
+				$month1=date('m',strtotime($mm[1]));
+				if(($year1==$year) && ($month1==$month)) $cnt++;
+			}
+			clearstatcache();
+		}
+	}
+	return $cnt;
+}
+
+function mybox_chk_nolog() {
+	if(file_exists("/var/sys/nolog")) return 1;
+	return 0;
+}
+
+function mybox_compress_log() {
+	global $_LOG_PATH, $_RTMP_PATH;
+	if(mybox_chk_nolog()==1) return 0;
+	if(!file_exists("/var/sys/init_no_restart")) mybox_echo_query("syslog-restart");
+	$prev=time() - 86400;
+	$_dirarray=mybox_dir2array("$_LOG_PATH/*.log");
+	if(count($_dirarray)!=0) {
+		foreach($_dirarray as $file) {
+			if(preg_match("/\-(\d+)\.log$/",$file,$mm)) {
+				$tt=strtotime($mm[1]);
+				if($prev >= $tt) {
+					mybox_gzip($file);
+					//mybox_exec_cmd("gzip -qf9 $file");
+					$filex=basename($file);
+					if(file_exists("$_RTMP_PATH/$filex.offset")) @unlink("$_RTMP_PATH/$filex.offset");
+					if(file_exists("$_RTMP_PATH/$filex.sum")) @unlink("$_RTMP_PATH/$filex.sum");
+				}
+				unset($tt);
+			}
+		}
+	}
+}
+
+function mybox_purge_log() {
+	global $_LOG_PATH;
+	if(mybox_chk_nolog()==1) return 0;
+	$local_logs_purge=0;$local_logs_purge_time=0;
+	if(file_exists("/var/sys/local_logs_purge")) {
+		$local_logs_purge=mybox_fget_contents("/var/sys/local_logs_purge");
+	}
+	if($local_logs_purge==0) return 0;
+
+	$local_logs_purge_time=strtotime("-$local_logs_purge days");
+	if($local_logs_purge_time==-1) $local_logs_purge_time=0;
+
+	if($local_logs_purge_time!=0) {
+		$_dirarray=mybox_dir2array("$_LOG_PATH/*.log*");
+		if(count($_dirarray)!=0) {
+			foreach($_dirarray as $file) {
+				if(preg_match("/\-(\d+)\.log/",$file,$mm)) {
+					$tt=strtotime($mm[1]);
+					if($local_logs_purge_time > $tt) {
+						@unlink("$file");
+						if(file_exists("$file.offset")) @unlink("$file.offset");
+						if(file_exists("$file.sum")) @unlink("$file.sum");
+						$fx=basename($file);
+						if(!file_exist("$file")) {
+							@mybox_slog("INFO","Purge logs '$fx' which older than $local_logs_purge day(s)");
+						}
+					}
+				}
+				unset($tt);
+			}
+		}
+	}
+}
+
+function mybox_send_remotelog($time='',$msg) {
+	if(!file_exists("/var/sys/logger")) return 1;
+	$msg=trim($msg);
+	if($msg=='') return 1;
+	if($time=='') $time=time();
+	$actualtime=$time;
+	$month=date("M",$actualtime);
+	$day=substr("  ".date("j",$actualtime), -2);
+	$hhmmss=date("H:i:s",$actualtime);
+	$timestamp=$month." ".$day." ".$hhmmss;
+
+	$logger_facility=1;
+	$logger_priority=5;
+	$hostname="mybox.firewall.local";
+	$server=file('/var/sys/logger');
+	if(count($server)!=0) {
+		foreach($server as $ipx) {
+			$ipx=trim($ipx);
+			if($ipx=='') continue;
+			list($hostname,$logger_priority,$logger_facility,$_proto,$_ip,$_port)=preg_split("/,/",$ipx);
+			if($logger_facility <  0) { $logger_facility=0; }
+			if($logger_facility > 23) { $logger_facility=23; }
+			if($logger_priority <  0) { $logger_priority=0; }
+			if($logger_priority >  7) { $logger_priority=7; }
+
+			$pri="<".($logger_facility*8 + $logger_priority).">";
+			$header="$timestamp $hostname";
+
+			$message=substr("$pri$header $msg", 0, 1024);
+
+			$fp=@fsockopen("$_proto://$_ip", $_port, $errno, $errstr, 3);
+			if(!$fp) {
+				return 1;
+			} else {
+				@fwrite($fp,"$message\n");
+				@fclose($fp);
+			}
+		}
+		return 0;
+	}
+	return 1;
+}
+
+function mybox_chk_https_logout($opt,$ldate,$ip) {
+	$_ID=unserialize(mybox_fget_contents("/var/sys/https.session"));
+	if(!is_array($_ID)) $_ID=array();
+	@session_start();
+	$sess=session_id();
+	if($opt==1) {
+		$cnt=count($_ID);
+		if($cnt==0) $cnt=1;
+		$pid="MY$cnt";
+		$sess1='';
+		$sess1=array_search($pid,$_ID);
+		if($sess1!='') unset($_ID[$sess]);
+		$_ID[$sess]="$pid";
+		$console="https_{$pid}_{$ip}_".date('d:m:Y_H:i:s',$ldate);
+		@touch("/tmp/console.session/$console");
+	}
+	if($opt==2) {
+		if($_ID[$sess]!='') {
+			$cnt=count($_ID);
+			if($cnt==0) $cnt=1;
+			$pid="MY$cnt";
+			$console="https_{$pid}_{$ip}_";
+			mybox_exec_cmd("rm -f /tmp/console.session/$console*");
+			unset($_ID[$sess]);
+		}
+	}
+	file_put_contents("/var/sys/https.session",serialize($_ID));
+}
+
+function mybox_authlog($status) {
+	global $_LOGIN, $_LOG_PATH;
+
+	$time=time();
+	$logname=date('Ymd',$time);
+	$date=date('d/m/Y H:i:s',$time);
+	if($_LOGIN['auth_id']=='') {
+		$auth='unknown';
+	} else {
+		$auth=$_LOGIN['auth_id'];
+	}
+	if($_LOGIN['auth_addr']=='') {
+		$auth_addr=getenv("REMOTE_ADDR");
+	} else {
+		$auth_addr=$_LOGIN['auth_addr'];
+	}
+	if($auth_addr=='') $auth_addr='unknown';
+	if($status=="Access granted") {
+		mybox_chk_https_logout('1',$time,$auth_addr);
+	} else {
+		mybox_chk_https_logout('2',$time,$auth_addr);
+	}
+	$msg="[$date] TYPE=https USER=$auth IP=$auth_addr MSG=$status";
+	$msgx="<0> TYPE=https USER=$auth IP=$auth_addr MSG=$status";
+	if(mybox_chk_nolog()==0) mybox_append_to_file("$_LOG_PATH/auth-$logname.log","$msg\n");
+	mybox_send_remotelog($time,$msgx);
+}
+
+function mybox_write_consolelogin($str) {
+	global $_LOG_PATH;
+
+	$pat="(\w+)\s+(\d+)\s+(\S+)\s+(\S+)\s+MYBOX_LOGIN\[(\d+)\]\:\s+AUTH_CONSOLE\s+(\S+)\s+(.*)";
+	if(preg_match("/^$pat$/",$str,$match)) {
+		$thisyear=date('Y');
+		$ldate=strtotime("{$match[1]} {$match[2]} {$match[3]} $thisyear");
+		$logname=date('Ymd',$ldate);
+		$match[6]=str_replace("/dev/","",$match[6]);
+		$date=date('d/m/Y H:i:s',$ldate);
+		$msg="[$date] TYPE=console USER=console IP={$match[6]} MSG={$match[7]}";
+		$msgx="<0> TYPE=console USER=console IP={$match[6]} MSG={$match[7]}";
+		$msg=trim($msg);$msgx=trim($msgx);
+		if($msg!='') {
+			if(mybox_chk_nolog()==0) mybox_append_to_file("$_LOG_PATH/auth-$logname.log","$msg\n");
+			mybox_send_remotelog($ldate,$msgx);
+		}
+		return 0;
+	}
+	return 1;
+}
+
+function mybox_slog($type,$str) {
+	global $_LOG_PATH;
+	$time=time();
+	$logname=date('Ymd',$time);
+	$date=date('d/m/Y H:i:s',$time);
+	$msg="[$date] TYPE=$type MSG=$str";
+	$msgx="<1> TYPE=$type MSG=$str";
+	if($msg!='' && $msgx!='') {
+		if(mybox_chk_nolog()==0) mybox_append_to_file("$_LOG_PATH/system-$logname.log","$msg\n");
+		mybox_send_remotelog($time,$msgx);
+		return 0;
+	}
+	return 1;
+}
+
+function mybox_auditlog($type,$who="unknown",$str) {
+	global $_LOG_PATH, $_LOGIN;
+	$time=time();
+	$user="unknown";
+	$addr="unknown";
+	if(isset($_LOGIN['auth_id'])&&$_LOGIN['auth_id']!='') $user=$_LOGIN['auth_id'];
+	if(isset($_LOGIN['auth_addr'])&&$_LOGIN['auth_addr']!='') {
+		$addr=$_LOGIN['auth_addr'];
+	} else {
+		if(isset($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+			$addr=$_SERVER['HTTP_X_FORWARDED_FOR'];
+		} elseif (isset($_SERVER['HTTP_CLIENT_IP'])) {
+			$addr=$_SERVER['HTTP_CLIENT_IP']; 
+			} else {
+			$addr=$_SERVER['REMOTE_ADDR']; 
+		}
+	}
+	if($who=='UI') $who="$user@$addr";
+	$logname=date('Ymd',$time);
+	$date=date('d/m/Y H:i:s',$time);
+	$msg="[$date] TYPE=$type WHO=$who MSG=$str";
+	$msgx="<10> TYPE=$type WHO=$who MSG=$str";
+	if($msg!='' && $msgx!='') {
+		if(mybox_chk_nolog()==0) mybox_append_to_file("$_LOG_PATH/audit-$logname.log","$msg\n");
+		mybox_send_remotelog($time,$msgx);
+		return 0;
+	}
+	return 1;
+}
+
+
+$_BCRELAY1='1';
+$_BCRELAY2='2';
+function mybox_write_pptplog($str) {
+	global $_LOG_PATH, $_BCRELAY1, $_BCRELAY2;
+
+	$pat1="(\w+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(pppd|pptpd|nmbd|smbd|bcrelay)\[(\d+)\]\:\s+(.*)";
+	//if(file_exists("/var/log/log.nmbd")) @unlink("/var/log/log.nmbd");
+	//if(file_exists("/var/log/log.smbd")) @unlink("/var/log/log.smbd");
+	//if(file_exists("/var/log/log.winbindd")) @unlink("/var/log/log.winbindd");
+	if(is_dir("/var/log/smb")) mybox_rmdir("/var/log/smb","/var/log/smb");
+
+	if(preg_match("/^$pat1$/",$str,$match)) {
+		$thisyear=date('Y');
+		$ldate=strtotime("{$match[1]} {$match[2]} {$match[3]} $thisyear");
+		$logname=date('Ymd',$ldate);
+		$date=date('d/m/Y H:i:s',$ldate);
+		$match[7]=trim($match[7]);
+		if(preg_match("/^\[\d+\/\d+\/\d+\s+\d+\:\d+\:\d+\,\s+\d+\]\s+/",$match[7])) return 1;
+		$match[7]=str_replace("Samba","SMB",$match[7]);
+		$_BCRELAY1="{$match[7]}";
+		if($_BCRELAY2==$_BCRELAY1) return 1;
+		$_BCRELAY2=$_BCRELAY1;
+		if(preg_match("/relayed to:$/",$match[7])) return 1;
+		if(preg_match("/GRE\:\s+accepting\s+packet\s+\#\d+/",$match[7])) return 1;
+		$mx=preg_replace(array("/\/usr\/lib\/pptpd\//","/\/usr\/lib\//","/\/usr\//"),"",$match[7]);
+		$msg="[$date] $mx";
+		$msgx="<6> $mx";
+		$msg=trim($msg);$msgx=trim($msgx);
+		if($msg!='') {
+			if(mybox_chk_nolog()==0) mybox_append_to_file("$_LOG_PATH/pptpvpn-$logname.log","$msg\n");
+			mybox_send_remotelog($ldate,$msgx);
+		}
+		return 0;
+	}
+	return 1;
+}
+
+function mybox_write_httpsdlog($str) {
+	global $_LOG_PATH;
+
+	$pat1="(\w+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(.*)";
+
+	if(preg_match("/^$pat1$/",$str,$match)) {
+		$thisyear=date('Y');
+		$ldate=strtotime("{$match[1]} {$match[2]} {$match[3]} $thisyear");
+		$logname=date('Ymd',$ldate);
+		$date=date('d/m/Y H:i:s',$ldate);
+		$mm=preg_split("/,/",$match[6]);
+		if(count($mm)!=0) {
+			$mm[0]=ltrim(rtrim($mm[0],'"'),'"');
+			$mm[1]=ltrim(rtrim($mm[1],'"'),'"');
+			$mm[2]=ltrim(rtrim($mm[2],'"'),'"');
+			$mm[3]=ltrim(rtrim($mm[3],'"'),'"');
+			$mm[4]=ltrim(rtrim($mm[4],'"'),'"');
+			$msg="[$date] FROM={$mm[0]} ACTION={$mm[1]} STATUS={$mm[2]} REFERRER={$mm[3]} BROWSER={$mm[4]}";
+			$msgx="<4> FROM={$mm[0]} ACTION={$mm[1]} STATUS={$mm[2]} REFERRER={$mm[3]} BROWSER={$mm[4]}";
+			$msg=trim($msg);$msgx=trim($msgx);
+			if($msg!='' && $msgx!='') {
+				if(mybox_chk_nolog()==0) mybox_append_to_file("$_LOG_PATH/httpsd-$logname.log","$msg\n");
+				mybox_send_remotelog($ldate,$msgx);
+			}
+		}
+		return 0;
+	}
+	return 1;
+}
+
+function mybox_write_dhcplog($str) {
+	global $_LOG_PATH;
+
+	$pat1="(\w+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(.*)";
+	if(preg_match("/^$pat1$/",$str,$match)) {
+		$thisyear=date('Y');
+		$ldate=strtotime("{$match[1]} {$match[2]} {$match[3]} $thisyear");
+		$logname=date('Ymd',$ldate);
+		$date=date('d/m/Y H:i:s',$ldate);
+		if(preg_match("/^Internet Systems Consortium/",$match[6])) return 1;
+		if(preg_match("/^Copyright/",$match[6])) return 1;
+		if(preg_match("/^For info/",$match[6])) return 1;
+		if(preg_match("/^All rights reserved/",$match[6])) return 1;
+		$msg="[$date] {$match[6]}";
+		$msgx="<9> {$match[6]}";
+		$msg=trim($msg);$msgx=trim($msgx);
+		if($msg!='') {
+			if(mybox_chk_nolog()==0) mybox_append_to_file("$_LOG_PATH/dhcpd-$logname.log","$msg\n");
+			mybox_send_remotelog($ldate,$msgx);
+		}
+		return 0;
+	}
+	return 1;
+}
+
+function mybox_write_sshlog($str) {
+	global $_LOG_PATH;
+
+	$str=preg_replace("/dropbear/","sshd",$str);
+	$pat1="(\w+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(.*)";
+	if(preg_match("/^$pat1$/",$str,$match)) {
+		$thisyear=date('Y');
+		$ldate=strtotime("{$match[1]} {$match[2]} {$match[3]} $thisyear");
+		$logname=date('Ymd',$ldate);
+		$date=date('d/m/Y H:i:s',$ldate);
+		$msg="[$date] {$match[6]}";
+		$msgx="<5> {$match[6]}";
+		$msg=trim($msg);$msgx=trim($msgx);
+		if($msg!='') {
+			if(mybox_chk_nolog()==0) mybox_append_to_file("$_LOG_PATH/sshd-$logname.log","$msg\n");
+			mybox_send_remotelog($ldate,$msgx);
+		}
+		return 0;
+	}
+	return 1;
+}
+
+function mybox_write_ftplog($str) {
+	global $_LOG_PATH;
+	$pat1="(\w+)\s+(\d+)\s+(\S+)\s+(\S+)\svsftpd\:\s+(\w+)\s+(\w+)\s+(\d+)\s+(\S+)\s+(\d+)\s+\[pid\s+(\d+)\]\s+(.*)";
+	if(preg_match("/^$pat1$/",$str,$match)) {
+		$thisyear=date('Y');
+		$ldate=strtotime("{$match[1]} {$match[2]} {$match[3]} $thisyear");
+		$logname=date('Ymd',$ldate);
+		$date=date('d/m/Y H:i:s',$ldate);
+		$mx=preg_replace(array("/\[ftp1\]/","/\"/"),"",$match[11]);
+		$msg="[$date] $mx";
+		$msgx="<11> $mx";
+		$msg=trim($msg);$msgx=trim($msgx);
+		if($msg!='') {
+			if(mybox_chk_nolog()==0) mybox_append_to_file("$_LOG_PATH/ftp-$logname.log","$msg\n");
+			mybox_send_remotelog($ldate,$msgx);
+		}
+		return 0;
+	}
+	return 1;
+}
+
+?>

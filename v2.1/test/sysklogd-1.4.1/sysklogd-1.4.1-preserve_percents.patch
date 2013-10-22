@@ -1,0 +1,45 @@
+--- sysklogd-1.4.1rh/klogd.c.preserve_percents	2002-04-17 10:49:34.000000000 -0400
++++ sysklogd-1.4.1rh/klogd.c	2004-12-02 15:58:17.026614000 -0500
+@@ -741,7 +741,7 @@
+         switch( parse_state )
+         {
+         case PARSING_TEXT:
+-               delta = copyin( line, space, ptr, len, "\n[%" );
++               delta = copyin( line, space, ptr, len, "\n[" );
+                line  += delta;
+                ptr   += delta;
+                space -= delta;
+@@ -797,30 +797,9 @@
+                      parse_state = PARSING_SYMSTART;      /* at < */
+                   break;
+                }
+-               if( *ptr == '%' )   /* dangerous printf marker */
+-	       {
+-		   delta = 0;
+-		   while (len && *ptr == '%')
+-		   {
+-		       *line++ = *ptr++;	/* copy it in */
+-		       space -= 1;
+-		       len   -= 1;
+-		       delta++;
+-		   }
+-		   if (delta % 2)	/* odd amount of %'s */
+-		   {
+-		       if (space)
+-		       {
+-			   *line++ = '%';	/* so simply add one */
+-			   space -= 1;
+-		       }
+-		       else 
+-		       {
+-			   *line++ = '\0';	/* remove the last one / terminate the string */
+-		       }
+-
+-		   }
+-	       }
++               /* Now that line_buff is no longer fed to *printf as format
++                * string, '%'s are no longer "dangerous".
++		*/
+                break;
+         
+         case PARSING_SYMSTART:

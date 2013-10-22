@@ -1,0 +1,45 @@
+Linux Guest OS installation:
+
+1) Upload mybox package to Linux Guest OS; eg; Fedora
+2) Extract package
+   # tar -zxvf mybox.
+1) copy myboxos.bin,myboxsys.bin to /boot directory
+   # cp -av myboxos.bin myboxsys.bin /boot
+2) edit boot loader configuration; eg; /etc/grub.conf or /etc/lilo.conf. copy line below to boot loader configuration
+
+#------------------------
+title MyBox Firewall System
+        root (hd0,0)
+        kernel /myboxos.bin rw root=/dev/ram0 dev_boot=/dev/sda1:ext3 dev_swap=/dev/sda2:swap dev_strg=/dev/sda3:ext3 quiet single
+        initrd /myboxsys.bin
+#-----------------------------
+   
+   Parameter format:
+
+   dev_boot=<device>:<filesystem>	<-- for boot device
+   dev_swap=<device>:swap		<-- for swap device
+   dev_strg=<device>:<filesystem>	<-- for storage device
+
+3) copy mybox to root path; 
+   # cp -av mybox /
+
+4) Update boot loader seeting if need so. eg; lilo -vv
+5) reboot
+6) On initial booting menu, select "MyBox Firewall System"
+
+7) default access password info:
+   console = console123
+   admin = admin123
+   look = look123
+   ssh = user: mfs passwd: ssh123
+
+8) Web-based access (MyADMIN) 
+   By default mybox will up LAN interface (eth0) with IP Address 192.168.3.1 and allow IP from 192.168.3.2.
+   You can bypass this setting by login to console and enter policy.init clear and set the ip with using ifconfig
+   command.
+   # policy.init clear
+   # ifconfig eth0 <your ip>
+
+9) Updating license:
+   you can update thru MyADMIN or just copy license file (mfs-license.exc) into /mybox/
+

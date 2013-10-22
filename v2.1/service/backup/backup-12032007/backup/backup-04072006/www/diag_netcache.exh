@@ -1,0 +1,178 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+chk_session();
+write_nocache();
+
+$_SYSID="diag_netcache";
+
+$db_id=db_connect($_DB_NAME);
+
+if(chk_pri($_LOGIN['auth_id'],2)==1 && isset($do_save)&&$do_save!='') {
+	if($tab==1) {
+		arp_flush();
+		sleep(2);
+	}
+	if($tab==2) {
+		exec_cmd("ip route flush cache");
+		sleep(2);
+	}
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied!.";
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script language="javascript" src="<?echo $_URL_PATH;?>/j/strings.js"></script>
+<script language="javascript">
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+</script>
+<script language="javascript">
+function do_submit() {
+	document.f.btsave.disabled=true;
+	document.getElementById("msg").style.display='';
+	document.getElementById("msg").innerHTML="Clearing cache.. Please..wait..";
+	document.f.do_save.value='1';
+	document.f.submit();
+	return true;
+}
+
+
+</script>
+</head>
+<body onload="parent.left_frame.switchmenu('sub5');" scroll=auto>
+<form name=f method=post action="<?echo "$_URL_PATH/diag_netcache.exh";?>">
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 10px;'>
+<tr>
+<td>
+<p class="sectitle"><b>Diagnostic:</b> IP Cache</p><br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="<?echo "$_URL_PATH/diag_netcache.exh?tab=1";?>" <?if($tab==1){?>class="tabact"<?}?>>ARP</a></li>
+<li><a href="<?echo "$_URL_PATH/diag_netcache.exh?tab=2";?>" <?if($tab==2){?>class="tabact"<?}?>>Routes</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td> 
+<br>
+
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><?if(isset($msg)&&$msg!='') {?><span id=msg class=notice><?echo "$msg";?></span><?}else{echo "<span id=msg class=notice style='display: none;'></span>";}?></td></tr>
+</table><br>
+
+<!-- tab container -->
+<?if($tab==1) {?>
+<table class="data" width="100%">
+<thead class="blue"> 
+<tr>
+<td style='font-weight: bold; width: 2px'>#</td> 
+<td style='font-weight: bold;'>IP Address</td>
+<td style='font-weight: bold;'>MAC Address</td>
+</tr></thead>
+<tbody>
+<?			
+exec("dnet arp show",$out,$ret);
+if(count($out)!=0) {
+	$i=1;
+	foreach($out as $line) {
+		list($ip,$mac)=preg_split("/at/",$line);
+		$ip=trim($ip);
+		$mac=strtoupper(trim($mac));
+		echo "<tr>";
+		echo "<td width=1px>$i</td>";
+		echo "<td>$ip</td>";
+		echo "<td>$mac</td></tr>";
+		$i++;
+	}
+}
+?>
+</tbody>
+</table>
+<? } //tab==1?>
+
+<?if($tab==2) {?>
+<table class="data" width="100%">
+<thead class="blue"> 
+<tr>
+<td style='font-weight: bold; width: 2px'>#</td> 
+<td style='font-weight: bold;'>Type</td>
+<td style='font-weight: bold;'>Source</td>
+<td style='font-weight: bold;'>Destination</td>
+</tr></thead>
+<tbody>
+<?
+exec("ip route show cache",$out,$ret);
+if(count($out)!=0) {
+	$i=1;
+	foreach($out as $line) {
+		if(preg_match("/cache/",$line)) continue;
+		if(preg_match("/(\S+)\s+(\d+\.\d+\.\d+\.\d+)\s+from\s+(\d+\.\d+\.\d+\.\d+)/",$line,$mm)) {
+			$type=$mm[1];
+			$src=$mm[2];
+			$dst=$mm[3];
+			echo "<tr>";
+			echo "<td width=2px>$i</td>";
+			echo "<td>$type</td>";
+			echo "<td>$src</td>";
+			echo "<td>$dst</td></tr>";
+			$i++;
+		} elseif(preg_match("/(\d+\.\d+\.\d+\.\d+)\s+from\s+(\d+\.\d+\.\d+\.\d+)/",$line,$mm)) {
+			$type="ip";
+			$src=$mm[1];
+			$dst=$mm[2];
+			echo "<tr>";
+			echo "<td width=2px>$i</td>";
+			echo "<td>$type</td>";
+			echo "<td>$src</td>";
+			echo "<td>$dst</td></tr>";
+			$i++;
+		}
+	}
+}
+?>
+</tbody>
+</table>
+<? } //tab==2?>
+
+<table align=right>
+<tbody>
+<tr>
+<td colspan=2><input name="btsave" value="Clear cache" type="button" class=button onclick="do_submit();"></td>
+</tbody>
+</table>
+
+<!-- end tab container -->
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?echo $tab;?>>
+</form>
+</body>
+</html>
+
+<?db_close($db_id); flush();?>

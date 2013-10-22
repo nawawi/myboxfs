@@ -1,0 +1,27 @@
+version 0.4
+!
+hostname router
+!
+banner login Welcome to router!
+!
+enable secret $1$eDSj.SCK$w8qiSo9gQKuFB9AJw3hd30
+!
+ip name-server 192.168.1.1
+!
+interface eth0 
+ ip address 192.168.1.100 255.255.255.0 
+!
+ip route 192.168.168.0 255.255.255.0 192.168.1.1
+!
+ip default-gateway 192.168.1.1
+!
+router rip
+!
+access-list 12 permit 192.168.9.0 0.0.0.3 in eth0
+!
+access-list 12 permit host 192.168.11.1 in eth0
+!
+access-list 12 deny any in eth0
+!
+end
+

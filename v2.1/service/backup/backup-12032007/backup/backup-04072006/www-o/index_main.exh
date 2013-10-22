@@ -1,0 +1,195 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+include_once('graphsc.exl');
+
+chk_session();
+write_nocache();
+$db_id=db_connect($_DB_NAME);
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<meta http-equiv=refresh content='300'; url='<?echo $_URL_PATH;?>/main.exh'>
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script language="javascript">
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+</script>
+</head>
+<body bgcolor='#ffffff' scroll=no style='margin-top:20px;'>
+<table border="0" cellpadding="4" cellspacing="4" width="500" align=center valign=middle>
+<tr>
+<td align=center>
+<?if($just_logout==''){?>
+<img src="<?echo $_URL_PATH;?>/i/login_logo.png" nosave border=0>
+<br><br>
+<!---------->
+
+<table valign=top border=0 width="650" cellpadding="6" cellspacing="0">
+<tr>
+<td>
+<table valign=top border=0 width="450" cellpadding="6" cellspacing="0">
+<tr> 
+<td width="30%" valign="middle" class="tdcelltop"><b>Firmware Version</b></td>
+<td width="70%" valign="middle" class="mtabletop"> 
+<?
+echo trim(shell_exec("uname -v"));
+if(file_exists("/etc/firmware")) {
+	$fupdate=trim(file_get_contents("/etc/firmware"));
+	echo " UPDATE:$fupdate";
+}
+?>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell"><b>System Uptime</b></td>
+<td width="70%" valign="middle" class="mtable"> 
+<?echo mybox_uptime();?>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell"><b>System Time</b></td>
+<td width="70%" valign="middle" class="mtable"> 
+<?echo shell_exec("date");?>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell"><b>License</b></td>
+<td width="70%" valign="middle" class="mtable"> 
+<?echo mfs_license('pkg');?>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell"><b>Valid to</b></td>
+<td width="70%" valign="middle" class="mtable"> 
+<?echo mfs_license('org');?>
+</td>
+</tr>
+
+</table>
+
+</td>
+<td width="400" valign=top>
+<?
+$cpu=0;
+$mem=0;
+$strg=0;$ram=0;
+$proc=0;
+exec("top -n1 -b",$buff,$ret);
+if($ret==0) {
+	$str=trim($buff[4]);
+	if(preg_match("/^CPU\s+states\:\s+(\S+)\%\s+user\s+(\S+)\%\s+system\s+(\S+)\%\s+nice\s+(\S+)\%\s+iowait\s+(\S+)\%\s+idle/",$str,$mm)) {
+		$user=$mm[1];
+		$system=$mm[2];
+		$idle=$mm[5];
+		$cpu=$system;
+	}
+}
+unset($ret,$buff,$str);
+
+exec("df",$buff,$ret);
+if($ret==0) {
+	$str=trim($buff[1]);
+	list($p1,$p2,$p3,$p4,$ram)=preg_split("/\s+/",$str);
+	$ram=trim($ram,'%');
+	$str=trim($buff[2]);
+	list($p1,$p2,$p3,$p4,$strg)=preg_split("/\s+/",$str);
+	$strg=trim($strg,'%');
+}
+unset($ret,$buff,$str);
+
+if($fi=fopen("/proc/meminfo","r")) {
+	$mtotal=0;$mfree=0;
+	while($buff=fgets($fi,150)) {
+		$buff=trim($buff);
+		if(preg_match("/^MemTotal:\s+(\d+)\s+kB/",$buff,$mm)) {
+			$mtotal=$mm[1];
+		}
+		if(preg_match("/^MemFree:\s+(\d+)\s+kB/",$buff,$mm)) {
+			$mfree=$mm[1];
+		}
+	}
+	fclose($fi);
+}
+unset($ret,$buff,$str);
+
+$graph = new BAR_GRAPH("pBar");
+$graph->values = "$system;100, $user;100, $idle;100, $mfree;$mtotal, $ram;100, $strg;100";
+$graph->labels = "CPU Sys,CPU App,CPU Idle,Memory,Ramdisk,Storage";
+
+$graph->graphBGColor = "white";
+$graph->graphBorder = "1px solid #336699";
+$graph->graphPadding = 10;
+$graph->barColor = "#80D080,#80D080,#80D080,#80D080,#80D080,#80D080,#80D080";
+$graph->barBGColor = "#D0F0D0";
+$graph->labelColor = "#000000";
+$graph->labelBGColor = "#e7e9f2";
+$graph->labelBorder = "1px solid #336699";
+$graph->labelFont = "verdana,arial,sans-serif";
+$graph->labelSize = "10";
+$graph->barWidth = 12;
+//$graph->showValues = 1;
+echo $graph->create();
+?>
+</td>
+</tr>
+<?
+$_nonews=0;
+$result=db_query("select val from misc where name='local_news'",$db_id);
+if(db_num_rows($result)!=0) {
+	$_nonews=db_fetch_single($result);
+}
+if($_nonews==0) {?>
+<tr>
+<table width="640" valign=top border=0 cellpadding="4" cellspacing="1" class=blocktopb>
+<tr class=bgcolor1> 
+<td height="10" class=bgcolor1><font style='color:#ffffff;font-weight:bold;'>Latest News</font></td>
+</tr>
+<tr valign="top"> 
+<td align="center" valign="top">
+<iframe src="<?echo "$_URL_PATH/news.exh";?>" align="center" scrolling='auto' marginheight='0' marginwidth='0' margintop='2' marginbottom='2' width='100%' height="130" frameborder="0"><font size="-1">Your browser not IFRAME supported</font></iframe>
+</td>
+</tr>
+</table>
+</tr>
+<? } // nonews ?>
+
+</table>
+
+
+<!---------->
+<? } ?>
+<?if($just_logout==5) {?>
+<form name=f method=post action="<?echo "$_URL_PATH/login.exh";?>" target=_top>
+<table width="100%" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span class=notice>Are you sure you want to proceed?</span></td></tr>
+</table><br>
+<table valign=top border=0 width="400" cellpadding="6" cellspacing="0">
+<tr> 
+<td width="30%" valign="middle" class="tdcelltop"><b>Reason</b></td>
+<td width="70%" valign="middle" class="mtabletop"> 
+<input name="rebootreason" type="text" class="textbox" size="30" value="maintenance">
+<select name="just_logout" size=1 class="textbox">
+<option value=5>reboot</option>
+<option value=6>shutdown</option>
+</select>
+</td>
+</tr>
+<tr>
+<td width=100% align=right valign=bottom colspan=2 style='white-space: nowrap;'><input type=submit value='Proceed' class='button'><input type=button value='Discard' onclick='history.go(-1);' class='button'></td></tr>
+</table>
+</form>
+<? } ?>
+<?if($just_logout==about) {
+echo $_PNG['about'];
+} ?>
+</td>
+</tr>
+</table>
+</body>
+</html>
+<?db_close($db_id); flush();?>

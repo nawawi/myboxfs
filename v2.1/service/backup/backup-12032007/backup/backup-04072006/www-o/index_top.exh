@@ -1,0 +1,80 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+chk_session();
+write_nocache();
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script language="javascript">
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+	function load() {
+		window.status='Session checking...';
+		self.location.href='<?echo $_URL_PATH;?>/index_top.exh';
+	};
+	<?if($_LOGIN['page_check']!='') {?>
+	window.setTimeout(load, '<?echo $_LOGIN['page_check'];?>');
+	<? } else {?>
+	window.setTimeout(load, '1800000');
+	<? } ?>
+<?if(chk_pri($_LOGIN['auth_id'],1)==1) {?>
+	function do_reboot() {
+		if(confirm('Are you sure you want to proceed?')) {
+			top.location.href='<?echo $_URL_PATH;?>/login.exh?just_logout=5';
+			window.status='MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>';
+			return false;
+		}
+		window.status='MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>';
+		return false;
+	}
+<? }?>
+</script>
+</head>
+<body bgcolor='#ffffff' scroll=no>
+<div align=center>
+<table cellspacing=0 cellpadding=1 width='100%' border=0>
+<tbody>
+<tr>
+<td class=blocktop valign=middle>
+<table cellspacing=0 cellpadding=1 width='100%' border=0>
+<tbody>
+<tr>
+<td width='23%'>
+<table border=0 cellspacing=2 cellpadding=2>
+<tr><td class=blockimg width=204>
+<img src='<?echo $_URL_PATH;?>/i/logo_sm.png' width='203'>
+</td></tr></table>
+</td>
+<td class=toptitle align=center valign=middle>
+<table border=0 cellspacing=2 cellpadding=2>
+<tr>
+<td style='font-weight:bold;font-size:11px;'>Web-based Console: <?echo shell_exec("hostname");?></td>
+</tr></table>
+</td>
+<td align=right>
+<table cellspacing=2 cellpadding=3 border=0>
+<tbody>
+<tr>
+<td align=center class=menuboxbg><a class=menulink href="<?echo $_URL_PATH;?>/index_main.exh" target=main_frame>Main</a></td>
+<td align=center class=menuboxbg><a class=menulink href="<?echo $_URL_PATH;?>/index_menu.exh" target=main_frame>Configure</a></td>
+<td align=center>&nbsp;</td>
+<?if(chk_pri($_LOGIN['auth_id'],1)==1) {?>
+<td align=center class=menuboxbg><a class=menulink href="<?echo $_URL_PATH;?>/index_main.exh?just_logout=5" target=main_frame>Reboot</a></td>
+<? } else {?>
+<td align=center class=menuboxbg><a class=menulink href='#' onclick="alert('permission denied');return false;">Reboot</a></td>
+<? } ?>
+<td align=center>&nbsp;</td>
+<td align=center class=menuboxbg><a class=menulink href="<?echo $_URL_PATH;?>/index_main.exh?just_logout=about" target=main_frame>About</a></td>
+<td align=center class=menuboxbg><a class=menulink href='<?echo $_URL_PATH;?>/login.exh?just_logout=1' target=_top>Logout</a></td>
+<td align=center>&nbsp;</td>
+</tr></tbody></table></td></tr></tbody></table>
+</div>
+</body>
+</html>
+<?flush();?>

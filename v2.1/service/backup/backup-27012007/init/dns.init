@@ -1,0 +1,175 @@
+#!/bin/php -Cq
+<?
+// dns.init - last update 11-Jan-2007
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+
+putenv("PATH=/bin:/service/tools:/service/init");
+
+if(!file_exists("/bin/dns_resolver")) {
+	echo "Cannot execute dns.init. Internal error!\n";
+	mybox_slog("ERROR","Cannot execute ftp.init. Internal error!");
+	exit(1);
+}
+
+function dns_status() {
+	global $_QUIET;
+	$pid=mybox_get_progpid("dns_resolver");
+	if($pid!='') {
+		if($_QUIET==0) echo "* dns_resolver (pid $pid) is running...\n";
+		return 0;
+	}
+	return 1;
+}
+
+function dns_config() {
+	global $_QUIET, $_DB_NAME;
+	$_DNS_NAME='';$_DNS_HOME='127.0.0.1; ';$_DNS_IP='';
+	$ret=0;
+	$db_id=mybox_db_connect($_DB_NAME);
+	$result=mybox_db_query("select ip,stat from auth_ad where stat='1'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_DNS_NAME .="{$row['ip']}; ";
+		}
+	}
+	unset($result);
+	$result=mybox_db_query("select name from dns_name",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_DNS_NAME .="{$row['name']}; ";
+		}
+	}
+	unset($result);
+	$_DNS_NAME=trim($_DNS_NAME);
+
+	$result=mybox_db_query("select ip,mask from ipaddr where type!='1'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_ip=$row['ip'];
+			$_mask=$row['mask'];
+			$_ret=mybox_ipcalc($_ip,$_mask);
+			if(count($_ret)==0) {
+				$_prefix="24";
+			} else {
+				$_prefix=$_ret['prefix'];
+			}
+			$_DNS_HOME .="$_ip/$_prefix; ";
+			$_DNS_IP .="$_ip; ";
+		}
+	}
+	unset($result);
+	$result=mybox_db_query("select ip from auth_ad where stat='1'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_ad_domain=$row['domain'];
+			$_ad_ip=$row['ip'];
+		}
+		$_DNS_IP .="$_ad_ip; ";
+	}
+	unset($result);
+	$_DNS_HOME=trim($_DNS_HOME);
+	$_DNS_IP=trim($_DNS_IP);
+	mybox_db_close($db_id);
+	if(!is_dir("/etc/dns_resolver")) @mybox_mkdirr("/etc/dns_resolver");
+	if($fi=fopen("/etc/dns_resolver/named.conf","w")) {
+		fwrite($fi,"acl bogon {0.0.0.0/8;1.0.0.0/8;2.0.0.0/8;5.0.0.0/8;7.0.0.0/8;10.0.0.0/8;23.0.0.0/8;27.0.0.0/8;31.0.0.0/8;36.0.0.0/8;37.0.0.0/8;39.0.0.0/8;41.0.0.0/8;42.0.0.0/8;49.0.0.0/8;50.0.0.0/8;58.0.0.0/8;59.0.0.0/8;70.0.0.0/8;71.0.0.0/8;72.0.0.0/8;73.0.0.0/8;74.0.0.0/8;75.0.0.0/8;76.0.0.0/8;77.0.0.0/8;78.0.0.0/8;79.0.0.0/8;83.0.0.0/8;84.0.0.0/8;85.0.0.0/8;86.0.0.0/8;87.0.0.0/8;88.0.0.0/8;89.0.0.0/8;90.0.0.0/8;91.0.0.0/8;92.0.0.0/8;93.0.0.0/8;94.0.0.0/8;95.0.0.0/8;96.0.0.0/8;97.0.0.0/8;98.0.0.0/8;99.0.0.0/8;100.0.0.0/8;101.0.0.0/8;102.0.0.0/8;103.0.0.0/8;104.0.0.0/8;105.0.0.0/8;106.0.0.0/8;107.0.0.0/8;108.0.0.0/8;109.0.0.0/8;110.0.0.0/8;111.0.0.0/8;112.0.0.0/8;113.0.0.0/8;114.0.0.0/8;115.0.0.0/8;116.0.0.0/8;117.0.0.0/8;118.0.0.0/8;119.0.0.0/8;120.0.0.0/8;121.0.0.0/8;122.0.0.0/8;123.0.0.0/8;124.0.0.0/8;125.0.0.0/8;126.0.0.0/8;169.254.0.0/16;172.16.0.0/12;173.0.0.0/8;174.0.0.0/8;175.0.0.0/8;176.0.0.0/8;177.0.0.0/8;178.0.0.0/8;179.0.0.0/8;180.0.0.0/8;181.0.0.0/8;182.0.0.0/8;183.0.0.0/8;184.0.0.0/8;185.0.0.0/8;186.0.0.0/8;187.0.0.0/8;189.0.0.0/8;190.0.0.0/8;192.0.2.0/24;197.0.0.0/8;223.0.0.0/8;224.0.0.0/3;};");
+		fwrite($fi,"options {");
+		fwrite($fi,"directory \"/etc/dns_resolver/\";");
+		fwrite($fi,"pid-file \"/var/run/dns_resolver.pid\"; ");
+		fwrite($fi,"allow-query { $_DNS_HOME };");
+		fwrite($fi,"blackhole {bogon;};");
+		fwrite($fi,"dump-file \"/etc/dns_resolver/cache_dump.db\";");
+		fwrite($fi,"statistics-file \"/etc/dns_resolver/stats.txt\";");
+		fwrite($fi,"version \"MyBox DNS Resolver\";");
+		fwrite($fi,"transfer-format many-answers;");
+		fwrite($fi,"max-transfer-time-in 60;");
+		fwrite($fi,"interface-interval 0;");
+		fwrite($fi,"notify no;");
+		if($_DNS_NAME!='') fwrite($fi,"forwarders { $_DNS_NAME };");
+		fwrite($fi,"listen-on port 53 { 127.0.0.1; };");
+		if($_DNS_IP!='') fwrite($fi,"listen-on port 53 { $_DNS_IP };");
+		fwrite($fi,"};");
+		fwrite($fi,"logging {category notify {null;};category lame-servers {null;};category security {null;};};");
+		fwrite($fi,"zone \".\" IN {type hint;file \"dns.cache\";};");
+		fwrite($fi,"zone \"localhost\" IN {type master;file \"dns.localzone\";allow-update {none;};};");
+		fwrite($fi,"zone \"0.0.127.in-addr.arpa\" IN {type master;file \"dns.localrev\";allow-update {none;};};");
+		fwrite($fi,"zone \"255.in-addr.arpa\" IN {type master;file \"dns.localzone\";allow-update {none;};};");
+		fwrite($fi,"zone \"0.in-addr.arpa\" IN {type master;file \"dns.localzone\";allow-update {none;};};");
+		fclose($fi);
+		@mybox_save_to_file("/etc/resolv.conf","nameserver 127.0.0.1\n");
+		return 1;
+	}
+	return 0;
+}
+function dns_start() {
+	global $_QUIET;
+
+	@unlink("/var/sys/chk_dns_resolver");
+	if(@dns_config()==1 && @dns_status()==1) {
+		if(mybox_exec_cmd("dns_resolver")==0) {
+			if($_QUIET==0) {
+				echo "* Starting DNS Resolver agent\n";
+				mybox_slog("INFO","Starting DNS Resolver agent");
+			}
+			@touch("/var/sys/chk_dns_resolver");
+			return 0;
+		}
+	}
+	@touch("/var/sys/chk_dns_resolver");
+	if($_QUIET==0) {
+		echo "* Starting DNS Resolver agent failed\n";
+		mybox_slog("INFO","Starting DNS Resolver agent failed");
+	}
+	return 1;
+}
+
+function dns_stop() {
+	global $_QUIET;
+
+	@unlink("/var/sys/chk_dns_resolver");
+	@mybox_save_to_file("/etc/resolv.conf","");
+	if(mybox_killall("dns_resolver")==0) {
+		if($_QUIET==0) {
+			echo "* Shutting down DNS Resolver agent\n";
+			mybox_slog("INFO","Shutting down DNS Resolver agent");
+		}
+		return 0;
+	}
+	@touch("/var/sys/chk_dns_resolver");
+	if($_QUIET==0) {
+		echo "* Shutting down DNS Resolver agent failed\n";
+		mybox_slog("INFO","Shutting down DNS Resolver agent failed");
+	}
+	return 1;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=dns_start();
+		break;
+	case 'stop':
+		$ret=dns_stop();
+		break;
+	case 'restart':
+		$ret=dns_stop();
+		sleep(2);
+		$ret=dns_start();
+		break;
+	case 'status':
+		$ret=dns_status();
+		break;
+	case 'status':
+		$ret=dns_config();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/status/config]\n";
+		break;
+}
+flush();
+exit($ret);
+?>

@@ -1,0 +1,428 @@
+<?
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+
+function ftp_echo($what) {
+	if(isset($_ENV['GATEWAY_INTERFACE'])) {
+		echo "$what<br>";
+	} else {
+		echo "$what\n";
+	}
+}
+
+function backup_restore_ftp($type,$fname,$bname) {
+	global $_DB_NAME, $_DB_IPS, $_DB_BLACKLIST, $_DOWNLOAD_PATH, $_DB_PATH, $_SQLITE_BINARY;
+	global $_LOGIN;
+	$tname='RESTORE';
+	if($type==1) $tname='BACKUP';
+	
+	if($bname==0) {
+		$_DBS=$_DB_NAME;
+	} elseif($bname==1) {
+		$_DBS=$_DB_IPS;
+	} elseif($bname==2) {
+		$_DBS=$_DB_BLACKLIST;
+	} else {
+		$_DBS=$_DB_NAME;
+	}
+	$tty=0;
+	$who="mfs@console";
+	if(isset($_ENV['GATEWAY_INTERFACE'])) {
+		$tty=1;
+		$who="{$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}";
+	}
+	$val=array();
+	$db_id=db_connect($_DB_NAME);
+	$result=db_query("select * from misc where name like \"ftp_%\"",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_name=$row['name'];
+			$_val=$row['val'];
+			$val[$_name]=$_val;
+		}
+	}
+	$ftpserver=$val['ftp_server'];
+	$ftpuser=$val['ftp_user'];
+	$ftppass=str_decrypt($val['ftp_pass']);
+	$ftppath=$val['ftp_path'];
+	$ftppassive=$val['ftp_passive'];
+
+	$conn_id=@ftp_connect($ftpserver); 
+	ftp_echo("Sys> Making connection to $ftpserver");
+	$login_result=@ftp_login($conn_id, $ftpuser, $ftppass); 
+	if ((!$conn_id) || (!$login_result)) { 
+		auditlog($tname,$who,"ftp -> $fname, connecting to $ftpserver with user $ftpuser failed!");
+		ftp_echo("ftp> Connecting to $ftpserver with user $ftpuser failed!");
+		return 1; 
+   	}
+	$systype = @ftp_systype($conn_id);
+	@ftp_pasv($conn_id,$ftppassive);
+	auditlog($tname,$who,"ftp -> $fname, connecting to $ftpserver system type $systype");
+	ftp_echo("ftp> Connecting to $ftpserver system type $systype");
+	if($ftppassive=='TRUE') {
+		ftp_echo("ftp> Using passive transfer mode");
+	} else {
+		ftp_echo("ftp> Using native transfer mode");
+	}
+	if($type==1) @ftp_mkdir($conn_id,$ftppath);
+	if(@!ftp_chdir($conn_id, $ftppath)) { 
+   		auditlog($tname,$who,"ftp -> $fname, couldn't change remote directory '$ftppath'");
+		ftp_echo("ftp> Couldn't change remote directory '$ftppath'");
+		return 1;
+	} else {
+	   	auditlog($tname,$who,"ftp -> $fname, change remote directory to '$ftppath'");
+		ftp_echo("ftp> Change remote directory to '$ftppath'");	
+	}
+	chdir($_DOWNLOAD_PATH);
+	if($type==1) {
+		if(file_exists("$_DOWNLOAD_PATH/$fname")) {
+			$fp=@fopen("$_DOWNLOAD_PATH/$fname",'r');	
+			$upload=@ftp_nb_fput($conn_id, $fname, $fp, FTP_BINARY);
+			$remote_file_size=0;$local_file_size=0;$i=0;$ts=0;
+			$local_file_size=filesize("$_DOWNLOAD_PATH/$fname");
+			$ts=size_readable($local_file_size,null,'%d%s');
+			if($tty==1) echo "<span id=xm></span>";
+			while($upload == FTP_MOREDATA) {
+				clearstatcache();
+				if(!isset($conn_id2)) {
+					$conn_id2=@ftp_connect($ftpserver);
+					$login_result2=@ftp_login($conn_id2, $ftpuser, $ftppass);
+				}
+				if(isset($conn_id2)) {
+					clearstatcache();
+					$remote_file_size=@ftp_size($conn_id2, "$ftppath/$fname");
+				}
+  				if(isset($remote_file_size) && $remote_file_size > 0 ){
+  					$i=($remote_file_size/$local_file_size)*100;
+					$tt=size_readable($remote_file_size,null,'%d%s');
+					if($tty==0 && $quiet==0) {
+  						printf("\rUploading file $f.. %3.d%% %s of %s                ", $i, $tt, $ts);
+					} else {
+						$rr=sprintf("Uploading file $f.. %3d%% %s of %s", $i, $tt, $ts);
+						echo "<script>document.getElementById('xm').innerHTML='$rr';</script>";
+					}
+  					flush();
+ 				} 
+				$upload=ftp_nb_continue($conn_id);
+			}
+
+			if($upload != FTP_FINISHED) { 
+				auditlog($tname,$who,"ftp -> $fname, backup failed.");
+				ftp_echo("ftp> Uploading file $fname failed.");
+			} else { 
+				if(isset($conn_id2)) {
+					clearstatcache();
+					$remote_file_size=@ftp_size($conn_id2, "$ftppath/$fname");
+				}
+				if($i < 100 && $i!=0) {
+					$tt=size_readable($remote_file_size,null,'%d%s');
+					if($tty==0 && $quiet==0) {
+      						printf("\rUploading file $f.. %3.d%% %s of %s                ", "100", $tt, $ts);
+					} else {
+						$rr=sprintf("Uploading file $f.. %3d%% %s of %s", "100", $tt, $ts);
+						echo "<script>document.getElementById('xm').innerHTML='$rr';</script>";
+					}
+				}
+				if($tty==0 && $remote_file_size!=0 && $quiet==0) echo "\n";
+				if($tty==1 && $remote_file_size!=0 && $quiet==0) echo "<br>";
+				auditlog($tname,$who,"ftp -> $fname, backup succeed.");
+				ftp_echo("ftp> Uploading file $fname done.");
+			}
+			@fclose($fp);@ftp_close($conn_id2);
+			@unlink("$_DOWNLOAD_PATH/$fname");
+		}
+	} else {
+		$dld=0;$fs=0;$i=0;$ts=0;
+		$fp=@fopen("$_DOWNLOAD_PATH/$fname",'w');
+		$fs=@ftp_size($conn_id,$fname);
+		$ts=size_readable($fs,null,'%d%s');
+		$download=@ftp_nb_fget($conn_id, $fp, $fname, FTP_BINARY);
+		ftp_echo("ftp> Getting file $fname..");
+		if($tty==1) echo "<span id=xm></span>";
+		while($download == FTP_MOREDATA) {
+  			clearstatcache();
+  			$dld=filesize("$_DOWNLOAD_PATH/$fname");
+			if($dld > 0) {
+      				$i = ($dld/$fs)*100;
+				$tt=size_readable($dld,null,'%d%s');
+				if($tty==0 && $quiet==0) {
+					printf("\rGetting file $f.. %3.d%% %s of %s                ", $i, $tt, $ts);
+				} else {
+					$rr=sprintf("Getting file $f.. %3d%% %s of %s", $i, $tt, $ts);
+					echo "<script>document.getElementById('xm').innerHTML='$rr';</script>";
+				}
+				flush();
+  			}   
+  			$download=@ftp_nb_continue($conn_id);
+		}
+		if($tty==0) echo "\n";
+		if($download != FTP_FINISHED) {
+			auditlog($tname,$who,"getting file $fname failed.");
+			ftp_echo("ftp> Getting file $fname failed.");
+			@fclose($fp);
+			@unlink("$_DOWNLOAD_PATH/$fname");
+		} else {
+			if($i < 100 && $i!=0) {
+				clearstatcache();
+  				$dld=filesize("$_DOWNLOAD_PATH/$fname");
+				$tt=size_readable($dld,null,'%d%s');
+				if($tty==0 && $quiet==0) {
+					printf("\rGetting file $f.. %3.d%% %s of %s                ", "100", $tt, $ts);
+				} else {
+					$rr=sprintf("Getting file $f.. %3d%% %s of %s", "100", $tt, $ts);
+					echo "<script>document.getElementById('xm').innerHTML='$rr';</script>";
+				}
+			}
+			if($tty==0 && $dld!=0 && $quiet==0) echo "\n";
+			if($tty==1 && $dld!=0 && $quiet==0) echo "<br>";
+			auditlog($tname,$who,"getting file $fname.");
+			ftp_echo("ftp> Getting file $fname done.");
+			if(file_exists("$_DOWNLOAD_PATH/$fname")) {
+				@copy("$_DB_PATH/$_DBS","$_DB_PATH/$_DBS".".bak");
+				@unlink("$_DB_PATH/$_DBS");
+				ftp_echo("Sys> Restoring $fname, please wait.");
+				if(execq_cmd("zcat $_DOWNLOAD_PATH/$fname |$_SQLITE_BINARY $_DB_PATH/$_DBS")==0) {
+					ftp_echo("Sys> Restore succeed.");
+					auditlog($tname,$who,"ftp -> $fname, restore succeed.");
+					@unlink("$_DB_PATH/$_DB_NAME".".bak");
+				} else {
+					@rename("$_DB_PATH/$_DBS".".bak","$_DB_PATH/$_DB_NAME");
+					ftp_echo("Sys> Restore failed.");
+					auditlog($tname,$who,"ftp -> $fname, restore failed.");
+				}
+				@fclose($fp);
+				@unlink("$_DOWNLOAD_PATH/$fname");
+			}
+		}
+	}
+	@ftp_close($conn_id);
+	auditlog($tname,$who,"Closing remote connection.");
+	ftp_echo("Sys> Closing remote connection.");
+	return 0;
+}
+
+function sysupdate_do_update($quiet,$file,$key) {
+	global $_DB_BLACKLIST, $_DB_IPS, $_DB_NAME, $_DB_PATH;
+	$tname="UPDATE";
+	$tty=0;$ok=0;
+	$who="mfs@console";
+	if(isset($_ENV['GATEWAY_INTERFACE'])) {
+		$tty=1;
+		$who="{$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}";
+	}
+	if(file_exists($file)) {
+		$key2=md5_file($file);
+		if($key2!=$key) {
+			if($quiet==0) ftp_echo("Invalid file key.");
+			auditlog($tname,$who,"Invalid file '$file' key.");
+			@unlink($file);
+			return 0;
+		}
+		if(preg_match("/myboxOS\.(\d+)\.zip/",$file,$mm)) {
+			if(update_firmware($file)==0) {
+				if($quiet==0) ftp_echo("Firmware updated. You need to reboot the system.");
+				auditlog($tname,$who,"Firmware updated.");
+				$ok=1;
+			} else {
+				if($quiet==0) ftp_echo("Updating firmware failed.");
+				auditlog($tname,$who,"Updating firmware failed.");
+			}
+		}
+		if(preg_match("/blacklist\.(\d+)\.zip/",$file,$mm)) {
+			@rename("$_DB_PATH/$_DB_BLACKLIST","$_DB_PATH/$_DB_BLACKLIST.bak");
+			if(execq_cmd("zcat $file |sqlite $_DB_PATH/$_DB_BLACKLIST")==0) {
+				if($quiet==0) ftp_echo("Blacklist database updated.");
+				auditlog($tname,$who,"Blacklist database updated.");
+				$_time=time();
+				$db_id=@db_connect($_DB_BLACKLIST);
+				@db_query("update policy_blacklist_info set updates='$_time' where id='1'",$db_id);
+				@db_close($db_id);
+				unset($db_id,$_time);
+				file_put_contents("/etc/blacklistversion","{$mm[1]}\n");
+				@unlink($file);echo_query("policy-restart");
+			} else {
+				if($quiet==0) ftp_echo("Updating Blacklist database failed.");
+				auditlog($tname,$who,"Updating Blacklist database failed.");
+				@rename("$_DB_PATH/$_DB_BLACKLIST.bak","$_DB_PATH/$_DB_BLACKLIST");
+				@unlink($file);
+			}
+		}
+		if(preg_match("/ipsrules\.(\d+)\.zip/",$file,$mm)) {
+			@rename("$_DB_PATH/$_DB_IPS","$_DB_PATH/$_DB_IPS.bak");
+			if(execq_cmd("zcat $file |sqlite $_DB_PATH/$_DB_IPS")==0) {
+				if($quiet==0) ftp_echo("IPS signature updated.");
+				auditlog($tname,$who,"IPS signature updated.");
+				$_time=time();
+				$db_id=@db_connect($_DB_IPS);
+				@db_query("update policy_ips_info set updates='$_time' where id='1'",$db_id);
+				@db_close($db_id);
+				unset($db_id,$_time);
+				file_put_contents("/etc/ipsversion","{$mm[1]}\n");
+				@unlink($file);echo_query("ips-restart");
+			} else {
+				if($quiet==0) ftp_echo("Updating IPS signature failed.");
+				auditlog($tname,$who,"Updating IPS signature failed.");
+				@rename("$_DB_PATH/$_DB_IPS.bak","$_DB_PATH/$_DB_IPS");
+				@unlink($file);
+			}
+		}
+		@unlink($file);
+	}
+	if($ok===1) {
+		@touch("/var/sys/updates_need_reboot");
+		sleep(1);
+		exec_cmd("/service/tools/mfs-mailer.exc U");
+	}
+}
+
+function sysupdate_console_ftp($quiet=0) {
+	global $_UPDATE, $_DOWNLOAD_PATH;
+	$tname="UPDATE";
+	$tty=0;
+	$who="mfs@console";
+	if(isset($_ENV['GATEWAY_INTERFACE'])) {
+		$tty=1;
+		$who="{$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}";
+	}
+	if(!isDomainResolves($_UPDATE['url'])) {
+		if($quiet==0) ftp_echo("Failed to resolve {$_UPDATE['url']}\n");
+		auditlog($tname,$who,"Failed to resolve {$_UPDATE['url']}");
+		return 0;
+	}
+	$ipsv=0;$blkv=0;$fv=0;
+	if(!file_exists("/etc/updates")) {
+		chk_update();
+		sleep(1);
+	}
+	if(!file_exists("/etc/updates")) {
+		if($quiet==0) ftp_echo("Failed to get latest updates from download server.");
+		auditlog($tname,$who,"Failed to get latest updates from download server.");
+		return 0;
+	}
+	$upds=trim(file_get_contents("/etc/updates"));
+	if(file_exists("/etc/ipsversion")) {
+		$ipsv=trim(file_get_contents("/etc/ipsversion"));
+	}
+	if(file_exists("/etc/blacklistversion")) {
+		$blkv=trim(file_get_contents("/etc/blacklistversion"));
+	}
+	if(file_exists("/etc/firmware")) {
+		$fv=trim(file_get_contents("/etc/firmware"));
+	}
+	$ff=array();
+	if($upds!='') {
+		list($fvu1,$ipsvu1,$blkvu1)=preg_split("/,/",$upds);
+		list($fvu,$fvm)=explode("|",$fvu1);
+		list($ipsvu,$ipsm)=explode("|",$ipsvu1);
+		list($blkvu,$blkm)=explode("|",$blkvu1);
+		
+		if(file_exists("$_DOWNLOAD_PATH/mfs.$fvu.zip")) {
+			if(md5_file("$_DOWNLOAD_PATH/mfs.$fvu.zip")!="$fvm") @unlink("$_DOWNLOAD_PATH/mfs.$fvu.zip");
+			if($fvu!='' && $fvu > $fv) $ff[]="mfs.$fvu.zip|$fvm";
+		} else {
+			if($fvu!='' && $fvu > $fv) $ff[]="mfs.$fvu.zip|$fvm";
+		}
+		if(file_exists("$_DOWNLOAD_PATH/ipsrules.$ipsvu.zip")) {
+			if(md5_file("$_DOWNLOAD_PATH/ipsrules.$ipsvu.zip")!="$ipsm") @unlink("$_DOWNLOAD_PATH/ipsrules.$ipsvu.zip");
+			if($ipsvu!='' && $ipsvu > $ipsv) $ff[]="ipsrules.$ipsvu.zip|$ipsm";
+		} else {
+			if($ipsvu!='' && $ipsvu > $ipsv) $ff[]="ipsrules.$ipsvu.zip|$ipsm";
+		}
+		if(file_exists("$_DOWNLOAD_PATH/blacklist.$blkvu.zip")) {
+			if(md5_file("$_DOWNLOAD_PATH/blacklist.$blkvu.zip")!="$blkm") @unlink("$_DOWNLOAD_PATH/blacklist.$blkvu.zip");
+			if($blkvu!='' && $blkvu > $blkv) $ff[]="blacklist.$blkvu.zip|$blkm";
+		} else {
+			if($blkvu!='' && $blkvu > $blkv) $ff[]="blacklist.$blkvu.zip|$blkm";
+		}
+	}
+	if(count($ff)!=0) {
+		$ls=str_decrypt($_UPDATE['name']);
+		list($ftpuser,$ftppass)=preg_split("/\|/",$ls);
+		
+		$ftpserver=$_UPDATE['url'];
+		$ftppassive="TRUE";
+
+		$conn_id=@ftp_connect($ftpserver); 
+		if($quiet==0) ftp_echo("Making connection to $ftpserver.");
+		auditlog($tname,$who,"Making connection to $ftpserver.");
+		$login_result=@ftp_login($conn_id, $ftpuser, $ftppass); 
+		if ((!$conn_id) || (!$login_result)) { 
+			auditlog($tname,$who,"Making connecting to $ftpserver failed.");
+			ftp_echo("Connecting to $ftpserver failed.");
+			return 1; 
+   		}
+		$systype = @ftp_systype($conn_id);
+		@ftp_pasv($conn_id,$ftppassive);
+		if($quiet==0) ftp_echo("Connected to $ftpserver.");
+		auditlog($tname,$who,"Connected to $ftpserver.");
+		chdir($_DOWNLOAD_PATH);
+		$ok=0;$ii='';
+		if($tty==1) echo "<span id=xm></span>";
+		foreach($ff as $xf) {
+			list($f,$m)=explode("|",$xf);
+			$fp=@fopen("$_DOWNLOAD_PATH/$f",'w');
+			$fs=@ftp_size($conn_id,$f);
+			$ts=size_readable($fs,null,'%d%s');
+			$download=@ftp_nb_fget($conn_id, $fp, $f, FTP_BINARY);
+			while($download == FTP_MOREDATA) {
+  				clearstatcache();
+  				$dld=filesize("$_DOWNLOAD_PATH/$f");
+				if($dld > 0) {
+      					$i = ($dld/$fs)*100;
+					if(sprintf("%d",$i)!=$ii) {
+						$tt=size_readable($dld,null,'%d%s');
+						if($tty==0 && $quiet==0) {
+      							printf("\rGetting file $f.. %3.d%% %s of %s                ", $i, $tt, $ts);
+						} else {
+							$rr=sprintf("Getting file $f.. %3d%% %s of %s", $i, $tt, $ts);
+							echo "<script>document.getElementById('xm').innerHTML='$rr';</script>";
+						}
+					}
+					$ii=sprintf("%d",$i);
+					flush();
+  				} 
+  				$download=@ftp_nb_continue($conn_id);
+			}
+			if($i < 100 && $i!=0) {
+				clearstatcache();
+  				$dld=filesize("$_DOWNLOAD_PATH/$fname");
+				$tt=size_readable($dld,null,'%d%s');
+				if($tty==0 && $quiet==0) {
+      					printf("\rGetting file $f.. %3.d%% %s of %s                 ", "100", $tt, $ts);
+				} else {
+					$rr=sprintf("Getting file $f.. %3d%% %s of %s", $i, $tt, $ts);
+					echo "<script>document.getElementById('xm').innerHTML='$rr';</script>";
+				}
+			}
+			if($tty==0 && $dld!=0 && $quiet==0) echo "\n";
+			if($tty==1 && $dld!=0 && $quiet==0) echo "<br>";
+			if($download != FTP_FINISHED) {
+				if($quiet==0) ftp_echo("Getting file $f failed.");
+				auditlog($tname,$who,"Getting file $f failed.");
+				@fclose($fp);
+				@unlink("$_DOWNLOAD_PATH/$f");
+			} else {
+				if($quiet==0) ftp_echo("Getting file $f.. completed.");
+				auditlog($tname,$who,"Getting file $f.. completed.");
+				$ok++;
+			}
+			@fclose($fp);
+		}
+		@ftp_close($conn_id);
+		auditlog($tname,$who,"Closing remote connection.");
+		if($quiet==0) ftp_echo("Closing remote connection.");
+		if($ok!=0) {
+			foreach($ff as $xf) {
+				list($f,$m)=explode("|",$xf);
+				if($quiet==0) ftp_echo("Executing file $f, please wait..");
+				auditlog($tname,$who,"Executing file $f, please wait..");
+				sysupdate_do_update($quiet,"$_DOWNLOAD_PATH/$f",$m);
+			}
+		}
+	} else {
+		if($quiet==0) ftp_echo("No update available.");
+		if($tty==1) auditlog($tname,$who,"No update available.");
+	}
+	return 0;
+}
+
+?>

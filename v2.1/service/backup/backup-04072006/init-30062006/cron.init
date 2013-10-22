@@ -1,0 +1,168 @@
+#!/bin/php -Cq
+<?
+// cron.init - last update 11-Oct-2005
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+
+putenv("PATH=/bin:/service/tools:/service/init");
+
+if(!file_exists("/bin/crond") || !file_exists("/bin/crontab")) {
+	echo "! crond or crontab binary not found or cannot execute\n";
+	slog("INIT: crond or crontab binary not found or cannot execute");
+	exit(1);
+}
+
+if(!is_dir("/var/spool/cron/crontabs")) {
+	mkdirr("/var/spool/cron/crontabs");
+}
+
+function create_cron_time($time,$cmd) {
+	$_val='';
+	$ct=$time;
+	if($ct >= 44640) {
+		$ct=floor($ct / 44640);
+		if($ct > 12) {
+			$_val='';
+		} else {
+			$_val="0 0 1 */$ct * $cmd";
+		}
+	} else if($ct >= 1440) {
+		$ct=floor($ct / 1440);
+		if($ct > 31) {
+			$_val='';
+		} else {
+			$_val="0 0 */$ct * * $cmd";
+		}
+	} else if($ct >= 60) {
+		$ct=floor($ct / 60);
+		if($ct > 23) {
+			$_val='';
+		} else {
+			$_val="0 */$ct * * * $cmd";
+		}
+	} else {
+		$_val="*/$ct * * * * $cmd";	
+	}
+	return "$_val";
+}
+
+function cron_config() {
+	global $_DB_NAME;
+	$db_id=db_connect($_DB_NAME);
+	$ustat=0;$udate=0;
+	$result=db_query("select * from misc where name like \"ntp_%\" or name like \"update_%\" ",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_val=$row['val'];
+			$_name=$row['name'];
+			if($_name=='ntp_time') $ntptime=$_val;
+			if($_name=='ntp_server') $ntpserver=$_val;
+			if($_name=='update_stat') $ustat=$_val;
+			if($_name=='update_date') $udate=$_val;
+		}
+	}
+
+	$_ntp_val='';
+	if($ntptime!='' && $ntptime!='0') {
+		$_ntp_val=create_cron_time($ntptime,"/service/tools/mfs-query.exc n $ntpserver");
+	}
+
+	$result=db_query("select * from alert_setting",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_alert_stat=$row['stat'];
+			$_alert_report_min=$row['report_min'];
+		}
+	}
+	$_alert_val='';
+	if($_alert_stat=='1') {
+		$_alert_val=create_cron_time($_alert_report_min,"/service/tools/mfs-mailer.exc");
+	}
+
+	$result=db_query("select * from crontab",$db_id);
+	if(db_num_rows($result)!=0) {
+		if($fi=fopen("/var/spool/cron/crontabs/mfs","w")) {
+			echo "* Writing crontab file\n";
+			while($row=db_fetch_array_assoc($result)) {
+				$_val=trim($row['val']);
+				if($_val=='') continue;
+				fwrite($fi,"$_val\n");
+			}
+			if(!empty($_ntp_val)) fwrite($fi,"$_ntp_val\n");
+			if(!empty($_alert_val)) fwrite($fi,"$_alert_val\n");
+			fwrite($fi,"04 5 * * * /service/tools/mfs-query.exc c\n");
+			if($ustat!=0 && $udate!=0) {
+				fwrite($fi,"* * */$udate * * /service/tools/mfs-query.exc u\n");
+			}
+			fclose($fi);
+			slog("INIT: Writing crontab file");
+			return 1;
+		}
+	}
+	db_close($db_id);
+	echo "* Writing crontab file failed\n";
+	slog("INIT: Writing crontab file failed");
+	return 0;
+}
+
+function cron_status() {
+	$pid=get_progpid("crond");
+	if($pid!='') {
+		echo "* crond (pid $pid) is running...\n";
+		return 0;
+	}
+	return 1;
+}
+
+function cron_start() {
+	@cron_config();
+	if(@cron_status()==1) {
+		if(exec_cmd("crond -L /dev/null")==0) {
+			echo "* Starting CRON agent\n";
+			slog("INIT: Starting CRON agent");
+			return 0;
+		}
+	} 
+	echo "* Starting CRON agent failed\n";
+	slog("INIT: Starting CRON agent failed");
+	return 1;
+}
+
+function cron_stop() {
+	if(killall("crond")==0) {
+		echo "* Shutting down CRON agent\n";
+		slog("INIT: Shutting down CRON agent");
+		return 0;
+	}
+	echo "* Shutting down CRON agent failed\n";
+	slog("INIT: Shutting down CRON agent failed");
+	return 1;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=cron_start();
+		break;
+	case 'stop':
+		$ret=cron_stop();
+		break;
+	case 'restart':
+		$ret=cron_stop();
+		sleep(2);
+		$ret=cron_start();
+		break;
+	case 'status':
+		$ret=cron_status();
+		break;
+	case 'config':
+		$ret=cron_config();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/status/config]\n";
+		break;
+}
+flush();
+exit($ret);
+?>

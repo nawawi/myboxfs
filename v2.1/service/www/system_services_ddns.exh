@@ -1,0 +1,196 @@
+<?
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+mybox_chk_session();
+mybox_send_nocache();
+
+$_SYSID="system_services_ddns";
+
+$db_id=mybox_db_connect($_DB_NAME);
+if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+	if(isset($do_save)&&$do_save==1) {
+		if($tab==7) {
+			if($stat!='') $stat='1';
+			if($stat=='') $stat='0';
+			$pass=trim($pass);
+			mybox_db_query("update service_ddns set provider='$provider',user='$user',stat='$stat',hostname='$hostname'",$db_id);
+			if($pass!='' && substr($pass,0,4)!='enc:') {
+				$pass=mybox_str_encrypt($pass);
+				mybox_db_query("update service_ddns set pass='$pass'",$db_id);
+			}
+			$msg="Setting updated!.";
+			mybox_echo_query("ddns-restart");
+		}
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script type='text/javascript' src="<?echo $_URL_PATH;?>/j/strings.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+	page_load();
+</script>
+<script type='text/javascript'>
+	function do_submit() {
+		var host=Trim(document.f.hostname.value);
+		if(host.match(/(\S)\.(\S+)/)==null) {
+			error("Invalid hostname");
+			return false;
+		}
+		var user=Trim(document.f.user.value);
+		var pass=Trim(document.f.pass.value);
+		if(user=='') {
+			error("Invalid login");
+			return false;
+		}
+		if(pass=='') {
+			error("Invalid password");
+			return false;
+		}
+		document.f.do_save.value='1';
+		if(document.f.btsave) document.f.btsave.disabled=true;
+		document.f.submit();
+		return true;
+	}
+function do_ddns_stat() {
+	if(document.f.stat.checked==true) {
+		for(var x=1;x<5;x++) {
+			var xid="h"+x;
+			do_show(xid);
+		}
+	} else {
+		for(var x=1;x<5;x++) {
+			var xid="h"+x;
+			do_hide(xid);
+		}
+	}
+}
+</script>
+</head>
+<body onload="parent.left_frame.switchmenu('sub1');" scroll=auto>
+<form name=f method=post action="<?echo "$_URL_PATH/system_services_ddns.exh";?>" onsubmit="return do_submit();">
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 10px;'>
+<tr>
+<td>
+<p class="sectitle"><b>System:</b> Local Services</p><br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="<?echo "$_URL_PATH/system_services.exh?tab=1";?>" <?if($tab==1){?>class="tabact"<?}?>>SNMP</a></li>
+<li><a href="<?echo "$_URL_PATH/system_services.exh?tab=2";?>" <?if($tab==2){?>class="tabact"<?}?>>SSH</a></li>
+<li><a href="<?echo "$_URL_PATH/system_services.exh?tab=3";?>" <?if($tab==3){?>class="tabact"<?}?>>Remote Logging</a></li>
+<li><a href="<?echo "$_URL_PATH/system_services.exh?tab=4";?>" <?if($tab==4){?>class="tabact"<?}?>>DHCP</a></li>
+<li><a href="<?echo "$_URL_PATH/system_services.exh?tab=5";?>" <?if($tab==5){?>class="tabact"<?}?>>FTP</a></li>
+<li><a href="<?echo "$_URL_PATH/system_services_auth.exh?tab=6";?>" <?if($tab==6){?>class="tabact"<?}?>>Authentication</a></li>
+<li><a href="<?echo "$_URL_PATH/system_services_ddns.exh?tab=7";?>" <?if($tab==7){?>class="tabact"<?}?>>DDNS</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td>
+<br>
+
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><?if(isset($msg)&&$msg!='') {?><span id=msg class=notice><?echo "$msg";?></span><?}else{echo "<span id=msg class=notice style='display: none;'></span>";}?></td></tr>
+</table><br>
+
+<!-- tab container -->
+<?if($tab==7) {
+$result=mybox_db_query("select * from service_ddns",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_user=$row['user'];
+		$_pass=$row['pass'];
+		$_stat=$row['stat'];
+		$_hostname=$row['hostname'];
+		$_provider=$row['provider'];
+	}
+}
+
+?>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Enable DDNS</td>
+<td width="70%" valign="middle" class="tdvalue">
+<input name="stat" type="checkbox" value="1" <?if($_stat==1) echo "checked";?> onclick='do_ddns_stat();'> Enable/Disable</td>
+</td>
+</tr>
+<tr id='h1' style='display: none;'> 
+<td width="30%" valign="middle" class="tdname">DDNS provider</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<select name=provider size=1 class=valbox>
+<?
+foreach(array("custom@dyndns.org"=>"DynDNS","default@no-ip.com"=>"no-ip") as $a => $b) {
+	if($_provider=="$a") {
+		echo "<option value='$a' selected>$b</option>";
+	} else {
+		echo "<option value='$a'>$b</option>";
+	}
+}
+?>
+</select>
+</td>
+</tr>
+<tr id='h2' style='display: none;'> 
+<td width="30%" valign="middle" class="tdname">Login</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="user" type="text" class="valbox" size="30" value="<?echo $_user;?>"> 
+</td>
+</tr>
+<tr id='h3' style='display: none;'> 
+<td width="30%" valign="middle" class="tdname">Password</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="pass" type="password" class="valbox" size="30" value="<?echo "enc:$_pass";?>"> 
+</td>
+</tr>
+<tr id='h4' style='display: none;'> 
+<td width="30%" valign="middle" class="tdname">Hostname</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="hostname" type="text" class="valbox" size="30" value="<?echo $_hostname;?>"> 
+</td>
+</tr>
+</table>
+<?if($_stat=='1') {?>
+<script>do_ddns_stat();</script>
+<? }?>
+<?}?>
+<table align=right>
+<tbody>
+<tr>
+<td><input name="btsave" value="Save & Reload" type="button" class=button onclick="do_submit();"> </td>  </tr> 
+</tbody>
+</table>
+
+<!-- end tab container -->
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?echo $tab;?>>
+</form>
+<script type='text/javascript'>page_kill();</script>
+</body>
+</html>
+
+<?mybox_db_close($db_id); flush();?>

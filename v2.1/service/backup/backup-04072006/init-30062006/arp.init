@@ -1,0 +1,104 @@
+#!/bin/php -Cq
+<?
+// arp.init - last update 11-Oct-2005
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+
+putenv("PATH=/bin:/service/tools:/service/init");
+
+if(!file_exists("/bin/arpd")) {
+	echo "! arpd binary not found or cannot execute\n";
+	slog("INIT: arpd binary not found or cannot execute");
+	exit(1);
+}
+
+$_arp_start=0;
+$db_id=db_connect($_DB_NAME);
+$res=db_query("select val from misc where name='arp_start'",$db_id);
+if(db_num_rows($res)!=0) {
+	$_arp_start=sqlite_fetch_single($res);
+}
+
+function arp_status() {
+	$pid=get_progpid("arpd");
+	if($pid!='') {
+		echo "* arpd (pid $pid) is running...\n";
+		return 0;
+	}
+	return 1;
+}
+
+function arp_start() {
+	global $_arp_start, $_DB_PATH;
+	if($_arp_start==0) {
+		echo "* ARP agent disabled.\n";
+		exit(1);
+	}
+	touch("/var/sys/arpdb");
+	exec_cmd("arpd -b $_DB_PATH/arp.db");
+	echo "* Starting ARP agent\n";
+	slog("INIT: Starting ARP agent");
+	return 0;
+}
+
+function arp_stop() {
+	global $_DB_PATH;
+	if(killall("arpd")==0) {
+		@unlink("$_DB_PATH/arp.db");
+		echo "* Shutting down ARP agent\n";
+		slog("INIT: Shutting down ARP agent");
+		return 0;
+	}
+	echo "* Shutting down ARP agent failed\n";
+	slog("INIT: Shutting down ARP agent failed");
+	return 1;
+}
+
+function arp_active($set) {
+	global $db_id;
+	db_query("update misc set val='$set' where name='arp_start'",$db_id);
+	if($set==0) {
+		db_query("delete from crontab where name='arp'",$db_id);
+	} else {
+		db_query("insert into crontab values('arp','*/10 * * * * /service/init/arp.init restart')",$db_id);
+	}
+	echo_query("cron-restart");
+}
+
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=arp_start();
+		break;
+	case 'stop':
+		$ret=arp_stop();
+		break;
+	case 'restart':
+		$ret=arp_stop();
+		sleep(2);
+		$ret=arp_start();
+		break;
+	case 'status':
+		$ret=arp_status();
+		break;
+	case 'enable':
+		arp_active('1');
+		echo "* ARP agent enabled.\n";
+		slog("INIT: ARP agent enabled.");
+		$ret=0;
+		break;
+	case 'disable':
+		arp_active('0');
+		echo "* ARP agent disabled.\n";
+		slog("INIT: ARP agent disabled.");
+		$ret=0;
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/status/{enable,disable}]\n";
+		break;
+}
+flush();
+exit($ret);
+?>

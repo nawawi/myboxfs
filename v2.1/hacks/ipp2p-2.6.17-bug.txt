@@ -1,0 +1,123 @@
+From bugzilla-daemon at bugzilla.netfilter.org  Sun Aug  6 13:26:11 2006
+From: bugzilla-daemon at bugzilla.netfilter.org (bugzilla-daemon@bugzilla.netfilter.org)
+Date: Sun Aug  6 13:26:13 2006
+Subject: [Bug 499] New: ipp2p error. ip_tables: ipp2p match: invalid size 0
+	!= 8
+Message-ID: <E1G9gln-0000kf-SO@vishnu.netfilter.org>
+
+https://bugzilla.netfilter.org/bugzilla/show_bug.cgi?id=499
+
+           Summary: ipp2p error.  ip_tables: ipp2p match: invalid size 0 !=
+                    8
+           Product: netfilter/iptables
+           Version: linux-2.6.x
+          Platform: i386
+        OS/Version: other
+            Status: NEW
+          Severity: normal
+          Priority: P2
+         Component: unknown
+        AssignedTo: laforge@netfilter.org
+        ReportedBy: x12345@email.ro
+
+
+root@border:/ipp2p-0.8.0# iptables -A FORWARD -m ipp2p --ipp2p -j DROP
+iptables: Invalid Argument (dmesg may have more information)
+
+dmesg
+IPP2P v0.8.0 loading
+ip_tables: ipp2p match: invalid size 0 != 8
+same error with other version of ipp2p 0.7.X
+
+
+uname -a
+Linux border 2.6.17-MSI-slackware-b1 #5 Sat Aug 5 23:47:12 EEST 2006 i686 
+unknown unknown GNU/Linux
+
+iptables -V
+iptables v1.3.5
+
+pom
+patch-o-matic-ng-20060804
+with ROUTE,u32,TARPIT
+
+-- 
+Configure bugmail: https://bugzilla.netfilter.org/bugzilla/userprefs.cgi?tab=email
+------- You are receiving this mail because: -------
+You are the assignee for the bug, or are watching the assignee.
+
+From bugzilla-daemon at bugzilla.netfilter.org  Sun Aug  6 14:36:12 2006
+From: bugzilla-daemon at bugzilla.netfilter.org (bugzilla-daemon@bugzilla.netfilter.org)
+Date: Sun Aug  6 14:36:14 2006
+Subject: [Bug 499] ipp2p error. ip_tables: ipp2p match: invalid size 0 != 8
+Message-ID: <E1G9hrY-0006Me-ON@vishnu.netfilter.org>
+
+https://bugzilla.netfilter.org/bugzilla/show_bug.cgi?id=499
+
+
+x12345@email.ro changed:
+
+           What    |Removed                     |Added
+----------------------------------------------------------------------------
+             Status|NEW                         |RESOLVED
+         Resolution|                            |FIXED
+
+
+
+
+------- Additional Comments From x12345@email.ro  2006-08-06 14:36 MET -------
+
+diff -c ipp2p-0.8.1_rc1/Makefile ipp2p-0.8.1_rc1-ok/Makefile
+*** ipp2p-0.8.1_rc1/Makefile    2006-01-04 18:34:14.000000000 +0200
+--- ipp2p-0.8.1_rc1-ok/Makefile 2006-08-05 04:02:17.000000000 +0300
+***************
+*** 33,39 ****
+  endif
+
+  ifeq ($(IPTABLES_SRC),)
+! IPTABLES_SRC = /usr/src/iptables-1.2.9
+  endif
+
+  IPTABLES_INCLUDE = -I$(IPTABLES_SRC)/include
+--- 33,39 ----
+  endif
+
+  ifeq ($(IPTABLES_SRC),)
+! IPTABLES_SRC = /usr/src/iptables-1.3.5
+  endif
+
+  IPTABLES_INCLUDE = -I$(IPTABLES_SRC)/include
+Only in ipp2p-0.8.1_rc1-ok/: Modules.symvers
+diff -c ipp2p-0.8.1_rc1/ipt_ipp2p.c ipp2p-0.8.1_rc1-ok/ipt_ipp2p.c
+*** ipp2p-0.8.1_rc1/ipt_ipp2p.c 2006-01-04 18:00:49.000000000 +0200
+--- ipp2p-0.8.1_rc1-ok/ipt_ipp2p.c      2006-08-06 15:29:13.000000000 +0300
+***************
+*** 729,734 ****
+--- 729,735 ----
+  match(const struct sk_buff *skb,
+        const struct net_device *in,
+        const struct net_device *out,
++       const struct xt_match *match,
+        const void *matchinfo,
+        int offset,
+
+***************
+*** 818,823 ****
+--- 819,825 ----
+  static int
+  checkentry(const char *tablename,
+              const struct ipt_ip *ip,
++           const struct xt_match *match,
+            void *matchinfo,
+            unsigned int matchsize,
+            unsigned int hook_mask)
+***************
+*** 846,851 ****
+--- 848,854 ----
+        .name           = "ipp2p",
+        .match          = &match,
+        .checkentry     = &checkentry,
++         .matchsize    = sizeof(struct ipt_p2p_info),
+        .me             = THIS_MODULE,
+  #endif
+  };

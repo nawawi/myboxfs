@@ -1,0 +1,619 @@
+<?
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+if(mybox_license('IPS')!=1) exit("IPS module unlicensed");
+mybox_chk_session();
+mybox_send_nocache();
+
+$_SYSID="fw_ips";
+
+$db_id=mybox_db_connect($_DB_NAME);
+$db_id2=mybox_db_connect($_DB_IPS);
+if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+	if(isset($do_id)&&$do_id=='apply_chg') {
+		if($tab==2) {
+			mybox_echo_query("ips-config-reload");
+		} elseif($tab==3) {
+			mybox_echo_query("ips-reload");
+		} else {
+			mybox_echo_query("ips-restart");
+		}
+		$msg="<script>waitcount();</script>";
+		mybox_auditlog("EXECUTE","UI","IPS: reload");
+	}
+	if($tab==1) {
+		if(isset($do_save)&&$do_save==1) {
+			mybox_auditlog("WRITE","UI","IPS: update setting");
+			if($ids_timeout=='') $ids_timeout=5;
+			if($ids_stat!='') $ids_stat=1;
+			if($ids_stat=='') $ids_stat=0;
+			if($ids_astat!='') $ids_astat=1;
+			if($ids_astat=='') $ids_astat=0;
+			if($pscan_stat!='') $pscan_stat=1;
+			if($pscan_stat=='') $pscan_stat=0;
+			$ids_exclude=trim($ids_exclude);
+			$pscan_exclude=trim($pscan_exclude);
+			mybox_db_query("update misc set val='$ids_stat' where name='ids_stat'",$db_id);
+			mybox_db_query("update misc set val='$ids_astat' where name='ids_acl'",$db_id);
+			if($ids_timeout!='') mybox_db_query("update misc set val='$ids_timeout' where name='ids_timeout'",$db_id);
+			if($ids_exclude!='') mybox_db_query("update misc set val='$ids_exclude' where name='ids_exclude'",$db_id);
+			if($ids_mode!='') mybox_db_query("update misc set val='$ids_mode' where name='ids_mode'",$db_id);
+			mybox_db_query("update misc set val='$pscan_stat' where name='pscan_stat'",$db_id);
+			if($pscan_exclude!='') mybox_db_query("update misc set val='$pscan_exclude' where name='pscan_exclude'",$db_id);
+			if($pscan_mode!='') mybox_db_query("update misc set val='$pscan_mode' where name='pscan_mode'",$db_id);
+			$msg="Setting updated!.";
+		}
+	}
+	if($tab==2) {
+		if($col==1) {
+			if(isset($do_save)&&$do_save==2) $xstat=1;
+			if(isset($do_save)&&$do_save==3) $xstat=0;
+			mybox_auditlog("WRITE","UI","IPS: update signature setting");
+			if(is_array($del) && count($del)!=0) {
+				foreach($del as $xfile) {
+					mybox_db_query("update policy_ips set fstat='$xstat' where file='$xfile'",$db_id2);
+				}
+			} else {
+				if($del!='') mybox_db_query("update policy_ips set fstat='$xstat' where file='$del'",$db_id2);
+			}
+			unset($xstat,$xfile,$del);
+		}
+		if($col==2) {
+			if(isset($do_save)&&$do_save==1 && isset($sig)&&$sig!='') {
+				mybox_auditlog("WRITE","UI","IPS: update signature setting");
+				if(is_array($del) && count($del)!=0) {
+					foreach($del as $xfile) {
+						mybox_db_query("update policy_ips set stat='$stat',log='$log',block='$block' where sid='$xfile' and file='$sig'",$db_id2);
+					}
+				} else {
+					if($del!='') {
+						if($stat!='') mybox_db_query("update policy_ips set stat='$stat' where sid='$del' and file='$sig'",$db_id2);
+						if($log!='') mybox_db_query("update policy_ips set log='$log' where sid='$del' and file='$sig'",$db_id2);						if($stat!='') mybox_db_query("update policy_ips set stat='$stat',log='$log',block='$block' where sid='$del' and file='$sig'",$db_id2);
+						if($block!='') mybox_db_query("update policy_ips set block='$block' where sid='$del' and file='$sig'",$db_id2);
+					}
+				}
+				unset($xstat,$xfile,$del);	
+			}
+		}
+	}
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied!.";
+		mybox_auditlog("EXECUTE","UI","IPS: $msg");
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+if((!isset($col)||$col=='')&&$tab==2) $col=1;
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script type='text/javascript' src="<?echo $_URL_PATH;?>/j/strings.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+	page_load();
+</script>
+<script type='text/javascript'>
+	function do_changes() {
+		if(document.f.btsave) document.f.btsave.disabled=true;
+		if(document.f.btapply) document.f.btapply.disabled=true;
+		self.location.href='<?echo "$_URL_PATH/fw_ips.exh?tab=$tab&col=$col&sig=$sig&do_id=apply_chg";?>';	
+	}
+	<?if($tab!=3) {?>
+	function do_submit() {
+		<?if($tab==1) {?>
+		if(document.f.ids_stat.checked==true) {
+			if(document.f.ids_exclude.value!='' && !mip1plist(document.f.ids_exclude.value)) {error("Invalid IP whitelist!"); return false;}
+		}
+		if(document.f.btsave) document.f.btsave.disabled=true;
+		document.f.do_save.value='1';
+		<? } ?>
+		document.f.submit();
+		return true;
+	}
+	function dotoggle() {
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					document.f.elements[i].checked = !(document.f.elements[i].checked);
+    				}	
+			}
+  		}
+	}
+	function chkdel() {
+		var x='0';
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					if(document.f.elements[i].checked) x++;
+    				}	
+			}
+  		}
+		if(x==0) return false;
+		return true;
+	}
+	function do_active(val) {
+		if(chkdel()==true) {
+			if(document.f.btsave) document.f.btsave.disabled=true;
+			document.f.do_save.value=val;
+			document.f.submit();
+			return true;
+		}
+		error("Please select which rules you want to save!");
+		return false;
+	}
+	<?}?>
+
+var k=0;
+function waitcount() { 
+ 	k=k+2;
+	if(k <= 100) {
+    		document.getElementById("msg").innerHTML='Reloading.. Please wait..'+k+'%'; 
+    		setTimeout(waitcount,400);  
+	} else {
+		self.location.href='<?echo "$_URL_PATH/fw_ips.exh?tab=$tab&do_tab=$do_tab&col=$col&col2=$col2&sig=$sig";?>';
+	}
+}
+
+</script>
+</head>
+<body onload="parent.left_frame.switchmenu('sub3');" scroll=auto>
+<form name=f method=post action="<?echo "$_URL_PATH/fw_ips.exh";?>">
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 10px;'>
+<tr>
+<td>
+<p class="sectitle"><b>Firewall:</b> IPS </p><br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="<?echo "$_URL_PATH/fw_ips.exh?tab=1";?>" <?if($tab==1){?>class="tabact"<?}?>>Setting</a></li>
+<li><a href="<?echo "$_URL_PATH/fw_ips.exh?tab=2";?>" <?if($tab==2){?>class="tabact"<?}?>>Signatures</a></li>
+<li><a href="<?echo "$_URL_PATH/fw_ips.exh?tab=3";?>" <?if($tab==3){?>class="tabact"<?}?>>Blocked IP</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td> 
+<br>
+
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><?if(isset($msg)&&$msg!='') {?><span id=msg class=notice><?echo "$msg";?></span><?}else{echo "<span id=msg class=notice style='display: none;'></span>";}?></td></tr>
+</table><br>
+
+<!-- tab container -->
+<?if($tab==1) {
+$result=mybox_db_query("select * from misc where name like \"ids_%\" or name like \"pscan_%\"",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_name=$row['name'];
+		$_val=$row['val'];
+		if($_name=='ids_timeout') $_ids_timeout=$_val;
+		if($_name=='ids_stat') $_ids_stat=$_val;
+		if($_name=='ids_exclude') $_ids_exclude=trim($_val);
+		if($_name=='ids_mode') $_ids_mode=trim($_val);
+		if($_name=='pscan_stat') $_pscan_stat=$_val;
+		if($_name=='pscan_exclude') $_pscan_exclude=trim($_val);
+		if($_name=='pscan_mode') $_pscan_mode=trim($_val);
+		if($_name=='ids_acl') $_ids_astat=trim($_val);
+		if($_ids_stat==1) $_ids_stat1='checked';
+		if($_pscan_stat==1) $_pscan_stat1='checked';
+	}
+}
+
+?>
+<script type='text/javascript'>
+function do_chk() {
+	if(document.f.ids_stat.checked==true) {
+		for(var x=1;x<6;x++) {
+			var xid="h"+x;
+			do_show(xid);
+		}
+	} else {
+		for(var x=1;x<6;x++) {
+			var xid="h"+x;
+			do_hide(xid);
+		}
+	}
+}
+</script>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td valign="middle" class="tdname">Enable Intrusion Protection</td>
+<td valign="middle" class="tdvalue"> 
+<input type=checkbox name=ids_stat <?echo $_ids_stat1;?> onclick='do_chk();'> Enable/Disable
+</td>
+</tr>
+<tr id='h1' style='display: none;'> 
+<td valign="middle" class="tdname">Intrusion protection mode</td>
+<td valign="middle" class="tdvalue"> 
+<table class="data" style='border: 0px; margin-bottom: 0em;'>
+<tr><td valign=top style='border: 0px;'>
+<select name=ids_mode size=1 class=valbox>
+<?
+foreach($_INOUTB as $m => $v) {
+	if($_ids_mode==$v) {
+		echo "<option value='$v' selected>$m</option>";
+	} else {
+		echo "<option value='$v'>$m</option>";
+	}
+}
+?>
+</select>
+</td></tr></table>
+</td>
+</tr>
+<tr id='h2' style='display: none;'> 
+<td valign="middle" class="tdname">Enable Portscan Detector</td>
+<td valign="middle" class="tdvalue"> 
+<input type=checkbox name=pscan_stat <?echo $_pscan_stat1;?>>
+</td>
+</tr>
+<tr id='h3' style='display: none;'> 
+<td valign="middle" class="tdname">Portscan protection mode</td>
+<td valign="middle" class="tdvalue">
+<table class="data" style='border: 0px; margin-bottom: 0em;'>
+<tr><td valign=top style='border: 0px;'>
+<select name=pscan_mode size=1 class=valbox>
+<?
+foreach($_INOUTB as $m => $v) {
+	if($_pscan_mode==$v) {
+		echo "<option value='$v' selected>$m</option>";
+	} else {
+		echo "<option value='$v'>$m</option>";
+	}
+}
+?>
+</select>
+</td></tr></table>
+</td>
+</tr>
+<tr id='h4' style='display: none;'> 
+<td valign="middle" class="tdname">Blocking life time</td>
+<td valign="middle" class="tdvalue">
+<table class="data" style='border: 0px; margin-bottom: 0em;'>
+<tr><td valign=top style='border: 0px;'>
+<input name="ids_timeout" type="text" class="valbox" size="10" value="<?echo $_ids_timeout;?>"> minute(s); 0 to never unblock.
+</td></tr></table>
+</td>
+</tr>
+<tr id='h5' style='display: none;'> 
+<td valign="top" class="tdname">IP whitelist</td>
+<td valign="middle" class="tdvalue">
+<table class="data" style='border: 0px; margin-bottom: 0em;'>
+<tr><td valign=top style='border: 0px; width: 30%;'> 
+<input name="ids_astat" type="checkbox" value="1" <?if($_ids_astat==1) echo "checked";?>> ACL List</td>
+</tr> 
+<tr>
+<td valign=top style='border: 0px; padding-top: 4px;' colspan=2>
+IP Address:</td>
+</tr> 
+<tr><td valign=top style='border: 0px;'>
+<textarea name="ids_exclude" class="valbox" cols=40 rows=6 style='height: 80px;'>
+<?
+$list=preg_split('/\s+/',$_ids_exclude);
+if(count($list)!=0) {
+	foreach($list as $ip) {
+		if($ip!='') echo "$ip ";
+	}
+} else {
+	if($_ids_exclude!='') echo "$_ids_exclude";
+}	
+?>
+</textarea>
+</td>
+<td valign=bottom style='border: 0px; width: 60%;'>Each IP separate by space.
+</td></tr></table>
+
+</td>
+</tr>
+</tbody>
+</table>
+<script type='text/javascript'>
+do_chk();
+</script>
+<?}//tab==1?>
+
+<?if($tab==2) {
+	if($col==1) {
+?>
+<table class="data" width="100%">
+<thead class="blue"> 
+<tr>
+<td style='font-weight: bold;'></td> 
+<td style='font-weight: bold;'>Name</td>
+<td style='font-weight: bold;'>Description</td>
+<td style='font-weight: bold;'>Rule count</td>
+<td style='font-weight: bold;' width=2%>Active</td>
+<td style='font-weight: bold;' width=2%>Opt</td>
+</tr></thead>
+<tbody>
+<?
+$_F=array();
+$result=mybox_db_query("select distinct file,fstat,note from policy_ips",$db_id2);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_file=$row['file'];
+		$_fstat=$row['fstat'];
+		$_note=mybox_unescape_str($row['note']);
+		$_F[$_file]="$_fstat|$_note";
+	}
+}
+unset($result,$_file,$_fstat,$_note);
+$x=0;
+if(count($_F)!=0) {
+	foreach($_F as $_file => $_val) {
+		list($_fstat,$_note)=preg_split("/\|/",$_val);
+		$_cnt=0;
+		$_file=trim($_file);
+		if($_file=='') continue;
+		$result1=@mybox_db_query("select COUNT(file) from policy_ips where file='$_file'",$db_id2);
+		$_cnt=@mybox_db_fetch_single($result1);
+		unset($result1);
+		if($_fstat==0) $_xfstat=2;
+		if($_fstat==1) $_xfstat=3;
+		$f='rule';
+		if($_cnt > 1) $f='rules';
+		$lo="onclick=\"self.location.href='$_URL_PATH/fw_ips.exh?tab=$tab&col=2&sig=$_file';\" ";
+		echo "<tr $lt>";
+		echo "<td width=1%><name=sini><a href='#sini' $lo>{$_PNG['df_close']}</a></td>";
+		echo "<td align=center $lo><b>$_file</b></td>";
+		echo "<td>$_note</td>";
+		echo "<td>$_cnt $f</td>";
+		echo "<td width=2% style='text-align: center;' align=center><a href='$_URL_PATH/fw_ips.exh?tab=$tab&col=$col&do_save=$_xfstat&del=$_file'>{$_PNG_YESNO[$_fstat]}</a></td>";
+		echo "<td width=2% style='text-align: right;' align=right><input type=checkbox name=del[] value='$_file'></td>";
+      		echo "</tr>";
+		$x++;
+	}
+}
+if($x >= 1) {
+?>
+<tr>
+<td style='text-align: right;' align=right valign=top colspan=6><name="sin"><a href="#sin" onclick='do_active(3);'>Disable</a> / <a href="#sin" onclick='do_active(2);'>Enable</a> / <a href="#sin" onclick='dotoggle();'>Toggle</a> <?echo $_PNG['arrow_rtr'];?></td>
+</tr>
+<? }//if x >= 1 ?>
+</tbody>
+</table>
+
+<?} // col==1 ?>
+<?if($col==2) {?>
+<table class="data" width="100%">
+<thead class="blue"> 
+<tr>
+<td style='font-weight: bold;'><a href='#' onclick="self.location.href='<?echo "$_URL_PATH/fw_ips.exh?tab=2&col=1"?>';" title='Back to main'><?echo $_PNG['df_up'];?></a></td> 
+<td style='font-weight: bold;'>Name</td>
+<td style='font-weight: bold;'>Message</td>
+<td style='font-weight: bold;' width=2%>Log</td>
+<td style='font-weight: bold;' width=2%>Block</td>
+<td style='font-weight: bold;' width=2%>Active</td>
+<td style='font-weight: bold;' width=2%>Opt</td>
+</tr></thead>
+<tbody>
+<?
+$result=mybox_db_query("select sid,log,block,stat,msg,rules from policy_ips where file='$sig'",$db_id2);
+if(mybox_db_num_rows($result)!=0) {
+	$xid=0;
+	$_dr=array();
+	$_dr["->"]="Inbound";
+	$_dr["<-"]="Outbound";
+	$_dr["<>"]="Both";
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_sid=$row['sid'];
+		$_stat=$row['stat'];
+		$_block=$row['block'];
+		$_log=$row['log'];
+		$_msg=mybox_unescape_str($row['msg']);
+		$_rules=mybox_str_decrypt($row['rules']);
+		if($_log==0) {$_log1=1;} else {$_log1=0;}
+		if($_block==0) {$_block1=1;} else {$_block1=0;}
+		if($_stat==0) {$_stat1=1;} else {$_stat1=0;}
+		$_rulesx='';
+		if($_rules!='') {
+			$tk=$_rules;
+			$_protox='';$_srcx='';$_srcpx='';$_dirx='';$_dstx='';$_dstpx='';
+			if(preg_match("/^alert\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)/",$tk,$mm)) {
+				$_protox=strtoupper($mm[1]);
+				$_srcx=$mm[2];
+				$_srcpx=$mm[3];
+				$_dirx=$_dr[$mm[4]];
+				$_dstx=$mm[5];
+				$_dstpx=$mm[6];
+			}
+
+			unset($mm);
+			$tk=strstr($tk,"(msg:");
+			$tk=ltrim($tk,"(");
+                        $tk=rtrim($tk,")");
+			$xarg=preg_split("/;/",$tk);
+			if(count($xarg)!=0) {
+				$_rulesx="<table style='border: 0px; padding: 0px;'>";
+				$_rulesx .="<tr><td style='font-weight: bold;'>Protocol</td><td>: $_protox</td></tr>";
+				$_rulesx .="<tr><td style='font-weight: bold;'>Intruder</td><td>: $_dirx</td></tr>";
+				if($_srcx!="any" && $_srcx{0}!='$') {
+					$_rulesx .="<tr><td style='font-weight: bold;'>Source</td><td>: $_srcx</td></tr>";
+				}
+				if($_srcpx!="any" && $_srcpx{0}!='$') {
+					$_rulesx .="<tr><td style='font-weight: bold;'>Source Port</td><td>: $_srcpx</td></tr>";
+				}
+				if($_dstx!="any" && $_dstx{0}!='$') {
+					$_rulesx .="<tr><td style='font-weight: bold;'>Destination</td><td>: $_dstx</td></tr>";
+				}
+				if($_dstpx!="any" && $_dstpx{0}!='$') {
+					$_rulesx .="<tr><td style='font-weight: bold;'>Destination Port</td><td>: $_dstpx</td></tr>";
+				}
+				foreach($xarg as $tl) {
+					$tl=trim($tl);
+					if($tl=='') continue;
+					if($tl{0}==')') continue;
+					$v1='';$v2='';
+					if(preg_match("/^(\w+)\:(.*)/",$tl,$mm)) {
+						$v1=htmlentities(trim($mm[1],'"'));
+						$v2=htmlentities(trim($mm[2],'"'));
+					}
+					unset($mm);
+					if($v1=="msg") continue;
+					$v2=trim($v2,'"');
+					if($v1!='' && $v2!='') $_rulesx .="<tr><td style='font-weight: bold;'>".ucfirst($v1)."</td><td>: $v2</td></tr>";
+				}
+				$_rulesx .="</table>";
+			}
+			unset($tk,$xarg,$tl,$mm);
+		}
+		echo "
+		<tr>
+		<td width=1%><name='sini'><a href='#sini' onclick=\"dohide_show('h$xid');\" style=''>{$_PNG['file']}</a></td>
+		<td><b>$sig</b></td>
+		<td>$_msg</td>
+		<td width=2% style='text-align: center;' align=center $lo><a href='$_URL_PATH/fw_ips.exh?tab=2&col=2&do_save=1&log=$_log1&del=$_sid&sig=$sig'>{$_PNG_YESNO[$_log]}</a></td>
+		<td width=2% style='text-align: center;' align=center $lo><a href='$_URL_PATH/fw_ips.exh?tab=2&col=2&do_save=1&block=$_block1&del=$_sid&sig=$sig'>{$_PNG_YESNO[$_block]}</a></td>
+		<td width=2% style='text-align: center;' align=center $lo><a href='$_URL_PATH/fw_ips.exh?tab=2&col=2&do_save=1&stat=$_stat1&del=$_sid&sig=$sig'>{$_PNG_YESNO[$_stat]}</a></td>
+		<td width=2% style='text-align: right;' align=right><input type=checkbox name=del[] value=$_sid></td>
+		</tr>
+		<tr id='h$xid' style='display: none;'>
+		<td colspan=7 style='background: #ccc;'>
+		$_rulesx
+		</td>
+		</tr>
+		";
+		$xid++;
+	}
+}
+if($xid > 0) {
+?>
+<tr>
+<td style='text-align: right;' align=right valign=bottom colspan=7><name="sid">
+<select name=block size=1 class=valbox style='height: 16px; font-size: 10px;'>
+<option value='1' <?if(isset($block)&&$block==1)echo "selected";?>>Block</option>
+<option value='0' <?if(isset($block)&&$block==0)echo "selected";?>>Unblock</option>
+</select>
+<select name=log size=1 class=valbox style='height: 16px; font-size: 10px;'>
+<option value='1' <?if(isset($log)&&$log==1)echo "selected";?>>Log</option>
+<option value='0' <?if(isset($log)&&$log==0)echo "selected";?>>Nolog</option>
+</select> 
+<select name=stat size=1 class=valbox style='height: 16px; font-size: 10px;'>
+<option value='1' <?if(isset($stat)&&$stat==1)echo "selected";?>>Enable</option>
+<option value='0' <?if(isset($stat)&&$stat==0)echo "selected";?>>Disable</option>
+</select>&nbsp;
+<a href="#sid" onclick='dotoggle();'>Toggle</a> <?echo $_PNG['arrow_rtr'];?></td>
+</tr>
+<? } ?>
+</tbody>
+</table>
+<?}//col==2?>
+<?} // tab==2?>
+<?if($tab==3) {?>
+<table class="data" width="100%">
+<thead class="blue"> 
+<tr>
+<td style='font-weight: bold;'>#</td> 
+<td style='font-weight: bold;'>Source IP</td>
+<td style='font-weight: bold;'>Destination IP</td>
+<td style='font-weight: bold;'>Method</td>
+<td style='font-weight: bold;'>Hits</td>
+<td style='font-weight: bold;'>Blocked</td>
+<td style='font-weight: bold;'>Expiry</td>
+</tr></thead>
+<tbody>
+<?
+$t=0;
+if(file_exists("/var/sys/ipsblock")) {
+	$_IDS_SET=unserialize(mybox_fget_contents("/var/sys/ipsset"));
+	$_IDS_TIMEOUT=$_IDS_SET['timeout'];
+	$_file_array1=unserialize(mybox_fget_contents("/var/sys/ipsblock"));
+	$_file_array=array_reverse($_file_array1);
+	foreach($_file_array as $ip => $dt) {
+		$t++;
+		$_src=$ip;
+		echo "<tr>";
+		echo "<td>$t</td>";
+		echo "<td><name=sini><a style='color: red;' href='#sini' onclick=\"self.location.href='$_URL_PATH/fw_blacklist.exh?tab=2&col=2&_ip=$_src';\">$_src</a></td>";
+		$k=0;
+		foreach($dt as $dst => $opt) {
+			$k++;
+			$_time="Never expired";
+			if($opt[1]!=0) {
+				$_time=date('d/m/Y h:i:s',$opt[1]);
+			}
+			$_btime=date('d/m/Y h:i:s',$opt[3]);
+			$_hit=$opt[2];
+			$_dst=$opt[4];
+			if($opt[5]==2) {
+				$_method="<a style='color: green;' href='$_URL_PATH/diag_logs.exh?tab=2&id=7'>Portscan</a>";
+			} else {
+				$_method="<a style='color: green;' href='$_URL_PATH/diag_logs.exh?tab=2&id=6'>{$opt[5]}</a>";
+			}
+			if($k > 1) {
+				echo "<tr>";
+				echo "<td colspan=2 style='border: 0px;'>&nbsp;</td>";
+			}
+			echo "<td>$_dst</td>";
+			echo "<td>$_method</td>";
+			echo "<td style='color: red;'>$_hit</td>";
+			echo "<td>$_btime</td>";
+			echo "<td>$_time</td>";
+			if($k > 1) echo "</tr>";
+
+		}
+		echo "</tr>";
+		unset($_src,$_time,$_btime,$_tx,$_tr,$_tf,$_hit);
+	}
+}
+if($t==0){
+?>
+<tr>
+<td valign=bottom colspan=6>No data available.</td>
+</tr>
+<?}?>
+</tbody>
+</table>
+
+<?} // tab==3 ?>
+<table align=right>
+<tbody>
+<?if($tab!=3) {?>
+<tr>
+<td><input name="btapply" value="Reload" type="button" class=button onclick="do_changes();"></td>
+<?if($col!=1){?>
+<td><input name="btsave" value="Save" type="button" class=button onclick="<?if($tab==2 && $col==2){echo "do_active(1);"; }else{ echo "do_submit();"; }?>"> </td>  </tr> 
+<? } ?>
+<?} else { // tab!=3?>
+<tr>
+<td><input name="btapply" value="Release" type="button" class=button onclick="do_changes();"></td>
+</tr>
+<?}?>
+</tbody>
+</table>
+
+<!-- end tab container -->
+
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?echo $tab;?>>
+<input type=hidden name=col value=<?echo $col;?>>
+<?if($col==2) {?>
+<input type=hidden name=sig value=<?echo $sig;?>>
+<? } ?>
+</form>
+<script type='text/javascript'>page_kill();</script>
+</body>
+</html>
+
+<?mybox_db_close($db_id); flush();?>

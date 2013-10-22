@@ -1,0 +1,66 @@
+class db_connect {
+	var $db_id=null;
+	var $query_id=null;
+
+       	function db_connect($db_name) {
+		$this->db_id=@sqlite_open("$_DB_PATH/$db_name",0666,$error);
+		if(!$this->db_id) {
+			echo("cannot open configuration file $db_name\n");
+			$this->error($error,"cannot open configuration file $db_name",__FILE__, __LINE__);
+			exit;
+		}
+		sqlite_create_function($this->db_id, 'md5',array($this,'sqlite_md5'), 1);
+		sqlite_create_function($this->db_id, 'crypt',array($this,'sqlite_crypt'), 2);
+		sqlite_create_function($this->db_id, 'trim',array($this,'sqlite_trim'), 3);
+        }
+
+	function error($error, $sql, $file, $line) {
+		global $_LOG_PATH;
+		if(file_exists("/var/sys/db_do_debug")) {
+
+		} 
+		
+	}
+	function sqlite_md5($str) {
+		return md5($str);
+	}
+
+	function sqlite_crypt($str) {
+		return crypt($str,$str);
+	}
+
+	function sqlite_trim($str) {
+		return trim(str_replace(array('"',"'"),array('&#039','&quot'),$str));
+	}
+
+	function db_query($sql,$file = __FILE__, $line = __LINE__) {
+		$this->query_id=@sqlite_query($this->db_id,$sql);
+		if(!$this->query_id) {
+			$this->error($error,$sql,$file,$line);
+			return false;
+		} else {
+			return $this->query_id;
+		}
+	}
+
+        function db_num_rows($result) {
+                return @sqlite_num_rows($result);
+        }
+
+        function db_fetch($result,$mode='SQLITE_ASSOC') {
+                return @sqlite_fetch_array($result,$mode);
+        }
+
+        function db_fetch_single($result) {
+                return @sqlite_fetch_single($result);
+        }
+
+        function db_flush() {
+                $this->db_query("VACUUM",$this->db_id);
+        }
+        function db_close() {
+                $this->db_flush();
+                @sqlite_close($this->db_id);
+		$this->db_id='';
+        }
+}

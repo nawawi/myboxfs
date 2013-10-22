@@ -1,0 +1,182 @@
+#!/bin/php -Cq
+<?
+// cron.init - last update 30-Jun-2006
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+putenv("PATH=/bin:/service/tools:/service/init");
+if(!file_exists("/bin/crond") || !file_exists("/bin/crontab")) {
+	echo "Cannot execute cron.init. Internal error!\n";
+	mybox_slog("ERROR","Cannot execute cron.init. Internal error!");
+	exit(1);
+}
+$_QUIET=0;
+
+if(!is_dir("/var/spool/cron/crontabs")) {
+	mybox_mkdirr("/var/spool/cron/crontabs");
+}
+
+function create_cron_time($time,$cmd) {
+	$_val='';
+	$ct=$time;
+	if($ct >= 44640) {
+		$ct=floor($ct / 44640);
+		if($ct > 12) {
+			$_val='';
+		} else {
+			$_val="0 0 1 */$ct * $cmd";
+		}
+	} else if($ct >= 1440) {
+		$ct=floor($ct / 1440);
+		if($ct > 31) {
+			$_val='';
+		} else {
+			$_val="0 0 */$ct * * $cmd";
+		}
+	} else if($ct >= 60) {
+		$ct=floor($ct / 60);
+		if($ct > 23) {
+			$_val='';
+		} else {
+			$_val="0 */$ct * * * $cmd";
+		}
+	} else {
+		$_val="*/$ct * * * * $cmd";	
+	}
+	return "$_val";
+}
+
+function cron_config() {
+	global $_DB_NAME, $_QUIET;
+	$db_id=mybox_db_connect($_DB_NAME);
+	$ustat=0;$udate=0;
+	$result=mybox_db_query("select * from misc where name like \"ntp_%\" or name like \"update_%\" ",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_val=$row['val'];
+			$_name=$row['name'];
+			if($_name=='ntp_time') $ntptime=$_val;
+			if($_name=='ntp_server') $ntpserver=$_val;
+			if($_name=='update_stat') $ustat=$_val;
+			if($_name=='update_date') $udate=$_val;
+		}
+	}
+
+	$_ntp_val='';
+	if($ntptime!='' && $ntptime!='0') {
+		mybox_save_to_file("/var/sys/ntpserver","$ntpserver");
+		$_ntp_val=create_cron_time($ntptime,"/service/tools/mfs-query.exc n");
+	}
+
+	$result=mybox_db_query("select * from alert_setting",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_alert_stat=$row['stat'];
+			$_alert_report_min=$row['report_min'];
+		}
+	}
+	$_alert_val='';
+	if($_alert_stat=='1') {
+		$_alert_val=create_cron_time($_alert_report_min,"/service/tools/mfs-mailer.exc");
+	}
+
+	$result=mybox_db_query("select * from crontab",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		if($fi=fopen("/var/spool/cron/crontabs/mfs","w")) {
+			echo "* Writing crontab file\n";
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_val=trim($row['val']);
+				if($_val=='') continue;
+				fwrite($fi,"$_val\n");
+			}
+			if(!empty($_ntp_val)) fwrite($fi,"$_ntp_val\n");
+			if(!empty($_alert_val)) fwrite($fi,"$_alert_val\n");
+			fwrite($fi,"04 5 * * * /service/tools/mfs-query.exc c\n");
+			if($ustat!=0 && mybox_license('AUP')==1) {
+				if($udate!=0) fwrite($fi,"* * */$udate * * /service/tools/mfs-query.exc u\n");
+			}
+			fclose($fi);
+			mybox_db_close($db_id);
+			return 1;
+		}
+	}
+	if($_QUIET==0) echo "* Writing crontab file failed\n";
+	return 0;
+}
+
+function cron_status() {
+	global $_QUIET;
+	$pid=mybox_get_progpid("crond");
+	if($pid!='') {
+		if($_QUIET==0) echo "* crond (pid $pid) is running...\n";
+		return 0;
+	}
+	return 1;
+}
+
+function cron_start() {
+	global $_QUIET;
+	if(@cron_config()==1 && @cron_status()==1) {
+		if(mybox_exec_cmd("crond -L /dev/null")==0) {
+			if($_QUIET==0) {
+				echo "* Starting CRON agent\n";
+				mybox_slog("INFO","Starting CRON agent");
+			}
+			@touch("/var/sys/chk_crond");
+			return 0;
+		}
+	} 
+	@touch("/var/sys/chk_crond");
+	if($_QUIET==0) {
+		echo "* Starting CRON agent failed\n";
+		mybox_slog("INFO","Starting CRON agent failed");
+	}
+	return 1;
+}
+
+function cron_stop() {
+	global $_QUIET;
+	@unlink("/var/sys/chk_crond");
+	if(mybox_killall("crond")==0) {
+		if($_QUIET==0) {
+			echo "* Shutting down CRON agent\n";
+			mybox_slog("INFO","Shutting down CRON agent");
+		}
+		return 0;
+	}
+	@touch("/var/sys/chk_crond");
+	if($_QUIET==0) {
+		echo "* Shutting down CRON agent failed\n";
+		mybox_slog("INFO","Shutting down CRON agent failed");
+	}
+	return 1;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=cron_start();
+		break;
+	case 'stop':
+		$ret=cron_stop();
+		break;
+	case 'restart':
+		$ret=cron_stop();
+		sleep(2);
+		$ret=cron_start();
+		break;
+	case 'status':
+		$ret=cron_status();
+		break;
+	case 'config':
+		$ret=cron_config();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/status/config]\n";
+		break;
+}
+flush();
+exit($ret);
+?>

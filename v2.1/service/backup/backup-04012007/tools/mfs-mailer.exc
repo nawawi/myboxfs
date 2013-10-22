@@ -1,0 +1,217 @@
+#!/bin/php -f
+<?
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once("clib.exl");
+include_once("smtp.exl");
+putenv("PATH=/bin:/service/tools:/service/init");
+
+$_DO=0;
+if(isset($_SERVER["argv"][1])&&$_SERVER["argv"][1]=="U") $_DO=1;
+
+$smtp=new smtp_class;
+
+$db_id=mybox_db_connect($_DB_NAME);
+$domain=mybox_fget_contents("/proc/sys/kernel/hostname");
+if($domain!='' && $domain!="(none)") {
+	list($h1,)=preg_split("/\./",$domain);
+	$domain=preg_replace("/$h1/","",$domain);
+	$domain=trim($domain,".");
+} else {
+	$domain='mybox.local';
+}
+$_stat=0;
+$_report_names=array();
+$result=mybox_db_query("select * from alert_setting",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_stat=$row['stat'];
+		$_report_min=$row['report_min'];
+		$_report_title=$row['report_title'];
+		$_report_logs=$row['report_logs'];
+		$_report_strg=$row['report_strg'];
+		$_report_mem=$row['report_mem'];
+		$_report_sys=$row['report_sys'];
+		$_report_title=mybox_unescape_str($_report_title);
+		$_report_namess=$row['report_names'];
+		$_usesmtp=$row['usesmtp'];
+		$_smtphost=$row['smtphost'];
+		$_pophost=$row['pophost'];
+		$_user=$row['user'];
+		$_pass=mybox_str_decrypt($row['pass']);
+		$_from=$row['mailfrom'];
+	}
+	$_pp=preg_split("/,/",$_report_namess);
+	if(count($_pp)!=0) {
+		foreach($_pp as $_p) $_report_names[$_p]=1;
+	}
+}
+if($_stat==0) exit(1);
+$_direct=1;
+if($_usesmtp==1) $_direct=0;
+if($_from=='') $_from="mfs@mybox.net.my";
+$_to=array();
+$result=mybox_db_query("select email,stat from alert_email where stat='1'",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_email=trim($row['email']);
+		$_to[]="$_email";
+	}
+}
+mybox_db_close($db_id);
+if(count($_to)==0) exit(1);
+
+$smtp->host_name="$_smtphost";
+$smtp->localhost="$domain";
+$smtp->direct_delivery=$_direct;
+$smtp->timeout=10;
+$smtp->data_timeout=0;
+
+$smtp->debug=0;
+$smtp->html_debug=0;
+$smtp->pop3_auth_host="$_pophost";
+$smtp->user="$_user";
+$smtp->realm="";
+$smtp->password="$_pass";
+$smtp->workstation="";
+$smtp->authentication_mechanism="";
+
+
+$_uname1=mybox_fget_contents("/proc/sys/kernel/ostype");
+$_uname2=mybox_fget_contents("/proc/sys/kernel/version");
+$_datel=trim(shell_exec("date"),"\n");
+$_dateu=trim(shell_exec("date -u"),"\n");
+$_uptime=trim(shell_exec("uptime"),"\n");
+$_df=trim(shell_exec("df -kh |grep -v /config"),"\n");
+$_dflogs=trim(shell_exec("du -hc /strg/mybox/logs"));
+$_mem=trim(shell_exec("free"),"\n");
+$_update=mybox_fget_contents("/etc/firmware");
+if($_update!='') $_update="UPDATE: $_update";
+$_ldate=date('Ymd');
+
+$_data ="<PRE style='font-family: courier new, courier;white-space: pre;font-size: 12px;'>\n";
+if(file_exists("/var/sys/updates_need_reboot")) {
+	$_data .="=============================================================================\n";
+	$_data .=" SYSTEM UPDATES\n";
+	$_data .="=============================================================================\n";
+	$_data .="System updates completed, reboot required.\n\nPlease login and reboot the system.\n\nFor additional info please check audit logs.\n\n";
+
+}
+
+if($_report_sys==1) {
+	$_data .="=============================================================================\n";
+	$_data .=" SYSTEM STATUS\n";
+	$_data .="=============================================================================\n";
+	$_data .="DATE   : $_datel\n";
+	if($_dateu!=$_datel) {
+		$_data .="       : $_dateu\n";
+	}
+	$_data .="\n";
+	$_data .="SYSTEM : $_uname1\n";
+	$_data .="       : $_uname2 $_update\n\n";
+	$_data .="UPTIME : $_uptime\n\n";
+}
+if($_report_strg==1) {
+	$_data .="=============================================================================\n";
+	$_data .=" STORAGE STATUS(1)\n";
+	$_data .="=============================================================================\n";
+	$_data .="$_df\n\n";
+	$_data .="=============================================================================\n";
+	$_data .=" STORAGE STATUS(2)\n";
+	$_data .="=============================================================================\n";
+	$_data .="$_dflogs\n\n";
+}
+if($_report_mem==1) {
+	$_data .="=============================================================================\n";
+	$_data .=" MEMORY STATUS\n";
+	$_data .="=============================================================================\n";
+	$_data .="$_mem\n\n";
+}
+if($_report_logs==1) {
+	$ok=0;
+	$_data .="=============================================================================\n";
+	$_data .=" LOCAL LOGS SUMMARY\n";
+	$_data .="=============================================================================\n";
+	
+	foreach($_LOG_NAME as $_LIST) {
+		list($_title,$lgname)=preg_split("/\|/",$_LIST);
+		if($_report_names[$lgname]!=1) continue;
+		$logs="{$lgname}-{$_ldate}.log";
+		if(file_exists("$_LOG_PATH/$logs")) {
+			shell_exec("logtail $_LOG_PATH/$logs $_RTMP_PATH/$logs.offset |sort -r > $_RTMP_PATH/$logs.sum");
+			if(file_exists("$_LOG_PATH/$logs.sum")) {
+				$buff=mybox_fget_contents("$_RTMP_PATH/$logs.sum");
+				if($buff!='') {
+					$_data .="<u>$_title</u>:\n\n";
+					$_data .="$buff\n\n";
+					$ok++;
+				}
+				@unlink("$_LOG_PATH/$logs.sum");
+			}
+		}
+		unset($_title,$lgname,$buff);
+	}
+	if($ok==0) $_data .="No new logs\n\n";
+}
+$_data .="</PRE>\n";
+$_data .="\n\n\n";
+
+if($_DO==0) {
+	foreach($_to as $to) {
+		if($smtp->SendMessage(
+			$_from,
+			array($to),
+			array(
+				"From: $_from",
+				"To: $to",
+				"Subject: $_report_title",
+				"Date: ".strftime("%a, %d %b %Y %H:%M:%S %Z"),
+				"MIME-Version: 1.0",
+                     	  	"Content-Type: text/html;charset=\"iso-8859-1\"",
+				"X-Priority: 1",
+				"X-MSMail-Priority: High",
+				"X-Mailer: Mybox Internet Security Mailer"
+			),
+			"$_data")
+		) {
+			mybox_slog("INFO","Notification, Sending notification to $to succeeded.");
+		} else {
+			$error=$smtp->error;
+			mybox_slog("ERROR","Notification, Sending notification to $to failed. Error: $error");
+		}
+	}
+}
+if($_DO=="U") {
+	if(file_exists("/var/sys/updates_need_reboot")) {
+		$_data ="<PRE style='font-family: courier new, courier;white-space: pre;font-size: 12px;'>\n";
+		$_data .="System updates completed, reboot required.\n\nPlease login and reboot the system.\n\nFor additional info please check audit logs.\n\n";
+		$_data .="</PRE>\n";
+		$_data .="\n\n\n";
+		foreach($_to as $to) {
+			if($smtp->SendMessage(
+				$_from,
+				array($to),
+				array(
+					"From: $_from",
+					"To: $to",
+					"Subject: Mybox System Updates",
+					"Date: ".strftime("%a, %d %b %Y %H:%M:%S %Z"),
+					"MIME-Version: 1.0",
+                        		"Content-Type: text/html;charset=\"iso-8859-1\"",
+					"X-Priority: 1",
+					"X-MSMail-Priority: High",
+					"X-Mailer: Mybox Internet Security Mailer"
+				),
+				"$_data")
+			) {
+				mybox_slog("INFO","Notification, Sending notification to $to succeeded.");
+			} else {
+				$error=$smtp->error;
+				mybox_slog("ERROR","Notification, Sending notification to $to failed. Error: $error");
+			}
+		}
+	}
+}
+exit(0);
+?>

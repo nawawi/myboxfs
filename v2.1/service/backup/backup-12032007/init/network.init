@@ -1,0 +1,497 @@
+#!/bin/php -Cq
+<?
+// network.init - last update 30-Jun-2006
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+
+putenv("PATH=/bin:/service/tools:/service/init");
+
+if(!file_exists("/bin/ip") || !file_exists("/bin/route") || !file_exists("/bin/ifconfig") || !file_exists("/bin/vconfig") || !file_exists("/bin/arping")) {
+	echo "Cannot execute network.init. Internal error!\n";
+	mybox_slog("ERROR","Cannot execute network.init. Internal error!");
+	exit(1);
+}
+
+$_QUIET=0;
+
+function set_lcd_dev($dev) {
+	if(file_exists("/var/sys/lcd_dev")) mybox_save_to_file("/var/sys/lcdd_eth","$dev");
+}
+function set_wan_dev($dev,$db_id) {
+	mybox_save_to_file("/var/sys/wan_dev","$dev");
+	mybox_db_query("update pptp_vpn set bcrelay='$dev'",$db_id);
+}
+
+function set_balancing($_GWLIST,$_LOLIST) {
+	if(($_GWLIST=='') && ($_LOLIST=='')) return 1;
+	list($gw,$gw_dev,$gw_ip,$gw_prefix)=preg_split("/\|/",$_GWLIST);
+	list($fa,$fa_dev,$fa_ip,$fa_prefix)=preg_split("/\|/",$_LOLIST);
+	$WAN_GW="$gw";
+	$WAN_NET="$gw_prefix";
+	$WAN_IP="$gw_ip";
+	$WAN_DEV="$gw_dev";
+	$FA_GW="$fa";
+	$FA_NET="$fa_prefix";
+	$FA_IP="$fa_ip";
+	$FA_DEV="$fa_dev";
+	mybox_exec_cmd("ip route del default");
+	mybox_exec_cmd("ip rule del prio 50 table main");
+	mybox_exec_cmd("ip rule del prio 201 from $WAN_NET table 201");
+	mybox_exec_cmd("ip rule del prio 202 from $FA_NET table 202");
+	mybox_exec_cmd("ip rule del prio 222 table 222");
+	mybox_exec_cmd("ip route flush table 201");
+	mybox_exec_cmd("ip route flush table 202");
+	mybox_exec_cmd("ip route flush table 222");
+	mybox_exec_cmd("ip route del table 201");
+	mybox_exec_cmd("ip route del table 202");
+	mybox_exec_cmd("ip route del table 222");
+	mybox_exec_cmd("ip rule add prio 50 table main");
+	mybox_exec_cmd("ip route del default table main");
+	mybox_exec_cmd("ip rule add prio 201 from $WAN_NET table 201");
+	mybox_exec_cmd("ip rule add prio 202 from $FA_NET table 202");
+	mybox_exec_cmd("ip route add default via $WAN_GW dev $WAN_DEV src $WAN_IP proto static table 201");
+	mybox_exec_cmd("ip route append prohibit default table 201 metric 1 proto static");
+	mybox_exec_cmd("ip route add default via $FA_GW dev $FA_DEV src $FA_IP proto static table 202");
+	mybox_exec_cmd("ip route append prohibit default table 202 metric 1 proto static");
+	mybox_exec_cmd("ip rule add prio 222 table 222");
+	mybox_exec_cmd("ip route add default table 222 proto static nexthop via $WAN_GW dev $WAN_DEV nexthop via $FA_GW dev $FA_DEV");
+	mybox_exec_cmd("ip route flush cache");
+	$_cmd='';
+	$_cmd .="ip route del default\n";
+	$_cmd .="ip rule del prio 50 table main\n";
+	$_cmd .="ip rule del prio 201 from $WAN_NET table 201\n";
+	$_cmd .="ip rule del prio 202 from $FA_NET table 202\n";
+	$_cmd .="ip rule del prio 222 table 222\n";
+	$_cmd .="ip route flush table 201\n";
+	$_cmd .="ip route flush table 202\n";
+	$_cmd .="ip route flush table 222\n";
+	$_cmd .="ip route del table 201\n";
+	$_cmd .="ip route del table 202\n";
+	$_cmd .="ip route del table 222\n";
+	$_cmd .="ip rule add prio 50 table main\n";
+	$_cmd .="ip route del default table main\n";
+	$_cmd .="ip rule add prio 201 from $WAN_NET table 201\n";
+	$_cmd .="ip rule add prio 202 from $FA_NET table 202\n";
+	$_cmd .="ip route add default via $WAN_GW dev $WAN_DEV src $WAN_IP proto static table 201\n";
+	$_cmd .="ip route append prohibit default table 201 metric 1 proto static\n";
+	$_cmd .="ip route add default via $FA_GW dev $FA_DEV src $FA_IP proto static table 202\n";
+	$_cmd .="ip route append prohibit default table 202 metric 1 proto static\n";
+	$_cmd .="ip rule add prio 222 table 222\n";
+	$_cmd .="ip route add default table 222 proto static nexthop via $WAN_GW dev $WAN_DEV nexthop via $FA_GW dev $FA_DEV\n";
+	$_cmd .="ip route flush cache\n";
+	@mybox_save_to_file("/var/sys/load_balancing_route","$_cmd");
+	@mybox_save_to_file("/proc/sys/net/ipv4/route/gc_interval","15\n");
+	return 0;
+}
+
+function update_arp($dev,$ip) {
+	//mybox_exec_cmd("arping -q -A -c 1 -I $dev $ip");
+	mybox_exec_cmd("arping -q -A -c 1 -i $dev $ip");
+        sleep(2);
+	//mybox_exec_cmd("arping -q -U -c 1 -I $dev $ip");
+	mybox_exec_cmd("arping -q -U -c 1 -i $dev $ip");
+	return 0;
+}
+
+function set_vip($dev,$db_id) {
+	global $_QUIET;
+	if($dev=='') return 1;
+	$result=mybox_db_query("select * from ipalias where dev='$dev' and onboot='1'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		if($_QUIET==0) echo "* Bringing IP Aliasing\n";
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_pid=$row['pid'];
+			$_ipaddrip=$row['ip'];
+			$_ipaddrmask=$row['mask'];
+			$devv="$dev:$_pid";
+			if(mybox_isip_alive($dev,$_ipaddrip)==0) {
+				// don't flush, it will flush all child
+				//mybox_exec_cmd("ip addr flush dev $devv");
+				if(mybox_exec_cmd("ifconfig $devv $_ipaddrip netmask $_ipaddrmask")==0) {
+					if($_QUIET==0) echo "---- $devv $_ipaddrip/$_ipaddrmask\n";
+				}
+			} else {
+				if($_QUIET==0) {
+					$xmac=mybox_get_arp_ip_mac($dev,$_ipaddrip);
+					if($xmac!='') {
+						$xmac="machine ($xmac)";
+					} else {
+						$xmac="machine";
+					}
+					echo "---- Error, some other $xmac already uses address $_ipaddrip\n";
+					mybox_slog("ERROR","some other $xmac already uses address $_ipaddrip");
+				}
+			}
+		}
+	}
+	return 0;
+}
+
+function set_vlan($dev,$db_id) {
+	global $_QUIET;
+	if($dev=='') return 1;
+	$result=mybox_db_query("select * from vlan where dev='$dev' and onboot='1'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		if($_QUIET==0) echo "* Bringing VLAN\n";
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_ipaddrid=$row['vid'];
+			$_ipaddrip=$row['ip'];
+			$_ipaddrmask=$row['mask'];
+			$_flag=$row['flag'];
+			$_mtu=$row['mtu'];
+			$_ret=mybox_ipcalc($_ipaddrip,$_ipaddrmask);
+			if(count($_ret)==0) {
+				if($_QUIET==0) echo "---- Invalid $_ipaddrip/$_ipaddrmask !\n";
+				continue;
+			}
+			$_ipaddrnetwork=$_ret['network'];
+			$_ipaddrbcast=$_ret['broadcast'];
+			$_ipaddrprefix=$_ret['prefix'];
+			$devv="$dev.$_ipaddrid";
+			$out=array();
+			exec("ifconfig |grep $devv",$out,$ret);
+			if(count($out)!=0) mybox_exec_cmd("vconfig rem $devv");
+			if(mybox_isip_exists($_ipaddrip)==0) {
+				if(mybox_exec_cmd("vconfig add $dev $_ipaddrid")==0) {
+					if($_flag==1) mybox_exec_cmd("vconfig set_flag $devv 1");
+					//mybox_exec_cmd("ip addr flush dev $devv");
+					if(mybox_exec_cmd("ifconfig $devv $_ipaddrip netmask $_ipaddrmask mtu $_mtu")==0) {
+						echo "---- $devv $_ipaddrip/$_ipaddrmask mtu $_mtu\n";
+					} else {
+						mybox_exec_cmd("vconfig rem $devv");
+					}
+				}
+			} else {
+				if($_QUIET==0) {
+					$xmac=mybox_get_arp_ip_mac($dev,$_ipaddrip);
+					if($xmac!='') {
+						$xmac="machine ($xmac)";
+					} else {
+						$xmac="machine";
+					}
+					echo "---- Error, some other $xmac already uses address $_ipaddrip\n";
+					mybox_slog("ERROR","some other $xmac already uses address $_ipaddrip");
+				}
+			}
+		}
+	}
+	return 0;
+}
+
+function static_routes($db_id) {
+	$t=1;
+	$result=mybox_db_query("select * from static_route where stat='1'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_ip=$row['ip'];
+			$_gateway=$row['gateway'];
+			if(mybox_exec_cmd("ip route add $_ip via $_gateway metric 1")==0) $t=0;
+		}
+	}
+	return $t;
+}
+
+function network_start() {
+	global $_DB_NAME, $_QUIET;
+	$ret=1;
+	$_DEV=array();$_BAWAL=array();
+	$_hostname='';
+	$_hostname=mybox_fget_contents("/proc/sys/kernel/hostname");
+	if($_hostname=='' || $_hostname=='(none)') $_hostname="mfs.mybox.lo";
+	$db_id=mybox_db_connect($_DB_NAME);
+	$result=mybox_db_query("select * from ipaddr where onboot='1'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_ipaddrname=$row['name'];
+			$_ipaddrdev=$row['dev'];
+			$_ipaddrip=$row['ip'];
+			$_ipaddrmask=$row['mask'];
+			$_ipaddrmtu=$row['mtu'];
+			$_ret=mybox_ipcalc($_ipaddrip,$_ipaddrmask);
+			if(count($_ret)==0) {
+				if($_QUIET==0) echo "! Invalid $_ipaddrip/$_ipaddrmask !\n";
+				continue;
+			}
+			$_ipaddrnetwork=$_ret['network'];
+			$_ipaddrbcast=$_ret['broadcast'];
+			$_ipaddrprefix=$_ret['prefix'];
+			$_DEV[$_ipaddrdev]="$_ipaddrip|$_ipaddrprefix|$_ipaddrmask|$_ipaddrbcast|$_ipaddrname|$_ipaddrnetwork|$_ipaddrmtu";
+			$_BAWAL[]="$_ipaddrip|$_ipaddrmask|$_ipaddrnetwork";
+		}
+	}
+
+	if(count($_DEV)==0) {
+		if($_QUIET==0) echo "* Network disabled\n";
+		exit(1);
+	}
+	list($host,)=preg_split("/\./",$_hostname);
+	$domain=preg_replace("/$host/","",$_hostname);
+	$domain=trim($domain,".");
+	mybox_save_to_file("/etc/hosts.tmp","127.0.0.1\t\t$domain $host localhost.localdomain localhost\n");
+	if($_QUIET==0) {
+		echo "* Starting networking\n";
+		mybox_slog("INFO","Starting networking");
+	}
+	$_DEV3=array();
+	foreach($_DEV as $dev => $val) {
+		list($ip,$prefix,$mask,$brd,$name,$network,$mtu)=preg_split("/\|/",$val);
+		if(mybox_exec_cmd("ip link set $dev up mtu $mtu")==0) {
+			if(mybox_isip_alive($dev,$ip)==1) {
+				if($_QUIET==0) {
+					$xmac=mybox_get_arp_ip_mac($dev,$ip);
+					if($xmac!='') {
+						$xmac="machine ($xmac)";
+					} else {
+						$xmac="machine";
+					}
+					$txt="some other $xmac already uses address $ip";
+					echo "---- Error, $txt\n";
+					mybox_slog("ERROR","$txt");
+					mybox_append_to_file("/var/sys/network_error","$txt<br>\n");
+				}
+			} else {
+				mybox_exec_cmd("ip addr flush dev $dev");
+				if(mybox_exec_cmd("ip addr add $ip/$prefix brd $brd dev $dev scope global label $dev")==0) {
+					if($_QUIET==0) echo "---- $dev $ip/$mask\n";
+					update_arp($dev,$ip);
+					$ret=0;
+				} else {
+					if($_QUIET==0) echo "---- $dev $ip/$mask already up!\n";
+				}
+				$_DEV3[]="$dev";
+			}
+		} else {
+			if($_QUIET==0) {
+				echo "---- Failed to bring up $dev.\n";
+				mybox_slog("INFO","Failed to bring up $dev");
+			}
+		}
+		unset($ip,$prefix,$mask,$brd);
+	}
+	@rename("/etc/hosts.tmp","/etc/hosts");
+	unset($dev,$val);
+	if(count($_DEV3)!=0) {
+		foreach($_DEV3 as $dev) {
+			if($dev=='') continue;
+			set_vip($dev,$db_id);
+		}
+		unset($dev);
+		foreach($_DEV3 as $dev) {
+			if($dev=='') continue;
+			set_vlan($dev,$db_id);
+		}
+		unset($dev);
+	}
+
+	if(mybox_exec_cmd("ip link set lo up")==0) {
+		if(mybox_exec_cmd("ip addr add 127.0.0.1/8 brd 127.255.255.255 dev lo scope host label lo")==0) {
+			if($_QUIET==0) echo "* Setting loopback 127.0.0.1/255.0.0.0\n";
+			mybox_exec_cmd("route add -net 127.0.0.0 netmask 255.0.0.0 lo");
+		}
+	}
+
+	$_GWLIST=mybox_get_gw($db_id,0);
+	$_LOLIST=mybox_get_gw($db_id,1);
+	//echo "$_GWLIST $_LOLIST\n";
+	if($_LOLIST!='') {
+		if($_GWLIST!='') {
+			if(mybox_license('ILB')==1) {
+				$result=mybox_db_query("select link from gateway where id='1'",$db_id);
+				if(mybox_db_num_rows($result)!=0) {
+					$_lo_link=mybox_db_fetch_single($result);
+				}
+				unset($result);
+				$_lo_mode=1;
+				$result=mybox_db_query("select val from misc where name='fa_mode'",$db_id);
+				if(mybox_db_num_rows($result)!=0) {
+					$_lo_mode=mybox_db_fetch_single($result);
+				}
+				unset($result);
+				list($_GW_IP,$_GW_DEV,$_GW_DEVIP,$_GW_NET)=preg_split("/\|/",$_GWLIST);
+				list($_LO_IP,$_LO_DEV,$_LO_DEVIP,$_LO_NET)=preg_split("/\|/",$_LOLIST);
+				set_lcd_dev($_GW_DEV);set_wan_dev($_GW_DEV,$db_id);
+				mybox_save_to_file("/proc/sys/net/ipv4/ip_forward","1\n");
+				mybox_save_to_file("/var/sys/load_balancing","$_GW_IP|$_GW_DEV|$_LO_IP|$_LO_DEV|$_GW_DEVIP|$_LO_DEVIP\n");
+				$lo_link=preg_split("/\s+/",$_lo_link);
+				if(count($lo_link)!=0) {
+					foreach($lo_link as $lnx) mybox_append_to_file("/var/sys/load_balancing_link","$lnx\n");
+				} else {
+					mybox_save_to_file("/var/sys/load_balancing_link","$lnx\n");
+				}
+				if($_lo_mode==1) {
+					@unlink("/var/sys/load_balancing_mode2");
+					@touch("/var/sys/load_balancing_mode1");
+					if(mybox_exec_cmd("ip route add default via $_GW_IP dev $_GW_DEV metric 1")==0) {
+						if($_QUIET==0) {
+							echo "* Load balancing (active->cold) activate via $_GW_DEV $_LO_DEV\n";
+							mybox_slog("INFO","Load balancing (active->cold) activate via $_GW_DEV $_LO_DEV");
+						}
+						mybox_save_to_file("/proc/sys/net/ipv4/ip_forward","1\n");
+					} else {
+						if($_QUIET==0) {
+							echo "* Load balancing (active->cold) failed\n";
+							mybox_slog("INFO","Load balancing (active->cold) failed");
+						}
+					}
+				} else {
+					if(set_balancing($_GWLIST,$_LOLIST)==0) {
+						@unlink("/var/sys/load_balancing_mode1");
+						@touch("/var/sys/load_balancing_mode2");
+						if($_QUIET==0) {
+							echo "* Load balancing (active->active) activate via $_GW_DEV $_LO_DEV\n";
+							mybox_slog("INFO","Load balancing (active->active) activate via $_GW_DEV $_LO_DEV");
+						}
+					} else {
+						if($_QUIET==0) {
+							echo "* Load balancing (active->active) failed\n";
+							mybox_slog("INFO","Load balancing (active->active) failed");
+						}
+					}
+				}
+				@mybox_killall("failoverd");
+				@mybox_exec_cmd("failoverd");
+			}
+		}
+	} else {
+		if($_GWLIST!='') {
+			list($_GW_IP,$_GW_DEV,$_GW_DEVIP,$_GW_NET)=preg_split("/\|/",$_GWLIST);
+			set_lcd_dev($_GW_DEV);set_wan_dev($_GW_DEV,$db_id);
+			if(mybox_exec_cmd("ip route add default via $_GW_IP dev $_GW_DEV metric 1")==0) {
+				if($_QUIET==0) {
+					echo "* Setting default gateway: $_GW_IP via $_GW_DEV\n";
+					mybox_slog("INFO","Setting default gateway: $_GW_IP via $_GW_DEV");
+				}
+				mybox_save_to_file("/proc/sys/net/ipv4/ip_forward","1\n");
+			} else {
+				if($_QUIET==0) {
+					echo "* Default gateway not set\n";
+					mybox_slog("INFO","Default gateway not set");
+				}
+			}
+		} else {
+			if($_QUIET==0) {
+				echo "* Failed to set default gateway $_GW_IP via $_GW_DEV\n";
+				mybox_slog("ERROR","Failed to set default gateway $_GW_IP via $_GW_DEV");
+			}
+		}
+	}
+
+	if(static_routes($db_id)==0) {
+		if($_QUIET==0) {
+			echo "* Applying static routing\n";
+			mybox_slog("INFO","Applying static routing");
+		}
+	}
+	mybox_db_close($db_id);
+	if(!file_exists("/var/sys/init_no_restart")) {
+		if($_QUIET==0) echo "* Restarting related application services\n";
+		mybox_echo_query("policy-restart-quiet");
+		if(mybox_license('IPS')==1) mybox_echo_query("ips-restart-quiet");
+		if(mybox_license('PPTP')==1) mybox_echo_query("pptp-restart-quiet");
+	}
+	@shell_exec("ifconfig > /var/sys/ipconfig.cache");
+	@shell_exec("route -n > /var/sys/routen.cache");
+	if(mybox_user_license()!=0) {
+		file_put_contents("/var/sys/chk_bawal_eth",serialize($_BAWAL));
+		@mybox_exec_cmd("/service/tools/mfs-watch.exc");
+	}
+	return $ret;
+}
+
+function network_stop() {
+	global $_QUIET;
+	$ret=1;
+	if($_QUIET==0) {
+		echo "* Stopping networking\n";
+		mybox_slog("INFO","Stopping networking");
+	}
+	$ipconfig=mybox_get_ipconfig_cache();
+        if(count($ipconfig)!=0) {
+		$a=array();$b=array();$c=array();
+                foreach($ipconfig as $eth => $val) {
+			if(preg_match("/^eth(\d+)\.(\d+)$/",$eth)) $a[]="$eth";
+			if(preg_match("/^eth(\d+)\:(\d+)$/",$eth)) $b[]="$eth";
+			if(preg_match("/^eth(\d+)$/",$eth)) $c[]="$eth";
+		}
+		unset($eth,$val);
+		if(count($a)!=0) {
+			foreach($a as $eth) {
+				if($_QUIET==0) echo "---- $eth\n";
+				mybox_exec_cmd("ip addr flush dev $eth");
+				mybox_exec_cmd("ip link set $eth down");
+				mybox_exec_cmd("vconfig rem $eth");
+			}
+			unset($eth);
+		}
+		if(count($b)!=0) {
+			foreach($b as $eth) {
+				if($_QUIET==0) echo "---- $eth\n";
+				mybox_exec_cmd("ip addr flush dev $eth");
+				mybox_exec_cmd("ip link set $dev down");
+			}
+			unset($eth);
+		}
+		if(count($c)!=0) {
+			foreach($c as $eth) {
+				mybox_exec_cmd("ip addr flush dev $eth");
+				if(mybox_exec_cmd("ip link set $eth down")==0) {
+					if($_QUIET==0) echo "---- $eth\n";
+				}
+			}
+			unset($eth);
+		}
+	}
+	mybox_exec_cmd("ip link set lo down");
+	mybox_exec_cmd("ip addr flush dev lo");
+	mybox_exec_cmd("ip route flush cache");
+	mybox_exec_cmd("ip route flush table main");
+	mybox_exec_cmd("ip route flush table 201");
+	mybox_exec_cmd("ip route flush table 202");
+	mybox_exec_cmd("ip route flush table 222");
+	mybox_exec_cmd("ip rule flush");
+	mybox_exec_cmd("ip rule add prio 32766 table main");
+	mybox_exec_cmd("ip rule add prio 32767 table default");
+
+	mybox_save_to_file("/proc/sys/net/ipv4/ip_forward","0\n");
+	@mybox_save_to_file("/proc/sys/net/ipv4/route/gc_interval","60\n");
+	@unlink("/var/sys/ipconfig.cache");
+	@unlink("/var/sys/routen.cache");
+	@unlink("/var/sys/ipname.cache");
+	@unlink("/var/sys/name2dev.cache");
+	@unlink("/var/sys/load_balancing");
+	@unlink("/var/sys/load_balancing_link");
+	@unlink("/var/sys/load_balancing_mode1");
+	@unlink("/var/sys/load_balancing_mode2");
+	@unlink("/var/sys/load_balancing_WAN1_UP");
+	@unlink("/var/sys/load_balancing_WAN2_UP");
+	@unlink("/var/sys/chk_bawal");
+	@unlink("/var/sys/chk_bawal_eth");
+	@unlink("/var/sys/network_error");
+	@mybox_killall("failoverd");
+	@mybox_killall("mfs-watch.exc");
+	return $ret;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=network_start();
+		break;
+	case 'stop':
+		$ret=network_stop();
+		break;
+	case 'restart':
+		$ret=network_stop();
+		sleep(1);
+		$ret=network_start();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart]\n";
+		break;
+}
+flush();
+exit($ret);
+?>

@@ -1,0 +1,117 @@
+<?
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+
+if(isset($do_save)&&$do_save==1) {
+	$msg='';
+	if(move_uploaded_file("$filename","$_DOWNLOAD_PATH/$filename_name")) {
+		if($filename_name!="mfs-license.exc") {
+			$msg="Invalid license file!";
+			mybox_auditlog("UPLOAD","UI","License upload failed!. $msg");
+			@unlink("$_DOWNLOAD_PATH/$filename_name");
+		} else {
+			@rename("$_LICENSE_PATH","$_ROOT_DIR/mfs-license.exc.bak");
+			if(!copy("$_DOWNLOAD_PATH/$filename_name","$_LICENSE_PATH")) {
+				$msg="Updating license failed!";
+				mybox_auditlog("UPLOAD","UI","$msg");
+			}
+		}
+	}
+	if($msg=='') {
+		$msg='License updated!';
+		mybox_auditlog("UPLOAD","UI","$msg");
+		mybox_session_logout();
+		mybox_echo_query("mfs-reboot");
+		$xt=time();
+		mybox_send_logout("$_URL_PATH/?t=$xt",$xt,"License updated, please wait system reboot.");
+		exit;
+	}
+}
+
+@session_start();
+$_mm=$_SESSION['mybox_license_id'];
+if(!isset($h)||$h==''||$h!=$_mm || !isset($t) || $t=='') exit;
+if(file_exists("/var/sys/logout_msg$t")) {
+	$msg=mybox_fget_contents("/var/sys/logout_msg$t");
+	@unlink("/var/sys/logout_msg$t");
+}
+?>
+<head>
+<title>MyBox Firewall - License Update</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script type='text/javascript'>
+	if(top.frames.length!=0) top.location=self.document.location;
+	defaultStatus="MyBox Firewall - License Update";
+function Trim(str) {return(str.replace(/^\s*/,'').replace(/\s*$/,'').replace(/^\t*/,'').replace(/\t*$/,'').replace(/^\f*/,'').replace(/\f*$/,'').replace(/^\r*/,'').replace(/\r*$/,''));}
+function basename (path) { var m1=/.*\//;var m2=/.*\\/; if(path.match(m1)!=null) { return path.replace(m1,''); } else if(path.match(m2)!=null) {return path.replace(m2,'')}; return false;}
+function check_licensefile() {
+	var file=document.f.filename.value;
+	if(file=='') { return false; }
+	file=basename(file);
+	uf=Trim(file);
+	if(uf!="mfs-license.exc") {
+		error("Invalid license file!");
+		return false;
+	}
+	return true;
+}
+function do_submit() {
+	if(!check_licensefile()) {return false;};
+	document.f.btsubmit.disabled=true;
+	document.f.do_save.value='1';
+	document.f.submit();
+	return true;
+}
+</script>
+</head>
+<body class=bgcolor1 oncontextmenu="return false" scroll="no" onload='document.f.filename.focus();'>
+<br>
+<br>
+<br>
+<center>
+<?if(isset($msg)&&$msg!='') {?><span id=msg class=notice><?echo "$msg";?></span><?}else{echo "<span id=msg class=notice style='display: none;'></span>";}?>
+<br>
+<br>
+<table border=0 cellspacing=0 cellpadding=0 width=98% valign=middle>
+<tr>
+<td align=center valign=middle>
+<form name=f method=post action="<?echo "$_URL_PATH/license.exh";?>" onsubmit='return do_submit();' enctype="multipart/form-data">
+<table bgcolor=#ffffff border="0" cellpadding="2" cellspacing="0" width="40%" class=block>
+<tr><td>
+<table bgcolor="#eeeeee" border="0" cellpadding="2" cellspacing="0" width="100%" class=block> 
+<tr><td bgcolor="#e7e9f2" align="center">
+<table border="0" cellspacing="6" cellpadding="6" bgcolor="ffffff" width="100%">
+<tr bgcolor="#ffffff">
+<td align="center">
+<img src="<?echo $_URL_PATH;?>/i/login_logo.png" nosave border=0>
+<table border="0" cellpadding="4" cellspacing="0" bgcolor="#e7e9f2" class=block>
+<tr><td align="right" bgcolor="#e7e9f2" nowrap>License File:</td>
+<td class=bgcolor2><input name="filename" type="file" class="filebox" size="30"></td>
+<td><input name=btsubmit type="submit" value="Upload" class="button"></td>
+</tr>
+</tr>
+</table><br>
+<font>
+</font>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</td></tr></table>
+</td></tr></table>
+<span class=footnote>
+Copyright &copy; <a class=footnote href="http://www.tracenetwork.com.my" target="_blank">Tracenetwork Corporation Sdn Bhd</a>. All Rights Reserved
+</span>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=h value='<?echo $_mm;?>'>
+</form>
+</td>
+</tr>
+</table>
+</center>
+</body>
+</html>

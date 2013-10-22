@@ -1,0 +1,67 @@
+html {overflow-x: hidden;}
+body { voice-family: "\"}\""; voice-family: inherit; width: expression(document.documentElement.clientWidth - 30); margin-left: 1px; margin-right: 1px; margin-top: 1px; margin-bottom: 0px; background: #ffffff; }
+table,tabody,td,tr,div,p,a,font,span,input,hr,legend,fieldset,select,textarea { font-family: Verdana, Arial, Helvetica, sans-serif; font-size: 10px; font-weight : normal; }
+pre { border: 0px; background: #F0F0F0; padding: 1em; font-family: courier new, courier; white-space: pre; line-height: 11px; font-size: 11px; height: 150px; width: 100%; overflow: auto;}
+fieldset { border-color: #336699; background-color: #ffffff; border-style: solid; border-width: 1px; padding-left: 10px; padding-right: 10px; padding-top: 10px; padding-bottom: 10px; -moz-border-radius: 7px; }
+legend { border-color: #336699; border-style: solid; border-width: 1px; background-color: #E7E9F2; padding-left: 4px; padding-right: 4px; padding-top: 2px; padding-bottom: 2px; -moz-border-radius: 4px; }
+a { color: #003399; text-decoration: none; font-weight: solid; }
+a:hover { color: #FF6600; text-decoration: underline; font-weight: solid; }
+.footnote {font-size: 9px; color: #000000; text-decoration: none; padding-left: 2px; padding-right: 2px; }
+.footnote:hover {text-decoration: underline; color: #000000; }
+.footnote:visited {text-decoration: none; color: #000000; }
+.footnote:link {text-decoration: none; color: #000000; }
+.bgcolor1 {background: #336699; }
+.bgcolor2 {background: #e7e9f2; }
+.bgcolor3 {background: #ffffff; }
+.bgcolor4 {background: #eeeeee; }
+.block { border-color: #000000; border-style: solid; border-width: 1px; }
+.textbox {font-size: 10px; background-color: #ebebeb; border-color: #999999; border-style: solid; border-width: 1px; font-weight: solid; padding-left: 2px; padding-right: 0px; padding-top: 1px; padding-bottom: 1px;}
+.filebox {font-size: 11px; background-color: #ebebeb; border-color: #999999; border-width: 1px; border-style: solid; font-weight: solid; padding-top: 1px; padding-bottom: 1px; height: 18px;}
+.button {font-size: 11px; border-width: 1px; padding-left: 6px; padding-right: 6px; padding-top: 1px; padding-bottom: 1px; }
+.button-small {font-size: 10px; border-width: 1px; padding-left: 6px; padding-right: 6px; padding-top: 0px; padding-bottom: 0px; }
+.button-link {font-size: 9px; border-color: #999999; border-width: 1px; padding-top: 0px; padding-bottom: 0px; }
+.notice {text-align: center; font-size: 11px; background: #ff6600; color: #ffffff; font-weight: bold; padding-left: 4px; padding-right: 4px; padding-top: 2px; padding-bottom: 2px;}
+.note {color: darkblue; font-weight: bold; padding-left: 4px; padding-right: 4px; padding-top: 2px; padding-bottom: 2px; }
+.blocktop {border-color: #000000; background-color: #e7e9f2; border-style: solid; border-width: 1px; }
+.blocktopb {border-color: #336699; background-color: #e7e9f2; border-style: solid; border-width: 1px; }
+.blockin {background-color: #ffffff; border-color: #336699; border-style: solid; border-width: 1px; padding-left: 5px; padding-right: 5px; }
+.blockimg {background-color: #ffffff; border-color: #336699; border-style: solid; border-width: 1px; }
+.menuboxbg {padding-left: 10px; padding-right: 10px; color: black; border-width: 1px; border-style: solid; border-color: #999999; background-color: #eeeeee; }
+.menulink {font-size: 11px; color: #000000; text-decoration: none; font-weight: solid; }
+.menulink:hover {font-size: 11px; color: #FF6600; text-decoration: underline; font-weight: solid; }
+.mcell {border-top: 1px solid #eeeeee; border-right: 1px solid #eeeeee; }
+.tdcelltop {font-weight: bold; background-color: #e7e9f2; padding-right: 10px; padding-left: 8px; border-top: 1px solid #336699; border-left: 1px solid #336699; border-bottom: 1px solid #336699; }
+.tdcell {font-weight: bold; background-color: #e7e9f2; padding-right: 10px; padding-left: 8px; border-left: 1px solid #336699; border-bottom: 1px solid #336699; }
+.tdcellb {font-weight: bold; background-color: #e7e9f2; padding-right: 8px; padding-left: 8px; border-right: 1px solid #336699; border-left: 1px solid #336699; border-bottom: 1px solid #336699; }
+.mtabletop {border-top: 1px solid #336699; border-right: 1px solid #336699; border-bottom: 1px solid #336699; background-color: #ffffff; }
+.mtable {border-right: 1px solid #336699; border-bottom: 1px solid #336699; background-color: #ffffff; }
+ul#tabnav {font-size: 10px; font-weight: bold; list-style-type: none; margin: 0px; padding-left: 10px; line-height: 14px;}
+ul#tabnav li.tabinact {float: left; border-left: 1px solid #999999; background-color: #777777; color: #FFFFFF; padding: 0; white-space: nowrap; }
+ul#tabnav li.tabinact a {float: left; display: block; text-decoration: none; padding: 5px 8px 5px 8px; color: #FFFFFF; }
+ul#tabnav li.tabact {float: left; background-color: #EEEEEE; color: #000000; padding: 5px 8px 5px 8px; white-space: nowrap;}
+.tabcont {background-color: #EEEEEE; padding-right: 10px; padding-left: 10px; padding-top: 10px; padding-bottom: 10px; }
+.tablist {font-weight: solid; background-color: #e7e9f2; border: 1px solid #336699; }
+.tdlistop {border-top: 1px; border-right: 1px; border-bottom: 1px; font-weight: bold; background-color: #e7e9f2; white-space: nowrap; }
+.tdlist {border-top: 1px; border-right: 1px; border-bottom: 1px; font-size: 10px; font-weight: solid; background-color: #ffffff; white-space: nowrap; }
+.tdlistb {border-top: 1px; border-right: 1px; border-bottom: 1px; font-size: 10px; font-weight: solid; white-space: nowrap; }
+
+
+.tabs {border-bottom: 1px solid #ccc;margin: 0px;padding-bottom: 23px;padding-left: 10px;}
+.tabs ul, .tabs li {display: inline;list-style-type: none;margin: 0px;padding: 0px;}
+.tabs a:link, .tabs a:visited {background: #FEFADE;border: 1px solid #ccc;color: black;float: left;font-weight: normal;line-height: 14px;margin-right: 8px;padding:4px 10px 4px 10px;text-decoration: none;}
+.tabs a:link.tabact, .tabs a:visited.tabact {background: #fff;border-bottom: 1px solid #fff;color: #000;}
+.tabs .tabact {text-decoration: none;background: #fff;border-bottom: 1px solid #fff;color: #000;font-weight: bold;cursor: text;font-size: 11px;}
+td.tabact {text-align: middle;color: #efefef;font-weight: bold;background-color: #ddad08;border: 0px;}
+div.container {border-style: none solid solid;border-color: #cccccc;border-width: 0pt 1px 1px;width: 100%;}
+table.container {padding: 10px;width: 98%;}
+.data {border-collapse: collapse;border: 1px solid #ccc;margin-top: 3px;margin-right: 2em;margin-bottom: 2em;width: 100%;padding: 5em;}
+.data td {border-bottom: 1px solid #ddd; text-align: left; padding: 3px; border: 1px solid #ccc;}
+.blue {background: #d8e4f1;border:1px solid #d8e4f1;}
+thead.blue {background-color: #d8e4f1;color: black;border: 1px solid #ccc;}
+td.inputblue {background-color: #d8e4f1;color: black;border:1px solid #ccc;}
+td.blue {background-color: #d8e4f1;height: 10px;border: none;padding:0px;}
+/* end tabs */
+td.tdname {font-size: 10px; font-weight: bold; background-color: #d8e4f1; padding-right: 10px; padding-left: 8px; width: 30%;}
+td.tdvalue {font-size: 11px; width: 70%; background-color: #ffffff; padding: 3px;}
+.valbox {font-size: 11px; background-color: #ebebeb; border-color: #999999; border-style: solid; border-width: 1px; font-weight: solid; padding-left: 2px; padding-right: 0px; padding-top: 1px; padding-bottom: 1px; height: 18px;}
+.sectitle {border-bottom: 1px solid #ddad08; font-weight: solid; margin-top: 1px; margin-bottom: 1px; font-size: 115%; }

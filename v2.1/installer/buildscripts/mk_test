@@ -1,0 +1,3 @@
+sh mk_fs
+sh mk_img
+sh mk_iso

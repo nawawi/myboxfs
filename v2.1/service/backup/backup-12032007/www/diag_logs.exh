@@ -1,0 +1,436 @@
+<?
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+mybox_chk_session();
+
+mybox_send_nocache();
+
+$_SYSID="diag_logs";
+
+
+$db_id=mybox_db_connect($_DB_NAME);
+$fdownload='';
+if(mybox_chk_level($_LOGIN['auth_id'],2)==1) {
+	if($tab==1) {
+		if(isset($do_save)&&$do_save==2 && mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+			if(is_array($del) && count($del)!=0) {
+				foreach($del as $x) {
+					if($x!='') {
+						mybox_auditlog("DELETE","UI","Log Files: $x");
+						mybox_exec_cmd("rm -f $_LOG_PATH/$x*");$msg="Log files removed";
+					}
+				}
+			} else {
+				if($del!='') {
+					mybox_auditlog("DELETE","UI","Log File: $del");
+					mybox_exec_cmd("rm -f $_LOG_PATH/$del*");
+					$msg="Log files removed";
+				}
+			}
+		} else {
+			if(isset($do_save)&&$do_save==2) $msg="Permission denied!.";
+		}
+		if(isset($do_save)&&$do_save==3) {
+			if(count($del)!=0) {
+				$name="mybox_log";
+				if(file_exists("$_DOWNLOAD_PATH/$name.tgz")) @unlink("$_DOWNLOAD_PATH/$name.tgz");
+				chdir("$_LOG_PATH");
+				mybox_mkdirr("$name");
+				foreach($del as $fo) {
+					if($fo=='') continue;
+					mybox_exec_cmd("cp $_LOG_PATH/$fo*.log $_LOG_PATH/$name/");
+				}
+				mybox_exec_cmd("tar -czf $_DOWNLOAD_PATH/$name.tgz ./$name");
+				if(file_exists("$_DOWNLOAD_PATH/$name.tgz")) {
+					$fdownload="$_URL_PATH/d/$name.tgz";
+					mybox_auditlog("DOWNLOAD","UI","Log File: $name.tgz");
+				}
+				if(("$_LOG_PATH/$name"!="$_LOG_PATH") && (is_dir("$_LOG_PATH/$name"))) {
+					mybox_rmdir("$_LOG_PATH/$name");
+				}
+				chdir("$_HTDOCS_PATH");
+			}
+		}
+	} // tab==1
+	if($tab==2) {
+		if(isset($do_save)&&$do_save==2 && mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+			if(is_array($del) && count($del)!=0) {
+				foreach($del as $x) {
+					if($x!='') {
+						if(@unlink("$_LOG_PATH/$x")) {
+							mybox_auditlog("DELETE","UI","Log Files: $x");
+							$msg="Log files removed";
+						}
+					}
+				}
+			} else {
+				if($del!='') {
+					if(file_exists("$_LOG_PATH/$del")) {
+						if(@unlink("$_LOG_PATH/$del")) {
+							mybox_auditlog("DELETE","UI","Log File: $del");
+							$msg="Log files removed";
+						}
+					}
+				}
+			}
+		} else {
+			if(isset($do_save)&&$do_save==2) {
+				$msg="Permission denied!.";
+				mybox_auditlog("DELETE","UI","Log File: $msg");
+			}
+		}
+		if(isset($do_save)&&$do_save==3) {
+			if(count($del)!=0) {
+				list($title,$name)=preg_split("/\|/",$_LOG_NAME[$id]);
+				$name="$name"."_log";
+				if(file_exists("$_DOWNLOAD_PATH/$name.tgz")) @unlink("$_DOWNLOAD_PATH/$name.tgz");
+				chdir("$_LOG_PATH");
+				mybox_mkdirr("$name");
+				foreach($del as $fo) {
+					if($fo=='') continue;
+					if(file_exists("$_LOG_PATH/$fo")) {
+						copy("$_LOG_PATH/$fo","$_LOG_PATH/$name/$fo");
+					}
+				}
+				mybox_exec_cmd("tar -czf $_DOWNLOAD_PATH/$name.tgz ./$name");
+				if(file_exists("$_DOWNLOAD_PATH/$name.tgz")) {
+					mybox_auditlog("DOWNLOAD","UI","Log File: $name.tgz");
+					$fdownload="$_URL_PATH/d/$name.tgz";
+				}
+				if(("$_LOG_PATH/$name"!="$_LOG_PATH") && (is_dir("$_LOG_PATH/$name"))) {
+					mybox_rmdir("$_LOG_PATH/$name");
+				}
+				chdir("$_HTDOCS_PATH");
+			}
+		}
+	} // tab==2
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied!.";
+		mybox_auditlog("EXECUTE","UI","Local logs: $msg");
+	}
+}
+if(!isset($tab)||$tab=='') $tab=1;
+if(!isset($month)||$month=='') $month=date('m');
+if(!isset($year)||$year=='') $year=date('Y');
+
+if(mybox_chk_nolog()==1) {
+	if(isset($msg)&&$msg!='') {
+		$msg="* Note: Local logs disabled<br>$msg";
+	} else {
+		$msg="* Note: Local logs disabled";
+	}
+}
+
+if(!isset($noflush)||$noflush=='') $noflush=0;
+
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script type='text/javascript' src="<?echo $_URL_PATH;?>/j/strings.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+	page_load();
+</script>
+<script type='text/javascript'>
+	function dotoggle() {
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					document.f.elements[i].checked = !(document.f.elements[i].checked);
+    				}	
+			}
+  		}
+	}
+	function do_submit() {
+		document.f.btsubmit.disabled=true;
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	}
+
+	function chkdel() {
+		var x='0';
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					if(document.f.elements[i].checked) x++;
+    				}	
+			}
+  		}
+		if(x==0) return false;
+		return true;
+	}
+	function do_delete(val) {
+		if(chkdel()!=false) {
+			if(confirm('Are you sure you want to proceed?')) {
+				document.f.do_save.value=val;
+				document.f.submit();
+			}
+		}
+	}
+	function setgrep() {
+		var X='';
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					if(document.f.elements[i].checked) {
+						X += document.f.elements[i].value;
+						X +=',';
+					}
+    				}	
+			}
+  		}
+		return X;
+	}
+	function do_grep() {
+		if(chkdel()!=false) {
+			var list=setgrep();
+			var str=document.f.search.value;
+			if(str=='') return false;
+			LeftPosition = (screen.width) ? (screen.width-620)/2 : 0;
+			TopPosition = (screen.height) ? (screen.height-530)/2 : 0;
+			settings='width=650,height=530,top='+TopPosition+',left='+LeftPosition+',scrollbars=1,status=0,resizable=1,menubar=0';
+			index="diag_logread.exh?fo="+list+"&grep=1&str="+str;
+			win=window.open(index,"logwin<?echo time();?>",settings);
+			if(!win) {
+				error("Please allow window popup!");
+				return false;
+			}
+			if(parseInt(navigator.appVersion) >= 4){win.window.focus();}
+			return true;	
+		}
+	}
+	function log_win(file) {
+		LeftPosition = (screen.width) ? (screen.width-620)/2 : 0;
+		TopPosition = (screen.height) ? (screen.height-530)/2 : 0;
+		settings='width=650,height=530,top='+TopPosition+',left='+LeftPosition+',scrollbars=1,status=0,resizable=1,menubar=0';
+		index="diag_logread.exh?fo="+file;
+		win=window.open(index,"logwin<?echo time();?>",settings);
+		if(!win) {
+			error("Please allow window popup!");
+			return false;
+		}
+		if(parseInt(navigator.appVersion) >= 4){win.window.focus();}
+		return true;
+	}
+</script>
+</head>
+<body onload="parent.left_frame.switchmenu('sub5');" scroll=auto>
+<form name=f method=post action="<?echo "$_URL_PATH/diag_logs.exh";?>">
+
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 10px;'>
+<tr>
+<td>
+<p class="sectitle"><b>Diagnostic:</b> Log Files</p><br><br>
+<!-- start block --> 
+<div style="border-style: solid solid solid;border-color: #cccccc;border-width: 1pt 1px 1px;width: 100%;">
+<table align=center style="width: 98%;">
+<tbody>
+<tr>
+<td> 
+<br>
+
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><?if(isset($msg)&&$msg!='') {?><span id=msg class=notice><?echo "$msg";?></span><?}else{echo "<span id=msg class=notice style='display: none;'></span>";}?></td></tr>
+</table><br>
+
+<!-- tab container -->
+<?if($tab==1) { ?>
+<table class="data" width="100%">
+<thead class="blue"> 
+<tr>
+<td style='font-weight: bold; text-align: center;' colspan=2>Name</td>
+<td style='font-weight: bold;'>File count</td>
+<td style='font-weight: bold;'>Size</td>
+<td style='font-weight: bold; width: 7%; text-align: right; table-layout: fixed;'>Opt</td>
+</tr></thead>
+<tbody>
+<?
+$t=0;
+foreach($_LOG_NAME as $id => $ls) {
+	list($title,$file)=explode("|",$ls);
+	list($cnt,$size)=preg_split("/\|/",mybox_cntlogfile($file));
+	if($cnt!=0) {
+		$t=1;
+		$f='file';
+		if($cnt > 1) $f='files';
+		$size=mybox_size_readable($size,null,'%d%s');
+		$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff;'";
+		$lo="onclick=\"self.location.href='$_URL_PATH/diag_logs.exh?tab=2&id=$id';\"";
+		echo "<tr $lt>";
+		echo "<td width=1%><a href='$_URL_PATH/diag_logs.exh?tab=2&id=$id'>{$_PNG['df_close']}</a></td>";
+		echo "<td style='text-align: center;' align=center $lo><b>$title</b></td>";
+		echo "<td $lo>$cnt $f</td>";
+		echo "<td $lo>$size</td>";
+		echo "<td style='text-align: right; table-layout: fixed;' width=7%><a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='$_URL_PATH/diag_logs.exh?tab=1&do_save=2&del=$file';\">{$_PNG['delete']}</a><input type=checkbox name=del[] value=$file></td></tr>";
+	}
+}
+if($t==1) {
+?>
+<tr>
+<td style='text-align: right;' valign=top colspan=5><name="sini"><a href="#sini" onclick='do_delete(3);'>Download</a> / <a href="#sini" onclick='do_delete(2);'>Delete</a> / <a href="#" onclick='dotoggle();'>Toggle</a> <?echo $_PNG['arrow_rtr'];?></td>
+</tr>
+<? } else {?>
+<tr>
+<td valign=bottom colspan=5>No logs available.</td>
+</tr>
+<? } ?>
+</tbody>
+</table>
+<? }//tab==1?>
+<?if($tab==2 && $id!='' && $_LOG_NAME[$id]!='') {
+	list($title,$file)=explode("|",$_LOG_NAME[$id]);
+?>
+<table class="data" width="100%">
+<tr>
+<td width=300 valign=middle class=tdlist style='border-right: 0px;'>
+Month: <select name=month size=1 class=textbox onchange='document.f.submit();'>
+<?
+for($x=1;$x<13;$x++) {
+	if(strlen($x)==1) $x="0$x";
+	$mc=0;
+	$mc=mybox_cntmonthlogfile($file,$year,$x);
+	if($mc==0) continue;
+	$fn="file";
+	if($mc > 1) $fn="files";
+	$lx=(12 - strlen($_MONTH[$x]));
+	$lz=str_repeat("&nbsp;", $lx);
+	if($x==$month) {
+		echo "<option value='$x' selected>{$_MONTH[$x]}{$lz}- $mc $fn</option>";
+	} else {
+		echo "<option value='$x'>{$_MONTH[$x]}{$lz}- $mc $fn</option>";
+	}
+	unset($pad,$len);
+}
+?>
+</select>&nbsp;
+Year: <select name=year size=1 class=textbox>
+</select>
+</td>
+<td valign="middle" style='border-left: 0px;'><input type=submit value='Sort' class=button-small><input type=button value='Sort latest' class=button-small onclick="self.location.href='<?echo "$_URL_PATH/diag_logs.exh?tab=2&id=$id&month=&year=";?>';"></td>
+</tr>
+</table>
+<table class="data" width="100%">
+<thead class="blue"> 
+<tr>
+<td style='font-weight: bold; text-align: center; table-layout: fixed;' width=2%><name=sini><a href='#sini' onclick="self.location.href='<?echo "$_URL_PATH/diag_logs.exh?tab=1&do_tab=1&id=$id"?>';" title='Back to main'><?echo $_PNG['df_up'];?></a></td>
+<td style='font-weight: bold; text-align: center;' align=center>Name</td>
+<td style='font-weight: bold; text-align: center;' align=center>Filename</td>
+<td style='font-weight: bold; text-align: center;' align=center>Date</td>
+<td style='font-weight: bold; text-align: center;' align=center>Changed</td>
+<td style='font-weight: bold; text-align: center;' align=center>Size</td>
+<td style='font-weight: bold; text-align: right; table-layout: fixed;' width=7%>Opt</td>
+</tr>
+</thead>
+<tbody>
+<?
+
+$_file_array=mybox_getlogfile($file);
+rsort($_file_array);
+reset($_file_array);
+$t=0;
+foreach($_file_array as $ls) {
+	list($name,$size,$mtime)=explode("|",$ls);
+	$mtime=date('h:i:s A',$mtime);
+	if(preg_match("/$file"."-(\d+)\.log/",$name,$mm)) {
+		$date=date('D d-M-Y',strtotime($mm[1]));
+		$year1=date('Y',strtotime($mm[1]));
+		$month1=date('m',strtotime($mm[1]));
+		$yeararray[$year1]=1;
+	}
+	if(($year1!=$year)||($month1!=$month)) continue;
+	$pic=$_PNG['file'];
+	if(strpos($name,"log.gz")!==FALSE) $pic=$_PNG['zip'];
+	$size=mybox_size_readable($size,null,'%d%s');
+	$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff;'";
+	$lo="onclick=\"log_win('$name');\"";
+	echo "<tr $lt>";
+	echo "<td width='2%'><name=sini$t><a href='#sini$t' $lo>$pic</a></td>";
+	echo "<td style='text-align: center;' align=center $lo><b>$title</b></td>";
+	echo "<td style='text-align: center;' $lo>$name</td>";
+	echo "<td style='text-align: center;' $lo>$date</td>";
+	echo "<td style='text-align: center;' $lo>$mtime</td>";
+	echo "<td style='text-align: center;' $lo>$size</td>";
+	echo "<td width=7% style='text-align: right; table-layout: fixed;'><a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='$_URL_PATH/diag_logs.exh?tab=2&id=$id&&do_save=2&del=$name&month=$month&year=$year';\">{$_PNG['delete']}</a><input type=checkbox name=del[] value=$name></td></tr>";
+	$t++;
+}
+if($t!=0){
+?>
+<tr>
+<td style='text-align: right;' align=right valign=bottom colspan=7><name="sini"><input name=btgrep type=button value='Search' class="button-link" onclick="do_grep();"><input type=text size=30 name=search class=valbox>&nbsp;&nbsp;&nbsp;<a href="#sini" onclick='do_delete(3);'>Download</a> / <a href="#sini" onclick='do_delete(2);'>Delete</a> / <a href="#" onclick='dotoggle();'>Toggle</a> <?echo $_PNG['arrow_rtr'];?></td>
+</tr>
+<? } else {?>
+<tr>
+<td valign=bottom colspan=7>No logs available.</td>
+</tr>
+<? } ?>
+</tbody>
+</table>
+<?
+if(count($yeararray)!=0) {
+$x=0;
+echo "
+<script language='javascript'>
+var yeararray=new Array();
+";
+foreach($yeararray as $yy =>$opt) {
+	echo "yeararray[$x]='$yy';";
+	$x++;
+}
+echo "
+	var yeararraylength=yeararray.length;
+	for(x=0;x<yeararraylength;x++) {
+		year=yeararray[x];
+		document.f.year[x]=new Option(year,year);
+		if(year=='$year') {
+			document.f.year.options[x].selected=true;
+		}
+	}
+</script>
+";
+} else {
+	$noflush=1;
+}
+?>
+
+<? } //tab==2?>
+<!-- end tab container -->
+</td>
+</tr> 
+</tbody>
+</table>
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+
+<input type=hidden name=do_save value=0>
+<input type=hidden name=id value=<?echo $id;?>>
+<input type=hidden name=tab value=<?echo $tab;?>>
+<?
+if($tab==2) {
+	if($t==0 && $noflush==0) echo "<script language='javascript'>document.f.submit();</script>";
+	if($noflush==1) {
+		echo "<script>self.location.href='$_URL_PATH/diag_logs.exh?noflush=2';</script>";
+		exit;
+	}
+}
+if($fdownload!='') {
+	echo "<script language='javascript'>self.location.href='$fdownload';</script>";
+}
+?>
+
+</form>
+<script type='text/javascript'>page_kill();</script>
+</body>
+</html>
+<?mybox_db_close($db_id); flush();?>

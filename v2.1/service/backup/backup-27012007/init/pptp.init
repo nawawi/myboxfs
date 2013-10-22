@@ -1,0 +1,241 @@
+#!/bin/php -Cq
+<?
+// pptp.init - last update 30-Jun-2006
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+putenv("PATH=/bin:/service/tools:/service/init");
+
+if(mybox_license('PPTP')!=1) {
+	echo "PPTP VPN module unlicensed\n";
+	mybox_slog("INFO","PPTP VPN module unlicensed");
+	exit(1);
+}
+
+if(!file_exists("/bin/pppd") || !file_exists("/bin/pptpd") || !file_exists("/bin/pptpctrl") || !file_exists("/bin/bcrelay")) {
+	echo "Cannot execute pptp.init. Internal error!\n";
+	mybox_slog("ERROR","Cannot execute pptp.init. Internal error!");
+	exit(1);
+}
+
+$_QUIET=0;
+$_DEBUG=0;
+
+function pptp_config() {
+	global $_QUIET, $_DEBUG, $_DB_NAME;
+
+	$db_id=mybox_db_connect($_DB_NAME);
+	$result=mybox_db_query("select * from pptp_vpn",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_pptp_usead=$row['usead'];
+			$_pptp_listen=$row['listen'];
+			$_pptp_localip=$row['localip'];
+			$_pptp_ipstart=$row['ipstart'];
+			$_pptp_ipend=$row['ipend'];
+			$_pptp_mswins=$row['mswins'];
+			$_pptp_msdns=trim($row['dnswin']);
+			$_pptp_bcrelay=trim($row['bcrelay']);
+			$_pptp_group=trim($row['grp']);
+			$_pptp_stat=$row['stat'];
+			$_pptp_mtu=$row['mtu'];
+		}
+	}
+	unset($result);
+	if($_pptp_stat==0) {
+		if($_QUIET==0) {
+			@unlink("/var/sys/chk_pptp");
+			echo "* PPTP agent disabled\n";
+			mybox_slog("INFO","PPTP agent disabled");
+		}
+		return 0;
+	}
+	$_pptp_user=array();
+	if($_pptp_usead==0) {
+		$result=mybox_db_query("select * from auth_user where stat='1'",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_name=$row['name'];
+				$_passwd=mybox_str_decrypt($row['passwd']);
+				$_pptp_user[]="$_name|$_passwd";
+			}
+		}
+		unset($result);
+	}
+	if(count($_pptp_user)==0 && $_pptp_usead==0) {
+		if($_QUIET==0) {
+			echo "* PPTP No authentication. exit\n";
+			mybox_slog("INFO","* PPTP No authentication. exit");
+			return 0;
+		}
+	}
+	if($_pptp_ipend=='') $_pptp_ipend='254';
+	if($fi=fopen("/etc/pptpd.conf.tmp","w")) {
+		fwrite($fi,"speed 115200\n");
+		fwrite($fi,"ppp /bin/pppd\n");
+		fwrite($fi,"option /etc/ppp/options.pptpd\n");
+		fwrite($fi,"stimeout 10\n");
+		if($_pptp_listen!='any' && $_pptp_listen!='') fwrite($fi,"listen $_pptp_listen\n");
+		// bcrelay: setup by network_int.exh
+		if($_pptp_bcrelay=='') $_pptp_bcrelay='eth0';
+		fwrite($fi,"bcrelay $_pptp_bcrelay\n");
+		fwrite($fi,"localip $_pptp_localip\n");
+		fwrite($fi,"remoteip $_pptp_ipstart"."-$_pptp_ipend\n");
+		if($_DEBUG==1) fwrite($fi,"debug\n");
+		fwrite($fi,"logwtmp\n");
+		fclose($fi);
+		@copy("/etc/pptpd.conf.tmp","/etc/pptpd.conf");
+		@unlink("/etc/pptpd.conf.tmp");
+	}
+
+	if(!is_dir("/etc/ppp")) mybox_mkdirr("/etc/ppp");
+	@symlink("/service/tools/mfs-ppp.exc","/etc/ppp/ip-up");
+	//@symlink("/service/tools/mfs-ppp.exc","/etc/ppp/ip-down");
+	chmod("/etc/ppp/ip-up", 0700);
+	//chmod("/etc/ppp/ip-down", 0700);
+	if($fi=fopen("/etc/ppp/options.pptpd.tmp","w")) {
+		fwrite($fi,"name mybox-vpn\n");
+		fwrite($fi,"refuse-pap\n");
+		fwrite($fi,"refuse-chap\n");
+		fwrite($fi,"refuse-mschap\n");
+		fwrite($fi,"require-mschap-v2\n");
+		fwrite($fi,"require-mppe-128\n");
+		if($_pptp_msdns!='') {
+			$lst=preg_split("/\s+/",$_pptp_msdns);
+			foreach($lst as $mm) {
+				if($mm!='') fwrite($fi,"ms-dns $mm\n");
+			}
+			unset($mm,$lst);
+		}
+		if($_pptp_mswins!='') {
+			$lst=preg_split("/\s+/",$_pptp_mswins);
+			foreach($lst as $mm) {
+				if($mm!='') fwrite($fi,"ms-wins $mm\n");
+			}
+			unset($mm,$lst);
+		}
+		fwrite($fi,"defaultroute\n");
+		fwrite($fi,"proxyarp\n");
+		fwrite($fi,"lock\n");
+		fwrite($fi,"nobsdcomp\n");
+		fwrite($fi,"novj\n");
+		fwrite($fi,"novjccomp\n");
+		fwrite($fi,"nologfd\n");
+		if($_pptp_usead==1) {
+			@unlink("/etc/ppp/chap-secrets");
+			fwrite($fi,"plugin /lib/winbind.so\n");
+			if($_pptp_group=='') {
+				fwrite($fi,"ntlm_auth-helper '/bin/ntlm_auth --helper-protocol=ntlm-server-1'\n");
+			} else {
+				if(file_exists("/var/sys/ad_domain")) {
+					list($_domain,)=preg_split("/\./",mybox_fget_contents("/var/sys/ad_domain"));
+					$_domain=strtoupper($_domain);
+					$_pptp_group=strtoupper($_pptp_group);
+					fwrite($fi,"ntlm_auth-helper '/bin/ntlm_auth --helper-protocol=ntlm-server-1 --require-membership-of=$_domain+$_pptp_group'\n");
+				}
+			}
+		}
+		fclose($fi);
+		@rename("/etc/ppp/options.pptpd.tmp","/etc/ppp/options.pptpd");
+	}
+	if(count($_pptp_user)!=0 && $_pptp_usead!=1) {
+		if($fi=fopen("/etc/ppp/chap-secrets.tmp","w")) {
+			foreach($_pptp_user as $list) {
+				list($user,$passwd)=preg_split("/\|/",$list);
+				fwrite($fi,"$user\tmybox-vpn\t$passwd\t*\n");
+			}
+			fclose($fi);
+			@rename("/etc/ppp/chap-secrets.tmp","/etc/ppp/chap-secrets");
+			chmod("/etc/ppp/chap-secrets", 0600);
+		}
+	}
+	mybox_save_to_file("/var/sys/pptp_mtu","$_pptp_mtu");
+	if($_QUIET==0) echo "* Writing PPTP config..\n";
+	return 1;
+}
+
+function pptp_status() {
+	global $_QUIET;
+	$pid=mybox_get_progpid("pptpd");
+	if($pid!='') {
+		if($_QUIET==0) echo "* pptpd (pid $pid) is running...\n";
+		return 0;
+	}
+	return 1;
+}
+
+function pptp_start() {
+	global $_QUIET;
+
+	if(@pptp_config()==1 && @pptp_status()==1) {
+		if(mybox_exec_cmd("pptpd")==0) {
+			if($_QUIET==0) {
+				echo "* Starting PPTP agent\n";
+				mybox_slog("INFO","Starting PPTP agent");
+			}
+			@touch("/var/sys/chk_pptp");
+			@touch("/var/log/wtmp");
+			return 0;
+		}
+	}
+	@touch("/var/sys/chk_pptp");
+	if($_QUIET==0) {
+		echo "* Starting PPTP agent failed\n";
+		mybox_slog("INFO","Starting PPTP agent failed");
+	}
+	return 1;
+}
+
+function pptp_stop() {
+	global $_pptp_usead, $_QUIET;
+	@mybox_killall("bcrelay");
+	@unlink("/var/sys/chk_pptp");
+	if(mybox_killall("pptpd")==0) {
+		if($_QUIET==0) {
+			echo "* Shutting down PPTP agent\n";
+			mybox_slog("INFO","Shutting down PPTP agent");
+		}
+		@unlink("/var/log/wtmp");
+		@unlink("/etc/pptpd.conf");
+		@unlink("/var/sys/pptp_mtu");
+		@unlink("/var/run/utmp");
+		mybox_rmdir("/etc/ppp");
+		return 0;
+	}
+	@touch("/var/sys/chk_pptp");
+	if($_QUIET==0) {
+		echo "* Shutting down PPTP agent failed\n";
+		mybox_slog("INFO","Shutting down PPTP agent failed");
+	}
+	return 1;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+if($_SERVER["argv"][2]=='debug') $_DEBUG=1;
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=pptp_start();
+		break;
+	case 'stop':
+		$ret=pptp_stop();
+		break;
+	case 'restart':
+		$ret=pptp_stop();
+		sleep(2);
+		$ret=pptp_start();
+		break;
+	case 'status':
+		$ret=pptp_status();
+		break;
+	case 'config':
+		$ret=pptp_config();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/status/config]\n";
+		break;
+}
+flush();
+exit($ret);
+?>

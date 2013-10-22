@@ -1,0 +1,25 @@
+#!/bin/bash -e
+
+START_POINT=$(pwd)
+cd $START_POINT
+FS=$START_POINT/rootfs
+VER=$(date +%Y%m%d)
+
+KERNEL=$START_POINT/kernel_base/mfs-kernel
+rm -rfv mnt
+mkdir -p mnt
+
+cp -va $FS/* mnt/
+#cp -av ../kernel_base/keymaps.bz2 mnt/tmp
+
+echo "$VER" > mnt/etc/release
+sync
+mksquashfs mnt boot.img -all-root -noappend -nopad
+sync
+IMGZ=$(du -kc boot.img |grep total |tr -s '\t' ':' |cut -d ':' -f 1)
+echo "boot.img SIZE=$IMGZ"
+
+mv -v boot.img cdrom/isolinux/init.img
+cp -v $KERNEL cdrom/isolinux/kernel
+rm -rf mnt
+cd $START_POINT

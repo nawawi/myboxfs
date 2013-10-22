@@ -1,0 +1,627 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+chk_session();
+
+write_nocache();
+$_SYSID="network_int";
+
+$db_id=db_connect($_DB_NAME);
+
+if(chk_pri($_LOGIN['auth_id'],1)==1) {
+	if($tab==1) {
+		if(isset($chgdev)&&$chgdev==1 && $new!='' && $old!='' && $id!='') {
+			db_query("update ipaddr set dev='$old' where dev='$new'",$db_id);
+			db_query("update ipaddr set dev='$new' where id='$id'",$db_id);
+			$result=db_query("select id from ipalias where dev='$new'",$db_id);
+			while($row=db_fetch_array_assoc($result)) {
+				$_dv[]=$row['id'];
+			}
+			db_query("update ipalias set dev='$new' where dev='$old'",$db_id);
+			if(count($_dv)!=0) {
+				foreach($_dv as $dv) {
+					db_query("update ipaddr set dev='$old' where id='$dv'",$db_id);
+				}
+			}
+		}
+		if(isset($do_id)&&$do_id=='apply_chg') {
+			echo_query("network-restart");
+			$msg="<script>waitcount();</script>";
+		}
+		if(isset($do_save)&&$do_save==1) {
+			if(count($id)!=0) {
+				foreach($id as $_id => $_rest) {
+					if($_id!='new') {
+						$_ip=$ip[$_id];
+						$_dev=$dev[$_id];
+						$_mask=$mask[$_id];
+						$_onboot=$onboot[$_id];
+						$_note=escape_str($note[$_id]);
+						if($_ip=='') continue;
+						if($_mask=='') {
+							$_m=ipcalc($_ip);
+							$_mask=$_m['netmask'];
+						}
+						if($_onboot!='') $_onboot='1';
+						if($_onboot=='') $_onboot='0';
+						db_query("update ipaddr set ip='$_ip',mask='$_mask',dev='$_dev',note='$_note',onboot='$_onboot' where id='$_id'",$db_id);
+						if($_id==1) {
+							db_query("update pptp set bcrelay='$_dev'",$db_id);
+						}
+						$msg="Setting updated!.";
+					}
+				}
+			}
+		}
+	} // tab==1
+	if($tab==2) {
+		if(isset($do_id)&&$do_id=='apply_chg') {
+			echo_query("network-restart");
+			$msg="<script>waitcount();</script>";
+		}
+		if(isset($do_save)&&$do_save==1) {
+			if(count($id)!=0) {
+				$x=0;
+				db_query("delete from ipalias where dev='$dev'",$db_id);
+				foreach($id as $_pid => $_rest) {
+					$_ip=$ip[$_pid];
+					$_mask=$mask[$_pid];
+					$_onboot=$onboot[$_pid];
+					$_note=escape_str($note[$_pid]);
+					if($_ip=='') continue;
+					if($_mask=='') {
+						$_m=ipcalc($_ip);
+						$_mask=$_m['netmask'];
+					}
+					if($_onboot!='') $_onboot='1';
+					if($_onboot=='') $_onboot='0';
+					$result=db_query("select ip from ipaddr where ip='$_ip'",$db_id);
+					if(db_num_rows($result)==0) {
+						db_query("insert into ipalias (pid,dev,ip,mask,onboot,note) values ('$x','$dev','$_ip','$_mask','$_onboot','$_note')",$db_id);
+						$x++;
+					}
+				}
+			}
+		}
+		if(isset($do_save)&&$do_save==2) {
+			if(count($del)!=0) {
+				foreach($del as $id) {
+					if($id!='') db_query("delete from ipalias where id='$id'",$db_id);
+				}
+			}
+		}
+		if(isset($do_id)&&$do_id==del) {
+			if($id!='') db_query("delete from ipalias where id='$id'",$db_id);
+		}
+	} // tab==2
+	if($tab==3) {
+		if(isset($do_id)&&$do_id=='apply_chg') {
+			echo_query("network-restart");
+			$msg="<script>waitcount();</script>";
+		}
+		if(isset($do_save)&&$do_save==1) {
+			if(count($id)!=0) {
+				$x=2;
+				db_query("delete from vlan where dev='$dev'",$db_id);
+				foreach($id as $_pid => $_rest) {
+					$_ip=$ip[$_pid];
+					$_mask=$mask[$_pid];
+					$_onboot=$onboot[$_pid];
+					$_note=escape_str($note[$_pid]);
+					if($_ip=='') continue;
+					if($_mask=='') {
+						$_m=ipcalc($_ip);
+						$_mask=$_m['netmask'];
+					}
+					if($_onboot!='') $_onboot='1';
+					if($_onboot=='') $_onboot='0';
+					db_query("insert into vlan (vid,dev,ip,flag,mask,onboot,note) values ('$x','$dev','$_ip','1','$_mask','$_onboot','$_note')",$db_id);
+					$x++;
+				}
+			}
+		}
+		if(isset($do_save)&&$do_save==2) {
+			if(count($del)!=0) {
+				foreach($del as $id) {
+					if($id!='') db_query("delete from vlan where id='$id'",$db_id);
+				}
+			}
+		}
+		if(isset($do_id)&&$do_id==del) {
+			if($id!='') db_query("delete from vlan where id='$id'",$db_id);
+		}
+	}
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied!.";
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script language="javascript" src="<?echo $_URL_PATH;?>/j/strings.js"></script>
+<script language="javascript">
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+</script>
+<script language="javascript">
+	function dotoggle() {
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					document.f.elements[i].checked = !(document.f.elements[i].checked);
+    				}	
+			}
+  		}
+	}
+	function do_submit() {
+		if(chkvalidip()==true) {
+			document.f.btsubmit.disabled=true;
+			document.f.do_save.value='1';
+			document.f.submit();
+			return true;
+		}
+		return false;
+	}
+	function chkshift(newdev,oldev,id) {
+		self.location.href='<?echo $_URL_PATH;?>/network_int.exh?tab=<?echo $tab;?>&chgdev=1&new='+newdev+'&old='+oldev+'&id='+id;
+	}
+	function chkshiftdev(newdev) {
+		self.location.href='<?echo $_URL_PATH;?>/network_int.exh?tab=<?echo $tab;?>&dev='+newdev;
+	}
+	function chkdel() {
+		var x='0';
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					if(document.f.elements[i].checked) x++;
+    				}	
+			}
+  		}
+		if(x==0) return false;
+		return true;
+	}
+	function do_delete() {
+		if(chkdel()!=false) {
+			if(confirm('Are you sure you want to proceed?')) {
+				document.f.do_save.value='2';
+				document.f.submit();
+			}
+		}
+	}
+	function chkvalidip() {
+		var ip1='';
+		var ip2='';
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='text') {
+			    	if( document.f.elements[i].name.substr( 0, 2 ) == 'ip') {
+					ip1=document.f.elements[i].value;
+					if(!mip1(ip1)) {
+						alert("Invalid IP Address '"+ip1+"'");
+						return false;
+					} 
+					if(ip1=='' && ip2=='' ) {
+						return false;
+					}
+					if(ip1==ip2) {
+						alert("IP Address '"+ip1+"' already exist");
+						return false;
+					}
+					ip2=ip1;
+    				}	
+			}
+  		}
+		return true;
+	}
+var k=0;
+function waitcount() { 
+ 	k=k+2;
+	if(k <= 100) {
+    		msg.innerHTML='Reloading.. Please wait..'+k+'%'; 
+    		setTimeout(waitcount,200);  
+	} else {
+		self.location.href='<?echo "$_URL_PATH/network_int.exh?tab=$tab&col=$col&col2=$col2";?>';
+	}
+}
+</script>
+</head>
+<body scroll=auto>
+<form name=f method=post action="<?echo "$_URL_PATH/network_int.exh";?>" onsubmit="return do_submit();">
+<table border="0" cellpadding="4" cellspacing="4" width="700" align=center>
+<tr>
+<td align=center>
+
+<!-- main -->
+<fieldset>
+<legend>&nbsp;&nbsp;&nbsp;&nbsp;
+NETWORK: INTERFACES
+&nbsp;&nbsp;&nbsp;&nbsp;</legend>
+
+<table valign=top border=0>
+<tr>
+<td>
+<table border=0 cellpadding="2" cellspacing="2">
+<tr>
+<td align=center valign=middle>
+
+<table width="650" border="0" cellpadding="0" cellspacing="0">
+<tr><td>
+<ul id="tabnav">
+<li class="<?if($tab==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=1) { echo "<a href=\"$_URL_PATH/network_int.exh?tab=1\">"; }?>Static IP<?if($tab!=1) { echo "</a>"; }?></li>
+<li class="<?if($tab==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=2) { echo "<a href=\"$_URL_PATH/network_int.exh?tab=2\">"; }?>Virtual IP<?if($tab!=2) { echo "</a>"; }?></li>
+<li class="<?if($tab==3) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=3) { echo "<a href=\"$_URL_PATH/network_int.exh?tab=3\">"; }?>Virtual LAN<?if($tab!=2) { echo "</a>"; }?></li>
+
+</ul>
+</td></tr>
+<tr> 
+<td class="tabcont">
+
+<?if($tab==1) {?>
+
+<?if($msg!='') {?>
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span id=msg class=notice><?echo "$msg";?></span></td></tr>
+</table><br>
+<? }?>
+<table width="600" border=0 cellpadding="2" cellspacing="2" class=tablist>
+<tr class=bgcolor3>
+<td class=tdlistop>#</td>
+<td class=tdlistop>Name</td>
+<td class=tdlistop>Device</td>
+<td class=tdlistop>IP Address</td>
+<td class=tdlistop>Netmask</td>
+<td class=tdlistop>Active</td>
+<td class=tdlistop>Description</td>
+<td class=tdlistop align=center>Stats</td>
+</tr>
+<?
+$_int=array();
+exec("ip addr ls |awk -F: '/eth.:/{print $2}'", $output, $ret);
+while(list(,$dev) = each($output)) {
+	$dev=trim($dev);
+	$_int[]=$dev;
+}
+$result=db_query("select * from ipaddr",$db_id);
+if(db_num_rows($result)!=0) {
+	$_cnt=1;
+	while($row=db_fetch_array_assoc($result)) {
+		$_id=$row['id'];
+		$_name=$row['name'];
+		$_dev=$row['dev'];
+		$_ip=$row['ip'];
+		$_mask=$row['mask'];
+		$_onboot=$row['onboot'];
+		$_note=unescape_str($row['note']);
+		$_stat='';
+		$_oper=$_onboot;
+		if($_onboot==1) $_stat='checked';
+		$sel='';
+		$intold='';
+		$p='';
+		$cnt=count($_int);
+		if($cnt!=0) {
+			$ok=0;
+			foreach($_int as $int) {
+				if(!preg_match("/^eth(\d+)$/",$int)) continue;
+				if($_dev==$int) {
+					$ok=1;
+					$sel .="<option value='$int' selected>$int</option>";
+					$intold=$int;
+				} else {
+					$sel .="<option value='$int'>$int</option>";
+				}
+			}
+			$p="<select class='textbox' size=1 name=dev[$_id] onchange='chkshift(this.value,\"$intold\",$_id);'>";
+			if($ok==0) {
+				$_oper=0;
+				$sel .="<option value='$_dev' selected>$_dev</option>";
+				$p="<select class='textbox' size=1 name=dev[$_id] onchange='chkshift(this.value,\"$_dev\",$_id);'>";
+			}
+		
+		}
+	echo "
+      <tr>
+        <td class=tdlist><input type=hidden name=id[$_id] value='id'>$_cnt</td>
+        <td class=tdlist>$_name</td>
+        <td class=tdlist>
+	$p
+	$sel
+	</select>
+	</td>
+        <td class=tdlist><input type=text name=ip[$_id] value='$_ip' size=20 class='textbox'></td>
+        <td class=tdlist><input type=text name=mask[$_id] value='$_mask' size=20 class='textbox'></td>
+        <td class=tdlist><input type=checkbox name=onboot[$_id] $_stat></td>
+        <td class=tdlist><input type=text name=note[$_id] value='$_note' size=20 class='textbox'></td>
+        <td class=tdlist align=center>{$_PNG_NIC[$_oper]}</td>
+      </tr>";
+	$_cnt++;
+	}	
+}
+
+?>
+<tr><td align=right valign=top colspan=7 style='white-space: nowrap;'>
+<input name=btapply type="button" value="Apply changes" class="button-small" onclick="if(chkvalidip()==true) self.location.href='<?echo $_URL_PATH;?>/network_int.exh?tab=1&do_id=apply_chg';document.f.btapply.disabled=true;"><input name=btsubmit type="submit" value="Save" class="button-small"><input name=btadd type="button" value="<?if($do_id=="show_stat") { echo "Hide config";} else { echo "Show config"; }?>" class="button-small" onclick="self.location.href='<?echo $_URL_PATH;?>/network_int.exh?tab=1&do_id=<?if($do_id!="show_stat") echo "show_stat";?>'">
+</td></tr>
+
+</table>
+<?if($do_id=="show_stat") {?>
+<br>
+<table width="600" border=0 cellpadding="1" cellspacing="2">
+<tr>
+<td>
+<pre>
+<?
+foreach($_int as $int) {
+	if(preg_match("/^eth(\d+)$/",$int)) {
+   		$ph=popen("ifconfig $int","r" );
+   		while($line=fgets($ph)) echo htmlspecialchars($line);
+   		pclose($ph);
+	}
+}
+?>
+</pre>
+</td></tr></table>
+<? } // do_id==show_stat ?>
+<? }//tab==1 ?>
+
+<?if($tab==2) { ?>
+<?if($msg!='') {?>
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span id=msg class=notice><?echo "$msg";?></span></td></tr>
+</table><br>
+<? }?>
+<table width="600" border=0 cellpadding="2" cellspacing="2" class=tablist>
+      <tr class=bgcolor3>
+        <td class=tdlistop>#</td>
+	<td class=tdlistop>Name</td>
+        <td class=tdlistop>IP Address</td>
+	<td class=tdlistop>Netmask</td>
+	<td class=tdlistop>Active</td>
+        <td class=tdlistop>Description</td>
+        <td class=tdlistop>Opt</td>
+      </tr>
+<?
+if(!isset($dev)||$dev=='') {
+	$dev=search_devname("ipalias",$db_id);
+	if($dev=='') $dev='eth0';
+}
+$_dd=list_devname($db_id);
+$x=1;
+$result=db_query("select * from ipalias where dev='$dev'",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_id=$row['id'];
+		$_pid=$row['pid'];
+		$_name=$row['name'];
+		$_dev=$row['dev'];
+		$_ip=$row['ip'];
+		$_mask=$row['mask'];
+		$_onboot=$row['onboot'];
+		$_note=unescape_str($row['note']);
+		$_stat='';
+		if($_onboot==1) $_stat='checked';
+	echo "
+      <tr>
+        <td class=tdlist><input type=hidden name=id[$_id] value='$_id'>$x</td>
+        <td class=tdlist>{$_dd[$dev]}.$_pid</td>
+        <td class=tdlist><input type=text name=ip[$_id] value='$_ip' size=20 class='textbox'></td>
+        <td class=tdlist><input type=text name=mask[$_id] value='$_mask' size=20 class='textbox'></td>
+        <td class=tdlist><input type=checkbox name=onboot[$_id] $_stat></td>
+        <td class=tdlist><input type=text name=note[$_id] value='$_note' size=25 class='textbox'></td>
+        <td class=tdlist valign=middile><a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='$_URL_PATH/network_int.exh?tab=2&do_id=del&id=$_id';\">{$_PNG['delete']}</a><input type=checkbox name=del[$_id] value=$_id></td>
+      </tr>";
+	$x++;
+	}	
+}
+if(isset($do_id)&&$do_id=='add_new') {
+	$i=$x - 1;
+	echo "
+      <tr>
+        <td class=tdlist><input type=hidden name=id[new] value='new'>$x</td>
+        <td class=tdlist>{$_dd[$dev]}:$i</td>
+        <td class=tdlist><input type=text name=ip[new] value='' size=20 class='textbox'></td>
+        <td class=tdlist><input type=text name=mask[new] value='' size=20 class='textbox'></td>
+        <td class=tdlist><input type=checkbox name=onboot[new]></td>
+        <td class=tdlist><input type=text name=note[new] value='' size=25 class='textbox'></td>
+	<td class=tdlist></td>
+      </tr>";
+}
+if($x > 1) {
+?>
+<tr>
+<td align=right valign=top class=tdlist colspan=7><a href="#" onclick='do_delete();'>Delete</a> / <a href="#" onclick='dotoggle();'>Toggle</a> <?echo $_PNG['arrow_rtr'];?></td>
+</tr>
+<? } ?>
+<tr>
+<td align=right valign=bottom colspan=3 style='white-space: nowrap;'>
+Interface :<select name=dev size=1 class=textbox style='font-size: 9px;' onchange='chkshiftdev(this.value)'>
+<?
+if(count($_dd)!=0) {
+	foreach($_dd as $_dev => $_name) {
+		if($_dev==$dev) {
+			echo "<option value='$_dev' selected>$_name</option>";
+		} else {
+			echo "<option value='$_dev'>$_name</option>";
+		}
+	}
+}
+?>
+</select>&nbsp;
+<input name=btadd type="button" value="Add New" class="button-small" onclick="if(chkvalidip()==true) self.location.href='<?echo $_URL_PATH;?>/network_int.exh?tab=2&do_id=add_new&dev=<?echo $dev;?>'"><input name=btsubmit type="submit" value="Save" class="button-small">
+</td>
+<td align=right valign=bottom colspan=4 style='white-space: nowrap;'>
+<input name=btapply type="button" value="Apply changes" class="button-small" onclick="if(chkvalidip()==true) self.location.href='<?echo $_URL_PATH;?>/network_int.exh?tab=2&do_id=apply_chg&dev=<?echo $dev;?>';document.f.btapply.disabled=true;"><?if($x>1){?><input name=btadd type="button" value="<?if($do_id=="show_stat") { echo "Hide config";} else { echo "Show config"; }?>" class="button-small" onclick="self.location.href='<?echo $_URL_PATH;?>/network_int.exh?tab=2&do_id=<?if($do_id!="show_stat") echo "show_stat";?>&dev=<?echo $dev;?>'"><?}?></td></tr>
+</table>
+<?if($do_id=="show_stat") {
+exec("ifconfig |grep $dev:[0-9]",$out,$ret);
+if(count($out)!=0) {
+?>
+<br>
+<table width="600" border=0 cellpadding="1" cellspacing="2">
+<tr>
+<td>
+<pre>
+<?
+foreach($out as $int) {
+	list($_int,)=preg_split("/\s+/",$int);
+   	$ph=popen("ifconfig $_int","r" );
+   	while($line=fgets($ph)) echo htmlspecialchars($line);
+   	pclose($ph);
+}
+?>
+</pre>
+</td></tr></table>
+<? } // count !=0 ?>
+<? } // do_id==show_stat ?>
+<? } //tab==2 ?>
+
+<?if($tab==3) {?>
+<?if($msg!='') {?>
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span id=msg class=notice><?echo "$msg";?></span></td></tr>
+</table><br>
+<? }?>
+<table width="600" border=0 cellpadding="2" cellspacing="2" class=tablist>
+<tr class=bgcolor3>
+<td class=tdlistop>#</td>
+<td class=tdlistop>Name</td>
+<td class=tdlistop>IP Address</td>
+<td class=tdlistop>Netmask</td>
+<td class=tdlistop>Active</td>
+<td class=tdlistop>Description</td>
+<td class=tdlistop>Opt</td>
+</tr>
+<?
+if(!isset($dev)||$dev=='') {
+	$dev=search_devname("vlan",$db_id);
+	if($dev=='') $dev='eth0';
+}
+$_dd=list_devname($db_id);
+$x=1;
+$result=db_query("select * from vlan where dev='$dev'",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_id=$row['id'];
+		$_vid=$row['vid'];
+		$_name=$row['name'];
+		$_dev=$row['dev'];
+		$_ip=$row['ip'];
+		$_mask=$row['mask'];
+		$_onboot=$row['onboot'];
+		$_note=unescape_str($row['note']);
+		$_stat='';
+		if($_onboot==1) $_stat='checked';
+	echo "
+      <tr>
+        <td class=tdlist><input type=hidden name=id[$_id] value='$_id'>$x</td>
+        <td class=tdlist>{$_dd[$dev]}.$_vid</td>
+        <td class=tdlist><input type=text name=ip[$_id] value='$_ip' size=20 class='textbox'></td>
+        <td class=tdlist><input type=text name=mask[$_id] value='$_mask' size=20 class='textbox'></td>
+        <td class=tdlist><input type=checkbox name=onboot[$_id] $_stat></td>
+        <td class=tdlist><input type=text name=note[$_id] value='$_note' size=25 class='textbox'></td>
+        <td class=tdlist valign=middile><a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='$_URL_PATH/network_int.exh?tab=3&do_id=del&id=$_id';\">{$_PNG['delete']}</a><input type=checkbox name=del[$_id] value=$_id></td>
+      </tr>";
+	$x++;
+	}	
+}
+if(isset($do_id)&&$do_id=='add_new') {
+	if($_vid=='') {
+		$_vid=2;
+	} else {
+		$_vid++;
+	}
+	echo "
+      <tr>
+        <td class=tdlist><input type=hidden name=id[new] value='new'>$x</td>
+        <td class=tdlist>{$_dd[$dev]}.$_vid</td>
+        <td class=tdlist><input type=text name=ip[new] value='' size=20 class='textbox'></td>
+        <td class=tdlist><input type=text name=mask[new] value='' size=20 class='textbox'></td>
+        <td class=tdlist><input type=checkbox name=onboot[new]></td>
+        <td class=tdlist><input type=text name=note[new] value='' size=25 class='textbox'></td>
+	<td class=tdlist></td>
+      </tr>";
+}
+
+if($x > 1) {
+?>
+<tr>
+<td align=right valign=top class=tdlist colspan=7><a href="#" onclick='do_delete();'>Delete</a> / <a href="#" onclick='dotoggle();'>Toggle</a> <?echo $_PNG['arrow_rtr'];?></td>
+</tr>
+<? } ?>
+<tr>
+<td align=right valign=bottom colspan=3 style='white-space: nowrap;'>
+Interface :<select name=dev size=1 class=textbox style='font-size: 9px;' onchange='chkshiftdev(this.value)'>
+<?
+if(count($_dd)!=0) {
+	foreach($_dd as $_dev => $_name) {
+		if($_dev==$dev) {
+			echo "<option value='$_dev' selected>$_name</option>";
+		} else {
+			echo "<option value='$_dev'>$_name</option>";
+		}
+	}
+}
+?>
+</select>&nbsp;
+<input name=btadd type="button" value="Add New" class="button-small" onclick="if(chkvalidip()==true) self.location.href='<?echo $_URL_PATH;?>/network_int.exh?tab=3&do_id=add_new&dev=<?echo $dev;?>'"><input name=btsubmit type="submit" value="Save" class="button-small">
+</td>
+<td align=right valign=bottom colspan=4 style='white-space: nowrap;'>
+<input name=btapply type="button" value="Apply changes" class="button-small" onclick="if(chkvalidip()==true) self.location.href='<?echo $_URL_PATH;?>/network_int.exh?tab=3&do_id=apply_chg&dev=<?echo $dev;?>';document.f.btapply.disabled=true;"><?if($x>1){?><input name=btadd type="button" value="<?if($do_id=="show_stat") { echo "Hide config";} else { echo "Show config"; }?>" class="button-small" onclick="self.location.href='<?echo $_URL_PATH;?>/network_int.exh?tab=3&do_id=<?if($do_id!="show_stat") echo "show_stat";?>&dev=<?echo $dev;?>'"><?}?></td></tr>
+</table>
+
+<?if($do_id=="show_stat") {
+exec("ifconfig |grep $dev.[0-9]",$out,$ret);
+if(count($out)!=0) {
+?>
+<br>
+<table width="600" border=0 cellpadding="1" cellspacing="2">
+<tr>
+<td>
+<pre>
+<?
+foreach($out as $int) {
+	list($_int,)=preg_split("/\s+/",$int);
+	if(preg_match("/eth(\d+)\.(\d+)/",$_int)) {
+   		$ph=popen("ifconfig $_int","r" );
+   		while($line=fgets($ph)) echo htmlspecialchars($line);
+   		pclose($ph);
+	}
+}
+?>
+</pre>
+</td></tr>
+</table>
+<? } // count !=0 ?>
+<? } // do_id==show_stat ?>
+<? } //tab==3 ?>
+
+</td>
+</tr>
+
+
+</table>
+
+</td>
+</tr>
+</table>
+
+<!-- end main -->
+
+</td>
+</tr>
+</table>
+</fieldset>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?echo $tab;?>>
+</form>
+</body>
+</html>
+
+<?db_close($db_id); flush();?>

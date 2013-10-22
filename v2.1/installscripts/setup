@@ -1,0 +1,1150 @@
+#!/bin/sh
+# $Id: setup,v 1.90 2006/01/04 10:04:29 judd Exp $
+
+ANSWER="/tmp/.setup"
+TITLE="Arch Linux Installation"
+LOG="/dev/tty5"
+DESTDIR="/mnt"
+EDITOR=
+
+# name of the kernel image
+VMLINUZ="vmlinuz26"
+
+# pacman binary
+PACMAN="pacman.static"
+
+# sources
+SRC_READY=0
+SYNC_SERVER=
+SYNC_PATH=
+
+# partitions
+PART_ROOT=
+PART_SWAP=
+
+PATH=$PATH:/tmp/bin:/tmp/usr/bin:/tmp/sbin:/tmp/usr/sbin
+
+# default filesystem specs (the + is bootable flag)
+# <mountpoint>:<partsize>:<fstype>[:+]
+DEFAULTFS="/boot:32:ext2:+ swap:256:swap /:*:ext3"
+
+# install stages
+S_NET=0
+S_PART=0
+S_MKFS=0
+S_MKFSAUTO=0
+S_SELECT=0
+S_INSTALL=0
+S_LILO=0
+S_GRUB=0
+S_KERNEL=0
+
+abort()
+{
+	dodialog yesno "Abort Installation?" 6 40 || return 0
+	if [ "$SRC_READY" = "1" -a "$MODE" = "cd" ]; then
+		umount /src >/dev/null 2>&1
+	fi
+	exit 0
+}
+
+msg()
+{
+	dodialog msgbox "$1"
+	return 1
+}
+
+dodialog()
+{
+	# use this for msgbox, inputbox, yesno, infobox
+	#
+	# dodialog <boxtype> <text> [height] [width] [other]
+
+	# the new dialog's auto-sizing is pretty dumb, we can't trust it
+	height=12
+	width=65
+	if [ "$3" != "" ]; then
+		height=$3
+	fi
+	if [ "$4" != "" ]; then
+		width=$4
+	fi
+
+	dialog --backtitle "$TITLE" --aspect 15 --$1 "$2" $height $width $5
+}
+
+domenu()
+{
+	menutype=$1 ; shift
+	text=$1     ; shift
+	height=$1   ; shift
+	width=$1    ; shift
+	mheight=$1  ; shift
+	
+	dialog --backtitle "$TITLE" --$menutype "$text" $height $width $mheight $*
+}
+
+finddisks() {
+	cd /sys/block
+	for dev in `ls | egrep '^hd|^sd'`; do
+		if [ "`cat $dev/removable`" = "0" ]; then
+			echo "/dev/$dev"
+			[ "$1" ] && echo $1
+		fi
+	done
+	cd - >/dev/null
+}
+
+findcdroms() {
+	cd /sys/block
+	for dev in `ls | egrep '^hd|^sd|^sr|^scd'`; do
+		if [ "`cat $dev/removable`" = "1" ]; then
+			echo "/dev/$dev"
+			[ "$1" ] && echo $1
+		fi
+	done
+	cd - >/dev/null
+}
+
+findpartitions() {
+	for devpath in `finddisks`; do
+		disk=`echo $devpath | sed 's|.*/||'`
+		cd /sys/block/$disk
+		for part in $disk*; do
+			echo "/dev/$part"
+			[ "$1" ] && echo $1
+		done
+		cd - >/dev/null
+	done
+	# include any mapped devices
+	for devpath in `ls /dev/mapper 2>/dev/null | grep -v control`; do
+		echo "/dev/mapper/$devpath"
+		[ "$1" ] && echo $1
+	done
+}
+
+convertdev() {
+	# assume a /dev/hdX or /dev/hdXY name
+	letter=`echo $1 | cut -b8`
+	case $letter in
+		"a") dnum=0 ;;
+		"b") dnum=1 ;;
+		"c") dnum=2 ;;
+		"d") dnum=3 ;;
+		"e") dnum=4 ;;
+		"f") dnum=5 ;;
+		"g") dnum=6 ;;
+		"h") dnum=7 ;;
+		*) return
+	esac
+
+	if [ "`echo $1 | egrep '[0-9]$'`" ]; then
+		# /dev/hdXY
+		pnum=`echo $1 | cut -b9-`
+		pnum=$(($pnum-1))
+		echo "(hd${dnum},${pnum})"
+	else
+		# /dev/hdX
+		echo "(hd${dnum})"
+	fi
+}
+
+printk()
+{
+	case $1 in
+		"on")  echo 4 >/proc/sys/kernel/printk ;;
+		"off") echo 0 >/proc/sys/kernel/printk ;;
+	esac
+}
+
+getdest() {
+	[ "$DESTDIR" ] && return 0
+	dodialog inputbox "Enter the destination directory where your target system is mounted" 8 65 "/mnt" 2>$ANSWER || return 1
+	DESTDIR=`cat $ANSWER`
+}
+
+geteditor() {
+	dialog --backtitle "$TITLE" --menu "Select a Text Editor to Use" 10 35 3 \
+		"1" "vi" \
+		"2" "nano (easier)" 2>$ANSWER
+	case `cat $ANSWER` in
+		"1") EDITOR="vi" ;;
+		"2") EDITOR="nano" ;;
+		*)   EDITOR="nano" ;;
+	esac 
+}
+
+_mkfs() {
+	local _domk=$1
+	local _device=$2
+	local _fstype=$3
+	local _dest=$4
+	local _mountpoint=$5
+
+	if [ "${_fstype}" = "swap" ]; then
+		_mountpoint="swap"
+		swapoff ${_device} >/dev/null 2>&1
+		if [ "${_domk}" = "yes" ]; then
+			mkswap ${_device} >$LOG 2>&1
+			if [ $? != 0 ]; then
+				msg "Error creating swap: mkswap ${_device}"
+				return 1
+			fi
+		fi
+		swapon ${_device} >$LOG 2>&1
+		if [ $? != 0 ]; then
+			msg "Error activating swap: swapon ${_device}"
+			return 1
+		fi
+	elif [ "${_fstype}" = "xfs" ]; then
+		if [ "${_domk}" = "yes" ]; then
+			mkfs.xfs -f ${_device} >$LOG 2>&1
+			if [ $? != 0 ]; then
+				msg "Error creating filesystem: mkfs.xfs ${_device}"
+				return 1
+			fi
+			sleep 2
+		fi
+		mkdir -p ${_dest}${_mountpoint}
+		mount -t xfs ${_device} ${_dest}${_mountpoint} >$LOG 2>&1
+		if [ $? != 0 ]; then
+			msg "Error mounting ${_dest}${_mountpoint}"
+			return 1
+		fi
+	elif [ "${_fstype}" = "jfs" ]; then
+		if [ "${_domk}" = "yes" ]; then
+			yes | mkfs.jfs ${_device} >$LOG 2>&1
+			if [ $? != 0 ]; then
+				msg "Error creating filesystem: mkfs.jfs ${_device}"
+				return 1
+			fi
+			sleep 2
+		fi
+		mkdir -p ${_dest}${_mountpoint}
+		mount -t jfs ${_device} ${_dest}${_mountpoint} >$LOG 2>&1
+		if [ $? != 0 ]; then
+			msg "Error mounting ${_dest}${_mountpoint}"
+			return 1
+		fi
+	elif [ "${_fstype}" = "reiserfs" ]; then
+		if [ "${_domk}" = "yes" ]; then
+			yes | mkreiserfs ${_device} >$LOG 2>&1
+			if [ $? != 0 ]; then
+				msg "Error creating filesystem: mkreiserfs ${_device}"
+				return 1
+			fi
+			sleep 2
+		fi
+		mkdir -p ${_dest}${_mountpoint}
+		mount -t reiserfs ${_device} ${_dest}${_mountpoint} >$LOG 2>&1
+		if [ $? != 0 ]; then
+			msg "Error mounting ${_dest}${_mountpoint}"
+			return 1
+		fi
+	elif [ "${_fstype}" = "ext2" ]; then
+		if [ "${_domk}" = "yes" ]; then
+			mke2fs "${_device}" >$LOG 2>&1
+			if [ $? != 0 ]; then
+				msg "Error creating filesystem: mke2fs ${_device}"
+				return 1
+			fi
+			sleep 2
+		fi
+		mkdir -p ${_dest}${_mountpoint}
+		mount -t ext2 ${_device} ${_dest}${_mountpoint} >$LOG 2>&1
+		if [ $? != 0 ]; then
+			msg "Error mounting ${_dest}${_mountpoint}"
+			return 1
+		fi
+	elif [ "${_fstype}" = "ext3" ]; then
+		if [ "${_domk}" = "yes" ]; then
+			mke2fs -j ${_device} >$LOG 2>&1
+			if [ $? != 0 ]; then
+				msg "Error creating filesystem: mke2fs -j ${_device}"
+				return 1
+			fi
+			sleep 2
+		fi
+		mkdir -p ${_dest}${_mountpoint}
+		mount -t ext3 ${_device} ${_dest}${_mountpoint} >$LOG 2>&1
+		if [ $? != 0 ]; then
+			msg "Error mounting ${_dest}${_mountpoint}"
+			return 1
+		fi
+	else
+		msg "unknown fstype for ${_device}"
+		return 1
+	fi
+
+	# add to temp fstab
+	echo -n "${_device} ${_mountpoint} ${_fstype} defaults 0 " >>/tmp/.fstab
+	if [ "${_fstype}" = "swap" -o "${_fstype}" = "reiserfs" ]; then
+		echo "0" >>/tmp/.fstab
+	else
+		echo "1" >>/tmp/.fstab
+	fi
+}
+
+mksimplefs() {
+	DEVICE=$1
+	FSSPECS=$2
+
+# we assume a /dev/hdX format (or /dev/sdX)
+	dev=$DEVICE
+	PART_SWAP="${dev}2"
+	PART_ROOT="${dev}3"
+
+	if [ "$S_MKFS" = "1" ]; then
+		msg "You have already prepared your filesystems manually"
+		return 0
+	fi
+
+	# validate DEVICE
+	if [ ! -b "$DEVICE" ]; then
+	  msg "Device '$DEVICE' is not valid"
+	  return 1
+	fi
+
+	# validate DEST
+	if [ ! -d "$DESTDIR" ]; then
+		msg "Destination directory '$DESTDIR' is not valid"
+		return 1
+	fi
+
+	# /boot required
+	if [ `echo $FSSPECS | grep '/boot:' | wc -l` -ne 1 ]; then
+		msg "Need exactly one boot partition"
+		return 1
+	fi
+
+	# swap required
+	if [ `echo $FSSPECS | grep 'swap:' | wc -l` -lt 1 ]; then
+		msg "Need at least one swap partition"
+		return 1
+	fi
+
+	# / required
+	if [ `echo $FSSPECS | grep '/:' | wc -l` -ne 1 ]; then
+		msg "Need exactly one root partition"
+		return 1
+	fi
+
+	rm -f /tmp/.fstab
+	# setup input var for sfdisk
+	for fsspec in $FSSPECS; do
+		fssize=`echo $fsspec | tr -d ' ' | cut -f2 -d:`
+		if [ "$fssize" = "*" ]; then
+				fssize_spec=';'
+		else
+				fssize_spec=",$fssize"
+		fi
+		fstype=`echo $fsspec | tr -d ' ' | cut -f3 -d:`
+		if [ "$fstype" = "swap" ]; then
+				fstype_spec=",S"
+		else
+				fstype_spec=","
+		fi
+		bootflag=`echo $fsspec | tr -d ' ' | cut -f4 -d:`
+		if [ "$bootflag" = "+" ]; then
+			bootflag_spec=",*"
+		else
+			bootflag_spec=""
+		fi
+		sfdisk_input="${sfdisk_input}${fssize_spec}${fstype_spec}${bootflag_spec}\n"
+	done
+	sfdisk_input=`printf "$sfdisk_input"`
+
+	# invoke sfdisk
+	printk off
+	dodialog infobox "Partitioning $DEVICE"
+	sfdisk $DEVICE -uM >$LOG 2>&1 <<EOF
+$sfdisk_input
+EOF
+	if [ $? -gt 0 ]; then
+		msg "Error partitioning $DEVICE (see $LOG for details)"
+		prink on
+		return 1
+	fi
+	printk on
+
+	# need to mount root first, then do it again for the others
+	let part=1
+	for fsspec in $FSSPECS; do
+		mountpoint=`echo $fsspec | tr -d ' ' | cut -f1 -d:`
+		fstype=`echo $fsspec | tr -d ' ' | cut -f3 -d:`
+		if echo $mountpoint | tr -d ' ' | grep '^/$' 2>&1 > /dev/null; then
+				_mkfs yes ${DEVICE}${part} "$fstype" "$DESTDIR" "$mountpoint" || return 1
+		fi
+		let part=$part+1
+	done
+
+	# make other filesystems
+	let part=1
+	for fsspec in $FSSPECS; do
+		mountpoint=`echo $fsspec | tr -d ' ' | cut -f1 -d:`
+		fstype=`echo $fsspec | tr -d ' ' | cut -f3 -d:`
+		if [ `echo $mountpoint | tr -d ' ' | grep '^/$' | wc -l` -eq 0 ]; then
+			_mkfs yes ${DEVICE}${part} "$fstype" "$DESTDIR" "$mountpoint" || return 1
+		fi
+		let part=$part+1
+	done
+
+	msg "Auto-prepare was successful"
+	S_MKFSAUTO=1
+}
+
+partition() {
+	#
+	# Select disk to partition
+	#
+	DISCS=`finddisks _`
+	DISCS="$DISCS OTHER -"
+	domenu menu "Select the disk you want to partition" 14 55 7 $DISCS 2>$ANSWER || return 1
+	DISC=`cat $ANSWER`
+	if [ "$DISC" = "OTHER" ]; then
+		dodialog inputbox "Enter the full path to the device you wish to partition" 8 65 "/dev/hda" 2>$ANSWER || return 1
+		DISC=`cat $ANSWER`
+	fi
+	while [ "$DISC" != "DONE" ]; do
+		#
+		# Partition disc
+		#
+		dodialog msgbox "Now you'll be put into the cfdisk program where you can partition your hard drive. You should make a swap partition and as many data partition as you will need.  NOTE: cfdisk may tell you to reboot after creating partitions.  If you need to reboot, just re-enter this install program, skip this step and go on to step 2." 18 70
+		cfdisk $DISC
+
+		domenu menu "Select the disk you want to partition" 14 55 7 $DISCS DONE + 2>$ANSWER || return 1
+		DISC=`cat $ANSWER`
+		if [ "$DISC" = "OTHER" ]; then
+			dodialog inputbox "Enter the full path to the device you wish to partition" 8 65 "/dev/hda" 2>$ANSWER || return 1
+			DISC=`cat $ANSWER`
+		fi
+	done
+	S_PART=1
+}
+
+mountpoints() {
+	if [ "$S_MKFSAUTO" = "1" ]; then
+		msg "You have already prepared your filesystems with Auto-prepare"
+		return 0
+	fi
+
+	: >/tmp/.fstab
+	: >/tmp/.parts
+
+	# Determine which filesystems are available
+	insmod /lib/modules/`uname -r`/kernel/fs/xfs/xfs.ko >/dev/null 2>&1
+	insmod /lib/modules/`uname -r`/kernel/fs/jfs/jfs.ko >/dev/null 2>&1
+	FSOPTS="ext2 Ext2 ext3 Ext3"
+	[ "`which mkreiserfs`" ] && FSOPTS="$FSOPTS reiserfs Reiser3"
+	[ "`which mkfs.xfs`" ]   && FSOPTS="$FSOPTS xfs XFS"
+	[ "`which mkfs.jfs`" ]   && FSOPTS="$FSOPTS jfs JFS"
+
+	#
+	# Select mountpoints
+	#
+	PARTS=`findpartitions _`
+	domenu menu "Select the partition to use as swap" 21 50 13 NONE - $PARTS 2>$ANSWER || return 1
+	PART=`cat $ANSWER`
+	PART_SWAP=$PART
+	if [ "$PART_SWAP" != "NONE" ]; then
+		DOMKFS="no"
+		dodialog yesno "Would you like to create a filesystem on $PART?\n\n(This will overwrite existing data!)" && DOMKFS="yes"
+		echo "$PART:swap:swap:$DOMKFS" >>/tmp/.parts
+	fi
+	
+	domenu menu "Select the partition to mount as /" 21 50 13 $PARTS 2>$ANSWER || return 1
+	PART=`cat $ANSWER`
+	PART_ROOT=$PART
+	# Select root filesystem type
+	domenu menu "Select a filesystem for $PART" 13 45 6 $FSOPTS 2>$ANSWER || return 1
+	FSTYPE=`cat $ANSWER`
+	DOMKFS="no"
+	dodialog yesno "Would you like to create a filesystem on $PART?\n\n(This will overwrite existing data!)" && DOMKFS="yes"
+	echo "$PART:$FSTYPE:/:$DOMKFS" >>/tmp/.parts
+
+	#
+	# Additional partitions
+	#
+	domenu menu "Select any additional partitions to mount under your new root (select DONE when finished)" 21 50 13 $PARTS DONE _ 2>$ANSWER || return 1
+	PART=`cat $ANSWER`
+	while [ "$PART" != "DONE" ]; do
+		# Select a filesystem type
+		domenu menu "Select a filesystem for $PART" 13 45 6 $FSOPTS 2>$ANSWER || return 1
+		FSTYPE=`cat $ANSWER`
+		dodialog inputbox "Enter the mountpoint for $PART" 8 65 "/boot" 2>$ANSWER || return 1
+		MP=`cat $ANSWER`
+		DOMKFS="no"
+		dodialog yesno "Would you like to create a filesystem on $PART?\n\n(This will overwrite existing data!)" && DOMKFS="yes"
+		echo "$PART:$FSTYPE:$MP:$DOMKFS" >>/tmp/.parts
+		domenu menu "Select any additional partitions to mount under your new root" 21 50 13 $PARTS DONE _ 2>$ANSWER || return 1
+		PART=`cat $ANSWER`
+	done
+
+	for line in `cat /tmp/.parts`; do
+		PART=`echo $line | cut -d: -f 1`
+		FSTYPE=`echo $line | cut -d: -f 2`
+		MP=`echo $line | cut -d: -f 3`
+		DOMKFS=`echo $line | cut -d: -f 4`
+		umount $MP
+		if [ "$DOMKFS" = "yes" ]; then
+			if [ "$FSTYPE" = "swap" ]; then
+				dodialog infobox "Creating swapspace on $PART, activating..."
+			else
+				dodialog infobox "Creating $FSTYPE on $PART, mounting to ${DESTDIR}${MP}"
+			fi
+			_mkfs yes $PART $FSTYPE $DESTDIR $MP || return 1
+		else
+			if [ "$FSTYPE" = "swap" ]; then
+				dodialog infobox "Activating swapspace on $PART"
+			else
+				dodialog infobox "Mounting $PART to ${DESTDIR}${MP}"
+			fi
+			_mkfs no $PART $FSTYPE $DESTDIR $MP || return 1
+		fi
+		sleep 1
+	done
+
+	msg "Partitions were successfully mounted."
+
+	S_MKFS=1
+}
+
+getsource() {
+	if [ "$MODE" = "cd" ]; then
+		dialog --backtitle "$TITLE" --menu "You can either install packages from an Arch Linux CD, or you can switch to another VC and manually mount the source media under /src.  If you manually mount to /src, make sure the packages are available under /src/arch/pkg.\n\n" \
+			15 55 2 \
+			"CD" "Mount the CD-ROM and install from there" \
+			"SRC" "I have manually mounted the source media" 2>$ANSWER || return 1
+		case `cat $ANSWER` in
+			"CD")
+				# we may have leftover mounts...
+				umount /src >/dev/null 2>&1
+				CDROMS=`findcdroms _`
+				if [ "$CDROMS" = "" ]; then
+					msg "No CD drives were found"
+					return 1
+				fi
+				domenu menu "Select the CD drive that contains Arch packages" 14 55 7 $CDROMS 2>$ANSWER || return 1
+				CDROM=`cat $ANSWER`
+				dodialog infobox "Mounting $CDROM"
+				mount -t iso9660 $CDROM /src >/dev/null 2>&1
+				if [ $? -gt 0 ]; then
+					dodialog msgbox "Failed to mount $CDROM"
+					return 1
+				fi
+				SRC_READY=1
+				;;
+			"SRC")
+				SRC_READY=2
+				;;
+		esac
+		if [ ! -d /src/arch/pkg ]; then
+			msg "Package directory /src/arch/pkg is missing!"
+			return 1
+		fi
+		if [ ! -d /src/arch/pkg/setup ]; then
+			msg "Setup directory /src/arch/pkg/setup is missing!"
+			return 1
+		fi
+	fi
+
+	if [ "$MODE" = "ftp" ]; then
+		cd /arch
+		MIRRORS=`cat mirrors.txt | cut -d' ' -f 1 | sed 's|$| _|g'`
+		domenu menu "Select an FTP mirror" 14 55 7 $MIRRORS "Custom" "_" 2>$ANSWER || return 1
+		SYNC_SERVER=`cat $ANSWER`
+		if [ "$SYNC_SERVER" = "Custom" ]; then
+			dodialog inputbox "Enter the server hostname/ip" 8 65 "ftp.server.org" 2>$ANSWER || return 1
+			SYNC_SERVER=`cat $ANSWER`
+			dodialog inputbox "Enter the path to Arch Linux packages" 8 65 "/pub/archlinux/current/os/i686" 2>$ANSWER || return 1
+			SYNC_PATH=`cat $ANSWER`
+		else
+			SYNC_PATH=`grep "^$SYNC_SERVER" mirrors.txt | cut -d' ' -f 2`
+		fi
+		SRC_READY=1
+	fi
+}
+
+prepare_pacman() {
+	cd /tmp
+	# somehow our root can get remounted as RO, which breaks this stage.
+	mount -o remount,rw / >/dev/null 2>&1
+
+	if [ "$MODE" = "cd" ]; then
+		if [ ! -f usr/bin/$PACMAN ]; then
+			# Unpack and "install" pacman
+			dodialog infobox "Unpacking pacman"
+			tar zxf /src/arch/pkg/setup/pacman.pkg.tar.gz usr/bin/$PACMAN
+			cd /tmp
+		fi
+		# Setup a pacman.conf in /etc
+		echo "[current]" >/etc/pacman.conf
+		echo "Server = file:///src/arch/pkg" >>/etc/pacman.conf
+		# set up a symlink to fool pacman so it doesn't copy all the packages to the cache
+		if [ ! -d $DESTDIR/var/cache/pacman/pkg ]; then
+			mkdir -p $DESTDIR/var/cache/pacman >/dev/null 2>&1
+			rm -f $DESTDIR/var/cache/pacman/pkg >/dev/null 2>&1
+			ln -sf /src/arch/pkg $DESTDIR/var/cache/pacman/pkg >/dev/null 2>&1
+		fi
+	fi
+
+	if [ "$MODE" = "ftp" ]; then
+		if [ ! -f usr/bin/$PACMAN ]; then
+			# Download and "install" pacman
+			dodialog infobox "Downloading pacman"
+			snarf ftp://${SYNC_SERVER}${SYNC_PATH}/setup/pacman.pkg.tar.gz >$LOG 2>&1 || msg "Error downloading pacman!  Try another server." || return 1
+			tar zxf pacman.pkg.tar.gz usr/bin/$PACMAN || msg "Error unpacking pacman binary!  The tarball may be corrupt." || return 1
+			cd /tmp
+		fi
+		# Setup a pacman.conf in /etc
+		echo "[current]" >/etc/pacman.conf
+		echo "Server = ftp://${SYNC_SERVER}${SYNC_PATH}" >>/etc/pacman.conf
+		mkdir -p $DESTDIR/var/cache/pacman/pkg /var/cache/pacman >/dev/null 2>&1
+		rm -f /var/cache/pacman/pkg >/dev/null 2>&1
+		ln -sf $DESTDIR/var/cache/pacman/pkg /var/cache/pacman/pkg >/dev/null 2>&1
+	fi
+
+	export PATH=$PATH:/tmp/usr/bin
+	dodialog infobox "Refreshing package database..." 6 45
+	$PACMAN --sync --refresh --root $DESTDIR >$LOG 2>&1
+}
+
+cleanup_pacman() {
+	if [ "$MODE" = "cd" ]; then
+		rm -f $DESTDIR/var/cache/pacman/pkg >/dev/null 2>&1
+	fi
+}
+
+selectpkg() {
+	if [ $SRC_READY -gt 0 -a "$MODE" = "ftp" ]; then
+		dodialog yesno "Would you like to select a different server?"
+		if [ $? -eq 0 ]; then
+			getsource || return 1
+		fi
+	else
+		getsource || return 1
+	fi
+
+	dodialog msgbox "Package selection is split into two stages.  First you will select package categories that contain packages you may be interested in.  Then you will be presented with a full list of packages in your selected categories, allowing you to fine-tune your selection.\n\nNOTE: It is recommended that you only install the BASE category from this setup, and wait until you have a fully working system before installing other applications." 18 70
+
+	if [ "$MODE" = "cd" ]; then
+		PKGS="/src/arch/pkg/setup/packages.txt"
+	fi
+	
+	if [ "$MODE" = "ftp" ]; then
+		cd /tmp
+		rm -f packages.txt
+		dodialog infobox "Downloading package list..."
+		snarf ftp://${SYNC_SERVER}${SYNC_PATH}/setup/packages.txt >$LOG 2>&1
+		if [ $? -gt 0 ]; then
+			SRC_READY=0
+			msg "Error fetching package list from server"
+			return 1
+		fi
+		PKGS="packages.txt"
+	fi
+
+	CHKLIST="base ^ ON"
+	for category in `cat $PKGS | sed 's|/.*$||g' | uniq | grep -v base | grep -v kernels`; do
+		CHKLIST="$CHKLIST $category - OFF"
+	done
+	domenu checklist "Select Package Categories" 19 55 12 $CHKLIST 2>/tmp/.pkglist || return 1
+	SELECTALL="no"
+	dodialog yesno "Select all packages by default?" && SELECTALL="yes"
+	CHKLIST=
+	for category in `cat /tmp/.pkglist | sed 's|"||g'`; do
+		tag="OFF"
+		if [ "$category" = "base" -o "$SELECTALL" = "yes" ]; then
+			tag="ON"
+		fi
+		list=`cat $PKGS | grep "$category/" | sed 's|^[a-z0-9]*/||g' | sed "s|.pkg.tar.gz$| ($category) $tag|g" | sort`
+		CHKLIST="$CHKLIST $list"
+	done
+	domenu checklist "Select Packages to install.  Use SPACE to select." 19 60 12 $CHKLIST 2>/tmp/.pkglist || return 1
+	S_SELECT=1
+}
+
+doinstall()
+{
+  # count the packages to be installed
+  #total=`yes "n" | pacman --root $DESTDIR --sync $* 2>&1 | wc -w`
+  #total=$(($total-9))
+  # begin install
+  rm -f /tmp/pacman.lck
+	rm -f /tmp/pacman.log
+	# all pacman output goes to /tmp/pacman.log, which we tail into a dialog
+	( \
+		echo "Installing Packages..." >/tmp/pacman.log ; echo >>/tmp/pacman.log ; \
+		$PACMAN --noconfirm --root $DESTDIR --sync `echo $* | sed 's|"||g'` >>/tmp/pacman.log 2>&1 ; \
+		echo $? >/tmp/.pacman.retcode; \
+	  echo >>/tmp/pacman.log; \
+		if [ "`cat /tmp/.pacman.retcode`" -gt 0 ]; then 
+			echo "Package Installation FAILED." >>/tmp/pacman.log
+		else
+			echo "Package Installation Complete." >>/tmp/pacman.log
+		fi
+	) &
+	
+	sleep 2
+	dialog --backtitle "$TITLE" --title " Installing... Please Wait " \
+		--no-kill --tailboxbg "/tmp/pacman.log" 18 70 2>/tmp/.pid
+	while [ -f /tmp/pacman.lck ]; do
+		sleep 1
+	done
+	kill `cat /tmp/.pid`
+	if [ "`cat /tmp/.pacman.retcode`" -gt 0 ]; then
+		result="Installation Failed (see errors below)"
+		retcode=1
+	else
+		result="Installation Complete"
+		retcode=0
+	fi
+	dialog --backtitle "$TITLE" --title " $result " \
+		--exit-label "Continue" --textbox "/tmp/pacman.log" 18 70
+	# fix the stair-stepping that --tailboxbg leaves us with
+	stty onlcr
+
+	rm -f /tmp/.pacman.retcode
+	return $retcode
+}
+
+installpkg() {
+	if [ ! -f /tmp/.pkglist -o "$S_SELECT" != "1" ]; then
+		msg "You must select packages first."
+		return 1
+	fi
+	if [ "$S_MKFS" != "1" -a "$S_MKFSAUTO" != "1" ]; then
+		getdest
+	fi
+
+	msg "Package installation will begin now.  You can watch the output in the progress window.\n\nNOTE: Pacman can take a few minutes to process dependencies if you've selected a large amount of packages.  Please be patient."
+	delpkg="no"
+	LIST=
+	for pkg in `cat /tmp/.pkglist`; do
+		pkgname=${pkg%-*-*}
+		LIST="$LIST $pkgname"
+	done
+
+	prepare_pacman
+
+	if [ "$MODE" = "cd" ]; then
+    doinstall $LIST
+		if [ $? -gt 0 ]; then
+			cleanup_pacman
+			return 1
+		fi
+		S_INSTALL=1
+	fi
+
+	if [ "$MODE" = "ftp" ]; then
+		dodialog yesno "Do you want to keep the downloaded packages?  You can delete them later by running 'pacman -S --clean'" || delpkg="yes"
+		dodialog infobox "Downloading packages.  See $LOG for output." 6 55
+		$PACMAN --noconfirm --root $DESTDIR --sync --downloadonly `echo $LIST | sed 's|"||g'` >$LOG 2>&1
+		if [ $? -gt 0 ]; then
+			dodialog msgbox "One or more packages failed to download.  You can try again by re-selecting Install Packages from the main menu." 12 65
+			return 1
+		fi
+
+    doinstall $LIST 
+		if [ $? -gt 0 ]; then
+			cleanup_pacman
+			return 1
+		fi
+		if [ "$S_INSTALL" = "1" -a "$delpkg" = "yes" ]; then
+			# clean up the cached package files that pacman leaves
+			$PACMAN --root $DESTDIR --sync --clean --clean >$LOC 2>&1
+		fi
+		S_INSTALL=1
+	fi
+
+	sync
+	if [ "$S_MKFS" = "1" -o "$S_MKFSAUTO" = "1" ]; then
+		if [ -f /tmp/.fstab ]; then
+			cat /tmp/.fstab >>$DESTDIR/etc/fstab
+		fi
+	fi
+
+	cleanup_pacman
+}
+
+
+dokernel() {
+	if [ $SRC_READY -eq 0 ]; then
+		getsource || return 1
+	fi
+	getdest || return 1
+
+	local KERNTARG=
+	local SRCTARG=
+	#if [ "$SRC_READY" = "1" ]; then
+	#	umount /src >/dev/null 2>&1
+	#fi
+	dialog --backtitle "$TITLE" --menu "Select a kernel you would like to use" 14 55 7 \
+		"v2.6"      "Kernel 2.6.x for IDE/SCSI systems" \
+		"v2.4 IDE"  "Kernel 2.4.x for IDE systems" \
+		"v2.4 SCSI" "Kernel 2.4.x for SCSI systems" 2>$ANSWER || return 1
+	case `cat $ANSWER` in
+		"v2.6")      KERNTARG="kernel26" ;      VMLINUZ="vmlinuz26" ;;
+		"v2.4 IDE")  KERNTARG="kernel24" ;      VMLINUZ="vmlinuz"   ;;
+		"v2.4 SCSI") KERNTARG="kernel24-scsi" ; VMLINUZ="vmlinuz"   ;;
+	esac
+	if [ "$KERNTARG" != "" ]; then
+		prepare_pacman			
+		if [ "$MODE" = "ftp" ]; then
+			dodialog infobox "Downloading $KERNTARG package.  See $LOG for output." 6 55
+			$PACMAN --noconfirm --root $DESTDIR --sync --downloadonly $KERNTARG >$LOG 2>&1
+			if [ $? -gt 0 ]; then
+				SRC_READY=0
+				msg "Kernel package failed to download."
+				return 1
+			fi
+		fi
+		# mount proc/sysfs first, so mkinitrd can use auto-detection if it wants
+		mount -t proc none $DESTDIR/proc
+		mount -t sysfs none $DESTDIR/sys
+		doinstall $KERNTARG
+		ret=$?
+		umount $DESTDIR/proc $DESTDIR/sys
+		cleanup_pacman
+	fi
+	if [ $ret -gt 0 ]; then
+		msg "Failed to install the Linux kernel package."
+		return 1
+	else
+		sync
+		S_KERNEL=1
+		msg "The kernel was successfully installed.  Make sure to install a bootloader before you reboot."
+	fi
+}
+
+donetwork() {
+	ifconfig eth0 >/dev/null 2>&1
+	if [ $? -gt 0 ]; then
+		dodialog yesno "Cannot find an eth0 interface. You probably haven't loaded\nyour network module yet.  You have two options:\n\n  1) Probe for the correct module now.\n  2) Switch to another VC (ALT-F2) and load your module\n     with the modprobe command, then switch back here (ALT-F1)\n     and continue.\n\nIf you know which module you need, you should do Step 2 and\nselect NO below.  If you don't know which module you need,\nchoose Step 1 by selecting YES below.\n\nProbe for network module?" 18 70
+    if [ $? -eq 0 ]; then
+      probenic
+	    ifconfig eth0 >/dev/null 2>&1
+	    if [ $? -gt 0 ]; then
+	      return 1
+      fi
+		else
+			ifconfig eth0 >/dev/null 2>&1
+			if [ $? -gt 0 ]; then
+				msg "Cannot find the eth0 interface." || return 1
+			fi
+		fi
+	fi
+	dodialog yesno "Do you want to use DHCP?"
+	if [ $? -eq 0 ]; then
+		dodialog infobox "Please wait.  Polling DHCP server..."
+		dhcpcd >$LOG 2>&1 || msg "Failed to run dhcpcd." || return 1
+		sleep 10
+		if [ ! `ifconfig eth0 | grep 'inet addr:'` ]; then
+			msg "DHCP request failed." || return 1
+		fi
+	else
+		dodialog inputbox "Enter your IP address" 8 65 "192.168.0.2" 2>$ANSWER || return 1
+		IPADDR=`cat $ANSWER`
+		dodialog inputbox "Enter your netmask" 8 65 "255.255.255.0" 2>$ANSWER || return 1
+		SUBNET=`cat $ANSWER`
+		dodialog inputbox "Enter your gateway (optional)" 8 65 2>$ANSWER || return 1
+		GW=`cat $ANSWER`
+		dodialog inputbox "Enter your DNS server IP" 8 65 "192.168.0.1" 2>$ANSWER || return 1
+		DNS=`cat $ANSWER`
+
+		ifconfig eth0 $IPADDR netmask $SUBNET up >$LOG 2>&1 || msg "Failed to setup eth0 interface." || return 1
+		if [ "$GW" != "" ]; then
+			route add default gw $GW >$LOG 2>&1 || msg "Failed to setup your gateway." || return 1
+		fi
+		echo "nameserver $DNS" >/etc/resolv.conf
+	fi
+	msg "The network is configured."
+	S_NET=1
+}
+
+probenic() {
+  dodialog infobox "Looking for a matching ethernet module..."
+	printk off
+
+  cd /lib/modules/`uname -r`/kernel/drivers/net
+	if [ $? -gt 0 ]; then
+		msg "No ethernet modules were found!  Did you load the net add-ons?"
+		printk on
+		cd -
+		return 1
+	fi
+  for mod in `find . -name "*.ko" | sed 's|\.ko||g' | sed 's|.*/||g'`; do
+    modprobe $mod >/dev/null 2>&1
+    ifconfig eth0 >/dev/null 2>&1
+    if [ $? -eq 0 ]; then
+      break
+    fi
+		# FIXME: this can lock up the machine with some modules, dunno why.
+		#        I blame busybox, though.
+		#
+		#rmmod $mod
+  done
+
+  ifconfig eth0 >/dev/null 2>&1
+  if [ $? -gt 0 ]; then
+    msg "No matching ethernet modules found."
+  else
+    msg "Probe succeeded.  Your network module is loaded."
+  fi
+
+	# bring up the interfaces (early) so the correct modules are flagged as 'used' in lsmod
+	for int in `ifconfig -a | egrep '^[a-z]' | sed 's|  *| |g' | cut -d' ' -f 1`; do
+		ifconfig $int up
+	done
+	printk on
+
+  cd -
+}
+
+dolilo() {
+	if [ ! -f $DESTDIR/etc/lilo.conf ]; then
+		msg "Error: Couldn't find $DESTDIR/etc/lilo.conf.  Is LILO installed?"
+		return 1
+	fi
+	# Try to auto-configure LILO...
+	if [ "$PART_ROOT" != "" -a "$S_LILO" != "1" ]; then
+		sed -i "s|vmlinuz24|vmlinuz|g" $DESTDIR/etc/lilo.conf
+		sed -i "s|vmlinuz26|vmlinuz|g" $DESTDIR/etc/lilo.conf
+		sed -i "s|vmlinuz|$VMLINUZ|g" $DESTDIR/etc/lilo.conf
+		if [ "$VMLINUZ" = "vmlinuz26" ]; then
+			sed -i "s|root=.*$|root=${PART_ROOT}\ninitrd=/boot/initrd26.img|g" $DESTDIR/etc/lilo.conf
+		else
+			sed -i "s|root=.*$|root=${PART_ROOT}|g" $DESTDIR/etc/lilo.conf
+		fi
+	fi
+	msg "Before installing LILO, you must review the configuration file.  You will now be put into the editor.  After you save your changes and exit the editor, LILO will be installed."
+	[ "$EDITOR" ] || geteditor
+	$EDITOR ${DESTDIR}/etc/lilo.conf
+	dodialog infobox "Installing the LILO bootloader..."
+	mount -t proc none $DESTDIR/proc
+	mount -o bind /dev $DESTDIR/dev
+	chroot $DESTDIR /sbin/lilo >$LOG 2>&1
+	if [ $? -gt 0 ]; then
+		umount $DESTDIR/dev $DESTDIR/proc
+		msg "Error installing LILO. (see $LOG for output)"
+		return 1
+	fi
+	umount $DESTDIR/dev $DESTDIR/proc
+	msg "LILO was successfully installed."
+	S_LILO=1
+}
+
+dogrub() {
+	if [ ! -f $DESTDIR/boot/grub/menu.lst ]; then
+		msg "Error: Couldn't find $DESTDIR/boot/grub/menu.lst.  Is GRUB installed?"
+		return 1
+	fi
+	# try to auto-configure GRUB...
+	if [ "$PART_ROOT" != "" -a "$S_GRUB" != "1" ]; then
+		grubdev=`convertdev $PART_ROOT`
+		# look for a separately-mounted /boot partition
+		bootdev=`mount | grep $DESTDIR/boot | cut -d' ' -f 1`
+		if [ "$grubdev" != "" -o "$bootdev" != "" ]; then
+			cp $DESTDIR/boot/grub/menu.lst /tmp/.menu.lst
+			# remove the default entries by truncating the file at our little tag (#-*)
+			head -`cat /tmp/.menu.lst | grep -n '#-\*' | cut -d: -f 1` /tmp/.menu.lst >$DESTDIR/boot/grub/menu.lst
+			rm -f /tmp/.menu.lst
+			echo "" >>$DESTDIR/boot/grub/menu.lst
+			echo "# (0) Arch Linux" >>$DESTDIR/boot/grub/menu.lst
+			echo "title  Arch Linux" >>$DESTDIR/boot/grub/menu.lst
+			subdir=
+			if [ "$bootdev" != "" ]; then
+				grubdev=`convertdev $bootdev`
+			else
+				subdir="/boot"
+			fi
+			echo "root   $grubdev" >>$DESTDIR/boot/grub/menu.lst
+			echo "kernel $subdir/$VMLINUZ root=$PART_ROOT ro" >>$DESTDIR/boot/grub/menu.lst
+			if [ "$VMLINUZ" = "vmlinuz26" ]; then
+				echo "initrd $subdir/initrd26.img" >>$DESTDIR/boot/grub/menu.lst
+			fi
+			echo "" >>$DESTDIR/boot/grub/menu.lst
+		fi
+	fi
+
+	msg "Before installing GRUB, you must review the configuration file.  You will now be put into the editor.  After you save your changes and exit the editor, you can install GRUB."
+	[ "$EDITOR" ] || geteditor
+	$EDITOR ${DESTDIR}/boot/grub/menu.lst
+
+	DEVS=`finddisks _`
+	DEVS="$DEVS `findpartitions _`"
+	if [ "$DEVS" = "" ]; then
+		msg "No hard drives were found"
+		return 1
+	fi
+	domenu menu "Select the boot device where the GRUB bootloader will be installed (usually the MBR)" 14 55 7 $DEVS 2>$ANSWER || return 1
+	ROOTDEV=`cat $ANSWER`
+	dodialog infobox "Installing the GRUB bootloader..."
+	cp -a $DESTDIR/usr/lib/grub/i386-pc/* $DESTDIR/boot/grub/
+	sync
+	# look for a separately-mounted /boot partition
+	bootpart=`mount | grep $DESTDIR/boot | cut -d' ' -f 1`
+	if [ "$bootpart" = "" ]; then
+		if [ "$PART_ROOT" = "" ]; then
+			dodialog inputbox "Enter the full path to your root device" 8 65 "/dev/hda3" 2>$ANSWER || return 1
+			bootpart=`cat $ANSWER`
+		else
+			bootpart=$PART_ROOT
+		fi
+	fi
+	bootpart=`convertdev $bootpart`
+	bootdev=`convertdev $ROOTDEV`
+	if [ "$bootpart" = "" ]; then
+		msg "Error: Missing/Invalid root device: $bootpart"
+		return 1
+	fi
+	$DESTDIR/sbin/grub --no-floppy --batch >/tmp/grub.log 2>&1 <<EOF
+root $bootpart
+setup $bootdev
+quit
+EOF
+	cat /tmp/grub.log >$LOG
+	if grep "Error [0-9]*: " /tmp/grub.log >/dev/null; then
+		msg "Error installing GRUB. (see $LOG for output)"
+		return 1
+	fi
+	msg "GRUB was successfully installed."
+	S_GRUB=1
+}
+
+mainmenu() {
+	if [ "$MODE" = "ftp" ]; then
+		dialog --backtitle "$TITLE" --title " MAIN MENU " \
+			--menu "Use the UP and DOWN arrows to navigate menus.  Use TAB to switch between buttons and ENTER to select." 15 55 8 \
+			"0" "Configure Network" \
+			"1" "Prepare Hard Drive" \
+			"2" "Select Packages" \
+			"3" "Install Packages" \
+			"4" "Configure System" \
+			"5" "Install Kernel" \
+			"6" "Install Bootloader" \
+			"7" "Exit Install" 2>$ANSWER
+	else
+		dialog --backtitle "$TITLE" --title " MAIN MENU " \
+			--menu "Use the UP and DOWN arrows to navigate menus.  Use TAB to switch between buttons and ENTER to select." 15 55 8 \
+			"1" "Prepare Hard Drive" \
+			"2" "Select Packages" \
+			"3" "Install Packages" \
+			"4" "Configure System" \
+			"5" "Install Kernel" \
+			"6" "Install Bootloader" \
+			"7" "Exit Install" 2>$ANSWER
+	fi
+	case `cat $ANSWER` in
+		"0")
+			donetwork ;;
+		"1")
+			DONE=0
+			while [ "$DONE" = "0" ]; do
+				dialog --backtitle "$TITLE" --menu "Prepare Hard Drive" 12 60 5 \
+					"1" "Auto-Prepare (erases the ENTIRE hard drive)" \
+					"2" "Partition Hard Drives" \
+					"3" "Set Filesystem Mountpoints" \
+					"4" "Return to Main Menu" 2>$ANSWER
+				case `cat $ANSWER` in
+					"1")
+						DISCS=`finddisks`
+						if [ `echo $DISCS | wc -w` -gt 1 ]; then
+							domenu menu "Select the hard drive to use" 14 55 7 `finddisks _` 2>$ANSWER || return 1
+							DISC=`cat $ANSWER`
+						else
+							DISC=$DISCS
+						fi
+						dodialog yesno "$DISC will be COMPLETELY ERASED!  Are you absolutely sure?" && mksimplefs $DISC "$DEFAULTFS" ;;
+					"2")
+						partition ;;
+					"3")
+						mountpoints ;;
+					*)
+						DONE=1 ;;
+				esac
+			done ;;
+		"2")
+			selectpkg ;;
+		"3")
+			installpkg ;;
+		"4")
+			[ "$EDITOR" ] || geteditor
+			DONE=0
+			while [ "$EDITOR" != "" -a "$DONE" = "0" ]; do
+				dialog --backtitle "$TITLE" --menu "Configuration" 17 60 10 \
+					"/etc/rc.conf" "System Config" \
+					"/etc/hosts" "Network Hosts" \
+					"/etc/fstab" "Filesystem Mountpoints" \
+					"/etc/mkinitrd.conf" "Init Ramdisk Config" \
+					"/etc/modprobe.conf" "Kernel Modules (for 2.6.x)" \
+					"/etc/modules.conf" "Kernel Modules (for 2.4.x)" \
+					"/etc/resolv.conf" "DNS Servers" \
+					"_" "Return to Main Menu" 2>$ANSWER
+				FILE=`cat $ANSWER`
+				if [ "$FILE" = "_" -o "$FILE" = "" ]; then
+					DONE=1
+				else
+					if [ "$FILE" = "/etc/mkinitrd.conf" ]; then
+						dodialog msgbox "The mkinitrd.conf file controls which modules will be placed into the initial ramdisk for your system's kernel.  Note that most of you will not need to change anything in this file.  If you boot from a SCSI, SATA, or PATA (IDE) drive, then you don't need to change anything.\n\nNOTE: Any changes to this file should be made BEFORE you select Install Kernel." 18 70
+					fi
+					$EDITOR ${DESTDIR}${FILE}
+				fi
+			done ;;
+		"5")
+			dokernel ;;
+		"6")
+			dialog --backtitle "$TITLE" --menu "Which bootloader would you like to use?  Grub is the Arch default.\n\n" \
+				10 55 2 \
+				"GRUB" "Use the GRUB bootloader (default)" \
+				"LILO" "Use the LILO bootloader" 2>$ANSWER
+			case `cat $ANSWER` in
+				"GRUB") dogrub ;;
+				"LILO") dolilo ;;
+			esac
+			;;
+		"7")
+			if [ "$SRC_READY" = "1" -a "$MODE" = "cd" ]; then
+				umount /src >/dev/null 2>&1
+			fi
+			echo ""
+			echo "If the install finished successfully, you can now type 'reboot'"
+			echo "to restart the system."
+			echo ""
+			exit 0 ;;
+		*)
+			abort ;;
+	esac
+}
+
+dodialog msgbox "Welcome to the Arch Linux Installation program.  The install process is fairly straightforward, and you should run through the options in the order they are presented.  If you are unfamiliar with partitioning/making filesystems, you may want to consult some documentation before continuing.  You can view all output from commands by viewing your VC5 console (ALT-F5).  ALT-F1 will bring you back here." 14 65
+
+dialog --backtitle "$TITLE" --menu "Please select an installation source" 10 35 3 \
+"1" "CD-ROM" \
+"2" "FTP" 2>$ANSWER || abort
+case `cat $ANSWER` in
+	"1")
+		MODE="cd"
+		;;
+	"2")
+		MODE="ftp"
+		;;
+esac 
+
+if [ "$MODE" = "cd" ]; then
+	TITLE="Arch Linux CDROM Installation"
+else
+	TITLE="Arch Linux FTP Installation"
+	dodialog msgbox "If you wish to load your ethernet modules manually, please do so now (consoles 1 thru 4 are active).  If you have a pcmcia ethernet card, you should run cardmgr before loading modules." 12 65
+fi
+
+loop() {
+	while `/bin/true`; do
+		mainmenu
+	done
+}
+
+loop
+
+exit 0
+

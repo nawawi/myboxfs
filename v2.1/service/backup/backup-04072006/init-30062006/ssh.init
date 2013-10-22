@@ -1,0 +1,169 @@
+#!/bin/php -Cq
+<?
+// ssh.init - last update 12-Oct-2005
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+
+putenv("PATH=/bin:/service/tools:/service/init");
+
+if(!file_exists("/bin/sshd") || !file_exists("/bin/sshdkey")) {
+	echo "! sshd or sshdkey binary not found or cannot execute\n";
+	slog("INIT: sshd or sshdkey binary not found or cannot execute");
+	exit(1);
+}
+
+$_SSH_STAT=0;
+$_SSH_PORT=5052;
+$_SSH_PASSWORD=crypt('123456','123456');
+$_PASS_QUITE=0;
+
+$db_id=db_connect($_DB_NAME);
+$result=db_query("select * from service_ssh",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_SSH_STAT=$row['stat'];
+		$_SSH_PORT=$row['port'];
+		$_SSH_PASSWORD=trim($row['pass']);
+	}
+}
+db_close($db_id);
+
+if($_SSH_PASSWORD=='') {
+	$_SSH_PASSWORD=crypt('123456','123456');	
+}
+
+function ssh_key() {
+	@unlink("/etc/rsa_host_key");
+	@unlink("/etc/dss_host_key");
+	if(exec_cmd("sshdkey -t rsa -f /etc/rsa_host_key >> /dev/null 2>&1")==0) {
+		echo "* Generating SSH RSA key..\n";
+		slog("INIT: Generating SSH RSA key");
+	}
+	if(exec_cmd("sshdkey -t dss -f /etc/dss_host_key >> /dev/null 2>&1")==0) {
+		echo "* Generating SSH DSS key..\n";
+		slog("INIT: Generating SSH DSS key");
+	}
+	return 0;
+}
+
+function ssh_passwd() {
+	global $_SSH_PASSWORD;
+	global $_PASS_QUITE;
+	@copy("/etc/passwd","/etc/passwd.bak");
+	if($fi=fopen("/etc/passwd","w")) {
+		fwrite($fi,"mfs:$_SSH_PASSWORD:0:0:mfs:/:/bin/sh\n");
+		fwrite($fi,"nobody:x:0:0:nobody:/:/bin/none\n");
+		fwrite($fi,"pcap:x:0:0:pcap:/:/bin/none\n");
+		fclose($fi);
+		if($_PASS_QUITE==0) {
+			echo "* Generating SSH access password\n";
+			slog("INIT: Generating SSH access password");
+		}
+		@unlink("/etc/passwd.bak");
+		return 0;
+	}
+	@copy("/etc/passwd.bak","/etc/passwd");
+	if($_PASS_QUITE==0) {
+		echo "* Generating SSH access password failed\n";
+		slog("INIT: Generating SSH access password failed");
+	}
+	return 1;
+}
+
+function ssh_status() {
+	$pid=get_progpid("sshd");
+	if($pid!='') {
+		echo "* sshd (pid $pid) is running...\n";
+		return 0;
+	}
+	return 1;
+}
+
+function ssh_start() {
+	global $_SSH_PORT, $_SSH_STAT;
+	global $_PASS_QUITE;
+	$_SSH_OPT='';
+	$_PASS_QUITE=1;
+	if($_SSH_STAT==0) {
+		echo "* SSH agent disabled\n";
+		@unlink("/var/sys/chk_sshd");
+		return 1;
+	}
+	if(!file_exists("/etc/rsa_host_key") || !file_exists("/etc/dss_host_key")) {
+		@ssh_key();
+	}
+	ssh_passwd();
+	if($_SSH_PORT!='5052') $_SSH_OPT="-p $_SSH_PORT";
+	if(@ssh_status()==1) {
+		if(exec_cmd("sshd $_SSH_OPT")==0) {
+			echo "* Starting SSH agent\n";
+			slog("INIT: Starting SSH agent");
+			@touch("/var/sys/chk_sshd");
+			return 0;
+		}
+	} 
+	echo "* Starting SSH agent failed\n";
+	slog("INIT: Starting SSH agent failed");
+	return 1;
+}
+
+function ssh_stop() {
+	if(killall("sshd")==0) {
+		echo "* Shutting down SSH agent\n";
+		@unlink("/var/sys/chk_sshd");
+		slog("INIT: Shutting down SSH agent");
+		return 0;
+	}
+	echo "* Shutting down SSH agent failed\n";
+	slog("INIT: Shutting down SSH agent failed");
+	return 1;
+}
+
+function ssh_active($set) {
+	global $db_id;
+	db_query("update service_ssh set stat='$set'",$db_id);
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+if($_SERVER["argv"][2]=='quite') $_PASS_QUITE=1;
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=ssh_start();
+		break;
+	case 'stop':
+		$ret=ssh_stop();
+		break;
+	case 'restart':
+		$ret=ssh_stop();
+		sleep(2);
+		$ret=ssh_start();
+		break;
+	case 'status':
+		$ret=ssh_status();
+		break;
+	case 'passwd':
+		$ret=ssh_passwd();
+		break;
+	case 'key':
+		$ret=ssh_key();
+		break;
+	case 'enable':
+		ssh_active('1');
+		echo "* SSH agent enabled.\n";
+		slog("INIT: SSH agent enabled.");
+		$ret=0;
+		break;
+	case 'disable':
+		ssh_active('0');
+		echo "* SSH agent disabled.\n";
+		slog("INIT: SSH agent disabled.");
+		$ret=0;
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/status/passwd/key/{enable,disable}]\n";
+		break;
+}
+flush();
+exit($ret);
+?>

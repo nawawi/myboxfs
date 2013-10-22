@@ -1,0 +1,401 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+chk_session();
+write_nocache();
+
+$_SYSID="system_accesslist";
+
+$db_id=db_connect($_DB_NAME);
+
+if(!isset($tab)||$tab=='') $tab=1;
+if(!isset($col)||$col=='') $col=1;
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script language="javascript" src="<?echo $_URL_PATH;?>/j/strings.js"></script>
+<script language="javascript">
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+</script>
+
+</head>
+<body scroll=auto>
+<form name=f method=post action="<?echo "$_URL_PATH/system_acl.exh";?>" onsubmit="return do_submit();">
+<table border="0" cellpadding="4" cellspacing="4" width="700" align=center>
+<tr>
+<td align=center>
+
+<!-- main -->
+<fieldset>
+<legend>&nbsp;&nbsp;&nbsp;&nbsp;
+SYSTEM: ACCESS LIST
+&nbsp;&nbsp;&nbsp;&nbsp;</legend>
+
+<table valign=top border=0>
+<tr>
+<td>
+<table border=0 cellpadding="2" cellspacing="2">
+<tr>
+<td align=center valign=middle>
+
+<table width="650" border="0" cellpadding="0" cellspacing="0">
+<tr><td>
+<ul id="tabnav">
+<li class="<?if($tab==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=1) { echo "<a href=\"$_URL_PATH/system_acl.exh?tab=1\">"; }?>Password<?if($tab!=1) { echo "</a>"; }?></li>
+<li class="<?if($tab==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=2) { echo "<a href=\"$_URL_PATH/system_acl.exh?tab=2\">"; }?>Address Allowed<?if($tab!=2) { echo "</a>"; }?></li>
+</ul>
+</td></tr>
+<tr> 
+<td class="tabcont">
+
+<?if($tab==1) {
+
+if(isset($do_save)&&$do_save==1 && chk_pri($_LOGIN['auth_id'],1)==1) {
+	if($col!='') {
+		$_ssh_pass='';
+		$_ssh_pass2=crypt($passwd2,$passwd1);
+
+		$result=db_query("select pass from service_ssh",$db_id);
+		if(db_num_rows($result)!=0) {
+			$_ssh_pass=db_fetch_single($result);
+		}
+
+		if($col==1) {
+			$result=db_query("select * from auth_login where pass=md5('$passwd2') and name!='admin'",$db_id);
+			if(db_num_rows($result)==0 && $_ssh_pass!=$_ssh_pass2) {
+				db_query("update auth_login set pass=md5('$passwd2') where name='admin'",$db_id);
+				$msg="Password for Admin access updated!.";
+			} else {
+				$msg="Password already used!.";
+			}
+		}
+		if($col==2) {
+			$result=db_query("select * from auth_login where pass=md5('$passwd2') and name!='look'",$db_id);
+			if(db_num_rows($result)==0 && $_ssh_pass!=$_ssh_pass2) {
+				db_query("update auth_login set pass=md5('$passwd2') where name='look'",$db_id);
+				$msg="Password for Look access updated!.";
+			} else {
+				$msg="Password already used!.";
+			}
+		}
+		if($col==3) {
+			$result=db_query("select * from auth_login where pass=md5('$passwd2') and name!='console'",$db_id);
+			if(db_num_rows($result)==0 && $_ssh_pass!=$_ssh_pass2) {
+				db_query("update auth_login set pass=md5('$passwd2') where name='console'",$db_id);
+				$msg="Password for Console access updated!.";
+			} else {
+				$msg="Password already used!.";
+			}
+		}
+		if($col==4) {
+			$result=db_query("select pass from auth_login where pass=md5('$passwd2')",$db_id);
+			if(db_num_rows($result)==0) {
+				db_query("update service_ssh set pass=php('crypt','$passwd2','$passwd1')",$db_id);
+				$msg="Password for SSH access with user mfs updated!.";
+				echo_query("ssh-passwd");
+			} else {
+				$msg="Password already used!.";
+			}
+		}
+	}
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied!.";
+	}
+}
+
+?>
+
+<script language="javascript">
+	function do_submit() {
+<?
+	if(chk_pri($_LOGIN['auth_id'],1)==1) {
+?>
+		var passwd1=document.f.passwd1.value;
+		var passwd2=document.f.passwd2.value;
+		if(passwd1=='' || passwd2=='') {
+			alert("Password empty!");
+			document.f.passwd1.focus();
+			return false;
+		}
+		if(passwd1!=passwd2) {
+			document.f.passwd1.value='';
+			document.f.passwd2.value='';
+			document.f.passwd1.focus();
+			alert("Password not match!");
+			return false;
+		}
+		if(passwd1.length < 6 || passwd2.length < 6) {
+			document.f.passwd1.value='';
+			document.f.passwd2.value='';
+			document.f.passwd1.focus();
+			alert("Password must greater than 6 character length!");
+			return false;
+		}
+<? } ?>
+		document.f.do_save.value='1';
+		document.f.btsubmit.disabled=true;
+		document.f.submit();
+		return true;
+	}
+</script>
+
+<table width=100% border=0 cellpadding="2" cellspacing="2" class=tablist>
+<tr><td>
+<ul id="tabnav">
+<li class="<?if($col==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($col!=1) { echo "<a href=\"$_URL_PATH/system_acl.exh?tab=1&col=1\">"; }?>Admin<?if($col!=1) { echo "</a>"; }?></li>
+<li class="<?if($col==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($col!=2) { echo "<a href=\"$_URL_PATH/system_acl.exh?tab=1&col=2\">"; }?>Look<?if($col!=2) { echo "</a>"; }?></li>
+<li class="<?if($col==3) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($col!=3) { echo "<a href=\"$_URL_PATH/system_acl.exh?tab=1&col=3\">"; }?>Console<?if($col!=3) { echo "</a>"; }?></li>
+<li class="<?if($col==4) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($col!=4) { echo "<a href=\"$_URL_PATH/system_acl.exh?tab=1&col=4\">"; }?>SSH<?if($col!=4) { echo "</a>"; }?></li>
+
+</ul>
+</td></tr>
+
+
+<tr> 
+<td class="tabcont">
+<?if($msg!='') {?>
+<table width="100%" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span class=notice><?echo "$msg";?></span></td></tr>
+</table><br>
+<? }?>
+<table width="100%" border="0" cellpadding="6" cellspacing="0" align=center>
+<tr> 
+<td width="30%" valign="middle" class="tdcelltop">New Password</td>
+<td width="70%" valign="middle" class="mtabletop"> 
+<input name="passwd1" type="password" class="textbox" size="30" value=""> 
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Retype New Password</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="passwd2" type="password" class="textbox" size="30" value=""> 
+</td>
+</tr>
+</table>
+
+</td>
+</tr>
+</table>
+<tr><td align=right valign=top colspan=2><input name=btsubmit type="submit" value="Save & Update" class="button"></td></tr>
+<? } // tab==1 ?>
+
+<?if($tab==2) {
+if(chk_pri($_LOGIN['auth_id'],1)==1) {
+	if(isset($do_save)&&$do_save==1) {
+		if(count($aid)!=0) {
+			foreach($aid as $id) {
+				$ip=$aip[$id];
+				if($ip=='' || check_ipv4($ip)==0) continue;
+				$https=$ahttps[$id];
+				$ssh=$assh[$id];
+				$stat=$astat[$id];
+				$note=escape_str($anote[$id]);
+				if($https=='') {
+					$https=0;
+				} else {
+					$https=1;
+				}
+				if($ssh=='') {
+					$ssh=0;
+				} else {
+					$ssh=1;
+				}
+				if($stat=='') {
+					$stat=0;
+				} else {
+					$stat=1;
+				}
+				if($id!='new') {
+					db_query("update accesslist set https='$https',ssh='$ssh',stat='$stat',ip='$ip',note='$note' where id='$id'",$db_id);
+				} else {
+					$result=db_query("select * from accesslist where ip='$ip'",$db_id);
+					if(db_num_rows($result)==0) {
+						db_query("insert into accesslist (ip,ssh,https,stat,note) values ('$ip','$ssh','$https','$stat','$note')",$db_id);
+					} else {
+						$msg="IP Address already exist!.";
+					}
+				}
+			}
+
+		}
+	}
+	if(isset($do_save)&&$do_save==2) {
+		if(count($del)!=0) {
+			foreach($del as $id) {
+				if($id!='') db_query("delete from accesslist where id='$id'",$db_id);
+			}
+		}
+	}
+	if(isset($do_id)&&$do_id==del) {
+		if($id!='') db_query("delete from accesslist where id='$id'",$db_id);
+	}
+	if(isset($do_id)&&$do_id==apply_chg) {
+		$msg='<script>waitcount();</script>';
+		echo_query("policy-restart");
+	}
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied!.";
+	}
+}
+
+?>
+
+<script language="javascript">
+	function do_submit() {
+		document.f.do_save.value='1';
+		document.f.btsubmit.disabled=true;
+		document.f.submit();
+		return true;
+	}
+	function dotoggle() {
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					document.f.elements[i].checked = !(document.f.elements[i].checked);
+    				}	
+			}
+  		}
+	}
+	function chkdel() {
+		var x='0';
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					if(document.f.elements[i].checked) x++;
+    				}	
+			}
+  		}
+		if(x==0) return false;
+		return true;
+	}
+	function do_delete() {
+		if(chkdel()!=false) {
+			if(confirm('Are you sure you want to proceed?')) {
+				document.f.do_save.value='2';
+				document.f.submit();
+			}
+		}
+	}
+
+var k=0;
+function waitcount() { 
+ 	k=k+2;
+	if(k <= 100) {
+    		msg.innerHTML='Reloading.. Please wait..'+k+'%'; 
+    		setTimeout(waitcount,200);  
+	} else {
+		self.location.href='<?echo "$_URL_PATH/system_acl.exh?tab=$tab&col=$col&col2=$col2";?>';
+	}
+}
+</script>
+<?if($msg!='') {?>
+<table width="680" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span id=msg class=notice><?echo "$msg";?></span></td></tr>
+</table><br>
+<? }?>
+<table width="600" border=0 cellpadding="2" cellspacing="2" class=tablist align=center>
+      <tr class=bgcolor3>
+        <td class=tdlistop>#</td> 
+        <td class=tdlistop>IP Address</td>
+	<td class=tdlistop>WebCon</td>
+	<td class=tdlistop>SSH</td>
+	<td class=tdlistop>Active</td>
+        <td class=tdlistop>Description</td>
+        <td class=tdlistop>Opt</td>
+      </tr>
+<?
+$x=1;
+$result=db_query("select * from accesslist",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_id=$row['id'];
+		$_ip=$row['ip'];
+		$_ssh=$row['ssh'];
+		$_https=$row['https'];
+		$_stat=$row['stat'];
+		$_note=unescape_str($row['note']);
+		if($_ssh==1) { 
+			$_ssh1='checked';
+		} else {
+			$_ssh='';
+			$_ssh1='';
+		}	
+		if($_https==1) { 
+			$_https1='checked';
+		} else {
+			$_https='';
+			$_https1='';
+		}
+		if($_stat==1) { 
+			$_stat1='checked';
+		} else {
+			$_stat='';
+			$_stat1='';
+		}
+	echo "
+      <tr>
+        <td class=tdlist><input type=hidden name=aid[$_id] value='$_id'>$x</td>
+        <td class=tdlist><input type=text name=aip[$_id] value='$_ip' size=25 class='textbox'></td>
+        <td class=tdlist align=center><input type=checkbox name=ahttps[$_id] $_https1></td>
+        <td class=tdlist align=center><input type=checkbox name=assh[$_id] $_ssh1></td>
+        <td class=tdlist align=center><input type=checkbox name=astat[$_id] $_stat1></td>
+        <td class=tdlist><input type=text name=anote[$_id] value='$_note' size=40 class='textbox'></td>
+        <td class=tdlist valign=middle align=right><a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='$_URL_PATH/system_acl.exh?tab=2&do_id=del&id=$_id';\">{$_PNG['delete']}</a><input type=checkbox name=del[$_id] value=$_id></td>
+      </tr>";
+	$x++;
+	}
+}
+	if(isset($do_id)&&$do_id==add && chk_pri($_LOGIN['auth_id'],1)==1) {
+	echo "
+      <tr>
+        <td class=tdlist><input type=hidden name=aid[new] value='new'>$x</td>
+        <td class=tdlist><input type=text name=aip[new] value='' size=25 class='textbox'></td>
+        <td class=tdlist align=center><input type=checkbox name=ahttps[new]></td>
+        <td class=tdlist align=center><input type=checkbox name=assh[new]></td>
+        <td class=tdlist align=center><input type=checkbox name=astat[new]></td>
+        <td class=tdlist><input type=text name=anote[new] value='' size=40 class='textbox'></td>
+        <td class=tdlist></td>
+      </tr>";
+	}
+
+if($x > 1) {
+?>
+<tr>
+<td align=right valign=top class=tdlist colspan=7><a href="#" onclick='do_delete();'>Delete</a> / <a href="#" onclick='dotoggle();'>Toggle</a> <?echo $_PNG['arrow_rtr'];?></td>
+</tr>
+<? } ?>
+<tr><td align=right valign=top colspan=7><input name=btapply type="button" value="Apply changes" class="button-small" onclick="self.location.href='<?echo $_URL_PATH;?>/system_acl.exh?tab=2&do_id=apply_chg';document.f.btapply.disabled=true;"><input name=btsubmit type="submit" value="Save" class="button-small"><input name=btadd type="button" value="Add New" class="button-small" onclick="self.location.href='<?echo $_URL_PATH;?>/system_acl.exh?tab=2&do_id=add'"></td></tr>
+</table>
+
+<? }//tab==2 ?>
+</td>
+</tr>
+
+</table>
+
+</td>
+</tr>
+</table>
+
+<!-- end main -->
+
+</td>
+</tr>
+</table>
+</fieldset>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?echo $tab;?>>
+<input type=hidden name=col value=<?echo $col;?>>
+</form>
+</body>
+</html>
+
+<?db_close($db_id); flush();?>

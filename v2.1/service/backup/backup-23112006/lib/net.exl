@@ -1,0 +1,542 @@
+<?
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+
+function binnmtowm($binin){
+	$binin=rtrim($binin, "0");
+	if(!ereg("0",$binin) ){
+		return str_pad(str_replace("1","0",$binin), 32, "1");
+	} else {
+		return "1010101010101010101010101010101010101010";
+	}
+}
+
+function bintocdr($binin){
+	return strlen(rtrim($binin,"0"));
+}
+
+function bintodq($binin) {
+	if ($binin=="N/A") return $binin;
+	$binin=explode(".", chunk_split($binin,8,"."));
+	for ($i=0; $i<4 ; $i++) {
+		$dq[$i]=bindec($binin[$i]);
+	}
+        return implode(".",$dq) ;
+}
+
+function binwmtonm($binin){
+	$binin=rtrim($binin, "1");
+	if (!ereg("1",$binin)){
+		return str_pad(str_replace("0","1",$binin), 32, "0");
+	} else return "1010101010101010101010101010101010101010";
+}
+
+function cdrtobin($cdrin){
+	return str_pad(str_pad("", $cdrin, "1"), 32, "0");
+}
+
+function dqtobin($dqin) {
+        $dq = explode(".",$dqin);
+        for ($i=0; $i<4 ; $i++) {
+           $bin[$i]=str_pad(decbin($dq[$i]), 8, "0", STR_PAD_LEFT);
+        }
+        return implode("",$bin);
+}
+
+function check_ipv4($ip) {
+	// 0 = false; 1 = true;
+	if(preg_match('/^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$/',$ip)) {
+		if(!ereg('^0.',$ip)) {
+			foreach(explode(".",$ip) as $octet ){
+ 				if($octet > 255){ 
+					return 0;
+				}
+			}
+		}
+		return 1;
+	}
+	return 0;
+}
+
+function ipcalc($ip,$nmask='255.255.255.0') {
+	if(!check_ipv4($ip)) return array();
+	$dq_host=$ip;
+	$ret=array();
+	if(preg_match("/^[0-9]{1,2}$/",$nmask)) {
+		if(!($nmask >= 0 && $nmask <= 32)) return $ret;
+		$bin_nmask=cdrtobin($nmask);
+		$bin_wmask=binnmtowm($nmask);
+		$_prefix=$nmask;
+	} elseif(preg_match('/^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$/',$nmask)) {
+		$bin_nmask=dqtobin($nmask);
+		$bin_wmask=binnmtowm($bin_nmask);
+		if(ereg("0",rtrim($bin_nmask, "0"))) {
+			$bin_wmask=dqtobin($nmask);
+			$bin_nmask=binwmtonm($bin_wmask);
+			if(ereg("0",rtrim($bin_nmask, "0"))) {
+				return $ret;
+			}
+		}
+		$cdr_nmask=bintocdr($bin_nmask);
+		$_prefix=$cdr_nmask;
+	} else {
+		return $ret;
+	}
+	$bin_host=dqtobin($dq_host);
+	$bin_bcast=(str_pad(substr($bin_host,0,$cdr_nmask),32,1));
+	$bin_net=(str_pad(substr($bin_host,0,$cdr_nmask),32,0));
+	$bin_first=(str_pad(substr($bin_net,0,31),32,1));
+	$bin_last=(str_pad(substr($bin_bcast,0,31),32,0));
+	$host_total=(bindec(str_pad("",(32-$cdr_nmask),1)) - 1);
+	if($host_total <= 0) {
+		$bin_first="N/A" ; $bin_last="N/A" ; $host_total="N/A";
+		if ($bin_net === $bin_bcast) $bin_bcast="N/A";
+	}
+	if(ereg('^(00001010)|(101011000001)|(1100000010101000)',$bin_net)) {
+		$_type='Private';
+	} else {
+		$_type='Public';
+	}
+	$_ipaddr=$dq_host;
+	$_netmask=bintodq($bin_nmask);
+	$_wildcard=bintodq($bin_wmask);
+	$_network=bintodq($bin_net);
+	$_broadcast=bintodq($bin_bcast);
+	$_hostmin=bintodq($bin_first);
+	$_hostmax=bintodq($bin_last);
+	$_hostnet=$host_total;
+	
+	$ret['ip']=$_ipaddr;
+	$ret['netmask']=$_netmask;
+	$ret['wildcard']=$_wildcard;
+	$ret['network']=$_network;
+	$ret['broadcast']=$_broadcast;
+	$ret['hostmin']=$_hostmin;
+	$ret['hostmax']=$_hostmax;
+	$ret['total']=$_hostnet;
+	$ret['prefix']=$_prefix;
+	$ret['type']=$_type;
+	return $ret;
+}
+
+// 0 = false 1 = true
+function is_samenet($_IDS_NET,$src,$dst) {
+	$_srcnet=0;$_dstnet=1;
+	$found=0;
+	foreach($_IDS_NET as $list) {
+		$_ret=array();
+		list($ip,$prefix,$net,$mask)=preg_split("/\|/",$list);
+		$_ret=ipcalc($src,$mask);
+		if(count($_ret)!=0) $_srcnet=$_ret['network'];
+		$_ret=ipcalc($dst,$mask);
+		if(count($_ret)!=0) $_dstnet=$_ret['network'];
+		if($_srcnet==$_dstnet) $found=1;
+	}
+	return $found;
+}
+// 0 = false 1 = true
+function is_inbound($_IDS_NET,$src) {
+	$_srcnet=0;$_dstnet=1;
+	$found=1;
+	foreach($_IDS_NET as $list) {
+		$_ret=array();
+		list($ip,$prefix,$net,$mask)=preg_split("/\|/",$list);
+		$_ret=ipcalc($src,$mask);
+		if(count($_ret)!=0) $_srcnet=$_ret['network'];
+		if($_srcnet==$net) $found=0;
+	}
+	return $found;
+}
+
+
+// 0 = false 1 = true
+function is_attackme($_IDS_NET,$src,$dst) {
+	$_srcnet=0;$_dstnet=1;
+	$found=0;
+	foreach($_IDS_NET as $list) {
+		$_ret=array();
+		list($ip,$prefix,$net)=preg_split("/\|/",$list);
+		if($dst==$ip) $found=1;
+	}
+	return $found;
+}
+
+function isip_alive($dev,$ip) {
+	//exec("arping -c 2 -w 3 -D -I $dev $ip",$out,$ret);
+	exec("arping -f -c 2 -w 3 -D -i $dev $ip",$out,$ret);
+	foreach($out as $list) {
+        	if(preg_match("/Received\s(\d+)/",$list,$mm)) {
+                	if($mm[1]==0) return 0;
+        	}
+	}
+	return 1;
+}
+
+function isip_exists($ip) {
+	exec("arping -f -c 1 -w 1 -D $ip",$out,$ret);
+	foreach($out as $list) {
+        	if(preg_match("/Received\s(\d+)/",$list,$mm)) {
+                	if($mm[1]==0) return 0;
+        	}
+	}
+	return 1;
+}
+
+function chkconnect($proto,$ip,$port,$timeout) {
+        $ret=1;
+	if($proto=='udp') {
+		if(exec_cmd("check_udp -H $ip -p $port -t $timeout")!=0) $ret=0;
+	} elseif($proto=='tcp') {
+		if(exec_cmd("check_tcp -H $ip -p $port -t $timeout")!=0) $ret=0;
+	} else {
+        	$fp=@fsockopen("$proto://$ip", $port, $errno, $errstr, $timeout);
+       		if(!$fp) $ret=0;
+        	@fclose($fp);
+	}
+        return $ret;
+}
+
+function set_smb_acl($db_id,$ip) {
+	$result=db_query("select ip,mask,dev from ipaddr",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_ip=$row['ip'];
+			$_mask=$row['mask'];
+			$_dev=$row['dev'];
+			$_ret=ipcalc($_ip,$_mask);
+			$_net1=$_ret['network'];
+			$_ret=ipcalc($ip,$_mask);
+			$_net2=$_ret['network'];
+			if($_net1==$_net2) return "$_dev";
+			unset($_net1,$_net2,$_ret,$_ip,$_mask,$_dev);
+		}
+	}
+	return null;
+}
+
+function chk_valid_policy_input($db_id) {
+	$notok=0;
+	$result=db_query("select ip,onboot from ipalias where onboot='1'",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_ip=$row['ip'];
+			$result1=db_query("select dst,stat from policy_inbound where stat='1' and dst='$_ip'",$db_id);
+			if(db_num_rows($result1)!=0) {
+				while($row=db_fetch_array_assoc($result1)) {
+					$_dst=$row['dst'];
+					$result2=db_query("select dst,stat from policy_dnat where dst='$_dst' and stat='1'",$db_id);
+					if(db_num_rows($result2)==0) {
+						db_query("update policy_inbound set stat='0' where dst='$_dst'",$db_id);
+						slog("POLICY: Virtual IP not mapping with valid IP address");
+						slog("POLICY: Please check your INBOUND and NAT rules");
+						$notok=1;
+					}
+				}	
+			}
+		}
+	}
+	return $notok;
+}
+
+function get_gw_devname($db_id,$ip) {
+	$result=db_query("select * from ipaddr",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_srcnet='';$_dstnet='';
+			$_ret=array();
+			$_ipaddrname=$row['name'];
+			$_ipaddrdev=$row['dev'];
+			$_ipaddrip=$row['ip'];
+			$_ipaddrmask=$row['mask'];
+			$_ret=ipcalc($_ipaddrip,$_ipaddrmask);
+			if(count($_ret)!=0) $_srcnet=$_ret['network'];
+			$_ret=ipcalc($ip,$_ipaddrmask);
+			if(count($_ret)!=0) $_dstnet=$_ret['network'];
+			if($_srcnet==$_dstnet) return $_ipaddrname;
+		}
+	}
+	return 'NULL';
+}
+function get_gw_device($db_id,$name) {
+	$result=db_query("select * from ipaddr where name='$name'",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_ret=array();
+			$_ipaddrip=$row['ip'];
+			$_ipaddrdev=$row['dev'];
+			$_ipaddrmask=$row['mask'];
+			$_ret=ipcalc($_ipaddrip,$_ipaddrmask);
+			if(count($_ret)!=0) {
+				$_net=$_ret['network'];
+				$_pref=$_ret['prefix'];
+				return "$_ipaddrdev|$_ipaddrip|$_net/$_pref";
+			}
+		}
+	}
+	return '';
+}
+function get_gw($db_id,$id) {
+	$result=db_query("select * from gateway where id='$id' and stat='1'",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_ip=$row['ip'];
+			$_devname=$row['dev'];
+			$_dev=get_gw_device($db_id,$_devname);
+			if($_dev!='') {
+				return "$_ip|$_dev";
+			}
+		}
+	}
+	return '';
+}
+
+function list_devname($db_id) {
+	$_dd=array();
+	$result=db_query("select name,dev from ipaddr",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_name=$row['name'];
+			$_dev=$row['dev'];
+			$_dd[$_dev]=$_name;
+		}
+	}
+	return $_dd;
+}
+// 19/09/2006
+function list_namedev($db_id) {
+	$_dd=array();
+	$result=db_query("select name,dev from ipaddr",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_name=$row['name'];
+			$_dev=$row['dev'];
+			$_dd[$_name]=$_dev;
+		}
+	}
+	return $_dd;
+}
+
+function search_devname($table,$db_id) {
+	$_ret='';
+	$result=db_query("select dev from $table",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_dev=$row['dev'];
+			$_ret="$_dev";
+		}
+	}
+	return $_ret;
+}
+// 27/05/2006: dnet arp show
+// update: 20/11/2006: arp -n
+function arp_flush() {
+	if($fi=popen("arp -n","r")) {
+		while($buff=fgets($fi,1024)) {
+			$buff=trim($buff);
+			if($buff=='') continue;
+			if(preg_match("/^Address/",$buff)) continue;
+			if(preg_match("/\(incomplete\)/",$buff)) continue;
+			list($addr,$hw)=preg_split("/\s+/",$buff);
+			$addr=trim($addr);
+			if($addr!='') {
+				exec_cmd("arp -d $addr");
+			}
+			unset($addr,$hw);
+		}
+		pclose($fi);
+		@static_arp();
+	}
+}
+// 03/06/2006
+function if_dev_up_array() {
+	$_int=array();
+	$ipconfig=get_ipconfig_cache();
+	if(count($ipconfig)!=0) {
+		foreach($ipconfig as $eth => $val) {
+			if(!preg_match("/^eth(\d+)$/",$eth)) continue;
+			$dev1=trim($eth);
+			$_int[$dev1]=1;
+		}
+		return $_int;
+	}
+}
+
+// 19/09/2006
+function if_vip_up_array() {
+	$_int=array();
+	$ipconfig=get_ipconfig_cache();
+	if(count($ipconfig)!=0) {
+		foreach($ipconfig as $eth => $val) {
+			if(!preg_match("/^eth(\d+)\:(\d+)$/",$eth)) continue;
+			$dev=trim($eth);
+			$_int[$dev]=1;
+		}
+		return $_int;
+	}
+}
+
+// 28/09/2006
+function if_vlan_up_array() {
+	$_int=array();
+	$ipconfig=get_ipconfig_cache();
+	if(count($ipconfig)!=0) {
+		foreach($ipconfig as $eth => $val) {
+			if(!preg_match("/^eth(\d+)\.(\d+)$/",$eth)) continue;
+			$dev=trim($eth);
+			$_int[$dev]=1;
+		}
+		return $_int;
+	}
+}
+
+// 14/11/2006
+// update: 20/11/2006
+function get_arp_ip_mac($dev,$ip) {
+        exec("arping -f -c 2 -w 3 -i $dev $ip",$out,$ret);
+        $mac='';
+        if($ret==0) {
+                if(count($out)!=0) {
+                        foreach($out as $lx) {
+                                $lx=trim($lx);
+                                if(preg_match("/\s+$ip\s+\[(\S+\:\S+\:\S+\:\S+\:\S+\:\S+)\]/",$lx,$mm)) {
+                                        $mac=$mm[1];
+                                        break;
+                                }
+                        }
+                }
+        }
+        return $mac;
+}
+// 14/11/2006
+function get_ipconfig_cache() {
+	$ret=1;$_mac=array();
+	if(!file_exists("/var/sys/ipconfig.cache")) @shell_exec("ifconfig > /var/sys/ipconfig.cache");
+	if(file_exists("/var/sys/ipconfig.cache")) {
+		$out=file("/var/sys/ipconfig.cache");
+		$ret=0;
+	} else {
+		exec("ifconfig",$out,$ret);
+	}
+	if($ret==0) {
+		if(count($out)!=0) {
+			foreach($out as $lx) {
+				if(preg_match("/^(eth\d+)\s+Link\s+encap\:Ethernet\s+HWaddr\s+(\S+\:\S+\:\S+\:\S+\:\S+\:\S+)/",$lx,$mm)) {
+					$tag=$mm[1];
+					if($_mac[$tag]=='') $_mac[$tag] .="{$mm[2]},";
+				} elseif(preg_match("/^(eth\d+\:\d+)\s+Link\s+encap\:Ethernet\s+HWaddr\s+(\S+\:\S+\:\S+\:\S+\:\S+\:\S+)/",$lx,$mm)) {
+					$tag=$mm[1];
+					if($_mac[$tag]=='') $_mac[$tag] .="{$mm[2]},";
+				} elseif(preg_match("/^(eth\d+\.\d+)\s+Link\s+encap\:Ethernet\s+HWaddr\s+(\S+\:\S+\:\S+\:\S+\:\S+\:\S+)/",$lx,$mm)) {
+					$tag=$mm[1];
+					if($_mac[$tag]=='') $_mac[$tag] .="{$mm[2]},";
+				} else if(preg_match("/\s+inet\s+addr\:(\d+\.\d+\.\d+\.\d+)\s+Bcast\:(\d+\.\d+\.\d+\.\d+)\s+Mask\:(\d+\.\d+\.\d+\.\d+)/",$lx,$mm1)) {
+					$_mac[$tag] .="{$mm1[1]},{$mm1[2]},{$mm1[3]}";
+				} else {
+					continue;
+				}
+			}
+		}
+		return $_mac;
+	}
+	return $_mac;
+}
+
+// 20/11/2006
+function get_routen_cache() {
+	$ret=1;$_route=array();
+	if(!file_exists("/var/sys/routen.cache")) @shell_exec("route -n > /var/sys/routen.cache");
+	if(file_exists("/var/sys/routen.cache")) {
+		$out=file("/var/sys/routen.cache");
+		$ret=0;
+	} else {
+		exec("route -n",$out,$ret);
+	}
+	if($ret==0) {
+		if(count($out)!=0) {
+			foreach($out as $lx) {
+				$lx=trim($lx);
+				if($lx=='') continue;
+				if(preg_match("/^(Kernel|Destination)/",$lx)) continue;
+				list($destination,$gateway,$genmask,$flags,$metric,$ref,$use,$iface)=preg_split('/\s+/',$lx);
+				$_route[]="$flags|$gateway|$iface|$destination|$genmask|$metric|$ref|$use";
+			}
+		}
+		return $_route;
+	}
+	return $_route;
+}
+
+function static_arp() {
+	global $_DB_NAME;
+	// re-flush static ARP cache
+	if($fi=popen("arp -n","r")) {
+		while($buff=fgets($fi,1024)) {
+			$buff=trim($buff);
+			if($buff=='') continue;
+			if(preg_match("/^Address/",$buff)) continue;
+			if(preg_match("/\(incomplete\)/",$buff)) continue;
+			list($addr,$hw,$mac,$flag,$dev)=preg_split("/\s+/",$buff);
+			$addr=trim($addr);
+			if($addr!='' && $flag=="CM") {
+				exec_cmd("arp -d $addr");
+			}
+			unset($addr,$hw,$mac,$flag,$dev);
+		}
+		pclose($fi);
+	}
+	exec_cmd("iptables -F ACL1002-arp");
+	exec_cmd("iptables -Z ACL1002-arp");
+        $ipconfig=get_ipconfig_cache();
+        if(count($ipconfig)!=0) {
+                foreach($ipconfig as $eth => $val) {
+			if(!preg_match("/^eth(\d+)$/",$eth)) continue;
+                        list($mac,$ip,$bcast,$mask)=preg_split("/,/",$val);
+                        if($ip!='' && $mac!='') {
+				exec_cmd("arp -s $ip $mac -i $eth");
+				exec_cmd("iptables -A ACL1002-arp -s ! $ip -m mac --mac-source $mac -j DROP");
+			}
+                }
+        } 
+	$routen=get_routen_cache();
+	if(count($routen)!=0) {
+		foreach($routen as $lx) {
+			if($lx=='') continue;
+			$_mac='';
+			list($flags,$gateway,$iface,$destination,$genmask,$metric,$ref,$use)=preg_split('/\|/',$lx);
+			if($flags=="UG") {
+				$_mac=get_arp_ip_mac($iface,$gateway);
+				if($_mac!='') {
+					exec_cmd("arp -s $gateway $_mac -i $iface");
+					exec_cmd("iptables -A ACL1002-arp -s ! $gateway -m mac --mac-source $_mac -j DROP");
+				}
+			}
+		}
+	}
+	if(file_exists("/var/sys/dhcp.cache")) {
+		$buff=file("/var/sys/dhcp.cache");
+		if(count($buff)!=0) {
+			foreach($buff as $ln) {
+				$ln=trim($ln);
+				if($ln=='') continue;
+				list($ip,$mac,$dev)=preg_split("/\|/",$ln);
+				if($ip!='' && $mac!='' && $dev!='') {
+					exec_cmd("arp -s $ip $mac -i $dev");
+					exec_cmd("iptables -A ACL1002-arp -s ! $ip -m mac --mac-source $mac -j DROP");
+				}
+			}
+		}
+	}
+	$db_id=db_connect($_DB_NAME);
+	$result=db_query("select ip,mac,stat from static_arp where stat='1'",$db_id);
+	if(@db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_ip=$row['ip'];
+			$_mac=strtoupper($row['mac']);
+			if($_ip!='' && $_mac!='') {
+				exec_cmd("arp -s $_ip $_mac");
+				exec_cmd("iptables -A ACL1002-arp -s ! $_ip -m mac --mac-source $_mac -j DROP");
+			}
+		}
+	}
+}
+
+?>

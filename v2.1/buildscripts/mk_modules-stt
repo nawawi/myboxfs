@@ -1,0 +1,239 @@
+#!/bin/sh
+
+ldconfig
+
+START_POINT=$(pwd)
+cd $START_POINT
+MODS_DIR=$START_POINT/modules
+BASE_DIR=$START_POINT/rootfs
+VER=$(date +%Y%m%d)
+
+rm -rfv $START_POINT/build/tools
+rm -rfv $START_POINT/build/modules
+mkdir -p $START_POINT/build/tools
+mkdir -p $START_POINT/build/modules
+
+if [ -d "$MODS_DIR" ]; then
+	rm -rfv $MODS_DIR
+fi
+
+function cp_modules() {
+        if [ -z "$1" ]; then
+                echo "Usage: cp_modules binary modules_dir";
+                exit;
+        fi
+	if [ -z "$2" ]; then
+                echo "Usage: cp_modules binary modules_dir";
+                exit;
+        fi
+	noupx=0
+	[ ! -z "$3" ] && noupx=1
+        local file=$1
+	local xdir=$2
+
+	mkdir -p $xdir
+
+        if [ -x "$file" ]; then
+                dirname=$(dirname $file)
+                basename=$(basename $file)
+                bindir="$xdir/bin"
+        else
+                echo "file '$file' not found"
+                exit
+        fi
+
+        cp -v $file $bindir
+        chmod -v a-srwx $bindir/$basename
+        chmod -v u+rwx $bindir/$basename
+	sh $START_POINT/preload.sh $bindir/$basename >>/tmp/list
+	DIR="$xdir/lib"
+	mklibs -L /mfs-gcc/lib --ldlib /usr/bin/ldd -v -d $DIR $bindir/$basename
+        strip --strip-all $bindir/$basename
+        echo "++ compressing.. $bindir/$basename"
+	for f in $DIR/*;do
+		fp=
+		fp=$(basename $f)
+		if [ -f "$BASE_DIR/lib/$fp" ]; then
+			echo "######## $fp already exist in $BASE_DIR/lib/$fp #######"
+			rm -fv $DIR/$fp
+		fi 
+	done        
+	#[ "$noupx" = 0 ] && upx-kernel -q --best $bindir/$basename >/dev/null
+        upx-bin -q --best --force-execve $bindir/$basename >/dev/null
+
+}
+
+function pptp_vpn_modules() {
+	cd $START_POINT
+	local PPP_LIB=src/ppp-*/pppd/plugins/winbind.so
+	local PPTP_LIB=src/pptpd-*/plugins/pptpd-logwtmp.so
+	local SMB_DIR=/usr/smb
+	local MMODS_DIR="$MODS_DIR/pptp-vpn"
+
+	local SCRIPTS="service/www/vpn_pptp.exh
+			service/init/pptp.init"
+
+	local BIN_LIST="src/ppp-*/pppd/pppd 
+			src/pptpd-*/pptpd
+			src/pptpd-*/pptpctrl
+			src/pptpd-*/bcrelay"
+
+	mkdir -p $MMODS_DIR/{etc,bin,lib,service/{lib,www,init,tools},strg/mybox/smb,var/log/smb}
+	mkdir -p $MMODS_DIR/usr/smb
+	mkdir -p $MMODS_DIR/usr/lib/pptpd
+
+	for x in $BIN_LIST;do
+		cp_modules "$x" "$MMODS_DIR"
+	done
+
+	for x1 in $PPP_LIB;do
+		cp -av "$x1" "$MMODS_DIR/lib"
+		strip --strip-debug "$MMODS_DIR/lib/$(basename $x1)"
+	done
+	for x2 in $PPTP_LIB;do
+		cp -av "$x2" "$MMODS_DIR/usr/lib/pptpd"
+		strip --strip-debug "$MMODS_DIR/usr/lib/pptpd/$(basename $x2)"
+	done
+
+	for x in $SCRIPTS;do
+		mv -v "$START_POINT/rootfs/$x" "$MMODS_DIR/$x"
+	done
+	if [ ! -d "$SMB_DIR" ]; then
+		echo "samba not compile yet"
+		exit	
+	else
+		cp -av $SMB_DIR $MMODS_DIR/usr
+		SMB_DIR2="$MMODS_DIR/usr/smb"
+		if [ "$SMB_DIR2" = "" ]; then
+			echo "SMB_DIR2 empty"
+			exit
+		fi
+		cp_modules "$SMB_DIR2/bin/net" "$MMODS_DIR" noupx
+		cp_modules "$SMB_DIR2/bin/ntlm_auth" "$MMODS_DIR" noupx
+		cp_modules "$SMB_DIR2/bin/wbinfo" "$MMODS_DIR" noupx
+		cp_modules "$SMB_DIR2/sbin/nmbd" "$MMODS_DIR" noupx
+		cp_modules "$SMB_DIR2/sbin/winbindd" "$MMODS_DIR" noupx
+		#cp_modules "$SMB_DIR2/sbin/smbd" "$MMODS_DIR" noupx
+		mkdir -p $MMODS_DIR/var/log
+		strip -v $SMB_DIR2/lib/charset/*
+		rm -rfv $SMB_DIR2/sbin
+		rm -rfv $SMB_DIR2/bin
+		rm -rfv $SMB_DIR2/man
+		rm -rfv $SMB_DIR2/swat
+		rm -rfv $SMB_DIR2/var
+		rm -rfv $SMB_DIR2/lib/vfs
+		rm -rfv $SMB_DIR2/lib/rpc
+		rm -fv $SMB_DIR2/lib/*.msg
+	fi
+	cd $MODS_DIR/pptp-vpn
+	tar -jcvf $START_POINT/build/modules/pptp-vpn.$VER.bz2 * |sort
+}
+
+function ips_modules() {
+	cd $START_POINT
+	local MMODS_DIR="$MODS_DIR/ips"
+	local BIN_LIST="src/snort-*/src/snort"
+	local UNICODE="$(ls src/snort-*/etc/unicode.map)"
+	local SCRIPTS="service/www/fw_ips.exh
+			service/init/ips.init"
+	# snort 2.6.x
+	local _DNLIBS="src/snort-*/src/dynamic-preprocessors/build/usr/lib/snort_dynamicpreprocessor/libsf_*.so*
+			src/snort-*/src/dynamic-plugins/sf_engine/.libs/libsf_engine.so*"
+
+	mkdir -p $MMODS_DIR/{etc,bin,lib,service/{lib,www,init,tools}}
+
+	for x in $BIN_LIST;do
+		cp_modules "$x" "$MMODS_DIR"
+	done
+	for x in $SCRIPTS;do
+		mv -v "$START_POINT/rootfs/$x" "$MMODS_DIR/$x"
+	done
+	# snort 2.6.x
+	for x in $_DNLIBS;do
+		cp -av "$x" "$MMODS_DIR/lib"
+	done
+
+	mv -v $MMODS_DIR/bin/snort $MMODS_DIR/bin/snortd
+
+	mkdir -p $MMODS_DIR/usr/ips_rules
+	#cp -v $UNICODE $MMODS_DIR/usr/ips_rules
+	#cp -av $START_POINT/configs/snort_rules $MMODS_DIR/usr/ips_rules
+	cd $MMODS_DIR
+	tar -jcvf $START_POINT/build/modules/ips.$VER.bz2 * |sort
+}
+
+function shaper_modules() {
+	cd $START_POINT
+	local MMODS_DIR="$MODS_DIR/shaper"
+	local BIN_LIST="src/HTB-tools*/q_checkcfg
+			src/HTB-tools*/q_parser
+			src/HTB-tools*/q_show
+			/sbin/tc"
+	local SCRIPTS="service/www/network_shaper.exh
+			service/init/shaper.init"
+	mkdir -p $MMODS_DIR/{etc,bin,lib,service/{lib,www,init,tools}}
+
+	for x in $BIN_LIST;do
+		cp_modules "$x" "$MMODS_DIR"
+	done
+	for x in $SCRIPTS;do
+		mv -v "$START_POINT/rootfs/$x" "$MMODS_DIR/$x"
+	done
+
+	cd $MMODS_DIR
+	tar -jcvf $START_POINT/build/modules/shaper.$VER.bz2 * |sort
+}
+
+function tools_modules() {
+	cd $START_POINT
+	local MMODS_DIR="$MODS_DIR/tools"
+	
+	#mkdir -p $MMODS_DIR/nmap/{bin,lib}
+	#mkdir -p $MMODS_DIR/nmap/usr/share
+	#cp_modules "/usr/bin/nmap" "$MMODS_DIR/nmap"
+	#cp -av /usr/share/nmap $MMODS_DIR/nmap/usr/share
+	#cd $MMODS_DIR/nmap
+	#tar -jcvf $START_POINT/build/tools/nmap.$VER.bz2 * |sort
+
+	cd $START_POINT
+	mkdir -p $MMODS_DIR/tcpdump/{bin,lib}
+	cp_modules "/usr/sbin/tcpdump" "$MMODS_DIR/tcpdump"
+	cd $MMODS_DIR/tcpdump
+	tar -jcvf $START_POINT/build/tools/tcpdump.$VER.bz2 * |sort
+
+	cd $START_POINT
+	mkdir -p $MMODS_DIR/nbtscan/{bin,lib}
+	local nbtf=$(ls src/nbtscan-*/nbtscan)
+	cp_modules "$nbtf" "$MMODS_DIR/nbtscan"
+	cd $MMODS_DIR/nbtscan
+	tar -jcvf $START_POINT/build/tools/nbtscan.$VER.bz2 * |sort
+
+	#cd $START_POINT
+	#local snmpwf=$(ls src/ucd-snmp-*/apps/snmpwalk)
+	#mkdir -p $MMODS_DIR/snmpwalk/{bin,lib}
+	#cp_modules "$snmpwf" "$MMODS_DIR/snmpwalk"
+	#cd $MMODS_DIR/snmpwalk
+	#tar -jcvf $START_POINT/build/tools/snmpwalk.$VER.bz2 * |sort
+
+	cd $START_POINT
+	mkdir -p $MMODS_DIR/ssh-utils/{bin,lib}
+	local sshl=$(ls -d src/openssh-*)
+	#cp_modules "$sshl/sftp" "$MMODS_DIR/ssh-utils" noupx
+	cp_modules "$sshl/ssh" "$MMODS_DIR/ssh-utils" noupx
+	cp_modules "$sshl/scp" "$MMODS_DIR/ssh-utils" noupx
+	#cp_modules "$sshl/ssh-keygen" "$MMODS_DIR/ssh-utils" noupx
+	cd $MMODS_DIR/ssh-utils
+	tar -jcvf $START_POINT/build/tools/ssh-utils.$VER.bz2 * |sort
+
+	#cd $START_POINT
+	#mkdir -p $MMODS_DIR/elinks/{bin,lib}
+	#local el=$(ls src/elinks*/src/elinks)
+	#cp_modules "$el" "$MMODS_DIR/elinks"
+	#cd $MMODS_DIR/elinks
+	#tar -jcvf $START_POINT/build/tools/elinks.$VER.bz2 * |sort
+}
+
+pptp_vpn_modules
+ips_modules
+shaper_modules
+tools_modules

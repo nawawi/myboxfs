@@ -1,0 +1,183 @@
+#!/bin/php -Cq
+<?
+// ftp.init - last update 18-Aug-2006
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+
+putenv("PATH=/bin:/service/tools:/service/init");
+
+if(!file_exists("/bin/ftpd")) {
+	echo "Cannot execute ftp.init. Internal error!\n";
+	mybox_slog("ERROR","Cannot execute ftp.init. Internal error!");
+	exit(1);
+}
+
+$_FTP_STAT=0;
+$_FTP_PORT=5053;
+$_FTP_DPORT=5054;
+$_FTP_PASS=crypt('ftp123','ftp123');
+$_SSH_PASS='';
+$_QUIET=0;
+
+$db_id=mybox_db_connect($_DB_NAME);
+$result=mybox_db_query("select * from service_ftp",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_FTP_STAT=$row['stat'];
+		$_FTP_PORT=$row['port'];
+		$_FTP_DPORT=$row['dport'];
+		$_FTP_PASS=trim($row['pass']);
+	}
+}
+unset($result);
+$result=mybox_db_query("select pass from service_ssh",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	$_SSH_PASSWORD=mybox_db_fetch_single($result);
+}
+mybox_db_close($db_id);
+
+$_QUIET=0;
+function vsftp_passwd() {
+	global $_QUIET, $_FTP_STAT, $_FTP_PASS, $_SSH_PASSWORD;
+	if($_SSH_PASSWORD=='') {
+		$_SSH_PASSWORD=crypt('123456','123456');	
+	}
+	@copy("/etc/passwd","/etc/passwd.bak");
+	if($fi=fopen("/etc/passwd","w")) {
+		fwrite($fi,"mfs:$_SSH_PASSWORD:0:0:mfs:/config:/bin/sh\n");
+		fwrite($fi,"ftp1:$_FTP_PASS:0:0:ftp1:/config:/bin/sh\n");
+		fwrite($fi,"nobody:x:0:0:nobody:/:/bin/false\n");
+		fwrite($fi,"pcap:x:0:0:pcap:/:/bin/false\n");
+		fclose($fi);
+		@unlink("/etc/passwd.bak");
+		return 1;
+	}
+	@rename("/etc/passwd.bak","/etc/passwd");
+	if($_QUIET==0) echo "* Generating FTP access password failed\n";
+	return 0;
+}
+function vsftp_config() {
+	global $_QUIET, $_FTP_STAT, $_FTP_PORT, $_FTP_DPORT;
+	if(!is_dir("/etc/vsftpd")) @mybox_mkdirr("/etc/vsftpd");
+	if($fi=fopen("/etc/vsftpd/vsftpd.conf","w")) {
+		fwrite($fi,"anonymous_enable=NO\n");
+		fwrite($fi,"local_enable=YES\n");
+		fwrite($fi,"write_enable=YES\n");
+		fwrite($fi,"local_umask=022\n");
+		fwrite($fi,"dirmessage_enable=YES\n");
+		fwrite($fi,"xferlog_enable=YES\n");
+		fwrite($fi,"connect_from_port_20=YES\n");
+		fwrite($fi,"xferlog_enable=NO\n");
+		fwrite($fi,"xferlog_std_format=NO\n");
+		fwrite($fi,"idle_session_timeout=600\n");
+		fwrite($fi,"data_connection_timeout=120\n");
+		fwrite($fi,"ftpd_banner=MyBox Firewall System\n");
+		fwrite($fi,"userlist_enable=YES\n");
+		fwrite($fi,"listen=YES\n");
+		fwrite($fi,"chmod_enable=NO\n");
+		fwrite($fi,"chroot_local_user=YES\n");
+		fwrite($fi,"syslog_enable=YES\n");
+		fwrite($fi,"userlist_deny=NO\n");
+		fwrite($fi,"use_localtime=YES\n");
+		fwrite($fi,"listen_port=$_FTP_PORT\n");
+		fwrite($fi,"ftp_data_port=$_FTP_DPORT\n");
+		fclose($fi);
+		mybox_save_to_file("/etc/vsftpd/user_list","ftp1\n");
+		if(!is_dir("/usr/share/empty")) @mybox_mkdirr("/usr/share/empty");
+		return 1;
+	}
+	if($_QUIET==0) echo "* Writing FTP config failed\n";
+	return 0;
+}
+
+function vsftp_status() {
+	global $_QUIET;
+	$pid=mybox_get_progpid("ftpd");
+	if($pid!='') {
+		if($_QUIET==0) echo "* ftpd (pid $pid) is running...\n";
+		return 0;
+	}
+	return 1;
+}
+
+function vsftp_start() {
+	global $_QUIET, $_FTP_STAT, $_FTP_PORT, $_FTP_DPORT;
+
+	if($_FTP_STAT==0) {
+		if($_QUIET==0) {
+			echo "* FTP agent disabled\n";
+			mybox_slog("INFO","FTP agent disabled");
+		}
+		exit(1);
+	}
+	if(@vsftp_passwd()==1 && @vsftp_config()==1 && @vsftp_status()==1) {
+		if(mybox_exec_cmd("ftpd")==0) {
+			if($_QUIET==0) {
+				echo "* Starting FTP agent\n";
+				mybox_slog("INFO","Starting FTP agent");
+			}
+			@touch("/var/sys/chk_ftpd");
+			return 0;
+		}
+	}
+	@touch("/var/sys/chk_ftpd");
+	if($_QUIET==0) {
+		echo "* Starting FTP agent failed\n";
+		mybox_slog("INFO","Starting FTP agent failed");
+	}
+	return 1;
+}
+
+function vsftp_stop() {
+	global $_QUIET;
+
+	@unlink("/var/sys/chk_ftpd");
+	if(mybox_killall("ftpd")==0) {
+		if($_QUIET==0) {
+			echo "* Shutting down FTP agent\n";
+			mybox_slog("INFO","Shutting down FTP agent");
+		}
+		@mybox_rmdir("/etc/vsftpd");
+		@mybox_rmdir("/usr/share/empty");
+		return 0;
+	}
+	@touch("/var/sys/chk_ftpd");
+	if($_QUIET==0) {
+		echo "* Shutting down FTP agent failed\n";
+		mybox_slog("INFO","Shutting down FTP agent failed");
+	}
+	return 1;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=vsftp_start();
+		break;
+	case 'stop':
+		$ret=vsftp_stop();
+		break;
+	case 'restart':
+		$ret=vsftp_stop();
+		sleep(2);
+		$ret=vsftp_start();
+		break;
+	case 'status':
+		$ret=vsftp_status();
+		break;
+	case 'passwd':
+		$ret=vsftp_passwd();
+		break;
+	case 'config':
+		$ret=vsftp_config();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/passwd/status/config]\n";
+		break;
+}
+flush();
+exit($ret);
+?>

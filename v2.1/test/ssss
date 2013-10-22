@@ -1,0 +1,34 @@
+export CFLAGS="-fPIE -Os -g -pipe -fsigned-char" ; export LDFLAGS=-pie ; 
+
+  --exec_prefix=/usr \
+   --bindir=%{_sbindir} \
+   --libexecdir=%{_libdir}/squid \
+   --localstatedir=/var \
+   --datadir=%{_datadir} \
+   --sysconfdir=/etc/squid \
+   --enable-poll \
+   --enable-snmp \
+   --enable-removal-policies="heap,lru" \
+   --enable-storeio="aufs,coss,diskd,null,ufs" \
+   --enable-ssl \
+   --with-openssl=/usr/kerberos \
+   --enable-delay-pools \
+   --enable-linux-netfilter \
+   --with-pthreads \
+   --enable-ntlm-auth-helpers="SMB,winbind,fakeauth" \
+   --enable-external-acl-helpers="ip_user,ldap_group,unix_group,wbinfo_group,winbind_group" \
+   --enable-auth="basic,digest,ntlm" \
+   --enable-digest-auth-helpers="password" \
+   --with-winbind-auth-challenge \
+   --enable-useragent-log \
+   --enable-referer-log \
+   --disable-dependency-tracking \
+
+   --enable-cachemgr-hostname=localhost \
+   --enable-underscores \
+   --enable-basic-auth-helpers="LDAP,MSNT,NCSA,PAM,SMB,YP,getpwnam,multi-domain-NTLM,SASL,winbind" \
+   --enable-cache-digests \
+   --enable-ident-lookups \
+   --with-large-files \
+   --enable-fd-config \
+   --enable-follow-x-forwarded-for \

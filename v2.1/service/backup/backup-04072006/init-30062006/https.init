@@ -1,0 +1,181 @@
+#!/bin/php -Cq
+<?
+// httpa.init - last update 11-Oct-2005
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+
+putenv("PATH=/bin:/service/tools:/service/init");
+
+if(!file_exists("/bin/httpsd")) {
+	echo "! httpsd binary not found or cannot execute\n";
+	slog("INIT: httpsd binary not found or cannot execute");
+	exit(1);
+}
+
+$db_id=db_connect($_DB_NAME);
+$_HTTPS_STAT=0;
+$result=db_query("select * from service_https",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_HTTPS_STAT=$row['stat'];
+		$_HTTPS_PORT=$row['port'];
+	}
+}
+db_close($db_id);
+
+if($_HTTPS_STAT==0) {
+	echo "* HTTPS agent disabled\n";
+	exit(1);
+}
+
+function write_ssl_config() {
+	global $_DB_NAME;
+	$db_id=db_connect($_DB_NAME);
+	$result=db_query("select * from site_certificate",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_country=$row['country'];
+			$_state=$row['state'];
+			$_city=$row['city'];
+			$_organization=$row['organization'];
+			$_section=$row['section'];
+			$_email=$row['email'];
+			$_hostname=$row['hostname'];
+		}
+	}
+	db_close($db_id);
+	$_CERT ="RANDFILE = /tmp/.server.rnd\n";
+	$_CERT .="[ req ]\n";
+	$_CERT .="default_bits = 1024\n";
+	$_CERT .="encrypt_key = yes\n";
+	$_CERT .="distinguished_name = req_dn\n";
+	$_CERT .="x509_extensions = cert_type\n";
+	$_CERT .="[ req_dn ]\n";
+	$_CERT .="countryName = Country Name (2 letter code)\n";
+	$_CERT .="countryName_default = $_country\n";
+	$_CERT .="countryName_min = 2\n";
+	$_CERT .="countryName_max = 2\n";
+	$_CERT .="stateOrProvinceName = State or Province Name (full name)\n";
+	$_CERT .="stateOrProvinceName_default = $_state\n";
+	$_CERT .="localityName = Locality Name (eg, city)\n";
+	$_CERT .="localityName_default = $_city\n";
+	$_CERT .="0.organizationName = Organization Name (eg, company)\n";
+	$_CERT .="0.organizationName_default = $_organization\n";
+	$_CERT .="organizationalUnitName = Organizational Unit Name (eg, section)\n";
+	$_CERT .="organizationalUnitName_default = $_section\n";
+	$_CERT .="0.commonName = Common Name (FQDN of your server)\n";
+	$_CERT .="0.commonName_default = $_hostname\n";
+	$_CERT .="emailAddress = Email Address\n";
+	$_CERT .="emailAddress_default = $_email\n";
+	$_CERT .="emailAddress_max = 40\n";
+	$_CERT .="[ cert_type ]\n";
+	$_CERT .="nsCertType = server\n";
+
+	if($fi=fopen("/etc/openssl.cnf","w")) {
+		fwrite($fi,"$_CERT");
+		fclose($fi);
+	}
+	unset($_CERT);
+	return 0;
+}
+
+function create_ssl_certificate() {
+	@write_ssl_config();
+	echo "* Generating Site Certificate\n";
+	exec_cmd("openssl req -batch -new -x509 -days 365 -nodes -config /etc/openssl.cnf -out /etc/openssl.pem -keyout /etc/openssl.pem");
+	exec_cmd("openssl x509 -subject -dates -fingerprint -noout -in /etc/openssl.pem");
+	chmod("/etc/openssl.pem",0600);
+	slog("INIT: Generating Site Certificate");
+	return 0;
+}
+
+function https_config() {
+	global $_HTTPS_PORT;
+	if($fi=fopen("/etc/httpsd.cnf.tmp","w")) {
+		fwrite($fi,"pidfile=/var/run/httpsd\n");
+		fwrite($fi,"cgipat=**.exh|**.exl|**.exc\n");
+		fwrite($fi,"dir=/service/www\n");
+		fwrite($fi,"port=$_HTTPS_PORT\n");
+		fwrite($fi,"ssl\n");
+		fwrite($fi,"user=mfs\n");
+		fwrite($fi,"nosyslog\n");
+		fclose($fi);
+		@copy("/etc/httpsd.cnf.tmp","/etc/httpsd.cnf");
+		@unlink("/etc/httpsd.cnf.tmp");
+		chmod("/etc/httpsd.cnf",0600);
+		echo "* Writing https config\n";
+		slog("INIT: Writing https config");
+		if(!file_exists("/etc/openssl.pem")) create_ssl_certificate();
+		return 0;
+	}
+	slog("INIT: Writing https config failed");
+	return 1;
+}
+function https_status() {
+	$pid=get_progpid("httpsd");
+	if($pid!='') {
+		echo "* https (pid $pid) is running...\n";
+		return 0;
+	}
+	echo "* https not running..\n";
+	return 1;
+}
+
+function https_start() {
+	@https_config();
+	if(@https_status()==1) {
+		if(exec_cmd("httpsd >/dev/null 2>&1")==0) {
+			@touch("/var/sys/chk_httpsd");
+			echo "* Starting HTTPS agent\n";
+			slog("INIT: Starting HTTPS agent");
+			return 0;
+		}
+	}
+	echo "* Starting HTTPS agent failed\n";
+	slog("INIT: Starting HTTPS agent failed");
+	return 1;
+}
+
+function https_stop() {
+	if(killall("httpsd")==0) {
+		echo "* Shutting down HTTPS agent\n";
+		slog("INIT: Shutting down HTTPS agent");
+		@unlink("/var/run/httpsd");
+		@unlink("/var/sys/chk_httpsd");
+		return 0;
+	}
+	echo "* Shutting down httpsd failed\n";
+	slog("INIT: Shutting down httpsd failed");
+	return 1;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=https_start();
+		break;
+	case 'stop':
+		$ret=https_stop();
+		break;
+	case 'restart':
+		$ret=https_stop();
+		sleep(2);
+		$ret=https_start();
+		break;
+	case 'status':
+		$ret=https_status();
+		break;
+	case 'config':
+		$ret=https_config();
+		break;
+	case 'cert':
+		$ret= create_ssl_certificate();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/status/config/cert]\n";
+		break;
+}
+flush();
+exit($ret);
+?>

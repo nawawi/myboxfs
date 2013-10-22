@@ -1,0 +1,116 @@
+--- sysklogd-1.4.1rh/syslogd.c.no_io_in_sighandlers	2005-03-28 12:12:07.498437000 -0500
++++ sysklogd-1.4.1rh/syslogd.c	2005-03-28 15:02:55.787588000 -0500
+@@ -570,6 +570,8 @@
+ static int debugging_on = 0;
+ static int nlogs = -1;
+ static int restart = 0;
++static int alarm_signal = 0;
++static int exit_on_signal = 0;
+ 
+ #define MAXFUNIX	20
+ 
+@@ -765,9 +767,11 @@
+ void reapchild();
+ const char *cvthname(struct sockaddr_in *f);
+ void domark();
++void alarm_handler(int sig);
+ void debug_switch();
+ void logerror(char *type);
+ void die(int sig);
++void exit_signal_handler(int sig);
+ #ifndef TESTING
+ void doexit(int sig);
+ #endif
+@@ -1006,11 +1010,11 @@
+ 		if (isupper(*p))
+ 			*p = tolower(*p);
+ 
+-	(void) signal(SIGTERM, die);
+-	(void) signal(SIGINT, Debug ? die : SIG_IGN);
+-	(void) signal(SIGQUIT, Debug ? die : SIG_IGN);
++	(void) signal(SIGTERM, exit_signal_handler);
++	(void) signal(SIGINT, Debug ? exit_signal_handler : SIG_IGN);
++	(void) signal(SIGQUIT, Debug ? exit_signal_handler : SIG_IGN);
+ 	(void) signal(SIGCHLD, reapchild);
+-	(void) signal(SIGALRM, domark);
++	(void) signal(SIGALRM, alarm_handler);
+ 	(void) signal(SIGUSR1, Debug ? debug_switch : SIG_IGN);
+ 	(void) alarm(TIMERINTVL);
+ 	
+@@ -1020,7 +1024,11 @@
+ 	 * Hence we need to add siginterrupt calls:
+ 	 */
+ 	siginterrupt(SIGTERM,1);
++	siginterrupt(SIGINT, 1);
++	siginterrupt(SIGQUIT,1);
++	siginterrupt(SIGCHLD,1);
+ 	siginterrupt(SIGALRM,1);
++	siginterrupt(SIGUSR1,1);
+ 	
+ 	/* Create a partial message table for all file descriptors. */
+ 	num_fds = getdtablesize();
+@@ -1100,6 +1108,13 @@
+ 		}
+ 		nfds = select(maxfds+1, (fd_set *) &readfds, (fd_set *) NULL,
+ 				  (fd_set *) NULL, (struct timeval *) NULL);
++
++		if ( exit_on_signal )
++		{
++			die( exit_on_signal );
++			exit_on_signal = 0;
++		}
++
+ 		if ( restart )
+ 		{
+ 			restart = 0;
+@@ -1196,6 +1211,11 @@
+ 		  }
+ 
+ #endif
++		if ( alarm_signal )
++		{
++			domark();
++			alarm_signal = 0;
++		}
+ 	}
+ }
+ 
+@@ -2082,6 +2102,14 @@
+ 	return (hp->h_name);
+ }
+ 
++void alarm_handler( int sig )
++{
++	alarm_signal = 1;
++	(void) signal(SIGALRM, alarm_handler);	
++	(void) alarm(TIMERINTVL);
++	siginterrupt(SIGALRM,1);
++}
++
+ void domark()
+ {
+ 	register struct filed *f;
+@@ -2112,9 +2140,6 @@
+ 		}
+ 	}
+ 	}
+-	(void) signal(SIGALRM, domark);	
+-	(void) alarm(TIMERINTVL);
+-	siginterrupt(SIGALRM,1);
+ }
+ 
+ void debug_switch()
+@@ -2191,6 +2216,13 @@
+ 	exit(0);
+ }
+ 
++void exit_signal_handler(int sig)
++{
++	exit_on_signal = sig;
++	signal(sig, exit_signal_handler);
++	siginterrupt(sig,1);
++}
++
+ /*
+  * Signal handler to terminate the parent process.
+  */

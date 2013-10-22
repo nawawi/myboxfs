@@ -1,0 +1,846 @@
+#!/bin/php -f
+<?
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once("clib.exl");
+putenv("PATH=/bin:/service/tools:/service/init");
+
+$_DISABLE=0;
+
+if(mybox_license()==-1) $_DISABLE=1;
+if(mybox_license()==-2) $_DISABLE=1;
+if(mybox_license()==-3) $_DISABLE=1;
+
+function parse_sshlog($str) {
+	global $_LOG_PATH, $_INIT_DIR;
+
+	$pat1="(\w+)\s+(\d+)\s+(\S+)\s+(\S+)\ssshd\[(\d+)\]\:\s+password\s+auth\s+succeeded\s+for\s+'(\w+)'\s+from\s+(\S+)";
+	$pat2="(\w+)\s+(\d+)\s+(\S+)\s+(\S+)\ssshd\[(\d+)\]\:\s+exit\s+after\s+auth\s+\((\S+)\)\:\s+Exited\s+normally";
+	$pat3="(\w+)\s+(\d+)\s+(\S+)\s+(\S+)\ssshd\[(\d+)\]\:\s+bad\s+password\s+attempt\s+for\s+'(\w+)'\s+from\s+(\S+)";
+	$pat4="(\w+)\s+(\d+)\s+(\S+)\s+(\S+)\ssshd\[(\d+)\]\:\s+login\s+attempt\s+for\s+nonexistent\s+user\s+from\s+(\S+)";
+	$pat5="(\w+)\s+(\d+)\s+(\S+)\s+(\S+)\ssshd\[(\d+)\]\:\s+client\s+trying\s+multiple\s+usernames\s+from\s+(\S+)";
+	$thisyear=date('Y');
+	if(preg_match("/^$pat1/",$str,$match)) {
+		$ldate=strtotime("{$match[1]} {$match[2]} {$match[3]} $thisyear");
+		$logname=date('Ymd',$ldate);
+		$date=date('d/m/Y H:i:s',$ldate);
+
+		$pid=$match[5];
+		$who=trim($match[6]);
+		$ip="unknown";
+		if(preg_match("/([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})/",$match[7],$mm)) {
+			$ip="{$mm[1]}.{$mm[2]}.{$mm[3]}.{$mm[4]}";
+		}
+		if($who!='mfs') {
+			mybox_kill($pid,9);
+			$msg="[$date] TYPE=ssh USER=$who IP=$ip MSG=User not accepted";
+			$msgx="<0> TYPE=ssh USER=$who IP=$ip MSG=User not accepted";
+			if(mybox_chk_nolog()==0) mybox_append_to_file("$_LOG_PATH/auth-$logname.log","$msg\n");
+			mybox_send_remotelog($ldate,$msgx);
+			mybox_exec_cmd("$_INIT_DIR/ssh.init passwd quiet");
+			return 1;
+		}
+		$msg="[$date] TYPE=ssh USER=$who IP=$ip MSG=Password Accepted";
+		$msgx="<0> TYPE=ssh USER=$who IP=$ip MSG=Password Accepted";
+		mybox_chk_ssh_logout('1',$pid,$ldate,$ip);
+		if(mybox_chk_nolog()==0) mybox_append_to_file("$_LOG_PATH/auth-$logname.log","$msg\n");
+		mybox_send_remotelog($ldate,$msgx);
+		mybox_exec_cmd("$_INIT_DIR/ssh.init passwd quiet");
+		return 0;
+	} elseif(preg_match("/^$pat2/",$str,$match)) {
+		$ldate=strtotime("{$match[1]} {$match[2]} {$match[3]} $thisyear");
+		$logname=date('Ymd',$ldate);
+		$date=date('d/m/Y H:i:s',$ldate);
+		$pid=$match[5];
+		$who=$match[6];
+		$ip=mybox_chk_ssh_logout('2',$pid,$ldate);
+		$msg="[$date] TYPE=ssh USER=$who IP=$ip MSG=Session logout.";
+		$msgx="<0> TYPE=ssh USER=$who IP=$ip MSG=Session logout.";
+		if(mybox_chk_nolog()==0) mybox_append_to_file("$_LOG_PATH/auth-$logname.log","$msg\n");
+		mybox_send_remotelog($ldate,$msgx);
+		mybox_exec_cmd("$_INIT_DIR/ssh.init passwd quiet");
+		return 0;
+	} elseif(preg_match("/^$pat3/",$str,$match)) {
+		$ldate=strtotime("{$match[1]} {$match[2]} {$match[3]} $thisyear");
+		$logname=date('Ymd',$ldate);
+		$date=date('d/m/Y H:i:s',$ldate);
+		$pid=$match[5];
+		$who=$match[6];
+		$ip="unknown";
+		if(preg_match("/([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})/",$match[7],$mm)) {
+			$ip="{$mm[1]}.{$mm[2]}.{$mm[3]}.{$mm[4]}";
+		}
+		mybox_kill($pid,9);
+		mybox_exec_cmd("$_INIT_DIR/ssh.init passwd quiet");
+		$msg="[$date] TYPE=ssh USER=$who IP=$ip MSG=Password not Accepted";
+		$msgx="<0> TYPE=ssh USER=$who IP=$ip MSG=Password not Accepted";
+		if(mybox_chk_nolog()==0) mybox_append_to_file("$_LOG_PATH/auth-$logname.log","$msg\n");
+		mybox_send_remotelog($ldate,$msgx);
+		return 0;
+	} elseif(preg_match("/^$pat4/",$str,$match)) {
+		$ldate=strtotime("{$match[1]} {$match[2]} {$match[3]} $thisyear");
+		$logname=date('Ymd',$ldate);
+		$date=date('d/m/Y H:i:s',$ldate);
+		$pid=$match[5];
+		$ip="unknown";
+		mybox_kill($pid,9);
+		mybox_exec_cmd("$_INIT_DIR/ssh.init passwd quiet");
+		$msg="[$date] TYPE=ssh USER=unknown IP=$ip MSG=Nonexistent user (Killed pid $pid)";
+		$msgx="<0> TYPE=ssh USER=unknown IP=$ip MSG=Nonexistent user (Killed pid $pid)";
+		if(mybox_chk_nolog()==0) mybox_append_to_file("$_LOG_PATH/auth-$logname.log","$msg\n");
+		mybox_send_remotelog($ldate,$msgx);
+		return 0;
+	} elseif(preg_match("/^$pat5/",$str,$match)) {
+		$ldate=strtotime("{$match[1]} {$match[2]} {$match[3]} $thisyear");
+		$logname=date('Ymd',$ldate);
+		$date=date('d/m/Y H:i:s',$ldate);
+		$pid=$match[5];
+		$ip="unknown";
+		mybox_kill($pid,9);
+		mybox_exec_cmd("$_INIT_DIR/ssh.init passwd quiet");
+		$msg="[$date] TYPE=ssh USER=unknown IP=$ip MSG=Nonexistent user (Killed pid $pid)";
+		$msgx="<0> TYPE=ssh USER=unknown IP=$ip MSG=Nonexistent user (Killed pid $pid)";
+		if(mybox_chk_nolog()==0) mybox_append_to_file("$_LOG_PATH/auth-$logname.log","$msg\n");
+		mybox_send_remotelog($ldate,$msgx);
+		return 0;
+	} else {
+		mybox_exec_cmd("$_INIT_DIR/ssh.init passwd quiet");
+		@mybox_write_sshlog($str);
+	}
+	return 1;
+}
+
+function parse_ftplog($str) {
+	global $_LOG_PATH, $_INIT_DIR, $ftp_carray;
+
+	$pat1="(\w+)\s+(\d+)\s+(\S+)\s+(\S+)\svsftpd\:\s+(\w+)\s+(\w+)\s+(\d+)\s+(\S+)\s+(\d+)\s+\[pid\s+(\d+)\]\s+CONNECT\:\s+Client\s+\"(\S+)\"";
+	$pat2="(\w+)\s+(\d+)\s+(\S+)\s+(\S+)\svsftpd\:\s+(\w+)\s+(\w+)\s+(\d+)\s+(\S+)\s+(\d+)\s+\[pid\s+(\d+)\]\s+\[(\S+)\]\s+OK\s+LOGIN\:\s+Client\s+\"(\S+)\"";
+	$thisyear=date('Y');
+	if(preg_match("/^$pat1/",$str,$match)) {
+		$pid=$match[10];
+		$ip=$match[11];
+		return 1;
+	} elseif(preg_match("/^$pat2/",$str,$match)) {
+		$ldate=strtotime("{$match[1]} {$match[2]} {$match[3]} $thisyear");
+		$logname=date('Ymd',$ldate);
+		$date=date('d/m/Y H:i:s',$ldate);
+
+		$pid=$match[10];
+		$who=trim($match[11]);
+		$ip="unknown";
+		if(preg_match("/([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})/",$match[12],$mm)) {
+			$ip="{$mm[1]}.{$mm[2]}.{$mm[3]}.{$mm[4]}";
+		}
+		if($who!='ftp1') {
+			mybox_kill($pid,9);mybox_kill($pid,9);
+			$msg="[$date] TYPE=ftp USER=$who IP=$ip MSG=User not accepted (Killed pid $pid)";
+			$msgx="<11> TYPE=ftp USER=$who IP=$ip MSG=User not accepted";
+			if(mybox_chk_nolog()==0) mybox_append_to_file("$_LOG_PATH/auth-$logname.log","$msg\n");
+			mybox_send_remotelog($ldate,$msgx);
+			mybox_exec_cmd("$_INIT_DIR/ftp.init passwd quiet");
+			return 1;
+		}
+		$ppid=preg_split("/\s+/",mybox_get_progpid("ftpd"));
+		if(count($ppid)!=0) {
+			$tag=0;
+			foreach($ppid as $xpid) {
+				if($xpid=="$pid") {
+					$tag=1; continue;
+				}
+				if($tag==1) {
+					$pid2=$xpid;
+					$tag=0;
+				}
+			}
+		}
+		mybox_chk_ftp_logout('1',$pid,$pid2,$ldate,$ip);
+		$msg="[$date] TYPE=ftp USER=$who IP=$ip MSG=Password Accepted";
+		$msgx="<11> TYPE=ftp USER=$who IP=$ip MSG=Password Accepted";
+		if(mybox_chk_nolog()==0) mybox_append_to_file("$_LOG_PATH/auth-$logname.log","$msg\n");
+		mybox_send_remotelog($ldate,$msgx);
+		mybox_exec_cmd("$_INIT_DIR/ftp.init passwd quiet");
+		return 0;
+	} else {
+		mybox_exec_cmd("$_INIT_DIR/ftp.init passwd quiet");
+		@mybox_write_ftplog($str);
+	}
+	return 1;
+}
+
+function parse_ddnslog($str) {
+	global $_LOG_PATH, $_INIT_DIR;
+
+	$pat1="(\w+)\s+(\d+)\s+(\S+)\s+(\S+)\INADYN\[(\d+)\]\:\s+I\:INADYN\:\s+IP\s+address\s+for\s+alias\s+\'(\S+)\'\s+needs\+update\s+to\s+\'(\S+)\'";
+	$pat2="(\w+)\s+(\d+)\s+(\S+)\s+(\S+)\INADYN\[(\d+)\]\:\s+W\:\'RC_IP_CONNECT_FAILED\'";
+	$pat3="(\w+)\s+(\d+)\s+(\S+)\s+(\S+)\INADYN\[(\d+)\]\:\s+I\:INADYN\:\s+Alias\s+\'(\S+)\'\s+to\s+IP\s+\'(\S+)\'\s+updated\s+successful";
+	$thisyear=date('Y');
+	if(preg_match("/^$pat1/",$str,$match)) {
+		$host=$match[6];
+		$ip=$match[7];
+		mybox_slog("INFO","DDNS, IP address for host $host needs update to $ip");
+		return 1;
+	}
+	if(preg_match("/^$pat2/",$str,$match)) {
+		mybox_slog("INFO","DDNS, host updating failed");
+		return 1;
+	}
+	if(preg_match("/^$pat3/",$str,$match)) {
+		$host=$match[6];
+		$ip=$match[7];
+		mybox_slog("INFO","DDNS, host $host to $ip updated successful");
+		return 1;
+	}
+}
+
+function update_ips_block($_IDS_BLOCK) {
+	if(file_exists("/var/sys/ipsblock")) {
+		@file_put_contents("/var/sys/ipsblock",serialize($_IDS_BLOCK));
+	}
+}
+
+function chk_ips_block($src,$dst,$_IDS_BLOCK,$_IDS_TIMEOUT) {
+	$_IDS_SET=unserialize(mybox_fget_contents("/var/sys/ipsset"));
+	$_IDS_MODE=$_IDS_SET['ids_mode'];
+	if(isset($_IDS_BLOCK[$src][$dst][0])&& $_IDS_BLOCK[$src][$dst][0]==1) {
+		$time=$_IDS_BLOCK[$src][$dst][1];
+		if($time!=0 && $time!='') {
+			if(time() >= $time) {
+				$ipsb=$_IDS_BLOCK[$src][$dst][6];
+				if($ipsb!='') {
+					$dlst=preg_split("/,/",$ipsb);
+					if(count($dlst)!=0) {
+						foreach($dlst as $dstll) {
+							mybox_exec_cmd("iptables -D ACL1001 -s $src -d $dstll -j DROP");
+						}
+					}
+				}
+				$dstl='';$dstm='';$dstlx='';
+				if($dst!='any') {
+					$dstl="-d $dst";$dstlx="-s $dst";
+					$dstm=" to $dst";
+				}
+				mybox_exec_cmd("iptables -D ACL1001 -s $src $dstl -j DROP");
+				//if($_IDS_MODE==3) mybox_exec_cmd("iptables -D ACL1001 $dstlx -d $src -j DROP");
+				mybox_slog("INFO","IPS, blocked time for intrusion from $src$dstm expired");
+				unset($_IDS_BLOCK[$src][$dst]);
+				if($_IDS_BLOCK[$src]==array()) unset($_IDS_BLOCK[$src]);
+				update_ips_block($_IDS_BLOCK);
+				return 0;
+			}
+		}
+		if($_IDS_TIMEOUT!=0) {
+			$time=time()+60*$_IDS_TIMEOUT;
+			$_IDS_BLOCK[$src][$dst][1]=$time;
+		}
+		$_IDS_BLOCK[$src][$dst][2]++;
+		update_ips_block($_IDS_BLOCK);
+		return 1;
+	}
+}
+
+function ids_block($src,$dst,$method,$_IDS_TIMEOUT,$_IDS_BLOCK,$_IDS_NAT) {
+	$dstl='';$dstlx='';
+	if($dst=='') $dst='any';
+	if($dst!='any') {
+		$dstl="-d $dst";$dstlx="-s $dst";
+	}
+	$_IDS_SET=unserialize(mybox_fget_contents("/var/sys/ipsset"));
+	$_IDS_MODE=$_IDS_SET['ids_mode'];
+	if($_IDS_TIMEOUT!=0) {
+		$time=time()+60*$_IDS_TIMEOUT;
+	} else {
+		$time=0;
+	}
+	$_IDS_BLOCK[$src][$dst][0]=1;
+	$_IDS_BLOCK[$src][$dst][1]=$time;
+	$_IDS_BLOCK[$src][$dst][2]++;
+	$_IDS_BLOCK[$src][$dst][3]=time();
+	$_IDS_BLOCK[$src][$dst][4]="$dst";
+	$_IDS_BLOCK[$src][$dst][5]="$method";
+	$_IDS_BLOCK[$src][$dst][6]="";
+	// put iptables command here
+	if($_IDS_NAT[$dst]!="") {
+		$dlsx=trim($_IDS_NAT[$dst],",");
+		$dlst=preg_split("/,/",$dlsx);
+		if(count($dlst)!=0) {
+			foreach($dlst as $dstll) {
+				mybox_exec_cmd("iptables -I ACL1001 -s $src -d $dstll -j DROP");
+				$_IDS_BLOCK[$src][$dst][6] .="$dstll,";
+			}
+		}
+	}
+	mybox_exec_cmd("iptables -I ACL1001 -s $src $dstl -j DROP");
+	//if($_IDS_MODE==3) mybox_exec_cmd("iptables -I ACL1001 $dstlx -d $src -j DROP");
+	update_ips_block($_IDS_BLOCK);
+	return 0;
+}
+
+
+function parse_snortlog($str) {
+	global $_LOG_PATH;
+	$thisyear=date('Y');
+	
+	$_IDS_NET=unserialize(mybox_fget_contents("/var/sys/ipsnet"));
+	$_IDS_SET=unserialize(mybox_fget_contents("/var/sys/ipsset"));
+	$_IDS_IGNORE=unserialize(mybox_fget_contents("/var/sys/ipsignore"));
+	$_IDS_RULES=unserialize(mybox_fget_contents("/var/sys/ipsrules"));
+	$_IDS_NAT=unserialize(mybox_fget_contents("/var/sys/ips_nat"));
+	// 09-Dec-2006
+	$_ACL=unserialize(mybox_fget_contents("/var/sys/policy_acl"));
+
+	if(file_exists("/var/sys/ipsblock")) {
+		$_IDS_BLOCK=unserialize(mybox_fget_contents("/var/sys/ipsblock"));
+	}
+
+	$_IDS_TIMEOUT=$_IDS_SET['timeout'];
+	$_IDS_STAT=$_IDS_SET['stat'];
+	$_IDS_MODE=$_IDS_SET['ids_mode'];
+	$_PSCAN_MODE=$_IDS_SET['pscan_mode'];
+
+	if($_IDS_STAT==0) return 1;
+
+	// update to snort 2.4.0
+	// updated: 14/04/2006 - ([A-z0-9_\-\!\@\/\.\%\$\*\&\^\#\)\(\]\[\}\{\'\:\;\,\>\<\=\+\?\~ ]+)
+	// updated: 18/05/2006 - $pat1 ([^>]+)
+	// update to snort 2.4.5: 06/07/2006
+	//$pat1="(\w+)\s+(\d+)\s+(\S+)\s+(\S+)\s+snort\[\d+\]\:\s+\[\d+\:(\S+)\:\d+\]\s+(\S+)\s+([A-z0-9_\-\!\@\/\.\%\$\*\&\^\#\)\(\]\[\}\{\'\:\;\,\>\<\=\+\?\~ ]+)\s+\{(\S+)\}\s+(\S+)\s+\-\>\s+(\S+)";
+	$pat1="(\w+)\s+(\d+)\s+(\S+)\s+(\S+)\s+snort\[\d+\]\:\s+\[\d+\:(\S+)\:\d+\]\s+(\S+)\s+([^>]+)\s+\{(\S+)\}\s+(\S+)\s+\-\>\s+(\S+)";
+	$pat2="(\w+)\s+(\d+)\s+(\S+)\s+(\S+)\s+snort\[\d+\]\:\s+\[\d+\:(\S+)\:\d+\]\s+\(portscan\)\s+(TCP|UDP)\s+(\S+)\s+\{(\S+)\}\s+(\S+)\s+\-\>\s+(\S+)";
+	$pat3="(\w+)\s+(\d+)\s+(\S+)\s+(\S+)\s+snort\[\d+\]\:\s*spp_portscan:\sportscan\sstatus\sfrom\s(\d+\.\d+\.\d+\.\d+)\:\s(.*)\:\s(.*)";
+	$pat4="(\w+)\s+(\d+)\s+(\S+)\s+(\S+)\s+snort\[\d+\]\:\s*spp_portscan:\sPORTSCAN\sDETECTED\sfrom\s*(\d+\.\d+\.\d+\.\d+)\s*(.*)";
+	$pat5="(\w+)\s+(\d+)\s+(\S+)\s+(\S+)\s+snort\[\d+\]\:\s*spp_portscan:\sPORTSCAN\sDETECTED\sto\sport\s(\d+)\sfrom\s*(\d+\.\d+\.\d+\.\d+)\s*(.*)";
+	// updated: 17/04/2006
+	$pat6="(\w+)\s+(\d+)\s+(\S+)\s+(\S+)\s+snort\[\d+\]\:\s*Portscan\sdetected\sfrom\s*(\d+\.\d+\.\d+\.\d+)\s*(.*)";
+
+	if(preg_match("/^$pat1$/",$str,$match)) {
+		$ldate=strtotime("{$match[1]} {$match[2]} {$match[3]} $thisyear");
+		$date=date('d/m/Y H:i:s',$ldate);
+		$logname=date('Ymd',$ldate);
+		$sid=$match[5];
+		$sig=$match[6];
+		$txt=$match[7];
+		$src=$match[9];
+		$dst=$match[10];
+
+		if(strpos($src,':') !== FALSE) {
+			list($src1,)=preg_split("/\:/",$src);
+			$src=$src1;
+		}
+		if(strpos($dst,':') !== FALSE) {
+			list($dst1,)=preg_split("/\:/",$dst);
+			$dst=$dst1;
+		}
+		if(preg_match("/^\(\S+\)/",$sig)) {
+			if(file_exists("/var/sys/ips-do-debug")) mybox_append_to_file("/strg/mybox/ipsdebug-{$logname}.txt","$str\n");
+			return 1;
+		}
+		if($_IDS_IGNORE[$src]==1) return 1;
+
+		if($_IDS_BLOCK[$src][$dst][0]==1) {
+			chk_ips_block($src,$dst,$_IDS_BLOCK,$_IDS_TIMEOUT);
+			return 1;
+		}
+		if($src!='0.0.0.0' && $dst!='0.0.0.0') {
+			// 1 = inbound
+			// 2 = outbound
+			// 3 = both
+			if($_IDS_RULES[$sid]['block']==1) {
+				if(mybox_is_attackme($_IDS_NET,$src,$dst)==1) {
+					// attack from accesslist to me, just ignore
+					if(array_search($src,$_ACL)!='') return 1;
+					$msg="[$date] SRC=$src DST=$dst SIG=$sig MSG=$txt ACTION=DROP";
+					ids_block($src,$dst,$sig,$_IDS_TIMEOUT,$_IDS_BLOCK,$_IDS_NAT);
+					mybox_slog("INFO","IPS, blocking intrusion from $src to me ($dst)");
+				} elseif(mybox_is_samenet($_IDS_NET,$src,$dst)==1) {
+					$msg="[$date] SRC=$src DST=$dst SIG=$sig MSG=$txt ACTION=PASS";
+					mybox_slog("INFO","IPS, ignoring intrusion from $src to $dst (same network)");
+				} else {
+					if($_IDS_MODE==1) {
+						if(mybox_is_inbound($_IDS_NET,$src)==1) {
+							$msg="[$date] SRC=$src DST=$dst SIG=$sig MSG=$txt ACTION=DROP";
+							ids_block($src,$dst,$sig,$_IDS_TIMEOUT,$_IDS_BLOCK,$_IDS_NAT);
+							mybox_slog("INFO","IPS, blocking intrusion from $src to $dst (mybox network)");
+						}
+					} elseif($_IDS_MODE==2) {
+						if(mybox_is_inbound($_IDS_NET,$src)==0) {
+							$msg="[$date] SRC=$src DST=$dst SIG=$sig MSG=$txt ACTION=DROP";
+							ids_block($src,$dst,$sig,$_IDS_TIMEOUT,$_IDS_BLOCK,$_IDS_NAT);
+							mybox_slog("INFO","IPS, blocking intrusion from $src to $dst");
+						}
+					} else {
+						if(mybox_is_inbound($_IDS_NET,$src)==1) {
+							$msg="[$date] SRC=$src DST=$dst SIG=$sig MSG=$txt ACTION=DROP";
+							ids_block($src,$dst,$sig,$_IDS_TIMEOUT,$_IDS_BLOCK,$_IDS_NAT);
+							mybox_slog("INFO","IPS, blocking intrusion from $src to $dst (mybox network)");
+						} else {
+							$msg="[$date] SRC=$src DST=$dst SIG=$sig MSG=$txt ACTION=DROP";
+							ids_block($src,$dst,$sig,$_IDS_TIMEOUT,$_IDS_BLOCK,$_IDS_NAT);
+							mybox_slog("INFO","IPS, blocking intrusion from $src to $dst");
+						}
+					}
+				}
+			} else {
+				$msg="[$date] SRC=$src DST=$dst SIG=$sig MSG=$txt ACTION=PASS";
+			}
+			if($_IDS_RULES[$sid]['log']==1) {
+				if($msg!='') {
+					mybox_append_to_file("$_LOG_PATH/ips-$logname.log","$msg\n");
+        				if(preg_match("/^\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]\s+/",$msg,$mm)) {
+                				$time1=strtotime("{$mm[2]}/{$mm[1]}/{$mm[3]} {$mm[4]}:{$mm[5]}:{$mm[6]}");
+                				$msgx=preg_replace("/^\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]\s+/","<7> ",$msg);
+        				}
+					mybox_send_remotelog($time1,$msgx);
+				}
+			}
+		}
+		return 0;
+	}
+
+	if(preg_match("/^$pat2$/",$str,$match)) {
+		$ldate=strtotime("{$match[1]} {$match[2]} {$match[3]} $thisyear");
+		$logname=date('Ymd',$ldate);
+		$txt="{$match[6]} {$match[7]}";
+		$src=$match[9];
+		$dst=$match[10];
+		$date=date('d/m/Y H:i:s',$ldate);
+		if(strpos($src,':') !== FALSE) {
+			list($src1,)=preg_split("/\:/",$src);
+			$src=$src1;
+		}
+		if(strpos($dst,':') !== FALSE) {
+			list($dst1,)=preg_split("/\:/",$dst);
+			$dst=$dst1;
+		}
+		if($_IDS_IGNORE[$src]==1) return 1;
+
+		if($_IDS_BLOCK[$src][$dst][0]==1) {
+			chk_ips_block($src,$dst,$_IDS_BLOCK,$_IDS_TIMEOUT);
+			return 1;
+		}
+		$msg="[$date] SRC=$src DST=$dst MSG=$txt";
+		if($src!='0.0.0.0' && $dst!='0.0.0.0') {
+			if($msg!='') {
+				// local dns resolver false alarm
+				if(strpos($msg,"Port/Proto Range: 53:137")!==FALSE) {
+					if(mybox_is_attackme($_IDS_NET,$src,$dst)==1 && mybox_is_inbound($_IDS_NET,$src)==0) {
+						return 1;
+					}
+				}
+				mybox_append_to_file("$_LOG_PATH/portscan-$logname.log","$msg\n");
+        			if(preg_match("/^\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]\s+/",$msg,$mm)) {
+                			$time1=strtotime("{$mm[2]}/{$mm[1]}/{$mm[3]} {$mm[4]}:{$mm[5]}:{$mm[6]}");
+                			$msgx=preg_replace("/^\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]\s+/","<8> ",$msg);
+        			}
+				mybox_send_remotelog($time1,$msgx);
+			}
+			if(mybox_is_attackme($_IDS_NET,$src,$dst)==1) {
+				if(array_search($src,$_ACL)!='') return 1;
+				ids_block($src,$dst,'2',$_IDS_TIMEOUT,$_IDS_BLOCK,$_IDS_NAT);
+				mybox_slog("INFO","IPS, blocking port scanning from $src to me ($dst)");
+			} elseif(mybox_is_samenet($_IDS_NET,$src,$dst)==1) {
+				mybox_slog("INFO","IPS, ignoring port scanning from $src to $dst (same network)");
+			} else {
+				if($_PSCAN_MODE==1) {
+					if(mybox_is_inbound($_IDS_NET,$src)==1) {
+						if(mybox_check_ipv4($src)) {
+							ids_block($src,$dst,'2',$_IDS_TIMEOUT,$_IDS_BLOCK,$_IDS_NAT);
+							mybox_slog("INFO","IPS, blocking port scanning from $src to $dst (mybox network)");
+						}
+					}
+				} elseif($_PSCAN_MODE==2) {
+					if(mybox_is_inbound($_IDS_NET,$src)==0) {
+						if(mybox_check_ipv4($src)&&mybox_check_ipv4($dst)) {
+							ids_block($src,$dst,'2',$_IDS_TIMEOUT,$_IDS_BLOCK,$_IDS_NAT);
+							mybox_slog("INFO","IPS, blocking port scanning from $src to $dst");
+						}
+					}
+				} else {
+					if(mybox_check_ipv4($src)&&mybox_check_ipv4($dst)) {
+						ids_block($src,$dst,'2',$_IDS_TIMEOUT,$_IDS_BLOCK,$_IDS_NAT);
+						mybox_slog("INFO","IPS, blocking port scanning from $src to $dst");
+					}
+				}
+			}
+		}
+		return 0;
+	}
+
+	if(preg_match("/^$pat3$/",$str,$match)) {
+		$ldate=strtotime("{$match[1]} {$match[2]} {$match[3]} $thisyear");
+		$logname=date('Ymd',$ldate);
+		$txt="{$match[6]} {$match[7]}";
+		$src=$match[5];
+		$dst='any';
+		$date=date('d/m/Y H:i:s',$ldate);
+		if(strpos($src,':') !== FALSE) {
+			list($src1,)=preg_split("/\:/",$src);
+			$src=$src1;
+		}
+		if($_IDS_IGNORE[$src]==1) return 1;
+
+		if($_IDS_BLOCK[$src][$dst][0]==1) {
+			chk_ips_block($src,$dst,$_IDS_BLOCK,$_IDS_TIMEOUT);
+			return 1;
+		}
+		$msg="[$date] SRC=$src DST=$dst MSG=$txt";
+		if($src!='0.0.0.0') {
+			if($msg!='') {
+				mybox_append_to_file("$_LOG_PATH/portscan-$logname.log","$msg\n");
+        			if(preg_match("/^\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]\s+/",$msg,$mm)) {
+                			$time1=strtotime("{$mm[2]}/{$mm[1]}/{$mm[3]} {$mm[4]}:{$mm[5]}:{$mm[6]}");
+                			$msgx=preg_replace("/^\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]\s+/","<8> ",$msg);
+        			}
+				mybox_send_remotelog($time1,$msgx);
+			}
+			// only drop from inbound
+			if(mybox_is_inbound($_IDS_NET,$src)==1) {
+				if(mybox_check_ipv4($src)) {
+					ids_block($src,$dst,'2',$_IDS_TIMEOUT,$_IDS_BLOCK,$_IDS_NAT);
+					mybox_slog("INFO","IPS, blocking port scanning from $src to mybox network");
+				}
+			}
+		}
+		return 0;
+	}
+	if(preg_match("/^$pat4$/",$str,$match)) {
+		$ldate=strtotime("{$match[1]} {$match[2]} {$match[3]} $thisyear");
+		$logname=date('Ymd',$ldate);
+		$txt=strtolower(trim(trim($match[6],')'),'('));
+		$src=$match[5];
+		$dst='any';
+		$date=date('d/m/Y H:i:s',$ldate);
+		if(strpos($src,':') !== FALSE) {
+			list($src1,)=preg_split("/\:/",$src);
+			$src=$src1;
+		}
+		if($_IDS_IGNORE[$src]==1) return 1;
+
+		if($_IDS_BLOCK[$src][$dst][0]==1) {
+			chk_ips_block($src,$dst,$_IDS_BLOCK,$_IDS_TIMEOUT);
+			return 1;
+		}
+		$msg="[$date] SRC=$src DST=$dst MSG=$txt";
+		if($src!='0.0.0.0') {
+			if($msg!='') {
+				mybox_append_to_file("$_LOG_PATH/portscan-$logname.log","$msg\n");
+        			if(preg_match("/^\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]\s+/",$msg,$mm)) {
+                			$time1=strtotime("{$mm[2]}/{$mm[1]}/{$mm[3]} {$mm[4]}:{$mm[5]}:{$mm[6]}");
+                			$msgx=preg_replace("/^\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]\s+/","<8> ",$msg);
+        			}
+				mybox_send_remotelog($time1,$msgx);
+			}
+			// only drop from inbound
+			if(mybox_is_inbound($_IDS_NET,$src)==1) {
+				if(mybox_check_ipv4($src)) {
+					ids_block($src,$dst,'2',$_IDS_TIMEOUT,$_IDS_BLOCK,$_IDS_NAT);
+					mybox_slog("INFO","IPS, blocking port scanning from $src to mybox network");
+				}
+			}
+		}
+		return 0;
+	}
+	if(preg_match("/^$pat5$/",$str,$match)) {
+		$ldate=strtotime("{$match[1]} {$match[2]} {$match[3]} $thisyear");
+		$logname=date('Ymd',$ldate);
+		$txt=strtolower(trim(trim($match[7],')'),'('));
+		$txt2="(sport {$match[5]})";
+		$src=$match[6];
+		$dst='any';
+		$date=date('d/m/Y H:i:s',$ldate);
+		if(strpos($src,':') !== FALSE) {
+			list($src1,)=preg_split("/\:/",$src);
+			$src=$src1;
+		}
+		if($_IDS_IGNORE[$src]==1) return 1;
+
+		if($_IDS_BLOCK[$src][$dst][0]==1) {
+			chk_ips_block($src,$dst,$_IDS_BLOCK,$_IDS_TIMEOUT);
+			return 1;
+		}
+		$msg="[$date] SRC=$src DST=$dst MSG=$txt2 $txt";
+		if($src!='0.0.0.0') {
+			if($msg!='') {
+				mybox_append_to_file("$_LOG_PATH/portscan-$logname.log","$msg\n");
+        			if(preg_match("/^\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]\s+/",$msg,$mm)) {
+                			$time1=strtotime("{$mm[2]}/{$mm[1]}/{$mm[3]} {$mm[4]}:{$mm[5]}:{$mm[6]}");
+                			$msgx=preg_replace("/^\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]\s+/","<8> ",$msg);
+        			}
+				mybox_send_remotelog($time1,$msgx);
+			}
+			// only drop from inbound
+			if(mybox_is_inbound($_IDS_NET,$src)==1) {
+				if(mybox_check_ipv4($src)) {
+					ids_block($src,$dst,'2',$_IDS_TIMEOUT,$_IDS_BLOCK,$_IDS_NAT);
+					mybox_slog("INFO","IPS, blocking port scanning from $src to mybox network");
+				}
+			}
+		}
+		return 0;
+	}
+	if(preg_match("/^$pat6$/",$str,$match)) {
+		$ldate=strtotime("{$match[1]} {$match[2]} {$match[3]} $thisyear");
+		$logname=date('Ymd',$ldate);
+		$src=$match[5];
+		$txt=trim($match[6]);
+		$dst='any';
+		$date=date('d/m/Y H:i:s',$ldate);
+		if(strpos($src,':') !== FALSE) {
+			list($src1,)=preg_split("/\:/",$src);
+			$src=$src1;
+		}
+		if($_IDS_IGNORE[$src]==1) return 1;
+
+		if($_IDS_BLOCK[$src][$dst][0]==1) {
+			chk_ips_block($src,$dst,$_IDS_BLOCK,$_IDS_TIMEOUT);
+			return 1;
+		}
+		$msg="[$date] SRC=$src DST=$dst MSG=$txt";
+		if($src!='0.0.0.0') {
+			if($msg!='') {
+				mybox_append_to_file("$_LOG_PATH/portscan-$logname.log","$msg\n");
+        			if(preg_match("/^\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]\s+/",$msg,$mm)) {
+                			$time1=strtotime("{$mm[2]}/{$mm[1]}/{$mm[3]} {$mm[4]}:{$mm[5]}:{$mm[6]}");
+                			$msgx=preg_replace("/^\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]\s+/","<8> ",$msg);
+        			}
+				mybox_send_remotelog($time1,$msgx);
+			}
+			// only drop from inbound
+			if(mybox_is_inbound($_IDS_NET,$src)==1) {
+				if(mybox_check_ipv4($src)) {
+					ids_block($src,$dst,'2',$_IDS_TIMEOUT,$_IDS_BLOCK,$_IDS_NAT);
+					mybox_slog("INFO","IPS, blocking port scanning from $src to mybox network");
+				}
+			}
+		}
+		return 0;
+	}
+	//else anything miss match
+	if(file_exists("/var/sys/ips-do-debug")) {
+		$logname=date('Ymd');
+		mybox_append_to_file("/strg/mybox/ipsdebug-{$logname}.txt","$str\n");
+		return 0;
+	}
+}
+
+################## portscan ##################################
+function scan_portscanlog() {
+	global $_PSCANLOG_PATH, $_DISABLE;
+	$file="$_PSCANLOG_PATH";
+
+	if(!file_exists("$file")) {
+		@touch($file);
+		return array();
+	}
+	if(filesize($file) < 1) return array();
+	if($_DISABLE==1 || mybox_license('IPS')!=1) {
+		@unlink($file);
+		return array();
+	}
+	$_tag_array=array();
+	$buff=file("$file");
+	@file_put_contents($file,"");
+	if(count($buff)==0) return array();
+	if(count($buff)!=0) {
+		$thisyear=date('Y');
+		foreach($buff as $line) {
+			$line=trim($line);
+			if($line=='') continue;
+			if(preg_match("/^Time\:\s+(\d+)\/(\d+)\-(\d+)\:(\d+)\:(\S+)/",$line,$mm)) {
+				$s=floor($mm[5]);
+				if(strlen($s)==1) $s="0$s";
+				$m=$mm[1];$d=$mm[2];$h=$mm[3];$i=$mm[4];
+				$ldate=strtotime("$m/$d/$thisyear $h:$i:$s");
+			} else if(preg_match("/(event_id|event_ref)\:\s+(\d+)/",$line,$mm)) {
+				$_id=$mm[2];
+				if(!isset($_tag_array[$_id])||$_tag_array[$_id]=='') $_tag_array[$_id] .="$ldate|";
+			} else if(preg_match("/(\d+\.\d+\.\d+\.\d+)\s+\-\>\s+(\d+\.\d+\.\d+\.\d+)\s+\(portscan\)\s+(\S+)\s+(\S+)/",$line,$mm)) {
+				$src=$mm[1];
+				$dst=$mm[2];
+				if($mm[3]=="Open") continue;
+				$_tag_array[$_id] .="$src|$dst|{$mm[3]}|";
+			} else {
+				if(isset($_tag_array[$_id])&&$_tag_array[$_id]!='') $_tag_array[$_id] .="$line|";
+			}
+		}
+	}
+	return $_tag_array;
+}
+
+function parse_pscanlog() {
+	global $_LOG_PATH;
+
+	$_PSCAN=array();
+	$_PSCAN=scan_portscanlog();
+	if(count($_PSCAN)==0) return 1;
+
+	$thisyear=date('Y');
+	$_IDS_NET=unserialize(mybox_fget_contents("/var/sys/ipsnet"));
+	$_IDS_SET=unserialize(mybox_fget_contents("/var/sys/ipsset"));
+	$_IDS_IGNORE=unserialize(mybox_fget_contents("/var/sys/ipsignore"));
+	$_IDS_RULES=unserialize(mybox_fget_contents("/var/sys/ipsrules"));
+	$_IDS_NAT=unserialize(mybox_fget_contents("/var/sys/ips_nat"));
+	// 09-Dec-2006
+	$_ACL=unserialize(mybox_fget_contents("/var/sys/policy_acl"));
+
+	$_IDS_TIMEOUT=$_IDS_SET['timeout'];
+	$_IDS_STAT=$_IDS_SET['stat'];
+	$_IDS_MODE=$_IDS_SET['ids_mode'];
+	$_PSCAN_MODE=$_IDS_SET['pscan_mode'];
+
+	if($_IDS_STAT==0) return 1;
+
+	if(file_exists("/var/sys/ipsblock")) {
+		$_IDS_BLOCK=unserialize(mybox_fget_contents("/var/sys/ipsblock"));
+	}
+
+	if(count($_PSCAN)!=0) {
+		foreach($_PSCAN as $line) {
+			$line=trim(trim($line,"|"));
+			$lx=preg_split("/\|/",$line);
+			$ldate=$lx[0];
+			$src=$lx[1];
+			$dst=$lx[2];
+			// at least have source and destination
+			if($src=='' || $dst=='') continue;
+			$proto=$lx[3];
+			$logname=date('Ymd',$ldate);
+			$date=date('d/m/Y H:i:s',$ldate);
+			$msg0="$proto Portscan -> ";
+			for($x=4;$x<count($lx);$x++) $msg0 .="{$lx[$x]} -> ";
+			$msg0=trim($msg0);
+			$msg0=rtrim($msg0,"->");
+			$msg="[$date] SRC=$src DST=$dst MSG=$msg0";
+			if($_IDS_IGNORE[$src]==1) continue;
+			if($_IDS_BLOCK[$src][$dst][0]==1) {
+				chk_ips_block($src,$dst,$_IDS_BLOCK,$_IDS_TIMEOUT);
+				continue;
+			}
+			$msg="[$date] SRC=$src DST=$dst MSG=$msg0";
+			if($src!='0.0.0.0' && $dst!='0.0.0.0' && $src!='' && $dst!='') {
+				if($msg!='') {
+					// local dns resolver false alarm
+					if(strpos($msg,"Port/Proto Range: 53:137")!==FALSE) {
+						if(mybox_is_attackme($_IDS_NET,$src,$dst)==1 && mybox_is_inbound($_IDS_NET,$src)==0) {
+							return 1;
+						}
+					}
+					mybox_append_to_file("$_LOG_PATH/portscan-$logname.log","$msg\n");
+        				if(preg_match("/^\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]\s+/",$msg,$mm)) {
+                				$time1=strtotime("{$mm[2]}/{$mm[1]}/{$mm[3]} {$mm[4]}:{$mm[5]}:{$mm[6]}");
+                				$msgx=preg_replace("/^\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]\s+/","<8> ",$msg);
+        				}
+					mybox_send_remotelog($time1,$msgx);
+				}
+				if(mybox_is_attackme($_IDS_NET,$src,$dst)==1) {
+					if(array_search($src,$_ACL)!='') return 1;
+					ids_block($src,$dst,'2',$_IDS_TIMEOUT,$_IDS_BLOCK,$_IDS_NAT);
+					mybox_slog("INFO","IPS, blocking port scanning from $src to me ($dst)");
+				} elseif(mybox_is_samenet($_IDS_NET,$src,$dst)==1) {
+					mybox_slog("INFO","IPS, ignoring port scanning from $src to $dst (same network)");
+				} else {
+					if($_PSCAN_MODE==1) {
+						if(mybox_is_inbound($_IDS_NET,$src)==1) {
+							if(mybox_check_ipv4($src)) {
+								ids_block($src,$dst,'2',$_IDS_TIMEOUT,$_IDS_BLOCK,$_IDS_NAT);
+								mybox_slog("INFO","IPS, blocking port scanning from $src to mybox network");
+							}
+						}
+					} elseif($_PSCAN_MODE==2) {
+						if(mybox_is_inbound($_IDS_NET,$src)==0) {
+							if(mybox_check_ipv4($src)&&mybox_check_ipv4($dst)) {
+								ids_block($src,$dst,'2',$_IDS_TIMEOUT,$_IDS_BLOCK,$_IDS_NAT);
+								mybox_slog("INFO","IPS, blocking port scanning from $src to $dst");
+							}
+						}
+					} else {
+						if(mybox_check_ipv4($src)&&mybox_check_ipv4($dst)) {
+							ids_block($src,$dst,'2',$_IDS_TIMEOUT,$_IDS_BLOCK,$_IDS_NAT);
+							mybox_slog("INFO","IPS, blocking port scanning from $src to $dst");
+						}
+					}
+				}
+			}
+			unset($src,$dst,$ldate,$lx);
+		}
+	}
+}
+
+function portscan_loop() {
+	global $_PSCANLOG_PATH;
+	if(mybox_daemon()==0) {
+		mybox_slog("ERROR","mfs-system.exc (portscan) running in background failed.");
+		return 1;
+	}
+	while(1) {
+		if(file_exists("$_PSCANLOG_PATH")) {
+			parse_pscanlog();
+			sleep(1);
+		}
+	}
+	exit;
+}
+
+function read_system_log($file) {
+	global $_LOG_PATH, $_BCRELAY1, $_BCRELAY2, $_DISABLE;
+	if($fi=fopen("$file","r")) {
+		while($buff=fgets($fi,4096)) {
+			$buff=trim($buff);
+			if($buff!='' && $_DISABLE!=1) {
+				if(mybox_license('IPS')==1) {
+					if(preg_match("/snort\[\d+\]\:\s+/",$buff)) {
+						parse_snortlog($buff);
+					}
+				}
+				if(preg_match("/sshd\[\d+\]\:\s+/",$buff)) {
+					parse_sshlog($buff);
+				}
+				if(mybox_license('PPTP')==1) {
+					if(preg_match("/(pppd|pptpd|nmbd|smbd|bcrelay)/",$buff)) {
+						@mybox_write_pptplog($buff);
+					}
+				}
+				if(preg_match("/\s+MYBOX_LOGIN\[\d+\]\:\s+AUTH_CONSOLE/",$buff)) {
+					@mybox_write_consolelogin($buff);
+				}
+				if(preg_match("/httpsd/",$buff)) {
+					@mybox_write_httpsdlog($buff);
+				}
+				if(preg_match("/dhcpd\:/",$buff)) {
+					@mybox_write_dhcplog($buff);
+				}
+				if(preg_match("/vsftpd\:\s+/",$buff)) {
+					@parse_ftplog($buff);
+				}
+				if(preg_match("/INADYN/",$buff)) {
+					@parse_ddnslog($buff);
+				}
+			}
+			$buff='';
+		}
+		fclose($fi);
+	}
+}
+function main_loop() {
+	if(mybox_daemon()==0) {
+		mybox_slog("ERROR","mfs-system.exc running in background failed");
+		return 1;
+	}
+	while(1) {
+		if(file_exists("/var/log/system")) {
+			sleep(1);
+			read_system_log("/var/log/system");
+		}
+	}
+	exit;
+}
+if(isset($_SERVER["argv"][1])&&$_SERVER["argv"][1]!='') {
+	if($_SERVER["argv"][1]=="p") {
+		if(mybox_license('IPS')==1) portscan_loop();
+	}
+} else {
+	main_loop();
+}
+exit(0);
+
+?>

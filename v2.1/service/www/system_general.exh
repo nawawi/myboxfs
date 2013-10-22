@@ -1,0 +1,682 @@
+<?
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+mybox_chk_session();
+mybox_send_nocache();
+
+$_SYSID="system_general";
+
+$db_id=mybox_db_connect($_DB_NAME);
+
+if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+	if($tab==1) {
+		if(isset($do_save)&&$do_save==1) {
+			if($val!='') {
+				if(count($val)!=0) {
+					$_local_logs=0;
+					$_local_news=0;
+					$_singlelogin=0;
+					foreach($val as $p => $v) {
+						if($v!='') {
+							if($p=='singlelogin') {
+								$_singlelogin=1;	
+								if($v!='') $v=1;
+							}
+							if($p=='local_logs') {
+								$_local_logs=1;	
+								if($v!='') $v=1;
+							}
+							if($p=='local_news') {
+								$_local_news=1;	
+								if($v!='') $v=1;
+							}
+							if($p=='local_logs_purge') {	
+								if($v=='') {
+									$v=0;
+								} else {
+									if(!preg_match("/^(\d+)$/",trim($v))) $v=0;
+									@mybox_save_to_file("/var/sys/local_logs_purge","$v\n");
+								}
+							}
+							mybox_db_query("update misc set val='$v' where name='$p'",$db_id);
+							if($p=='www_session' && $v!=0) {
+								mybox_session_update($v);
+							}
+							if($_local_logs==0) {
+								mybox_db_query("update misc set val='0' where name='local_logs'",$db_id);
+							}
+							if($_local_news==0) {
+								mybox_db_query("update misc set val='0' where name='local_news'",$db_id);
+							}
+							if($_singlelogin==0) {
+								mybox_db_query("update misc set val='0' where name='singlelogin'",$db_id);
+							}
+						}
+					}
+					if($https_port=='') $https_port='5051';
+					mybox_db_query("update service_https set port='$https_port',stat='1'",$db_id);
+					@unlink("/var/sys/nolog");
+					if($_local_logs==1) @touch("/var/sys/nolog");
+					$msg="System setting updated!.";
+				}
+			}
+			if(isset($dns)&&$dns!='') {
+				mybox_db_query("delete from dns_name",$db_id);
+				mybox_db_flush($db_id);
+				$list=preg_split("/\s+/",$dns);
+				if(count($list)!=0) {
+					foreach($list as $dns) {
+						if($dns!='') mybox_db_query("insert into dns_name (name) values ('$dns')",$db_id);
+					}
+				}
+			}
+		}
+		if(isset($do_save)&&$do_save==2) {
+			if(isset($do_id)&&$do_id=='apply_chg') {
+				$msg="<script>waitcount();</script>";
+				mybox_echo_query("update-dnshost");
+				mybox_echo_query("cron-restart");
+				mybox_echo_query("https-restart");
+				mybox_echo_query("dhcp-restart");
+				mybox_echo_query("pptp-restart");
+				mybox_echo_query("policy-restart");
+				mybox_echo_query("ips-restart");
+			}
+		}
+	}
+	if($tab==2) {
+		if(isset($do_save)&&$do_save==1) {
+			if($certstat=='') $certstat=0;
+			if($certstat!='') $certstat=1;
+			if($certstat==0) {
+				if($val!='') {
+					if(count($val)!=0) {
+						foreach($val as $p => $v) {
+							if($v!='') {
+								mybox_db_query("update site_certificate set $p='$v'",$db_id);
+							}
+						}
+						mybox_db_query("update site_certificate set certstat='$certstat'",$db_id);
+						$msg="Site Certificate updated!.";
+					}
+				}
+			} else {
+				mybox_db_query("update site_certificate set certstat='$certstat=1',cert='$cert'",$db_id);
+			}
+		}
+		if(isset($do_save)&&$do_save==2) {
+			if(isset($do_id)&&$do_id=='apply_chg') {
+				$msg="<script>waitcount();</script>";
+				mybox_echo_query("https-cert");
+				mybox_echo_query("https-restart");
+			}
+		}
+	}
+	if($tab==3) {
+		if(isset($do_save)&&$do_save==1) {
+			if($val!='') {
+				if(count($val)!=0) {
+					foreach($val as $p => $v) {
+						if($v!='') {
+							mybox_db_query("update misc set val='$v' where name='$p'",$db_id);
+						}
+					}
+					$msg="Date/Time setting updated!.";
+				}
+			}
+			if($dstat==1) {
+				$_ndate="$ddmon$dday$ddhour$ddmin{$ddyear}.{$ddsec}";
+				mybox_exec_cmd("date $_ndate");
+			}
+		}
+		if(isset($do_save)&&$do_save==2) {
+			if(isset($do_id)&&$do_id=='apply_chg') {
+				$msg="<script>waitcount();</script>";
+				mybox_echo_query("update-clock");
+				mybox_echo_query("cron-restart");
+			}
+		}
+	}
+
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied!.";
+		mybox_auditlog("EXECUTE","UI","PREFERENCE: $msg");
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+
+$val=array();
+$result=mybox_db_query("select * from misc",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_name=$row['name'];
+		$_val=$row['val'];
+		$val[$_name]=$_val;
+	}
+}
+
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script type='text/javascript' src="<?echo $_URL_PATH;?>/j/strings.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+	page_load();
+</script>  
+<script type='text/javascript'>
+function do_submit() {
+	<?if($tab==1){?>
+	if(chk_input()==false) return false;
+	<?}?>
+	<?if($tab==2){?>
+	if(document.f.certstat.checked==true) {
+		var cert=Trim(document.f.cert.value);
+		if(cert=='') {
+			error("pre-generated certificate and key empty!");
+			return false;
+		}
+	}
+	<?}?>
+	if(document.f.btsave) document.f.btsave.disabled=true;
+	if(document.f.btapply) document.f.btapply.disabled=true;
+	document.f.do_save.value=1;
+	document.f.submit();
+}
+function do_changes() {
+	if(document.f.btsave) document.f.btsave.disabled=true;
+	if(document.f.btapply) document.f.btapply.disabled=true;
+	self.location.href='<?echo "$_URL_PATH/system_general.exh?tab=$tab&do_save=2&do_id=apply_chg";?>';	
+}
+var k=0;
+function waitcount() { 
+ 	k=k+2;
+	if(k <= 100) {
+    		document.getElementById("msg").innerHTML='Reloading.. Please wait..'+k+'%'; 
+    		setTimeout(waitcount,200);  
+	} else {
+		self.location.href='<?echo "$_URL_PATH/system_general.exh?tab=$tab";?>';
+	}
+}
+<?if($tab==1) {?>
+function chk_input() {
+		var m1=/(\S+)\.(\S+)\.(\S+)/;
+		var hport=Trim(document.f.https_port.value);
+		var dns=document.f.dns.value;
+		if(!mip1list(dns)) {
+			error("Invalid DNS Resolver value!");
+			return false;
+		}
+		if(!isnum(hport)) {
+			error("Invalid Session Port '"+hport+"'");
+			return false;
+		}
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='text') {
+			    	if( document.f.elements[i].name=="val[hostname]") {
+					var hostname=Trim(document.f.elements[i].value);
+					if(hostname.match(m1)==null) {
+						error("Invalid hostname '"+hostname+"'");
+						return false;
+					}
+    				}
+			    	if( document.f.elements[i].name=="val[www_session]") {
+					var wwwsession=Trim(document.f.elements[i].value);
+					if(!isnum(wwwsession)) {
+						error("Invalid Session lifetime '"+wwwsession+"'");
+						return false;
+					}
+    				}
+			    	if( document.f.elements[i].name=="val[local_logs_purge]") {
+					var logs=Trim(document.f.elements[i].value);
+					if(!isnum(logs)) {
+						error("Invalid value '"+logs+"'");
+						return false;
+					}
+    				}	
+			}
+  		}
+		return true;
+	}
+<?}?>
+<?if($tab==3) {?>
+function timeUpdate() {
+	s = parseInt(document.f.ddsec.options[document.f.ddsec.selectedIndex].value);
+	s = s ? s : 0;
+	s = s+5;
+	if( s>59 ){
+		s -= 60;
+		m = parseInt(document.f.ddmin.options[document.f.ddmin.selectedIndex].value);
+		m = m ? m : 0;
+		m+=1;
+		if( m>59 ){
+			m -= 60;
+			h = parseInt(document.f.ddhour.options[document.f.ddhour.selectedIndex].value);
+			h = h ? h : 0;
+			h += 1;
+			if( h>23 ){ h -= 24; }
+			document.f.ddhour.options[h].selected = true;
+		}
+		document.f.ddmin.options[m].selected = true;
+	}
+	document.f.ddsec.options[s].selected = true; 
+	setTimeout('timeUpdate()', 5000);
+}
+function do_dstat(stat) {
+	if(stat==1) {
+		document.f.dday.disabled=false;
+		document.f.ddmon.disabled=false;
+		document.f.ddyear.disabled=false;
+		document.f.ddhour.disabled=false;
+		document.f.ddmin.disabled=false;
+		document.f.ddsec.disabled=false;
+	} else {
+		document.f.dday.disabled=true;
+		document.f.ddmon.disabled=true;
+		document.f.ddyear.disabled=true;
+		document.f.ddhour.disabled=true;
+		document.f.ddmin.disabled=true;
+		document.f.ddsec.disabled=true;
+	}
+}
+<? } // tab==3 ?>
+
+</script>
+
+</head>
+
+<body onload="parent.left_frame.switchmenu('sub1');<?if($tab==3) {?>do_dstat(0);setTimeout('timeUpdate()', 5000);<? } ?>" scroll=auto>
+<form name="f" method="post" action="<?echo "$_URL_PATH/system_general.exh";?>">
+
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 10px;'>
+<tr>
+<td>
+<p class="sectitle"><b>System:</b> Preference</p><br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="<?echo "$_URL_PATH/system_general.exh?tab=1";?>" <?if($tab==1){?>class="tabact"<?}?>>General</a></li>
+<li><a href="<?echo "$_URL_PATH/system_general.exh?tab=2";?>" <?if($tab==2){?>class="tabact"<?}?>>Site Certificate</a></li>
+<li><a href="<?echo "$_URL_PATH/system_general.exh?tab=3";?>" <?if($tab==3){?>class="tabact"<?}?>>Date/Time</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td> 
+<br>
+
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><?if(isset($msg)&&$msg!='') {?><span id=msg class=notice><?echo "$msg";?></span><?}else{echo "<span id=msg class=notice style='display: none;'></span>";}?></td></tr>
+</table><br>
+
+<!-- tab container -->
+<?if($tab==1) {
+	$https_port='5051';
+	$result=mybox_db_query("select port from service_https",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		$https_port=mybox_db_fetch_single($result);
+	}
+?>
+<table class="data" width="100%">
+<tbody>
+<tr>
+<td valign="middle" class=tdname>System Hostname</td>
+<td valign="middle" class=tdvalue><input name="val[hostname]" type="text" class="valbox" size="35" value="<?echo $val['hostname'];?>"> (host.domain.lo)</td>
+</tr>
+<tr>
+<td valign="middle" class=tdname>Session Port</td>
+<td valign="middle" class=tdvalue><input name="https_port" type="text" class="valbox" size="10" value="<?echo $https_port;?>"> default 5051</td>
+</tr>
+<tr>
+<td valign="middle" class=tdname>Session lifetime</td>
+<td valign="middle" class=tdvalue><input name="val[www_session]" type="text" class="valbox" size="10" value="<?echo $val['www_session'];?>"> minute(s)</td>
+</tr>
+<tr>
+<td valign="middle" class=tdname>Session single login</td>
+<td width="70%" valign="middle" class="tdvalue"> <input name="val[singlelogin]" type="checkbox" value='<?echo $val['singlelogin'];?>' <?if($val['singlelogin']==1) echo "checked";?>>  Enable/Disable.
+</tr>
+<tr> 
+<td valign="top" class="tdname">DNS Resolver</td>
+<td  valign="middle" class="tdvalue">
+<textarea cols=35 rows=4 class=valbox name=dns style='height: 40px;'>
+<?
+$result=mybox_db_query("select * from dns_name",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_dns=trim($row['name']);
+		echo "$_dns ";
+	}
+}
+?>
+</textarea> Separate by space
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Disabled News Update</td>
+<td width="70%" valign="middle" class="tdvalue"> <input name="val[local_news]" type="checkbox" value='<?echo $val['local_news'];?>' <?if($val['local_news']==1) echo "checked";?>>  Enable/Disable.
+</td>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Disabled local logs</td>
+<td width="70%" valign="middle" class="tdvalue"> <input name="val[local_logs]" type="checkbox" value='<?echo $val['local_logs'];?>' <?if($val['local_logs']==1) echo "checked";?>>  Enable/Disable.
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Purge local logs older than</td>
+<td width="70%" valign="middle" class="tdvalue"> <input name="val[local_logs_purge]" type="text" value='<?echo $val['local_logs_purge'];?>' size=5 class=valbox>  day(s). '0' to disable.
+</td>
+</tr>
+</tbody>
+</table>
+<? } //tab==1 ?>
+
+<?if($tab==2) {
+$result=mybox_db_query("select * from site_certificate",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_country=$row['country'];
+		$_state=$row['state'];
+		$_city=$row['city'];
+		$_organization=$row['organization'];
+		$_section=$row['section'];
+		$_email=$row['email'];
+		$_hostname=$row['hostname'];
+		$_certstat=$row['certstat'];
+		if($_certstat==1) $_certstat1="checked";
+		$_cert=$row['cert'];
+	}
+	file_put_contents("/tmp/kk",serialize($row));
+}
+?>
+<script type='text/javascript'>
+function do_certh() {
+	if(document.f.certstat.checked==true) {
+		do_show('sh1');
+		for(var x=2;x<9;x++) {
+			var xid="sh"+x;
+			do_hide(xid);
+		}
+	} else {
+		do_hide('sh1');
+		for(var x=2;x<9;x++) {
+			var xid="sh"+x;
+			do_show(xid);
+		}
+	}
+}
+</script>
+<table class="data" width="100%">
+<tbody>
+
+<tr>
+<td valign="top" class="tdname">Use pre-generated certificate and key</td>
+<td valign="top" class="tdvalue"> 
+<table class="data" width="100%" style='border: 0px; margin-bottom: 0px;'>
+<tr>
+<td style='border: 0px;'><input type="checkbox" name=certstat <?echo $_certstat1;?> onclick="do_certh();"> Enable/Disable</td>
+</tr>
+<tr id='sh1' style='display: none;'>
+<td style='border: 0px;'>
+<textarea style='height: 120px;' cols=80 rows=5 class=valbox name=cert>
+<?
+if($_cert=='') {
+echo mybox_fget_contents("/etc/openssl.pem");
+} else {
+echo "$_cert";
+}?>
+</textarea>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+
+<tr id='sh2' style='display: none;'>
+<td valign="middle" class="tdname">Country</td>
+<td valign="middle" class="tdvalue">
+<select class="valbox" style='height: 16px; font-size: 10px;' name="val[country]" size=1>
+<?
+if(file_exists("$_HTDOCS_PATH/j/country.txt")) {
+	$ff=array();
+	$ff=file("$_HTDOCS_PATH/j/country.txt");
+	if(count($ff)!=0) {
+		foreach($ff as $lx) {
+			$lx=trim($lx);
+			if($lx=='') continue;
+			list($a,$b)=preg_split("/\|/",$lx);
+			if($a=="$_country") {
+				echo "<option value='$a' selected>$b</option>";
+			} else {
+				echo "<option value='$a'>$b</option>";
+			}
+		}
+	}
+	unset($ff);
+}
+?>
+</select></td>
+</tr>
+
+<tr id='sh3' style='display: none;'>
+<td valign="middle" class="tdname">State</td>
+<td valign="middle" class="tdvalue"> 
+<input name="val[state]" type="text" class="valbox" size="35" value="<?echo $_state;?>"> 
+</td>
+</tr>
+
+<tr id='sh4' style='display: none;'>
+<td valign="middle" class="tdname">City</td>
+<td valign="middle" class="tdvalue"> 
+<input name="val[city]" type="text" class="valbox" size="35" value="<?echo $_city;?>"> 
+</td>
+</tr>
+
+<tr id='sh5' style='display: none;'>
+<td valign="middle" class="tdname">Organization</td>
+<td valign="middle" class="tdvalue"> 
+<input name="val[organization]" type="text" class="valbox" size="35" value="<?echo $_organization;?>"> 
+</td>
+</tr>
+
+<tr id='sh6' style='display: none;'> 
+<td valign="middle" class="tdname">Section/Unit</td>
+<td valign="middle" class="tdvalue"> 
+<input name="val[section]" type="text" class="valbox" size="35" value="<?echo $_section;?>"> 
+</td>
+</tr>
+
+<tr id='sh7' style='display: none;'>
+<td valign="middle" class="tdname">Admin Email</td>
+<td valign="middle" class="tdvalue"> 
+<input name="val[email]" type="text" class="valbox" size="35" value="<?echo $_email;?>"> 
+</td>
+</tr>
+
+<tr id='sh8' style='display: none;'>
+<td valign="middle" class="tdname">Hostname or IP Address</td>
+<td valign="middle" class="tdvalue"> 
+<input name="val[hostname]" type="text" class="valbox" size="35" value="<?echo $_hostname;?>"> 
+</td>
+</tr>
+
+</tbody>
+</table>
+<script type='text/javascript'>do_certh();</script>
+<? } //tab==2 ?>
+
+<?if($tab==3) {
+	$_dday=date('d');
+	$_ddmon=date('m');
+	$_ddyear=date('Y');
+	$_ddhour=date('H');
+	$_ddmin=date('i');
+	$_ddsec=date('s');
+?>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td width="30%" valign="top" class="tdname"><input type=checkbox name=dstat onclick="if(this.checked) {this.value=1;do_dstat(1);}else{this.value=0;do_dstat(0);};"> System Time</td>
+<td width="70%" valign="top" class="tdvalue"> 
+<table border=0 cellpadding=0 cellspacing=2>
+<tr>
+<td align=right style='border: 0px;'>Day</td><td style='border: 0px;'>: <select name="dday" class="valbox" style='height: 16px; font-size: 10px;'>
+<?for($x=1;$x<32;$x++) {
+	if(strlen($x)==1) $x="0$x";
+	if($x==$_dday) {
+		echo "<option value='$x' selected>$x</option>";
+	} else {
+		echo "<option value='$x'>$x</option>";
+	}
+}
+?>
+</select>
+</td><td align=right style='border: 0px;'>Month</td><td style='border: 0px;'>: <select name="ddmon" class="valbox" style='height: 16px; font-size: 10px;'>
+<?for($x=1;$x<13;$x++) {
+	if(strlen($x)==1) $x="0$x";
+	if($x==$_ddmon) {
+		echo "<option value='$x' selected>{$_MONTH[$x]}</option>";
+	} else {
+		echo "<option value='$x'>{$_MONTH[$x]}</option>";
+	}
+}
+?>
+</select>
+</td><td align=right style='border: 0px;'>Year</td><td style='border: 0px;'>: <select name="ddyear" class="valbox" style='height: 16px; font-size: 10px;'>
+<?for($x=2004;$x<2021;$x++) {
+	if($x==$_ddyear) {
+		echo "<option value='$x' selected>$x</option>";
+	} else {
+		echo "<option value='$x'>$x</option>";
+	}
+}
+?>
+</select>
+</td>
+<tr>
+<td align=right style='border: 0px;'>Hour</td><td style='border: 0px;'>: <select name="ddhour" class="valbox" style='height: 16px; font-size: 10px;'>
+<?for($x=0;$x<25;$x++) {
+	if(strlen($x)==1) $x="0$x";
+	if($x==$_ddhour) {
+		echo "<option value='$x' selected>$x</option>";
+	} else {
+		echo "<option value='$x'>$x</option>";
+	}
+}
+?>
+</select>
+</td><td align=right style='border: 0px;'>Minute</td><td style='border: 0px;'>: <select name="ddmin" class="valbox" style='height: 16px; font-size: 10px;'>
+<?for($x=0;$x<61;$x++) {
+	if(strlen($x)==1) $x="0$x";
+	if($x==$_ddmin) {
+		echo "<option value='$x' selected>$x</option>";
+	} else {
+		echo "<option value='$x'>$x</option>";
+	}
+}
+?>
+</select>
+</td><td align=right style='border: 0px;'>Second</td><td style='border: 0px;'>: <select name="ddsec" class="valbox" style='height: 16px; font-size: 10px;'>
+<?for($x=0;$x<61;$x++) {
+	if(strlen($x)==1) $x="0$x";
+	if($x==$_ddsec) {
+		echo "<option value='$x' selected>$x</option>";
+	} else {
+		echo "<option value='$x'>$x</option>";
+	}
+}
+?>
+</select>
+</td></tr>
+</table>
+
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdname">Timezone</td>
+<td width="70%" valign="middle" class="tdvalue">
+<select class="valbox" style='height: 16px; font-size: 10px;' name="val[time_zone]">
+<?
+if($fi=fopen("$_ZONELIST","r")) {
+	while($buff=fgets($fi,150)) {
+		$buff=trim($buff);
+		$buff1=str_replace("_"," ",$buff);
+		if($buff==$val['time_zone']) {
+			echo "<option value='$buff' selected>$buff1</option>";
+		} else {
+			echo "<option value='$buff'>$buff1</option>";
+		}
+		unset($buff1);
+	}
+	fclose($fi);
+}
+?>
+</select></td>
+</tr>
+
+<tr> 
+<td width="30%" valign="top" class="tdname">NTP Server</td>
+<td width="70%" valign="top" class="tdvalue"> 
+<textarea class=valbox cols=40 rows=3 style='height: 50px;' name=val[ntp_server]>
+<?
+$_lst=preg_split("/\s+/",$val['ntp_server']);
+if(count($_lst)!=0) {
+	foreach($_lst as $_lx) {
+		$lx=trim($lx);
+		echo "$_lx ";
+	}
+} else {
+	echo "{$val['ntp_server']} ";
+}
+?>
+</textarea> Each server separate by space.
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdname">NTP interval</td>
+<td width="70%" valign="middle" class="tdvalue"> <input name="val[ntp_time]" type="text" class="valbox" size="10" value="<?echo $val['ntp_time'];?>">  minute(s), 0 to disable.
+</td>
+</tr>
+
+</tbody>
+</table>
+<? } //tab==3 ?>
+
+<table align=right>
+<tbody>
+<tr>
+<td><input name="btapply" value="Reload" type="button" class=button onclick="do_changes();"></td>
+<td><input name="btsave" value="Save" type="button" class=button onclick="do_submit();"> </td>  </tr> 
+</tbody>
+</table>
+<input type=hidden name=do_save value=''>
+<input type=hidden name=tab value='<?echo $tab;?>'>
+
+<!-- end tab container -->
+
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+
+</form>
+<script type='text/javascript'>page_kill();</script>
+</body>
+</html>
+<?mybox_db_close($db_id); flush();?>

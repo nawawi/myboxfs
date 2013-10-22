@@ -1,0 +1,391 @@
+#!/bin/sh
+trap abort 1 2 3 15
+
+PATH="/bin"
+TERM=linux
+export PATH TERM
+umask 077
+
+echo "0 0 0 0" > /proc/sys/kernel/printk
+
+ANSWER="/tmp/.setup"
+TITLE="MyBox Firewall System v2.1 Installation - http://www.mybox.net.my"
+LOG="/dev/tty2"
+CDROM=
+DISK=
+NIC=0
+NICS=0
+CHKOK=1
+TXT=
+
+SWAPS="2048"
+DISKSET=",101,,*\n,$SWAPS,S\n;,\n"
+
+abort() {
+/bin/clear
+umount -r /strg >/dev/null 2>&1
+umount -r /boot >/dev/null 2>&1
+umount -r /cdrom >/dev/null 2>&1
+wait
+/bin/eject >/dev/null 2>&1
+/bin/reboot
+}
+
+convertdev() {
+	# assume a /dev/hdX or /dev/hdXY name
+	letter=`echo $1 | cut -b8`
+	case $letter in
+		"a") dnum=0 ;;
+		"b") dnum=1 ;;
+		"c") dnum=2 ;;
+		"d") dnum=3 ;;
+		"e") dnum=4 ;;
+		"f") dnum=5 ;;
+		"g") dnum=6 ;;
+		"h") dnum=7 ;;
+		*) return
+	esac
+
+	if [ "`echo $1 | egrep '[0-9]$'`" ]; then
+		# /dev/hdXY
+		pnum=`echo $1 | cut -b9-`
+		pnum=$(($pnum-1))
+		echo "(hd${dnum},${pnum})"
+	else
+		# /dev/hdX
+		echo "(hd${dnum})"
+	fi
+}
+
+mkfsext3() {
+	local _device=$1
+	local _fstype=$2
+	local _dest=$3
+
+	mkfs.ext3 ${_device} >$LOG 2>&1
+	if [ $? != 0 ]; then
+		msg "Error creating filesystem: mkfs.ext3 ${_device}"
+		abort
+		/bin/reboot
+	fi
+	sleep 2
+	tune2fs -i 0 -c 0 ${_device} >$LOG 2>&1
+	mkdir -p ${_dest}
+	mount -t ext3 ${_device} ${_dest} >$LOG 2>&1
+	if [ $? != 0 ]; then
+		msg "Error mounting ${_dest}"
+		abort
+		/bin/reboot
+	fi
+}
+
+mkfsswap() {
+	local _device=$1
+	swapoff ${_device} >/dev/null 2>&1
+	mkswap ${_device} >$LOG 2>&1
+	sync
+	swapon ${_device} >$LOG 2>&1
+	if [ $? != 0 ]; then
+		msg "Error activating swap: swapon ${_device}"
+		abort
+		/bin/reboot
+	fi
+}
+
+
+findcdroms() {
+	cd /sys/block
+	for dev in `ls | egrep '^hd|^sd|^sr|^scd'`; do
+		if [ "`cat $dev/removable`" = "1" ]; then
+			echo "/dev/$dev"
+		fi
+	done
+	cd - >/dev/null
+}
+
+finddisks() {
+	cd /sys/block
+	for dev in `ls | egrep '^hda|^sda'`; do
+		if [ "`cat $dev/removable`" = "0" ]; then
+			echo "/dev/$dev"
+		fi
+	done
+	cd - >/dev/null
+}
+
+findnic() {
+	local pt="0"
+	NET_DEVICE=$(awk -F: '/eth.:/{print $1}' /proc/net/dev)
+	if [ -n "$NET_DEVICE" ]; then
+		for x in $NET_DEVICE; do
+			ip link set $x up >/dev/null 2>&1
+			if [ $? = 0 ]; then
+				echo -n "$x "
+				let pt=pt+1	
+			fi
+		done
+		NICS="$pt"
+	else
+		echo ""
+	fi
+}
+
+msg() {
+	dodialog msgbox "$1"
+	return 1
+}
+
+dodialog() {
+	height=12
+	width=65
+	if [ "$3" != "" ]; then
+		height=$3
+	fi
+	if [ "$4" != "" ]; then
+		width=$4
+	fi
+
+	dialog --backtitle "$TITLE" --aspect 15 --$1 "$2" $height $width $5
+}
+
+main() {
+	dodialog msgbox "Welcome to the MyBox Firewall System Installation program. The install process is fairly straightforward. Pressing ctrl+c will abort the installation." 10 65
+	TXT="Checking storage disk.."
+	dodialog infobox "$TXT" 10 65
+	DISK=$(finddisks)
+	if [ "$DISK" = "" ]; then
+		DISK="Not found"
+		CHKOK=0
+	fi
+	DISKB=$(basename $DISK)
+	if [ -r "/sys/block/$DISKB/size" ]; then
+		HDSIZE=$(($(cat /sys/block/$DISKB/size)/2/1024/1024))
+		TXT="$TXT $HDSIZE GB"
+		dodialog infobox "$TXT" 10 65
+		if [ "$HDSIZE" -gt "100" -o "$HDSIZE" = "100" ]; then
+			SWAPS="4096"
+		elif [ "$HDSIZE" -gt "4" -o "$HDSIZE" = "4" ]; then
+			SWAPS="1024"
+		else
+			SWAPS="128"
+                fi
+	fi
+	sleep 1
+	TXT="$TXT $DISK\nChecking CDROM........."
+	dodialog infobox "$TXT" 10 65
+	CDROM=$(findcdroms)
+	if [ "$CDROM" = "" ]; then
+		CDROM="Not found"
+		CHKOK=0
+	fi
+	sleep 1
+	TXT="$TXT $CDROM"
+	dodialog infobox "$TXT" 10 65
+	sleep 1
+	TXT="$TXT\nChecking NIC..........."
+	dodialog infobox "$TXT" 10 65
+	NIC=$(findnic)
+	findnic >/dev/null 2>&1
+	if [ "$NIC" = "" ]; then
+		NIC="Not found"
+		CHKOK=0
+	else
+		if [ "$NICS" -lt 3 ]; then
+			msg "Detected only have $NICS network interface. You need at least 3 interfaces. Press <Enter> to continue.."
+			sleep 2
+		fi
+	fi
+	TXT="$TXT $NIC"
+	dodialog infobox "$TXT" 10 65
+
+	if [ "$CHKOK" = 0 ]; then
+		TXT="$TXT\n\nChecking system requirements failed. Press <Enter> for reboot.."
+		dodialog infobox "$TXT" 10 65
+		read p
+		abort
+		/bin/reboot
+	else 
+		TXT="$TXT\nChecking system succeeded.."
+		dodialog infobox "$TXT" 10 65
+		sleep 2
+	fi
+
+	TXT="$TXT\nMounting CDROM $CDROM.."
+	dodialog infobox "$TXT" 10 65
+	mkdir /cdrom
+	mount -t iso9660 $CDROM /cdrom >$LOG 2>&1
+	if [ $? != 0 ]; then
+		msg "Error mounting /cdrom"
+		abort
+		/bin/reboot
+	fi
+	sleep 2
+
+	dodialog inputbox "Enter size for SWAP space in MB" 10 65 "$SWAPS" 2>$ANSWER || return 1
+	SWAPS=`cat $ANSWER`
+
+	dodialog infobox "$TXT\nSwap size $SWAPS MB" 10 65
+	sleep 2
+	DISKSET=",101,,*\n,$SWAPS,S\n;,\n"
+	DISKSET=$(printf "$DISKSET")
+
+	dodialog yesno "Next step, $DISK will be completely erased! are you absolutely sure?"
+	if [ "$?" = 1 ]; then
+		abort
+		/bin/reboot
+	fi
+
+	BOOT="${DISK}1"
+	SWAP="${DISK}2"
+	ROOT="${DISK}3"
+
+	TXT="Partitioning $DISK..please wait.."
+	dodialog infobox "$TXT" 10 65
+
+sfdisk $DISK -uM >$LOG 2>&1 <<EOF
+$DISKSET
+EOF
+
+	if [ $? -gt 0 ]; then
+		msg "Error partitioning $DEVICE (see $LOG for details)"
+		abort
+		/bin/reboot
+	fi
+
+	TXT="$TXT\nCreating boot filesystem.."
+	dodialog infobox "$TXT" 10 65
+	mkfsext3 "$BOOT" "ext3" "/boot"
+	sleep 1
+
+	TXT="$TXT\nCreating swap filesystem.."
+	dodialog infobox "$TXT" 10 65
+	mkfsswap "$SWAP"
+	sleep 1
+
+	TXT="$TXT\nCreating storage filesystem.."
+	dodialog infobox "$TXT" 10 65
+	mkfsext3 "$ROOT" "ext3" "/strg"
+
+	TXT="$TXT\nInstalling systems..."
+	dodialog infobox "$TXT" 10 65
+	tar -zxf /cdrom/data/os.dat -C /boot >$LOG 2>&1
+	sync
+	tar -zxf /cdrom/data/db.dat -C /strg >$LOG 2>&1
+	sync
+	IPSD=$(ls /cdrom/data/myboxOS.*.ips.*.bin)
+	tar -xvf $IPSD -C /strg/mybox
+	sync
+	if [ -f "/strg/mybox/ipsr/ips.db" ]; then
+		rm -f /strg/mybox/db/ips.db
+		wait
+		mv /strg/mybox/ipsr/ips.db /strg/mybox/db/ips.db
+	fi
+	sleep 1
+	TXT="$TXT\nInstalling boot loader..."
+	dodialog infobox "$TXT" 10 65
+	tar -C /boot/ -zxf /etc/grub.tgz
+	sleep 1
+	echo '#!/bin/sh
+rm -f *_fallback
+echo "rm -f *_fallback"
+for f in *.bin;do 
+        echo "mv $f ${f}_fallback"
+        mv $f ${f}_fallback
+done
+echo "mv ../*.bin ."
+mv  ../*.bin .' > /boot/ren
+	wait
+
+echo "
+#
+# Generated by Mybox Firewall System Installer
+#
+# - Info:
+# - Storage:
+# storage device                (${DISK})
+# dev_boot = boot partition     (${DISK}1)
+# dev_swap = swap partition     (${DISK}2)
+# dev_strg = storage partition  (${DISK}3)
+# - COM PORT:
+# COM1 = ttyS0
+# COM2 = ttyS1
+#
+# - Kernel options
+# - lcd: if you have LCM-100 lcd 
+#   connected to COM2
+#dev_lcd=ttyS1
+#
+# - NIC: max no. of NIC, leave untouch if you 
+#   want mybox auto detect NIC
+#numnet=4
+#
+
+# terminal order, console -> serial
+serial --unit=0 --speed=9600 --word=8 --parity=no --stop=1
+terminal --silent --timeout=2 console serial
+
+default=0
+fallback=1
+timeout=0
+hiddenmenu
+
+# (0) main kernel+fimware
+title Mybox Firewall System
+root (hd0,0)
+kernel /myboxos.bin rw root=/dev/ram0 dev_boot=${DISK}1:ext3 dev_swap=${DISK}2:swap dev_strg=${DISK}3:ext3 quiet console=tty1 console=ttyS0,9600n8
+initrd /myboxsys.bin
+quiet
+boot
+
+# (1) fallback kernel+fimware
+title Mybox Firewall System fallback
+root (hd0,0)
+kernel /myboxos.bin_fallback rw root=/dev/ram0 dev_boot=${DISK}1:ext3 dev_swap=${DISK}2:swap dev_strg=${DISK}3:ext3 quiet console=tty1 console=ttyS0,9600n8
+initrd /myboxsys.bin_fallback
+quiet
+boot
+" > /boot/grub/menu.lst
+
+	grubroot="$(convertdev ${DISK}1)"
+	grubsetup="$(convertdev $DISK)"
+
+/bin/grub --no-floppy --batch >/tmp/grub.log 2>&1 <<EOF
+root $grubroot
+setup $grubsetup
+quit
+EOF
+
+	cat /tmp/grub.log >$LOG
+	if grep "Error [0-9]*: " /tmp/grub.log >/dev/null; then
+		msg "Error installing boot loader. (see $LOG for output)"
+		/bin/sh
+	fi
+	TXT="$TXT\nBoot loader was successfully installed."
+	dodialog infobox "$TXT" 10 65
+	sleep 1
+	#dodialog yesno "\nAre you want to review the boot loader configuration file?" 8 50
+	#if [ $? = "0" ]; then
+	#	TMP=/tmp/conf$$
+	#	cp /boot/grub/menu.lst $TMP
+	#	vi $TMP
+	#	wait
+	#	if [ $? = "0" ]; then
+	#		TXT="$TXT\nSaving boot loader configuration file."
+	#		dodialog infobox "$TXT" 10 65
+	#		cp /boot/grub/menu.lst /boot/grub/menu.lst.ori
+	#		cat $TMP > /boot/grub/menu.lst
+	#		wait
+	#	fi
+	#fi
+	TXT="Installation is completed.\n\nPoint your web browser to https://192.168.3.1:5051.\n\nLogin with access password admin123.\n\nPress <Enter>/<return> to reboot."
+	dodialog infobox "$TXT"
+	read p
+	sleep 2
+	abort
+}
+
+main
+/bin/eject $CDROM >/dev/null 2>&1
+sleep 1
+/bin/reboot
+exit 0

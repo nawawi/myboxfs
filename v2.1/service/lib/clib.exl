@@ -1,0 +1,13 @@
+<?
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+
+include_once('global.exl');
+include_once('utils.exl');
+include_once('update.exl');
+include_once('db.exl');
+include_once('net.exl');
+include_once('auth.exl');
+include_once('logs.exl');
+include_once('rrdtool.exl');
+include_once('graph.exl');
+?>

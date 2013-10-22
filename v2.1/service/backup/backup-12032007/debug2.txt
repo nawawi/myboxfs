@@ -1,0 +1,18 @@
+Jan  9 17:08:01 fw INADYN[9029]: INADYN: Started 'INADYN version 1.96' - dynamic DNS updater. 
+Jan  9 17:08:02 fw INADYN[9029]: OS_UNIX:Signal '0x2' received. Sending 'Shutdown cmd'. 
+Jan  9 17:08:02 fw INADYN[9029]: INADYN:IP: Error 0x4 in recv() 
+Jan  9 17:08:02 fw INADYN[9029]: W: DYNDNS: Error 'RC_IP_RECV_ERROR' (0x15) when talking to IP server 
+Jan  9 17:08:02 fw INADYN[9029]: W:'RC_IP_RECV_ERROR' (0x15) updating the IPs. (it 0) 
+Jan  9 17:08:02 fw INADYN[9029]: STOP command received. Exiting. 
+Jan  9 17:08:12 fw INADYN[9077]: INADYN: Started 'INADYN version 1.96' - dynamic DNS updater. 
+Jan  9 17:08:13 fw INADYN[9077]: I:INADYN: IP address for alias 'awie.hopto.org' needs update to '219.95.155.218' 
+Jan  9 17:08:16 fw INADYN[9077]: W:'RC_IP_CONNECT_FAILED' (0x13) updating the IPs. (it 0) 
+Jan  9 17:22:33 fw INADYN[12018]: I:INADYN: Alias 'awie.hopto.org' to IP '219.95.155.218' updated successful.
+
+
+I:INADYN: IP address for alias 'awie.hopto.org' needs update to '219.95.171.114'
+I:INADYN: Alias 'awie.hopto.org' to IP '219.95.171.114' updated successful.
+
+
+Jan 15 18:56:33 fw snort[11336]: [125:7:1] (ftp_telnet) FTP traffic encrypted {TCP} 204.157.3.70:21 -> 192.168.0.203:57905
+Jan 15 18:56:33 fw snort[11325]: [125:7:1] (ftp_telnet) FTP traffic encrypted {TCP} 204.157.3.70:21 -> 192.168.1.2:57905

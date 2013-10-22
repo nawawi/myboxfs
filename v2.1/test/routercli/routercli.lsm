@@ -1,0 +1,15 @@
+Begin4
+Title:		RouterCli
+Version:	0.4
+Entered-date:	2004-07-09
+Description: 	Routercli is a Cisco-like shell for diskless or one-floppy Linux mini-distributions.
+Keywords:	routercli, cisco-like, cli,router
+Author:		xyzyx@rambler.ru (Alexander Eremin) 
+Maintained-by:	xyzyx@rambler.ru (Alexander Eremin)
+Primary-site:	http://routercli.sourceforge.net
+		126K    routercli-0.4.tar.gz
+Platforms:	Built with GNU C compiler with libreadline
+Copying-policy: Gnu Library General Public License (GLPL) 2.0
+End
+	 
+	 

@@ -1,0 +1,125 @@
+<?
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+mybox_chk_session();
+mybox_send_nocache();
+function write_link($file,$name,$license) {
+	global $_HTDOCS_PATH, $_URL_PATH, $_PNG;
+	if($license!='') {
+		if(mybox_license($license)!=1) return; 
+	}
+	$link="$_HTDOCS_PATH/$file";
+	if(file_exists($link)) {
+		echo "{$_PNG['rarrow']}&nbsp;<a href='$_URL_PATH/$file' target='right_frame'>$name</a><br/>";
+	}
+}
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/tblue.css" TYPE="text/css">
+<script type='text/javascript' src="<?echo $_URL_PATH;?>/j/strings.js"></script>
+<style type="text/css">
+body {
+background: white url("<?echo $_URL_PATH;?>/i/dotted.png");
+background-repeat: repeat-y;
+background-position: right;
+background-attachment: fixed;
+scrollbar-arrow-color: #FFFFFF;
+scrollbar-base-color: #8E8792;
+scrollbar-shadow-color: #8E8792;
+scrollbar-face-color: #AEA2B4;
+scrollbar-highlight-color: #DDDDDD;
+scrollbar-dark-shadow-color: #8E8792;
+scrollbar-3d-light-color: #8E8792;
+}
+</style>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+function switchmenu(obj){
+	if(document.getElementById) {
+		var el=document.getElementById(obj);
+		var ar=document.getElementById("menumain").getElementsByTagName("DIV");
+		if(el.style.display == "none"){
+			for(var i=0; i<ar.length; i++) {
+				ar[i].style.display = "none";
+			}; 
+			el.style.display = "block";
+
+		}
+	}
+};
+</script>
+</head>
+<body scroll=auto onload="switchmenu('sub1');loadimages('<?echo $_URL_PATH;?>/i/rmarrow.png','<?echo $_URL_PATH;?>/i/rarrow.png','<?echo $_URL_PATH;?>/i/dotted.png');">
+<table border=0 width="80%">
+<tr>
+<td align="justify" valign="left">
+<table style='width: 10px;'>
+<tr>
+<td align="left">
+<div id="menumain" style='padding-left: 0px;'>
+	<p id="menu1" class="left_menu" onclick="switchmenu('sub1')"><?echo $_PNG['rmarrow'];?>&nbsp;System</p>
+	<div class="left_submenu" id="sub1" style="display: none;">
+<?
+	write_link('system_general.exh','Preference','');
+	write_link('system_acl.exh','Access list','');
+	write_link('system_services.exh','Services','');
+	write_link('system_backup.exh','Backup','');
+	write_link('system_update.exh','Update','');
+	write_link('system_alert.exh','Notification','');
+	write_link('system_definations.exh','Definations','');
+?>
+	</div>
+
+	<p id="menu2" class="left_menu" onclick="switchmenu('sub2')"><?echo $_PNG['rmarrow'];?>&nbsp;Network</p> 
+	<div class="left_submenu" id="sub2" style="display: none;">
+<?
+	write_link('network_int.exh','Interfaces','');
+	write_link('network_route.exh','Routing/gateway','');
+	write_link('network_shaper.exh','Traffic shaper','ITS');
+	//write_link('network_ipscan.exh','IPScan','');
+	write_link('network_arp.exh','ARP','');
+?>
+	</div>
+
+	<p id="menu3" class="left_menu" onclick="switchmenu('sub3')"><?echo $_PNG['rmarrow'];?>&nbsp;Firewall</p>
+	<div class="left_submenu" id="sub3" style="display: none;">
+<?
+	write_link('fw_rules.exh','Packet Filter','');
+	write_link('fw_blacklist.exh','Blacklist','');
+	write_link('fw_nat.exh','NAT Rules','');
+	write_link('fw_ips.exh','IPS/Portscan','IPS');
+	write_link('fw_cf.exh','Surf Filter','');
+?>
+	</div>
+<?if(mybox_license("VPN")==1) {?>
+	<p id="menu4" class="left_menu" onclick="switchmenu('sub4')"><?echo $_PNG['rmarrow'];?>&nbsp;VPN Access</p>
+	<div class="left_submenu" id="sub4" style="display: none;">
+<?
+	write_link('vpn_pptp.exh','PPTP','PPTP');
+?>
+	</div>
+<? } // vpn ?>
+	<p id="menu5" class="left_menu" onclick="switchmenu('sub5')"><?echo $_PNG['rmarrow'];?>&nbsp;Diagnostics</p>
+	<div class="left_submenu" id="sub5" style="display: none;">
+<?
+	write_link('diag_logs.exh','Local logs','');
+	write_link('diag_graphs.exh','Graphs','');
+	write_link('diag_nettools.exh','IP Tools','');
+?>
+	</div>
+</div>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+</table>
+</body>
+</html>
+<?flush();?>

@@ -1,0 +1,405 @@
+#!/bin/bash
+# 
+#This program is free software; you can redistribute it and/or
+#modify it under the terms of the GNU General Public License
+#as published by the Free Software Foundation; either version 2
+#of the License, or (at your option) any later version.
+#
+#This program is distributed in the hope that it will be useful,
+#but WITHOUT ANY WARRANTY; without even the implied warranty of
+#MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#GNU General Public License for more details.
+#
+#You should have received a copy of the GNU General Public License
+#along with this program; if not, write to the Free Software
+#Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+#
+# This firewall was developed for the NetSecL Linux Distribution and was put together by:
+# Iuri Stanchev (admin) - NetSecL Maintainer
+# Alexandru Mocanu (Exeter)
+# John Matheson (johnm)
+#
+#The firewall is being discussed in the NetSecL forum
+#http://netsecl.myfreeforum.org/ftopic5.php
+
+if [ "$1" = "start" ]; then
+
+IPTABLES="/usr/sbin/iptables"
+
+#Probe internet interfaces
+if [ "$(/sbin/ifconfig | /bin/grep eth0)" ]; then
+INTERNET="eth0"
+
+elif [ "$(/sbin/ifconfig | /bin/grep eth1)" ]; then
+INTERNET="eth1"
+
+else INTERNET="ppp0"
+
+fi
+
+#Get the DNS Server
+NAMESERVER=`grep nameserver /etc/resolv.conf |head -1|awk '{print $2}'`
+#NAMESERVER="" #Manually set this variabale if the DNS is not recognized
+if [ "$NAMESERVER" = "" ]; then
+ echo "You must manually set the DNS Server. Please edit /etc/rc.d/rc.firewall or use netconfig to configure your network and set a DNS Server."
+fi
+
+
+CLASS_A="127.0.0.0/8"
+CLASS_B="172.16.0.0/12"
+CLASS_C="192.168.0.0/16"
+CLASS_D_MULTICAST="224.0.0.0/4"
+CLASS_E_RESERVED_NET="240.0.0.0/5"
+BROADCAST_DEST="255.255.255.255"
+
+# FTP (20, 21) SSH (22) SMTP (25) WHOIS (43) WWW (80) POP (110) IDENT (113) USENET (119)  IMAP (143) SSL (443) PROXY (8008, 8080)
+PORTS="20 21 25 80 110 113 443 8080" #
+PASSIVEFTP="Y"
+PINGDEATH="Y" 
+LOGGING="N" 
+SSHDREQ="N" #ALLOW INCOMING SSHD REQUESTS
+SSHSRV="N" #ALLOW SSH server
+
+$IPTABLES -P INPUT DROP
+$IPTABLES -P OUTPUT DROP
+$IPTABLES -P FORWARD DROP
+
+# Firewall initialization, remove everything, start with clean tables
+$IPTABLES -F # remove all rules
+$IPTABLES -t nat -F # remove all rules
+$IPTABLES -t mangle -F # delete all user-defined chains
+$IPTABLES -X # delete all user-defined chains
+$IPTABLES -t nat -X # remove all rules
+$IPTABLES -t mangle -X # delete all user-defined chains
+
+#enable broadcast echo protection
+echo 1 > /proc/sys/net/ipv4/icmp_echo_ignore_broadcasts
+
+echo 1 > /proc/sys/net/ipv4/icmp_echo_ignore_all
+
+#Disable Source Routed packets
+for f in /proc/sys/net/ipv4/conf/*/accept_source_route; do
+echo 0 > $f
+done
+
+#Enable TCP SYN Cookie Protection
+echo 1 > /proc/sys/net/ipv4/tcp_syncookies
+
+# Reduce SYN Floods
+echo 4096 >/proc/sys/net/ipv4/tcp_max_syn_backlog 
+
+#IP Forward
+echo 0 > /proc/sys/net/ipv4/ip_forward
+
+#Disable ICMP redirect Acceptance
+for f in /proc/sys/net/ipv4/conf/*/accept_redirects; do
+echo 0 > f$
+done
+
+# Send Redirect Messges
+for f in /proc/sys/net/ipv4/conf/*/send_redirects; do
+echo 0 > $f
+done
+
+echo 0 > /proc/sys/net/ipv4/conf/all/secure_redirects
+
+# Drop Spoofed Packets coming in on an interface, which, if replied to,
+# would result in the reply goingout a different interface.
+for f in /proc/sys/net/ipv4/conf/*/rp_filter; do
+echo 1 > f$
+done
+
+# Log packets with impossible addresses
+for f in /proc/sys/net/ipv4/conf/*/log_martians; do
+echo 1 > $f
+done
+
+# Set up our logging and packet 'executing' chains
+$IPTABLES -N LOG_DROP
+$IPTABLES -N logaborted2
+$IPTABLES -A logaborted2 -j LOG --log-prefix "ABORTED " --log-level 4 --log-ip-options --log-tcp-options --log-tcp-sequence
+$IPTABLES -A logaborted2 -m state --state ESTABLISHED,RELATED -j ACCEPT
+$IPTABLES -N logaborted
+$IPTABLES -A logaborted -m limit --limit 1/second --limit-burst 10 -j logaborted2
+$IPTABLES -A logaborted -m limit --limit 2/minute --limit-burst 1 -j LOG --log-prefix "LIMITED " --log-level 4 
+
+# allow everything for loop device
+$IPTABLES -A INPUT -i lo -j ACCEPT
+$IPTABLES -A OUTPUT -j ACCEPT
+
+$IPTABLES -P INPUT DROP
+$IPTABLES -P OUTPUT DROP
+$IPTABLES -P FORWARD DROP
+
+#portscan detector
+$IPTABLES -N PORTSCAN
+#portscan detection module
+# NMAP FIN/URG/PSH
+$IPTABLES -A INPUT -p tcp --tcp-flags ALL FIN,URG,PSH -m recent --set -j PORTSCAN
+$IPTABLES -A FORWARD -p tcp --tcp-flags ALL FIN,URG,PSH -m recent --set -j PORTSCAN
+# SYN/RST
+$IPTABLES -A INPUT -p tcp --tcp-flags SYN,RST SYN,RST -m recent --set -j PORTSCAN
+$IPTABLES -A FORWARD -p tcp --tcp-flags SYN,RST SYN,RST -m recent --set -j PORTSCAN
+# SYN/FIN -- Scan(probably)
+$IPTABLES -A INPUT -p tcp --tcp-flags SYN,FIN SYN,FIN -m recent --set -j PORTSCAN
+$IPTABLES -A FORWARD -p tcp --tcp-flags SYN,FIN SYN,FIN -m recent --set -j PORTSCAN
+# NMAP FIN Stealth
+$IPTABLES -A INPUT -p tcp --tcp-flags ALL FIN -m recent --set -j PORTSCAN
+$IPTABLES -A FORWARD -p tcp --tcp-flags ALL FIN -m recent --set -j PORTSCAN
+# ALL/ALL Scan
+$IPTABLES -A INPUT -p tcp --tcp-flags ALL ALL -m recent --set -j PORTSCAN
+$IPTABLES -A FORWARD -p tcp --tcp-flags ALL ALL -m recent --set -j PORTSCAN
+# NMAP Null Scan
+$IPTABLES -A INPUT -p tcp --tcp-flags ALL NONE -m recent --set -j PORTSCAN
+$IPTABLES -A FORWARD -p tcp --tcp-flags ALL NONE -m recent --set -j PORTSCAN
+#XMAS
+$IPTABLES -A INPUT -p tcp --tcp-flags ALL URG,ACK,PSH,RST,SYN,FIN -m recent --set -j PORTSCAN
+$IPTABLES -A FORWARD -p tcp --tcp-flags ALL URG,ACK,PSH,RST,SYN,FIN -m recent --set -j PORTSCAN
+
+if [ "$LOGGING" = "Y" ]; then
+$IPTABLES -A LOG_DROP -m limit --limit 6/minute --limit-burst 1 -j LOG --log-prefix "PORTSCAN SHUN " --log-level 4 --log-ip-options --log-tcp-options --log-tcp-sequence
+$IPTABLES -A LOG_DROP -j DROP 
+fi
+
+$IPTABLES -A PORTSCAN -j DROP
+
+
+# Drop packets with bad tcp flags
+$IPTABLES -N BAD_FLAGS
+$IPTABLES -A INPUT -p tcp --tcp-option 64 -m recent --set -j BAD_FLAGS
+$IPTABLES -A INPUT -p tcp --tcp-option 128 -m recent --set -j BAD_FLAGS
+
+if [ "$LOGGING" = "Y" ]; then
+$IPTABLES -A LOG_DROP -m limit --limit 6/minute --limit-burst 1 -j LOG --log-prefix "BADFLAGS SHUN " --log-level 4 --log-ip-options --log-tcp-options --log-tcp-sequence
+$IPTABLES -A LOG_DROP -j DROP 
+fi
+
+$IPTABLES -A BAD_FLAGS -j DROP
+
+# Drop packets that are too small Note:
+$IPTABLES -N SMALL
+$IPTABLES -A INPUT -p udp -m length --length 0:27 -m recent --set -j SMALL
+$IPTABLES -A INPUT -p tcp -m length --length 0:39 -m recent --set -j SMALL
+$IPTABLES -A INPUT -p icmp -m length --length 0:27 -m recent --set -j SMALL
+$IPTABLES -A INPUT -p 30 -m length --length 0:31 -m recent --set -j SMALL
+$IPTABLES -A INPUT -p 47 -m length --length 0:39 -m recent --set -j SMALL
+$IPTABLES -A INPUT -p 50 -m length --length 0:49 -m recent --set -j SMALL
+$IPTABLES -A INPUT -p 51 -m length --length 0:35 -m recent --set -j SMALL
+$IPTABLES -A INPUT -m length --length 0:19 -m recent --set -j SMALL
+
+if [ "$LOGGING" = "Y" ]; then
+$IPTABLES -A LOG_DROP -m limit --limit 6/minute --limit-burst 1 -j LOG --log-prefix "SMALL SHUN " --log-level 4 --log-ip-options --log-tcp-options --log-tcp-sequence
+$IPTABLES -A LOG_DROP -j DROP 
+fi 
+
+$IPTABLES -A SMALL -j DROP
+
+# Reject all BOGUS packets
+$IPTABLES -N BOGUS
+$IPTABLES -t filter -p all -A INPUT -m conntrack --ctstate INVALID -j BOGUS
+$IPTABLES -t filter -p all -A OUTPUT -m conntrack --ctstate INVALID -j BOGUS
+$IPTABLES -t filter -p all -A FORWARD -m conntrack --ctstate INVALID -j BOGUS
+
+if [ "$LOGGING" = "Y" ]; then
+$IPTABLES -A LOG_DROP -m limit --limit 6/minute --limit-burst 1 -j LOG --log-prefix "BOGUS SHUN " --log-level 4 --log-ip-options --log-tcp-options --log-tcp-sequence
+$IPTABLES -A LOG_DROP -j DROP 
+fi 
+
+$IPTABLES -A BOGUS -j REJECT
+
+#Enforce SYN only connections on NEW connections
+$IPTABLES -A INPUT -p tcp ! --syn -m conntrack --ctstate NEW -j LOG --log-prefix "New not syn:"
+$IPTABLES -A INPUT -p tcp ! --syn -m conntrack --ctstate NEW -j DROP
+$IPTABLES -A FORWARD -p tcp ! --syn -m conntrack --ctstate NEW -j LOG --log-prefix "New not syn:"
+$IPTABLES -A FORWARD -p tcp ! --syn -m conntrack --ctstate NEW -j DROP
+
+# Drop packets to "odd" ports
+$IPTABLES -N ODDPORTS
+$IPTABLES -A INPUT -p udp --sport 2:21 -m recent --set -j ODDPORTS
+$IPTABLES -A INPUT -p udp --dport 2:21 -m recent --set -j ODDPORTS
+$IPTABLES -A INPUT -p tcp --dport 0 -m recent --set -j ODDPORTS
+$IPTABLES -A INPUT -p tcp --sport 0 -m recent --set -j ODDPORTS
+$IPTABLES -A FORWARD -i $INTERNET -p udp --dport 2:21 -m recent --set -j ODDPORTS
+$IPTABLES -A FORWARD -i $INTERNET -p tcp --dport 0 -m recent --set -j ODDPORTS
+$IPTABLES -A FORWARD -i $INTERNET -p tcp --sport 0 -m recent --set -j ODDPORTS
+
+if [ "$LOGGING" = "Y" ]; then
+$IPTABLES -A LOG_DROP -m limit --limit 6/minute --limit-burst 1 -j LOG --log-prefix "ODDPORTS SHUN " --log-level 4 --log-ip-options --log-tcp-options --log-tcp-sequence
+$IPTABLES -A LOG_DROP -j DROP 
+fi 
+
+$IPTABLES -A ODDPORTS -j DROP
+
+#BLOCK OS Fingerprint Detection
+$IPTABLES -N os-fingerprint
+$IPTABLES -F os-fingerprint
+$IPTABLES -A os-fingerprint -p tcp --dport 0 -j DROP
+$IPTABLES -A os-fingerprint -p udp --dport 0 -j DROP
+$IPTABLES -A os-fingerprint -p tcp --sport 0 -j DROP
+$IPTABLES -A os-fingerprint -p udp --sport 0 -j DROP
+$IPTABLES -A os-fingerprint -p icmp --icmp-type address-mask-request -j DROP
+$IPTABLES -A os-fingerprint -p icmp --icmp-type address-mask-reply -j DROP
+
+#
+#refuse packets claiming to be from a Class_A private network.
+$IPTABLES -A INPUT -i $INTERNET -s $CLASS_A -j DROP
+
+#refuse packets claiming to be from a Class_B private network.
+$IPTABLES -A INPUT -i $INTERNET -s $CLASS_B -j DROP
+
+#refuse packets claiming to be from a Class_C private network.
+$IPTABLES -A INPUT -i $INTERNET -s $CLASS_C -j DROP
+
+#Refuse Class E reserved IP
+$IPTABLES -A INPUT -i $INTERNET -s $CLASS_D_MULTICAST -j DROP
+
+#Refuse Class D multicast address
+$IPTABLES -A INPUT -s $CLASS_E_RESERVED_NET -j DROP
+
+#refuse malformed broadcacst packets
+$IPTABLES -A INPUT -i $INTERNET -s $BROADCAST_DEST -j LOG
+$IPTABLES -A INPUT -i $INTERNET -s $BROADCAST_DEST -j DROP
+
+$IPTABLES -A INPUT -i $INTERNET -d $BROADCAST_DEST -j LOG
+$IPTABLES -A INPUT -i $INTERNET -d $BROADCAST_DEST -j DROP
+
+#Refuse addresses defined as reserved by the IANA
+$IPTABLES -A INPUT -i $INTERNET -s 0.0.0.0/8 -j DROP
+$IPTABLES -A INPUT -i $INTERNET -s 169.254.0.0/16 -j DROP
+$IPTABLES -A INPUT -i $INTERNET -s 192.0.2.0/24 -j DROP
+
+COMBLOCK="0:1 2 8 13 98 111 137:139 161:162 445 901 1214 1524 1999 2049 3049 4329 6346 3128 8000 12345 27444 27665 31335 31337 65535"
+TCPBLOCK="$COMBLOCK 512:515 1080 2000 3128 6000:6063"
+UDPBLOCK="$COMBLOCK 520 123 517:518 1427 4045 9000"
+
+$IPTABLES -N bad-ports
+$IPTABLES -F bad-ports
+
+echo -n "FW: Blocking attacks to TCP port "
+for i in $TCPBLOCK;
+do
+echo -n "$i "
+$IPTABLES -A INPUT -p tcp --dport $i -j DROP
+$IPTABLES -A OUTPUT -p tcp --dport $i -j DROP
+$IPTABLES -A FORWARD -p tcp --dport $i -j DROP
+$IPTABLES -A bad-ports -p tcp --dport $i -j DROP
+done
+echo ""
+
+echo -n "FW: Blocking attacks to UDP port "
+for i in $UDPBLOCK;
+do
+echo -n "$i "
+$IPTABLES -A INPUT -p udp --dport $i -j DROP
+$IPTABLES -A OUTPUT -p udp --dport $i -j DROP
+$IPTABLES -A FORWARD -p udp --dport $i -j DROP
+$IPTABLES -A bad-ports -p udp --dport $i -j DROP
+done
+echo ""
+
+# allow DNS in all directions
+if [ "$NAMESERVER" != "" ]; then
+$IPTABLES -A OUTPUT -p tcp --sport 0:65535 -d $NAMESERVER --dport 53:53 -j ACCEPT
+$IPTABLES -A INPUT -p tcp ! --syn -s $NAMESERVER --sport 53:53 --dport 0:65535 -j ACCEPT
+fi
+
+
+
+#ALLOW INCOMING SSHD REQUESTS.
+
+if [ "$SSHDREQ" = "Y" ]; then
+$IPTABLES -N allow-ssh-input
+$IPTABLES -F allow-ssh-input
+$IPTABLES -A allow-ssh-input -m limit --limit 1/second -p tcp --tcp-flags ALL RST --dport 22 -j ACCEPT
+$IPTABLES -A allow-ssh-input -m limit --limit 1/second -p tcp --tcp-flags ALL FIN --dport 22 -j ACCEPT
+$IPTABLES -A allow-ssh-input -m limit --limit 1/second -p tcp --tcp-flags ALL SYN --dport 22 -j ACCEPT
+$IPTABLES -A allow-ssh-input -m state --state ESTABLISHED,RELATED -p tcp --dport 22 -j ACCEPT
+fi
+
+if [ "$SSHSRV" = "Y" ]; then
+$IPTABLES -A INPUT -j allow-ssh-input
+fi
+
+# Detect aborted TCP connections.
+$IPTABLES -A INPUT -m state --state ESTABLISHED,RELATED -p tcp --tcp-flags RST RST -j logaborted
+
+# Allow previously established connections
+$IPTABLES -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+$IPTABLES -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+$IPTABLES -A INPUT -m state --state INVALID -j LOG --log-prefix "INVALID input: "
+$IPTABLES -A INPUT -m state --state INVALID -j DROP
+
+$IPTABLES -A OUTPUT -m state --state INVALID -j LOG --log-prefix "INVALID output: "
+$IPTABLES -A OUTPUT -m state --state INVALID -j DROP
+
+#Ping of death
+if [ "$PINGDEATH" = "Y" ]; then
+$IPTABLES -N ping-death
+$IPTABLES -A ping-death -m limit --limit 1/s --limit-burst 4 -j ACCEPT
+$IPTABLES -A ping-death -j LOG --log-prefix "iptables ping-death: "
+$IPTABLES -A ping-death -j DROP
+$IPTABLES -A INPUT -i $INTERNET -p icmp --icmp-type echo-request -j ping-death
+$IPTABLES -A FORWARD -i $INTERNET -p icmp --icmp-type echo-request -j ping-death
+fi
+
+#Stealth scan
+$IPTABLES -N stealth-scan
+$IPTABLES -A stealth-scan -j LOG --log-prefix "iptables stealth-scan: "
+$IPTABLES -A stealth-scan -j DROP
+$IPTABLES -A INPUT -i $INTERNET -p tcp ! --syn -m state --state NEW -j stealth-scan
+$IPTABLES -A FORWARD -i $INTERNET -p tcp ! --syn -m state --state NEW -j stealth-scan
+
+# Allow certain critical ICMP types
+$IPTABLES -A INPUT -p icmp --icmp-type destination-unreachable -j ACCEPT # Dest unreachable
+$IPTABLES -A OUTPUT -p icmp --icmp-type destination-unreachable -j ACCEPT # Dest unreachable
+$IPTABLES -A FORWARD -p icmp --icmp-type destination-unreachable -j ACCEPT &> /dev/null # Dest unreachable
+$IPTABLES -A INPUT -p icmp --icmp-type time-exceeded -j ACCEPT # Time exceeded
+$IPTABLES -A OUTPUT -p icmp --icmp-type time-exceeded -j ACCEPT # Time exceeded
+$IPTABLES -A FORWARD -p icmp --icmp-type time-exceeded -j ACCEPT &> /dev/null # Time exceeded
+$IPTABLES -A INPUT -p icmp --icmp-type parameter-problem -j ACCEPT # Parameter Problem
+$IPTABLES -A OUTPUT -p icmp --icmp-type parameter-problem -j ACCEPT # Parameter Problem
+$IPTABLES -A FORWARD -p icmp --icmp-type parameter-problem -j ACCEPT &> /dev/null # Parameter Problem
+
+$IPTABLES -A INPUT --fragment -p icmp -j LOG --log-prefix "Fragmented IMCP: "
+$IPTABLES -A INPUT --fragment -p icmp -j DROP
+
+# PORTS
+if [ "$NAMESERVER" != "" ]; then
+
+for i in $PORTS;
+do
+$IPTABLES -A OUTPUT -p tcp --sport 1024:65535 -d $NAMESERVER --dport $i:$i -m state --state NEW -j ACCEPT
+$IPTABLES -A OUTPUT -p tcp --sport 1024:65535 -d $NAMESERVER --dport $i:$i -m state --state ESTABLISHED,RELATED -j ACCEPT
+$IPTABLES -A INPUT -p tcp ! --syn -s $NAMESERVER --sport $i --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+done
+
+# Passive ftp
+if [ "$PASSIVEFTP" = "Y" ]; then
+$IPTABLES -A OUTPUT -p tcp --sport 1024:65535 -d $NAMESERVER --dport 1024:65535 -m state --state NEW -j ACCEPT
+$IPTABLES -A OUTPUT -p tcp --sport 1024:65535 -d $NAMESERVER --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+$IPTABLES -A INPUT -p tcp ! --syn -s $NAMESERVER --sport 1024:65535 --dport 1024:65535 -m state --state ESTABLISHED,RELATED -j ACCEPT
+fi
+
+fi
+
+if [ "$LOGGING" = "Y" ]; then
+$IPTABLES -A LOG_DROP -j LOG --log-prefix "Attack log: "
+$IPTABLES -A LOG_DROP -j DROP
+$IPTABLES -A INPUT -j LOG_DROP # drop all incomming
+$IPTABLES -A FORWARD -j LOG_DROP # drop all forwarded
+fi 
+
+elif [ "$1" = "stop" ]; then
+iptables -F
+iptables -X
+iptables -P OUTPUT ACCEPT
+iptables -P FORWARD ACCEPT
+iptables -P INPUT ACCEPT
+
+elif [ "$1" = "status" ]; then
+iptables -L -v
+
+else
+echo "usage: $0 start|stop|status"
+fi

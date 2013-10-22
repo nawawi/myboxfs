@@ -1,0 +1,55 @@
+<?
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+
+function mybox_db_md5($str) {
+	return md5($str);
+}
+
+function mybox_db_crypt($str) {
+	return crypt($str,$str);
+}
+
+function mybox_db_trim($str) {
+	return trim(str_replace(array('"',"'"),array('&#039','&quot'),$str));
+}
+
+function mybox_db_connect($db_name) {
+	global $_DB_PATH;
+	if($db_id=@sqlite_open("$_DB_PATH/$db_name",0666,$error)) {
+		sqlite_create_function($db_id, 'md5', 'mybox_db_md5', 1);
+		sqlite_create_function($db_id, 'crypt', 'mybox_db_crypt', 2);
+		sqlite_create_function($db_id, 'trim', 'mybox_db_trim', 3);
+		return $db_id;
+	} else {
+		die("cannot open configuration file '$db_name'\n");
+	}
+}
+
+function mybox_db_query($sql,$db_id) {
+	global $_DB_DEBUG;
+	if(isset($_DB_DEBUG)&&$_DB_DEBUG==1) echo "DEBUG: $sql<br>\n";
+	return @sqlite_query($db_id,$sql);
+}
+
+function mybox_db_close($db_id) {
+	mybox_db_flush($db_id);
+	return @sqlite_close($db_id);
+}
+
+function mybox_db_fetch_assoc($result) {
+	return @sqlite_fetch_array($result,SQLITE_ASSOC);
+}
+
+function mybox_db_num_rows($result) {
+	return @sqlite_num_rows($result);
+}
+
+function mybox_db_fetch_single($result) {
+	return @sqlite_fetch_single($result);
+}
+
+function mybox_db_flush($db_id) {
+	@mybox_db_query("VACUUM",$db_id);
+}
+
+?>

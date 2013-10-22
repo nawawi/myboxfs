@@ -1,0 +1,451 @@
+#!/bin/php -Cq
+<?
+// ips.init - last update 30-Jun-2006
+// updated to snort2.6.x - 23-Nov-2006
+
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+putenv("PATH=/bin:/service/tools:/service/init");
+
+if(!file_exists("/bin/snortd")) {
+	echo "! snortd binary not found or cannot execute\n";
+	mybox_slog("ips binary not found or cannot execute");
+	exit(1);
+}
+
+$_QUIET=0;
+$_IDS_STAT=0;
+$_DEV=array();
+
+function write_ips_rules($db_id2) {
+	if($fo=fopen("/usr/ips_rules/ips.sig","w")) {
+		$result=mybox_db_query("select rules,fstat,stat from policy_ips where fstat='1' and stat='1'",$db_id2);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_rules=mybox_str_decrypt($row['rules']);
+				fwrite($fo,"$_rules\n");
+			}
+		}
+		fclose($fo);
+		return 0;
+	}
+	return 1;
+}
+
+function ips_config() {
+	global $_DB_NAME, $_DB_IPS, $_IDS_STAT, $_DEV, $_QUIET;
+	global $_PSCANLOG_PATH;
+	$db_id=mybox_db_connect($_DB_NAME);
+	$db_id2=mybox_db_connect($_DB_IPS);
+	$_CONF='';
+	$_IGNP='';$_IGNP2='';$ipsv='';
+	$_IDS_NET=array();
+	$_IDS_RULES=array();
+	$_IDS_IGNORE=array();
+	$_IDS_SET=array();
+	$_INT=array();
+	$_INT=mybox_if_dev_up_array();
+	if(!is_dir("/usr/ips_rules")) mybox_mkdirr("/usr/ips_rules");
+
+	$result=mybox_db_query("select sid,log,block,stat from policy_ips where stat='1'",$db_id2);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_sid=$row['sid'];
+			$_log=$row['log'];
+			$_block=$row['block'];
+			$_IDS_RULES[$_sid]['block']=$_block;
+			$_IDS_RULES[$_sid]['log']=$_log;
+		}
+	}
+	unset($result);
+	$result=mybox_db_query("select * from gateway where stat='1'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_ipaddrip=$row['ip'];
+			$_IDS_IGNORE[$_ipaddrip]=1;
+		}
+	}
+	unset($result);
+	$result=mybox_db_query("select * from accesslist where stat='1'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_ipaddrip=$row['ip'];
+			$_IDS_IGNORE[$_ipaddrip]=1;
+		}
+	}
+	unset($result);
+	$result=mybox_db_query("select * from misc where name like \"ids_%\" or name like \"pscan_%\" ",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			$_val=$row['val'];
+			if($_name=='ids_timeout') $_IDS_TIMEOUT=$_val;
+			if($_name=='ids_stat') $_IDS_STAT=$_val;
+			if($_name=='ids_exclude') $_IDS_EXCLUDE=trim($_val);
+			if($_name=='ids_mode') $_IDS_MODE=trim($_val);
+			if($_name=='pscan_stat') $_PSCAN_STAT=$_val;
+			if($_name=='pscan_exclude') $_PSCAN_EXCLUDE=trim($_val);
+			if($_name=='pscan_mode') $_PSCAN_MODE=trim($_val);
+		}
+	}
+	if($_IDS_TIMEOUT=='') $_IDS_TIMEOUT=0;
+	if($_IDS_STAT=='') $_IDS_STAT=0;
+	if($_IDS_MODE=='') $_IDS_MODE=3;
+	if($_PSCAN_STAT=='') $_PSCAN_STAT=0;
+	if($_PSCAN_MODE=='') $_PSCAN_MODE=3;
+	$_IDS_SET['stat']=$_IDS_STAT;
+	$_IDS_SET['timeout']=$_IDS_TIMEOUT;
+	$_IDS_SET['ips_mode']=$_IDS_MODE;
+	$_IDS_SET['pscan_mode']=$_PSCAN_MODE;
+
+	if($_IDS_EXCLUDE!='') {
+		$_list=preg_split("/\s+/",$_IDS_EXCLUDE);
+		if(count($_list)!=0) {
+			foreach($_list as $ipw) $_IDS_IGNORE[$ipw]=1;
+		} else {
+			if($_IDS_EXCLUDE!='') $_IDS_IGNORE[$_IDS_EXCLUDE]=1;
+		}
+	}
+	unset($ipw,$_list);
+	$_pscan_ignore='';
+	if($_PSCAN_EXCLUDE!='') {
+		$_list=preg_split("/\s+/",$_PSCAN_EXCLUDE);
+		if(count($_list)!=0) {
+			foreach($_list as $ipw) {
+				$_pscan_ignore .="$ipw,";
+				$_IDS_IGNORE[$ipw]=1;
+			}
+		} else {
+			if($_PSCAN_EXCLUDE!='') {
+				$_pscan_ignore .="$_PSCAN_EXCLUDE";
+				$_IDS_IGNORE[$_PSCAN_EXCLUDE]=1;
+			}
+		}
+	}
+	unset($ipw,$_list);
+	$_pscan_ignore=trim($_pscan_ignore,',');
+	$result=mybox_db_query("select * from ipaddr where onboot='1'",$db_id);
+
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_ipaddrname=$row['name'];
+			$_ipaddrdev=$row['dev'];
+			if(!isset($_INT[$_ipaddrdev]) || $_INT[$_ipaddrdev]=='') continue;
+			$_ipaddrip=$row['ip'];
+			$_ipaddrmask=$row['mask'];
+
+			$_IDS_IGNORE[$_ipaddrip]=1;
+
+			$_IGNP .="$_ipaddrip/32,";
+			$_ret=mybox_ipcalc($_ipaddrip,$_ipaddrmask);
+			if(count($_ret)==0) continue;
+			$_DEV[]="$_ipaddrdev";
+			$_ipaddrnetwork=$_ret['network'];
+			$_ipaddrprefix=$_ret['prefix'];
+			$_CONF[$_ipaddrdev]="$_ipaddrnetwork/$_ipaddrprefix";
+			$_IDS_NET[]="$_ipaddrip|$_ipaddrprefix|$_ipaddrnetwork|$_ipaddrmask";
+		}
+		if($_IGNP!='') {
+			$_IGNP=trim($_IGNP,',');
+			if($_pscan_ignore!='') $_IGNP="$_IGNP,$_pscan_ignore";
+			// remove 22/02/2006 - portscan preprocessor not supported
+			//$_IGNP="preprocessor portscan-ignorehosts: [$_IGNP]";
+			$_IGNP2="src-ignore-net [$_IGNP]";
+			$_IGNP="ignore_scanners { $_IGNP }";
+		}
+	}
+	write_ips_rules($db_id2);
+	$result=mybox_db_query("select version from policy_ips_info where id='1'",$db_id2);
+	$ipsv=mybox_db_fetch_single($result);
+	mybox_db_close($db_id);
+	mybox_db_close($db_id2);
+	if($_IGNP!='' && count($_CONF)!=0 && count($_DEV)!=0) {
+		foreach($_DEV as $dev) {
+			$filename='';
+			$_config='';
+			$_config .="var HOME {$_CONF[$dev]}\n";
+			$_config .="var WORLD any\n";
+			$_config .="var HTTP_PORTS 80 443 8080\n";
+			$_config .="var SHELLCODE_PORTS !\$HTTP_PORTS\n";
+			$_config .="var ORACLE_PORTS 1521\n";
+			$_config .="var SSH_PORTS 22\n";
+			$_config .="var AIM_SERVERS [64.12.24.0/24,64.12.25.0/24,64.12.26.14/24,64.12.28.0/24,64.12.29.0/24,64.12.161.0/24,64.12.163.0/24,205.188.5.0/24,205.188.9.0/24]\n";
+			$_config .="preprocessor flow: stats_interval 0 hash 2\n";
+			// 08/10/2006 - snort 2.6.0.2	
+			//$_config .="preprocessor frag2\n";
+			$_config .="config disable_tcpopt_obsolete_alerts\n";
+			$_config .="config daemon\n";
+			$_config .="config dump_payload\n";
+			$_config .="config quiet\n";
+			$_config .="config no_promisc\n";
+			$_config .="config set_gid: mfs\n";
+			$_config .="config set_uid: mfs\n";
+			$_config .="preprocessor frag3_global: max_frags 65536\n";
+			$_config .="preprocessor frag3_engine: policy first detect_anomalies\n";
+			$_config .="preprocessor stream4: disable_evasion_alerts,detect_scans\n";
+			// disable (27/08/2005) can't detect
+			//$_config .="preprocessor stream4_reassemble: flush_behavior large_window\n";
+			//$_config .="preprocessor stream4_reassemble: both, ports all\n";
+			// 08/10/2006 - snort 2.6.0.2
+			$_config .="preprocessor stream4_reassemble\n";
+			$_config .="preprocessor rpc_decode: 111 32771\n";
+			$_config .="preprocessor bo\n";
+			$_config .="preprocessor telnet_decode\n";
+			$_config .="preprocessor http_inspect: global iis_unicode_map unicode.map 1252\n";
+			$_config .="preprocessor http_inspect_server: server default ports  { 80 8080 3128 } no_alerts non_strict non_rfc_char { 0x00 } flow_depth 0 apache_whitespace yes directory no iis_backslash no u_encode yes ascii no chunk_length 500000 bare_byte yes double_decode yes iis_unicode yes iis_delimiter yes multi_slash no\n";
+			//$_config .="preprocessor conversation: allowed_ip_protocols all, timeout 60, max_conversations 3000\n";
+			// 08/10/2006 - snort 2.6.0.2
+			$_config .="dynamicengine /lib/libsf_engine.so\n";
+			$_config .="dynamicpreprocessor file /lib/libsf_smtp_preproc.so\n";
+			$_config .="dynamicpreprocessor file /lib/libsf_ftptelnet_preproc.so\n";
+			$_config .="dynamicpreprocessor file /lib/libsf_dns_preproc.so\n";
+			$_config .="preprocessor ftp_telnet: global encrypted_traffic yes inspection_type stateful\n";
+			$_config .="preprocessor ftp_telnet_protocol: telnet normalize ayt_attack_thresh 200\n";
+			$_config .="preprocessor ftp_telnet_protocol: ftp server default def_max_param_len 100 alt_max_param_len 200 { CWD } cmd_validity MODE < char ASBCZ > cmd_validity MDTM < [ date nnnnnnnnnnnnnn[.n[n[n]]] ] string > chk_str_fmt { USER PASS RNFR RNTO SITE MKD } telnet_cmds yes data_chan\n";
+			$_config .="preprocessor ftp_telnet_protocol: ftp client default max_resp_len 256 bounce yes telnet_cmds yes\n";
+			$_config .="preprocessor smtp: ports { 25 } inspection_type stateful normalize cmds normalize_cmds { EXPN VRFY RCPT } alt_max_command_line_len 260 { MAIL } alt_max_command_line_len 300 { RCPT } alt_max_command_line_len 500 { HELP HELO ETRN } alt_max_command_line_len 255 { EXPN VRFY }\n";
+			$_config .="preprocessor dns: ports { 53 } enable_rdata_overflow\n";
+
+			// new 29/07/2005
+			// 08/10/2006 - snort 2.6  Deprecates
+			//$_config .="preprocessor xlink2state: ports { 25 691 }\n";
+
+			// update 22/02/2006
+			if($_PSCAN_STAT==1) {
+				$_config .="preprocessor sfportscan: proto  { all } scan_type { portscan decoy_portscan distributed_portscan } memcap { 10000000 } sense_level { low } watch_ip { \$HOME } $_IGNP logfile { $_PSCANLOG_PATH }\n";
+				// updated: 14/04/2006
+				// 08/10/2006 - Snort 2.3, Deprecates in favor of sfPortscan
+				//$_config .="preprocessor flow-portscan: talker-sliding-scale-factor 0.50 talker-fixed-threshold 30 talker-sliding-threshold 30 talker-sliding-window 20 talker-fixed-window 30 scoreboard-rows-talker 30000 server-watchnet \$HOME server-ignore-limit 200 server-rows 65535 server-learning-time 14400 server-scanner-limit 4 scanner-sliding-window 20 scanner-sliding-scale-factor 0.50 scanner-fixed-threshold 15 scanner-sliding-threshold 40 scanner-fixed-window 15 scoreboard-rows-scanner 30000 $_IGNP2 alert-mode once output-mode msg tcp-penalties on\n";
+				// 14/04/2006 - Snort 2.2, 2.3, Deprecates
+				//$_config .="preprocessor portscan: \$HOME 5 7\n";
+				//$_config .="$_IGNP\n";
+			}
+			$_config .="output alert_syslog: LOG_AUTH LOG_ALERT\n";
+
+			$filename="ips$dev".".conf";
+			// updated: 14/04/2006
+			if($_QUIET==0) echo "* Writing IPS $dev config..";
+			if($fi=fopen("/usr/ips_rules/$filename","w")) {
+				fwrite($fi,"$_config\n");
+				if(file_exists("/usr/ips_rules/ips.sig")) fwrite($fi,"include /usr/ips_rules/ips.sig\n");
+				fclose($fi);
+				if($_QUIET==0) echo "Ok\n";
+			} else {
+				if($_QUIET==0) echo "Failed\n";
+			}
+		}
+
+		file_put_contents("/etc/ipsversion","$ipsv\n");
+		file_put_contents("/var/sys/ipsset",serialize($_IDS_SET));
+		file_put_contents("/var/sys/ipsignore",serialize($_IDS_IGNORE));
+		file_put_contents("/var/sys/ipsrules",serialize($_IDS_RULES));
+		file_put_contents("/var/sys/ipsnet",serialize($_IDS_NET));
+
+		if($_QUIET==0) mybox_slog("Writing IPS config");
+		return 0;
+	} 
+	if($_QUIET==0) {
+		mybox_slog("Writing IPS config failed");
+		die("Writing IPS config failed\n");
+	}
+	return 1;
+}
+
+function ips_status() {
+	global $_QUIET;
+	$pid=mybox_get_progpid("snortd");
+	if($pid!='') {
+		if($_QUIET==0) echo "* snortd (pid $pid) is running...\n";
+		return 0;
+	}
+	if($_QUIET==0) echo "* snortd not running\n";
+	return 1;
+}
+
+function ips_start() {
+	global $_DB_NAME, $_IDS_STAT, $_DEV, $_QUIET;
+	@ips_config();
+	$_IDS_BLOCK=array();
+	if($_IDS_STAT==0) {
+		if($_QUIET==0) {
+			echo "* IPS agent disabled\n";
+			mybox_slog("IPS agent disabled");
+		}
+		return 1;
+	}
+	if(!file_exists("/var/sys/init_no_restart")) mybox_send_hup("syslogd");
+	if(@ips_status()==1) {
+		$ok=0;
+		if(count($_DEV)!=0) {
+			foreach($_DEV as $dev) {
+				if(!is_dir("/var/log/payload$dev")) mybox_mkdirr("/var/log/payload$dev");
+				$_EMP[]="/var/log/payload$dev";
+				$filename="ips$dev".".conf";
+				if($_QUIET==0) echo "* Starting IPS agent on $dev..";
+				putenv("PCAP_FRAMES=max");
+				if(mybox_exec_cmd("snortd -i $dev -l /var/log/payload$dev -c /usr/ips_rules/$filename")==0) {
+					if($_QUIET==0) echo "OK\n";
+					if($_QUIET==0) mybox_slog("Starting IPS agent on $dev");
+					$ok++;
+				} else {
+					echo "Failed\n";
+				}
+				unset($filename);
+			}
+			file_put_contents("/var/sys/payloaddir",serialize($_EMP));
+			@file_put_contents("/var/sys/ipsblock",serialize($_IDS_BLOCK));
+		}
+		if($ok!=0) {
+			mybox_save_to_file("/var/sys/chk_snortd",$ok);
+			return 0;
+		}
+	}
+	if($_QUIET==0) { 
+		echo "* Starting IPS agent failed\n";
+		mybox_slog("Starting IPS agent failed");
+	}
+	return 1;
+}
+
+function ips_stop() {
+	global $_QUIET;
+	$xp='';$xk=1;
+	$_dirarray=mybox_dir2array("/var/run/snort*");
+	if(count($_dirarray)!=0) {
+		foreach($_dirarray as $lx) {
+			$xp .=trim(file_get_contents($lx));
+			@unlink($lx);
+			
+		}
+		if($xp!='') {
+			$xk=mybox_exec_cmd("kill -9 $xp");
+		}
+	}
+	if($xk==1) $xk=mybox_killall("snortd");
+	if($xk==0) {
+		if($_QUIET==0) {
+			echo "* Shutting down IPS agent\n";
+			mybox_slog("Shutting down IPS agent");
+		}
+		mybox_exec_cmd("iptables -F ACL1001");
+		mybox_exec_cmd("iptables -Z ACL1001");
+		if($_QUIET==0) mybox_slog("IPS: release all drop attack");
+		@unlink("/var/sys/chk_snortd");
+		@unlink("/var/sys/ipsblock");
+		mybox_exec_cmd("rm -f /usr/ips_rules/ipseth*.conf");
+		return 0;
+	}
+	if($_QUIET==0) {
+		echo "* Shutting down IPS agent failed\n";
+		mybox_slog("Shutting down IPS agent failed");
+	}
+	@unlink("/var/sys/chk_snortd");
+	return 1;
+}
+
+function ips_reload() {
+	global $_QUIET;
+	if(file_exists("/var/sys/chk_snortd")) {
+		$_IDS_BLOCK=array();
+		mybox_send_hup("snortd");
+		sleep(1);
+		@file_put_contents("/var/sys/ipsblock",serialize($_IDS_BLOCK));
+		mybox_exec_cmd("iptables -F ACL1001");
+		mybox_exec_cmd("iptables -Z ACL1001");
+		if($_QUIET==0) {
+			echo "* Reloading IPS agent\n";
+			mybox_slog("Reloading IPS agent");
+		}
+	} else {
+		ips_stop();
+		sleep(2);
+		ips_start();
+	}
+	return 0;
+}
+
+function ips_config_reload() {
+	global $_QUIET;
+	if(file_exists("/var/sys/chk_snortd")) {
+		$_IDS_BLOCK=array();
+		@ips_config();
+		sleep(1);
+		mybox_send_hup("snortd");
+		@file_put_contents("/var/sys/ipsblock",serialize($_IDS_BLOCK));
+		mybox_exec_cmd("iptables -F ACL1001");
+		mybox_exec_cmd("iptables -Z ACL1001");
+		if($_QUIET==0) {
+			echo "* Reloading IPS agent config\n";
+			mybox_slog("Reloading IPS agent config");
+		}
+	} else {
+		ips_stop();
+		sleep(2);
+		ips_start();
+	}
+	return 0;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+$_sig=$_SERVER["argv"][2];
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=ips_start();
+		break;
+	case 'stop':
+		$ret=ips_stop();
+		break;
+	case 'restart':
+		$ret=ips_stop();
+		sleep(2);
+		$ret=ips_start();
+		break;
+	case 'reload':
+		$ret=ips_reload();
+		break;
+	case 'status':
+		$ret=ips_status();
+		break;
+	case 'config':
+		$ret=ips_config();
+		break;
+	case 'config_reload':
+		$ret=ips_config_reload();
+		break;
+	case 'update':
+		if(isset($_sig) && $_sig!='') {
+			if(!file_exists("$_sig")) {
+				die("$_sig not exist\n");
+			}
+			if(preg_match("/ipsrules\.(\d+)\.bin/",$_sig,$mm)) {
+				@rename("$_DB_PATH/$_DB_IPS","$_DB_PATH/$_DB_IPS.bak");
+				if(mybox_execq_cmd("zcat $_sig |sqlite $_DB_PATH/$_DB_IPS")==0) {
+					echo "* IPS signature updated!\n";
+					ips_stop();
+					ips_start();
+					$_time=time();
+					$db_id=@mybox_db_connect($_DB_IPS);
+					@mybox_db_query("update policy_ips_info set updates='$_time' where id='1'",$db_id);
+					@mybox_db_close($db_id);
+					unset($db_id,$_time);
+				} else {
+					echo "* Updating IPS signature failed!\n";
+					@rename("$_DB_PATH/$_DB_IPS.bak","$_DB_PATH/$_DB_IPS");
+				}
+			} else {
+				echo "! Invalid file '$_sig'\n";
+			}
+		} else {
+			echo "Usage: $_app update <file_full_path>\n";
+		}
+		$ret=0;
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/reload/status/config/config_reload/update <sig_file_full_path>]\n";
+		break;
+}
+flush();
+exit($ret);
+?>

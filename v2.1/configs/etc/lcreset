@@ -1,0 +1,18 @@
+#!/bin/sh
+if [ ! -z "$1" -a "$1" = "p" ]; then
+	lcds
+	sync
+	lcdp
+	sync
+	lcde
+	exit
+fi
+rm -f /var/sys/chk_lcdg
+ps grep lcd |xargs kill -9 >/dev/null 2>&1
+ps grep lcd |xargs kill -9 >/dev/null 2>&1
+ps grep lcd |xargs kill -9 >/dev/null 2>&1
+lcds
+lcdp
+lcde
+touch /var/sys/chk_lcdg
+exit

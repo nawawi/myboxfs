@@ -1,0 +1,365 @@
+#!/bin/php -Cq
+<?
+// network.init - last update 30-Jun-2006
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+
+putenv("PATH=/bin:/service/tools:/service/init");
+
+if(!file_exists("/bin/ip") || !file_exists("/bin/route") || !file_exists("/bin/ifconfig") || !file_exists("/bin/vconfig") || !file_exists("/bin/arping")) {
+	echo "! ip,route,ifconfig,arping or vconfig binary not found or cannot execute\n";
+	slog("ip,route,ifconfig,arping or vconfig binary not found or cannot execute");
+	exit(1);
+}
+
+$_QUIET=0;
+
+function set_balancing($_GWLIST,$_LOLIST) {
+	if(($_GWLIST=='') && ($_LOLIST=='')) return 1;
+	list($gw,$gw_dev,$gw_ip,$gw_prefix)=preg_split("/\|/",$_GWLIST);
+	list($fa,$fa_dev,$fa_ip,$fa_prefix)=preg_split("/\|/",$_LOLIST);
+	$WAN_GW="$gw";
+	$WAN_NET="$gw_prefix";
+	$WAN_IP="$gw_ip";
+	$WAN_DEV="$gw_dev";
+	$FA_GW="$fa";
+	$FA_NET="$fa_prefix";
+	$FA_IP="$fa_ip";
+	$FA_DEV="$fa_dev";
+	exec_cmd("ip route del default");
+	exec_cmd("ip route flush table 200");
+	exec_cmd("ip route flush table 201");
+	exec_cmd("ip route flush table 222");
+	exec_cmd("ip rule add prio 50 table main");
+	exec_cmd("ip rule add prio 200 from $WAN_NET table 200");
+	exec_cmd("ip route add default via $WAN_GW dev $WAN_DEV src $WAN_IP proto static table 200");
+	exec_cmd("ip route append prohibit default table 200 metric 1 proto static");
+	exec_cmd("ip rule add prio 201 from $FA_NET table 201");
+	exec_cmd("ip route add default via $FA_GW dev $FA_DEV src $FA_IP proto static table 201");
+	exec_cmd("ip route append prohibit default table 201 metric 1 proto static");
+	exec_cmd("ip rule add prio 222 table 222");
+	exec_cmd("ip route add default table 222 proto static nexthop via $WAN_GW dev $WAN_DEV nexthop via $FA_GW dev $FA_DEV");
+	return 0;
+}
+
+function update_arp($dev,$ip) {
+	//exec_cmd("arping -q -A -c 1 -I $dev $ip");
+	exec_cmd("arping -q -A -c 1 -i $dev $ip");
+        sleep(2);
+	//exec_cmd("arping -q -U -c 1 -I $dev $ip");
+	exec_cmd("arping -q -U -c 1 -i $dev $ip");
+	return 0;
+}
+
+function set_vip($dev,$db_id) {
+	global $_QUIET;
+	if($dev=='') return 1;
+	$result=db_query("select * from ipalias where dev='$dev' and onboot='1'",$db_id);
+	if(db_num_rows($result)!=0) {
+		if($_QUIET==0) echo "* Bringing IP Aliasing\n";
+		while($row=db_fetch_array_assoc($result)) {
+			$_pid=$row['pid'];
+			$_ipaddrip=$row['ip'];
+			$_ipaddrmask=$row['mask'];
+			$devv="$dev:$_pid";
+			if(isip_alive($devv,$_ipaddrip)==0) {
+				exec_cmd("ip addr flush dev $devv");
+				if(exec_cmd("ifconfig $devv $_ipaddrip netmask $_ipaddrmask")==0) {
+					if($_QUIET==0) echo "---- $devv $_ipaddrip/$_ipaddrmask\n";
+				}
+			}
+		}
+	}
+	return 0;
+}
+
+function set_vlan($dev,$db_id) {
+	global $_QUIET;
+	if($dev=='') return 1;
+	$result=db_query("select * from vlan where dev='$dev' and onboot='1'",$db_id);
+	if(db_num_rows($result)!=0) {
+		if($_QUIET==0) echo "* Bringing VLAN\n";
+		while($row=db_fetch_array_assoc($result)) {
+			$_ipaddrid=$row['vid'];
+			$_ipaddrip=$row['ip'];
+			$_ipaddrmask=$row['mask'];
+			$_flag=$row['flag'];
+			$_mtu=$row['mtu'];
+			$_ret=ipcalc($_ipaddrip,$_ipaddrmask);
+			if(count($_ret)==0) {
+				if($_QUIET==0) echo "---- Invalid $_ipaddrip/$_ipaddrmask !\n";
+				continue;
+			}
+			$_ipaddrnetwork=$_ret['network'];
+			$_ipaddrbcast=$_ret['broadcast'];
+			$_ipaddrprefix=$_ret['prefix'];
+			$devv="$dev.$_ipaddrid";
+			$out=array();
+			exec("ifconfig |grep $devv",$out,$ret);
+			if(count($out)!=0) exec_cmd("vconfig rem $devv");
+			if(isip_exists($_ipaddrip)==0) {
+				if(exec_cmd("vconfig add $dev $_ipaddrid")==0) {
+					if($_flag==1) exec_cmd("vconfig set_flag $devv 1");
+					exec_cmd("ip addr flush dev $devv");
+					if(exec_cmd("ifconfig $devv $_ipaddrip netmask $_ipaddrmask mtu $_mtu")==0) {
+						echo "---- $devv $_ipaddrip/$_ipaddrmask mtu $_mtu\n";
+					} else {
+						exec_cmd("vconfig rem $devv");
+					}
+				}
+			}
+		}
+	}
+	return 0;
+}
+
+function set_others_routing($db_id) {
+	$t=1;
+	$result=db_query("select * from route where stat='1'",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_ip=$row['ip'];
+			$_mask=$row['mask'];
+			$_gateway=$row['gateway'];
+			$_type=$row['type'];
+			if($_type==1) {
+				exec_cmd("route del -net $_ip netmask $_mask gw $_gateway metric 1");
+				if(exec_cmd("route add -net $_ip netmask $_mask gw $_gateway metric 1")==0) $t=0;
+			} else {
+				exec_cmd("route del -host $_ip gw $_gateway metric 1");
+				if(exec_cmd("route add -host $_ip gw $_gateway metric 1")==0) $t=0;
+			}
+		}
+	}
+	return $t;
+}
+
+function network_start() {
+	global $_DB_NAME, $_QUIET;
+	$ret=1;
+	$_DEV=array();
+	$_HOSTS=array();
+	$_hostname='';$_domainname='';
+	if(file_exists("/proc/sys/kernel/hostname")) {
+		$_hostname=trim(file_get_contents("/proc/sys/kernel/hostname"));
+	}
+	if(file_exists("/proc/sys/kernel/domainname")) {
+		$_domainname=trim(file_get_contents("/proc/sys/kernel/domainname"));
+	}
+
+	$db_id=db_connect($_DB_NAME);
+	$result=db_query("select * from ipaddr where onboot='1'",$db_id);
+	if($_QUIET==0) slog("Starting networking");
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_ipaddrname=$row['name'];
+			$_ipaddrdev=$row['dev'];
+			$_ipaddrip=$row['ip'];
+			$_ipaddrmask=$row['mask'];
+			$_ipaddrmtu=$row['mtu'];
+			$_ret=ipcalc($_ipaddrip,$_ipaddrmask);
+			if(count($_ret)==0) {
+				if($_QUIET==0) echo "! Invalid $_ipaddrip/$_ipaddrmask !\n";
+				continue;
+			}
+			$_ipaddrnetwork=$_ret['network'];
+			$_ipaddrbcast=$_ret['broadcast'];
+			$_ipaddrprefix=$_ret['prefix'];
+			$_DEV[$_ipaddrdev]="$_ipaddrip|$_ipaddrprefix|$_ipaddrmask|$_ipaddrbcast|$_ipaddrname|$_ipaddrnetwork|$_ipaddrmtu";
+		}
+	}
+
+	if(count($_DEV)==0) {
+		if($_QUIET==0) echo "* Network disabled\n";
+		exit(1);
+	}
+	save_to_file("/etc/hosts.tmp","127.0.0.1\t\tlocalhost.localdomain localhost\n");
+	if($_QUIET==0) echo "* Bringing up network interfaces\n";
+	$_DEV3=array();
+	foreach($_DEV as $dev => $val) {
+		list($ip,$prefix,$mask,$brd,$name,$network,$mtu)=preg_split("/\|/",$val);
+		if(exec_cmd("ip link set $dev up mtu $mtu")==0) {
+			if(isip_alive($dev,$ip)==1) {
+				if($_QUIET==0) {
+					echo "---- Error, some other host already uses address $ip.\n";
+					slog("Error, some other host already uses address $ip");
+				}
+			} else {
+				exec_cmd("ip addr flush dev $dev");
+				if(exec_cmd("ip addr add $ip/$prefix brd $brd dev $dev scope global label $dev")==0) {
+					if($_QUIET==0) echo "---- $dev $ip/$mask\n";
+					update_arp($dev,$ip);
+					$ret=0;
+				} else {
+					if($_QUIET==0) echo "---- $dev $ip/$mask already up!\n";
+				}
+
+				$_tmp="$ip\t\t$_hostname.$_domainname $_hostname $_domainname $name";
+				append_to_file("/etc/hosts.tmp","$_tmp\n");
+				unset($_tmp);
+				$_DEV3[]="$dev";
+			}
+		} else {
+			if($_QUIET==0) {
+				echo "---- Failed to bring up $dev.\n";
+				slog("Failed to bring up $dev");
+			}
+		}
+		unset($ip,$prefix,$mask,$brd);
+	}
+	@rename("/etc/hosts.tmp","/etc/hosts");
+	unset($dev,$val);
+	if(count($_DEV3)!=0) {
+		foreach($_DEV3 as $dev) {
+			if($dev=='') continue;
+			set_vip($dev,$db_id);
+		}
+		unset($dev);
+		foreach($_DEV3 as $dev) {
+			if($dev=='') continue;
+			set_vlan($dev,$db_id);
+		}
+		unset($dev);
+	}
+
+	if(exec_cmd("ip link set lo up")==0) {
+		if(exec_cmd("ip addr add 127.0.0.1/8 brd 127.255.255.255 dev lo scope host label lo")==0) {
+			if($_QUIET==0) echo "* Setting loopback 127.0.0.1/255.0.0.0\n";
+			exec_cmd("route add -net 127.0.0.0 netmask 255.0.0.0 lo");
+		}
+	}
+
+	$_GWLIST=get_gw($db_id,0);
+	$_LOLIST=get_gw($db_id,1);
+	//echo "$_GWLIST $_LOLIST\n";
+	if($_LOLIST!='') {
+		if($_GWLIST!='') {
+			if(set_balancing($_GWLIST,$_LOLIST)==0) {
+				list($_GW_IP,$_GW_DEV,$_GW_DEVIP,$_GW_NET)=preg_split("/\|/",$_GWLIST);
+				list($_LO_IP,$_LO_DEV,$_LO_DEVIP,$_LO_NET)=preg_split("/\|/",$_LOLIST);
+				if($_QUIET==0) {
+					echo "---- Load balancer activate via $_GW_DEV $_LO_DEV\n";
+					slog("Load balancing activate via $_LO_DEV $_LO_DEV");
+				}
+				save_to_file("/proc/sys/net/ipv4/ip_forward","1\n");
+				save_to_file("/var/sys/load_balancing","$_GW_IP|$_GW_DEV|$_LO_IP|$_LO_DEV\n");
+			} else {
+				if($_QUIET==0) {
+					echo "---- Load balancer not activate\n";
+					slog("Load balancer not activate");
+				}
+			}
+		}
+	} else {
+		if($_GWLIST!='') {
+			list($_GW_IP,$_GW_DEV,$_GW_DEVIP,$_GW_NET)=preg_split("/\|/",$_GWLIST);
+			if(exec_cmd("ip route add default via $_GW_IP dev $_GW_DEV metric 1")==0) {
+				if($_QUIET==0) {
+					echo "* Setting default gateway: $_GW_IP via $_GW_DEV\n";
+					slog("Setting default gateway: $_GW_IP via $_GW_DEV");
+				}
+				save_to_file("/proc/sys/net/ipv4/ip_forward","1\n");
+			} else {
+				if($_QUIET==0) {
+					echo "* Default gateway not set\n";
+					slog("Default gateway not set");
+				}
+			}
+		} else {
+			if($_QUIET==0) {
+				echo "* Default gateway not set\n";
+				slog("Default gateway not set");
+			}
+		}
+	}
+
+	if(set_others_routing($db_id)==0) {
+		if($_QUIET==0) {
+			echo "* Applying static routing\n";
+			slog("Applying static routing");
+		}
+	}
+	db_close($db_id);
+	if(!file_exists("/var/sys/init_no_restart")) {
+		if($_QUIET==0) echo "* Restarting related application services\n";
+		echo_query("policy-restart");
+		echo_query("ips-restart");
+		echo_query("pptp-restart");
+		echo_query("failover-restart");
+		@static_arp();
+	}
+	return $ret;
+}
+
+function network_stop() {
+	global $_QUIET;
+	$ret=1;
+	@killall("mfs-link.exc");
+	if($_QUIET==0) echo "* Shutting down network interfaces\n";
+	exec("ifconfig |grep ^eth[0-9]\.[0-9] |awk '{print $1}'", $output, $ret);
+	if(count($output)!=0) {
+   		while(list(,$vdev) = each($output)) {
+			$dev=trim($vdev);
+			if($_QUIET==0) echo "---- $dev\n";
+			exec_cmd("ip addr flush dev $dev");
+			exec_cmd("ip link set $dev down");
+			exec_cmd("vconfig rem $dev");
+		}
+	}
+	exec("ifconfig |grep ^eth[0-9]\:[0-9] |awk '{print $1}'", $output, $ret);
+	if(count($output)!=0) {
+   		while(list(,$vdev) = each($output)) {
+			$dev=trim($vdev);
+			if($_QUIET==0) echo "---- $dev\n";
+			exec_cmd("ip addr flush dev $dev");
+			exec_cmd("ip link set $dev down");
+		}
+	}
+ 	exec("ip addr ls |awk -F: '/eth.:/{print $2}'", $output, $ret);
+	if(count($output)!=0) {
+   		while(list(,$dev) = each($output)) {
+			$dev=trim($dev);
+			exec_cmd("ip addr flush dev $dev");
+			if(exec_cmd("ip link set $dev down")==0) {
+				if($_QUIET==0) echo "---- $dev\n";
+			}
+		}
+	}
+	exec_cmd("ip link set lo down");
+	exec_cmd("ip addr flush dev lo");
+	exec_cmd("ip route flush cache");
+	exec_cmd("ip route flush table main");
+	exec_cmd("ip route flush table 200");
+	exec_cmd("ip route flush table 201");
+	exec_cmd("ip route flush table 222");
+	save_to_file("/proc/sys/net/ipv4/ip_forward","0\n");
+	@unlink("/var/sys/ui-network-save");
+	if($_QUIET==0) slog("Stopping networking");
+	@unlink("/var/sys/ipconfig.cache");
+	@unlink("/var/sys/routen.cache");
+	return $ret;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=network_start();
+		break;
+	case 'stop':
+		$ret=network_stop();
+		break;
+	case 'restart':
+		$ret=network_stop();
+		sleep(1);
+		$ret=network_start();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart]\n";
+		break;
+}
+flush();
+exit($ret);
+?>

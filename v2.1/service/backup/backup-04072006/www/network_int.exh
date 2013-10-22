@@ -1,0 +1,942 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+chk_session();
+
+write_nocache();
+$_SYSID="network_int";
+
+$db_id=db_connect($_DB_NAME);
+
+if(chk_pri($_LOGIN['auth_id'],1)==1) {
+	if(isset($do_id)&&$do_id=='apply_chg') {
+		echo_query("network-restart");
+		$msg="<script>waitcount();</script>";
+	}
+	if($tab==1) {
+		if(isset($chgdev)&&$chgdev==1 && $new!='' && $old!='' && $id!='') {
+			db_query("update ipaddr set dev='$old' where dev='$new'",$db_id);
+			db_query("update ipaddr set dev='$new' where id='$id'",$db_id);
+			$result=db_query("select id from ipalias where dev='$new'",$db_id);
+			while($row=db_fetch_array_assoc($result)) {
+				$_dv[]=$row['id'];
+			}
+			db_query("update ipalias set dev='$new' where dev='$old'",$db_id);
+			if(count($_dv)!=0) {
+				foreach($_dv as $dv) {
+					db_query("update ipaddr set dev='$old' where id='$dv'",$db_id);
+				}
+			}
+			unset($result,$_dv,$dv);
+			$result=db_query("select id from htb_class where dev='$new'",$db_id);
+			while($row=db_fetch_array_assoc($result)) {
+				$_dv[]=$row['id'];
+			}
+			db_query("update htb_class set dev='$new' where dev='$old'",$db_id);
+			if(count($_dv)!=0) {
+				foreach($_dv as $dv) {
+					db_query("update htb_class set dev='$old' where id='$dv'",$db_id);
+				}
+			}
+		}
+		if(isset($do_save)&&$do_save==1) {
+			if(count($id)!=0) {
+				foreach($id as $_id => $_rest) {
+					$_ip=$ip[$_id];
+					$_dev=$dev[$_id];
+					$_mask=$mask[$_id];
+					$_onboot=$onboot[$_id];
+					$_type=$type[$_id];
+					$_mtu=$mtu[$_id];
+					$_note=escape_str($note[$_id]);
+					if($_ip=='') continue;
+					if(!preg_match("/^eth(\d+)/",$_dev)) {
+						$msg="Invalid device '$_dev'";
+						continue;
+					}
+					if($_mask=='') {
+						$_m=ipcalc($_ip);
+						$_mask=$_m['netmask'];
+					}
+					if($_onboot!='') $_onboot='1';
+					if($_onboot=='') $_onboot='0';
+					if($_id!='new') {
+						db_query("update ipaddr set ip='$_ip',mask='$_mask',dev='$_dev',note='$_note',mtu='$_mtu',type='$_type',onboot='$_onboot' where id='$_id'",$db_id);
+						if($_id > 3) {
+							$_name=trim($name[$_id]);
+							$_name=strtoupper($_name);
+							$_nameold=trim($nameold[$_id]);
+							$_nameold=strtoupper($_nameold);
+							if($_name!='' && $_name!=$_nameold) {
+								$_chk=db_query("select name from ipaddr where name='$_name'",$db_id);
+								if(db_num_rows($_chk)!=0) {
+									$msg="Device name '$_name' already exist";
+								} else {
+									db_query("update ipaddr set name='$_name' where id='$_id'",$db_id);
+									$_namenet="$_name"."-net";
+									$_nameonet="$_nameold"."-net";
+									// inbound
+									db_query("update policy_inbound set src='$_name' where src='$_nameold'",$db_id);
+									db_query("update policy_inbound set dst='$_name' where dst='$_nameold'",$db_id);
+									db_query("update policy_inbound set src='$_namenet' where src='$_nameonet'",$db_id);
+									db_query("update policy_inbound set dst='$_namenet' where dst='$_nameonet'",$db_id);
+									// outbound
+									db_query("update policy_outbound set src='$_name' where src='$_nameold'",$db_id);
+									db_query("update policy_outbound set dst='$_name' where dst='$_nameold'",$db_id);
+									db_query("update policy_outbound set src='$_namenet' where src='$_nameonet'",$db_id);
+									db_query("update policy_outbound set dst='$_namenet' where dst='$_nameonet'",$db_id);
+									// dnat
+									db_query("update policy_dnat set src='$_name' where src='$_nameold'",$db_id);
+									db_query("update policy_dnat set dst='$_name' where dst='$_nameold'",$db_id);
+									db_query("update policy_dnat set fwd='$_name' where fwd='$_nameold'",$db_id);
+									db_query("update policy_dnat set src='$_namenet' where src='$_nameonet'",$db_id);
+									db_query("update policy_dnat set dst='$_namenet' where dst='$_nameonet'",$db_id);
+									db_query("update policy_dnat set fwd='$_namenet' where fwd='$_nameonet'",$db_id);
+									// snat
+									db_query("update policy_snat set src='$_name' where src='$_nameold'",$db_id);
+									db_query("update policy_snat set dst='$_name' where dst='$_nameold'",$db_id);
+									db_query("update policy_snat set fwd='$_name' where fwd='$_nameold'",$db_id);
+									db_query("update policy_snat set src='$_namenet' where src='$_nameonet'",$db_id);
+									db_query("update policy_snat set dst='$_namenet' where dst='$_nameonet'",$db_id);
+									db_query("update policy_snat set fwd='$_namenet' where fwd='$_nameonet'",$db_id);
+								}
+							}
+						}
+						if($_id==1) {
+							db_query("update pptp set bcrelay='$_dev'",$db_id);
+						}
+						if($msg=='') $msg="Setting updated!.";
+						@touch("/var/sys/ui-network-save");
+					} else {
+						db_flush($db_id);
+						$_name=trim($name[$_id]);
+						$_name=strtoupper($_name);
+						$_chk=db_query("select dev from ipaddr where name='$_dev'",$db_id);
+						if(db_num_rows($_chk)!=0) {
+							if($msg=='') $msg="Device '$_dev' already exist";
+						} else {
+							db_query("insert into ipaddr (name,dev,ip,mask,mtu,type,onboot,note) values ('$_name','$_dev','$_ip','$_mask','$_mtu','$_type','$_onboot','$_note')",$db_id);
+						}
+					}
+				}
+			}
+		}
+		if(isset($do_id)&&$do_id==del) {
+			if($idx!='' && $idx > 3) {
+				db_query("delete from ipaddr where id='$idx'",$db_id);
+				db_flush($db_id);
+			}
+		}
+	} // tab==1
+	if($tab==2) {
+		if(isset($do_save)&&$do_save==1) {
+			if(count($id)!=0) {
+				$x=0;
+				db_query("delete from ipalias where dev='$dev'",$db_id);
+				db_flush($db_id);
+				foreach($id as $_pid => $_rest) {
+					$_ip=$ip[$_pid];
+					$_mask=$mask[$_pid];
+					$_onboot=$onboot[$_pid];
+					$_note=escape_str($note[$_pid]);
+					if($_ip=='') continue;
+					if($_mask=='') {
+						$_m=ipcalc($_ip);
+						$_mask=$_m['netmask'];
+					}
+					if($_onboot!='') $_onboot='1';
+					if($_onboot=='') $_onboot='0';
+					$result=db_query("select ip from ipaddr where ip='$_ip'",$db_id);
+					if(db_num_rows($result)==0) {
+						db_query("insert into ipalias (pid,dev,ip,mask,onboot,note) values ('$x','$dev','$_ip','$_mask','$_onboot','$_note')",$db_id);
+						$x++;
+					}
+				}
+				@touch("/var/sys/ui-network-save");
+			}
+		}
+		if(isset($do_save)&&$do_save==2) {
+			if(count($del)!=0) {
+				foreach($del as $id) {
+					if($id!='') db_query("delete from ipalias where id='$id'",$db_id);
+				}
+				db_flush($db_id);
+			}
+		}
+		if(isset($do_id)&&$do_id==del) {
+			if($id!='') {
+				db_query("delete from ipalias where id='$id'",$db_id);
+				db_flush($db_id);
+			}
+		}
+	} // tab==2
+	if($tab==3) {
+		if(isset($do_save)&&$do_save==1) {
+			if(count($id)!=0) {
+				foreach($id as $_pid => $_rest) {
+					$_ip=$ip[$_pid];
+					$_vid=$vid[$_pid];
+					$_mask=$mask[$_pid];
+					$_onboot=$onboot[$_pid];
+					$_note=escape_str($note[$_pid]);
+					$_flag=$flag[$_pid];
+					$_mtu=$mtu[$_pid];
+					if($_mtu=='') $_mtu='1500';
+					if($_ip=='') continue;
+					if($_mask=='') {
+						$_m=ipcalc($_ip);
+						$_mask=$_m['netmask'];
+					}
+					if($_onboot!='') $_onboot='1';
+					if($_onboot=='') $_onboot='0';
+					if($_pid!='new') {
+						db_query("update vlan set vid='$_vid',ip='$_ip',flag='$_flag',mask='$_mask',mtu='$_mtu',onboot='$_onboot',note='$_note' where id='$_pid' and dev='$dev'",$db_id);
+					} else {
+						db_query("insert into vlan (vid,dev,ip,mask,flag,mtu,onboot,note) values ('$_vid','$dev','$_ip','$_mask','$_flag','$_mtu','$_onboot','$_note')",$db_id);
+					}
+				}
+				@touch("/var/sys/ui-network-save");
+			}
+		}
+		if(isset($do_save)&&$do_save==2) {
+			if(count($del)!=0) {
+				foreach($del as $id) {
+					if($id!='') db_query("delete from vlan where id='$id'",$db_id);
+				}
+				db_flush($db_id);
+			}
+		}
+		if(isset($do_id)&&$do_id==del) {
+			if($id!='') {
+				db_query("delete from vlan where id='$id'",$db_id);
+				db_flush($db_id);
+			}
+		}
+	}
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='') || (isset($chgdev)&&$chgdev!='')) {
+		$msg="Permission denied!.";
+	}
+}
+
+$_int=if_dev_up_array();
+clearstatcache();
+if(!isset($tab)||$tab=='') $tab=1;
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script language="javascript" src="<?echo $_URL_PATH;?>/j/strings.js"></script>
+<script language="javascript">
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+</script>
+<script language="javascript">
+	function dotoggle() {
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					document.f.elements[i].checked = !(document.f.elements[i].checked);
+    				}	
+			}
+  		}
+	}
+	function do_submit() {
+		if(!chkvalidip()) { return false; }
+		<?if($tab==1){?>
+		if(!chk_name()) { return false; }
+		<?}?>
+		<?if($tab==3){?>
+		if(!chkvalidid()) { return false; }
+		<?}?>
+		document.f.btsave.disabled=true;
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	}
+	function do_changes() {
+		if(!chkvalidip()) { return false; }
+		<?if($tab==3){?>
+		if(!chkvalidid()) { return false; }
+		<?}?>
+		document.f.btsave.disabled=true;
+		document.f.btapply.disabled=true;
+		self.location.href='<?echo "$_URL_PATH/network_int.exh?tab=$tab&do_id=apply_chg";?>';	
+	}
+	function do_shc() {
+		if(document.getElementById("shc").style.display=='none') {
+			document.getElementById("shc").style.display='';
+			document.f.btshc.value='Hide Config';
+		} else {
+			document.getElementById("shc").style.display='none';
+			document.f.btshc.value='Show Config';
+		}
+	}
+
+	function chkshift(newdev,oldev,id) {
+		self.location.href='<?echo $_URL_PATH;?>/network_int.exh?tab=<?echo $tab;?>&chgdev=1&new='+newdev+'&old='+oldev+'&id='+id;
+	}
+	function chkshiftdev(newdev) {
+		self.location.href='<?echo $_URL_PATH;?>/network_int.exh?tab=<?echo $tab;?>&dev='+newdev;
+	}
+	function chkdel() {
+		var x='0';
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					if(document.f.elements[i].checked) x++;
+    				}	
+			}
+  		}
+		if(x==0) return false;
+		return true;
+	}
+	function do_delete() {
+		if(chkdel()!=false) {
+			if(confirm('Are you sure you want to proceed?')) {
+				document.f.do_save.value='2';
+				document.f.submit();
+			}
+		}
+	}
+	function chkvalidip() {
+		var ip1='';
+		var ip2='';
+		var mask1='';
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='text') {
+			    	if( document.f.elements[i].name.substr( 0, 2 ) == 'ip') {
+					ip1=document.f.elements[i].value;
+					if(ip1=='') {
+						return false;
+					}
+					if(!mip1(ip1)) {
+						error("Invalid IP Address '"+ip1+"'");
+						return false;
+					} 
+					if(ip1=='' && ip2=='' ) {
+						return false;
+					}
+					if(ip1==ip2) {
+						error("IP Address '"+ip1+"' already exist");
+						return false;
+					}
+					ip2=ip1;
+    				}	
+			}
+  		}
+		return true;
+	}
+<?if($tab==1) {?>
+	function chk_name() {
+		var n1='';
+		var n2='';
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='text') {
+			    	if( document.f.elements[i].name.substr( 0, 4 ) == 'name') {
+					n1=document.f.elements[i].value;
+					n1=n1.toUpperCase();
+					if(n1=='') {
+						return false;
+					}
+					if(n1=='' && n2=='' ) {
+						return false;
+					}
+					if(n1==n2) {
+						error("Device name '"+n1+"' already exist");
+						return false;
+					}
+					n2=n1;
+    				}	
+			}
+  		}
+		return true;
+	}
+<?}//tab==1?>
+<?if($tab==3) {?>
+	function chkvalidid() {
+		var vid1='';
+		var vid2='';
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='text') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'vid') {
+					vid1=document.f.elements[i].value;
+					if(vid1=='') {
+						return false;
+					}
+					if(!isnum(vid1)) {
+						error("Invalid Vlan Id '"+vid1+"'");
+						return false;
+					} 
+					if(vid1 < 2 || vid1==1) {
+						error("Vlan id must start from 2");
+						return false;
+					}
+					if(vid1=='' && vid2=='' ) {
+						return false;
+					}
+					if(vid1==vid2) {
+						error("Vlan Id '"+vid1+"' already exist");
+						return false;
+					}
+					vid2=vid1;
+    				}	
+			}
+  		}
+		return true;
+	}
+<?} //tab==3?>
+var k=0;
+function waitcount() { 
+ 	k=k+2;
+	if(k <= 100) {
+    		document.getElementById("msg").innerHTML='Reloading.. Please wait..'+k+'%'; 
+    		setTimeout(waitcount,600);  
+	} else {
+		self.location.href='<?echo "$_URL_PATH/network_int.exh?tab=$tab&col=$col&col2=$col2";?>';
+	}
+}
+</script>
+</head>
+<body onload="parent.left_frame.switchmenu('sub2');" scroll=auto>
+<form name=f method=post action="<?echo "$_URL_PATH/network_int.exh";?>">
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 10px;'>
+<tr>
+<td>
+<p class="sectitle"><b>Network:</b> Interfaces</p><br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="<?echo "$_URL_PATH/network_int.exh?tab=1";?>" <?if($tab==1){?>class="tabact"<?}?>>Static IP</a></li>
+<li><a href="<?echo "$_URL_PATH/network_int.exh?tab=2";?>" <?if($tab==2){?>class="tabact"<?}?>>Virtual IP</a></li>
+<li><a href="<?echo "$_URL_PATH/network_int.exh?tab=3";?>" <?if($tab==3){?>class="tabact"<?}?>>Virtual LAN</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td> 
+<br>
+
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><?if(isset($msg)&&$msg!='') {?><span id=msg class=notice><?echo "$msg";?></span><?}else{echo "<span id=msg class=notice style='display: none;'></span>";}?></td></tr>
+</table><br>
+
+<!-- tab container -->
+<?if($tab==1) {?>
+<table class="data" width="100%">
+<thead class="blue"> 
+<tr>
+<td style='font-weight: bold;'>#</td> 
+<td style='font-weight: bold;'>Name</td>
+<td style='font-weight: bold;'>Device</td>
+<td style='font-weight: bold;'>IP Address</td>
+<td style='font-weight: bold;'>Netmask</td>
+<td style='font-weight: bold;'>MTU</td>
+<td style='font-weight: bold;'>Type</td>
+<td style='font-weight: bold;'>Active</td>
+<td style='font-weight: bold;' colspan=2>Description</td>
+</tr></thead>
+<tbody>
+<?
+db_flush($db_id);
+$_dd=list_devname($db_id);
+$_ttype['1']="EXT";
+$_ttype['2']="DMZ";
+$_ttype['3']="INT";
+$_cnt=1;$_tac=0;
+$result=db_query("select * from ipaddr",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_id=$row['id'];
+		$_name=strtoupper($row['name']);
+		$_dev=$row['dev'];
+		$_ip=$row['ip'];
+		$_mask=$row['mask'];
+		$_mtu=$row['mtu'];
+		$_type=$row['type'];
+		$_onboot=$row['onboot'];
+		$_note=unescape_str($row['note']);
+		$_stat='';
+		$_oper=0;
+		if($_int[$_dev]==1) {
+			$_oper=1;
+		}
+		if($_onboot==1) $_stat='checked';
+	if($_id > 3 && $_tac==0) {
+		echo "<tr rowspan=2><td colspan=10></td></tr>";
+		echo "<tr rowspan=2><td colspan=10 class=blue style='font-weight: bold;'>Additional</td></tr>";
+		$_tac=1;
+	}
+	echo "
+	<tr>
+       	<td><input type=hidden name=id[$_id] value='id'>$_cnt</td>
+	";
+	if($_id > 3) {
+		echo "<td><input type=hidden name=nameold[$_id] value='$_name'><input type=text name=name[$_id] value='$_name' size=4 maxlength=4 class='valbox'></td>";
+       	} else {
+		echo "<td style='font-size: 11px;'><input type=hidden name=nameold[$_id] value='$_name'><input type=hidden name=name[$_id] value='$_name'>$_name</td>";
+	}
+	echo "<td>";
+	$_opt='';
+	$_intold='';
+	foreach($_dd as $_nn => $_nn2) {
+		if($_dev==$_nn) {
+			$_opt .="<option value='$_nn' selected>$_nn</option>";
+			$_intold=$_nn;
+		} else {
+			$_opt .="<option value='$_nn'>$_nn</option>";	
+		}
+	}
+	echo "
+	<select class='valbox' size=1 name=dev[$_id] onchange='chkshift(this.value,\"$_intold\",$_id);'>
+	$_opt
+	</select>
+	</td>
+        <td><input type=text name=ip[$_id] value='$_ip' size=16 class='valbox'></td>
+        <td>
+	<select name=mask[$_id] size=1 class='valbox'>";
+	if(count($_CLASSIP)!=0) {
+		foreach($_CLASSIP as $_mmask) {
+			if($_mmask==$_mask) {
+				echo "<option value='$_mmask' selected>$_mmask</option>";
+			} else {
+				echo "<option value='$_mmask'>$_mmask</option>";
+			}
+		}
+	}
+	echo "
+	</select></td>
+        <td><input type=text name=mtu[$_id] value='$_mtu' size=4 class='valbox'></td>
+	<td>
+	";
+	if($_id > 3) {
+		echo "<select name=type[$_id] size=1 class=valbox>";
+		foreach($_ttype as $u2 => $u1) {
+			if($u2=="$_type") {
+				echo "<option value='$u2' selected>$u1</option>";
+			} else {
+				echo "<option value='$u2'>$u1</option>";
+			}
+		}
+		echo "</select>";
+	} else {
+		echo "<input type=hidden name=type[$_id] value='$_type'><font style='font-size: 11px;'>{$_ttype[$_type]}</font>";
+	}
+	echo "</td>
+       	<td><input type=checkbox name=onboot[$_id] $_stat></td>
+       	<td><input type=text name=note[$_id] value='$_note' size=20 class='valbox'></td>
+       	<td style='text-align: right; vertical-align: middle;' align=right>";
+	if($_id > 3) {
+		echo "<a href='javascript:void(0);' onclick=\"self.location.href='$_URL_PATH/network_int.exh?tab=1&do_id=del&idx=$_id';\">{$_PNG['delete']}</a>";
+	}
+	echo "{$_PNG_NIC[$_oper]}</td>
+	</tr>";
+	$_cnt++;
+	}
+}
+if(isset($do_id)&&$do_id=='add_new') {
+	echo " 
+	<tr>
+	<td><input type=hidden name=id[new] value='id'>$_cnt</td>
+	<td><input type=text name=name[new] value='' size=4 maxlength=4 class='valbox' style='text-transform: uppercase;'></td>
+	<td><input type=text name=dev[new] value='eth' size=4 maxlength=6 class='valbox'></td>
+	<td><input type=text name=ip[new] value='' size=20 class='valbox'></td>
+	<td>
+	<select name=mask[new] size=1 class='valbox'>";
+	if(count($_CLASSIP)!=0) {
+		foreach($_CLASSIP as $_mmask) {
+			if($_mmask=="255.255.255.0") {
+				echo "<option value='$_mmask' selected>$_mmask</option>";
+			} else {
+				echo "<option value='$_mmask'>$_mmask</option>";
+			}
+		}
+	}
+	echo "
+	</select>
+	</td>
+	<td><input type=text name=mtu[new] value='$_mtu' size=5 class='valbox'></td>
+	<td>
+	<select name=type[new] size=1 class=valbox>
+	";
+	foreach($_ttype as $u2 => $u1) {
+		if($u2=="0") {
+			echo "<option value='$u2' selected>$u1</option>";
+		} else {
+			echo "<option value='$u2'>$u1</option>";
+		}
+	}
+	echo "
+	</select></td>
+	<td><input type=checkbox name=onboot[new]></td>
+	<td><input type=text name=note[new] value='' size=20 class='valbox'></td>
+	<td style='text-align: center;' align=center>&nbsp;</td>
+	</tr>";
+}
+?>
+
+<tr>
+<td align=right valign=top colspan=10 style='white-space: nowrap; text-align: right;'>
+<input name=btadd type="button" value="Add New" class="button-small" onclick="if(chkvalidip()==true) self.location.href='<?echo $_URL_PATH;?>/network_int.exh?tab=1&do_id=add_new';">
+<?if(!file_exists("/var/sys/ui-network-save")) {?>
+<input name=btshc class="button-small" type="button" value="Show Config" onclick='do_shc();'>
+<?}?>
+</td></tr>
+
+</tbody>
+</table>
+<?if(!file_exists("/var/sys/ui-network-save")) {?>
+<table class="data" width="100%" id=shc style='display: none;'>
+<tr>
+<td>
+<pre>
+<?
+foreach($_int as $int => $opt) {
+	if(preg_match("/^eth(\d+)$/",$int)) {
+   		$ph=popen("ifconfig $int","r" );
+   		while($line=fgets($ph)) {
+			if($line=='') continue;
+			echo htmlspecialchars($line);
+		}
+   		pclose($ph);
+	}
+}
+?>
+</pre>
+</td></tr></table>
+<? } ?>
+<? }//tab==1 ?>
+<?if($tab==2) {?>
+<table class="data" width="100%">
+<thead class="blue"> 
+<tr>
+<td style='font-weight: bold;'>#</td> 
+<td style='font-weight: bold;'>Name</td>
+<td style='font-weight: bold;'>IP Address</td>
+<td style='font-weight: bold;'>Netmask</td>
+<td style='font-weight: bold;'>Active</td>
+<td style='font-weight: bold;'>Description</td>
+<td style='font-weight: bold;'>Opt</td>
+</tr></thead>
+<tbody>
+<?
+if(!isset($dev)||$dev=='') {
+	$dev=search_devname("ipalias",$db_id);
+	if($dev=='') $dev='eth0';
+}
+$_dd=list_devname($db_id);
+$x=1;
+$result=db_query("select * from ipalias where dev='$dev'",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_id=$row['id'];
+		$_pid=$row['pid'];
+		$_name=$row['name'];
+		$_dev=$row['dev'];
+		$_ip=$row['ip'];
+		$_mask=$row['mask'];
+		$_onboot=$row['onboot'];
+		$_note=unescape_str($row['note']);
+		$_stat='';
+		if($_onboot==1) $_stat='checked';
+		echo "
+		<tr>
+		<td><input type=hidden name=id[$_id] value='$_id'>$x</td>
+		<td>{$_dd[$dev]}.$_pid</td>
+		<td><input type=text name=ip[$_id] value='$_ip' size=20 class='valbox'></td>
+		<td>
+		<select name=mask[$_id] size=1 class='valbox'>";
+		if(count($_CLASSIP)!=0) {
+			foreach($_CLASSIP as $_mmask) {
+				if($_mmask==$_mask) {
+					echo "<option value='$_mmask' selected>$_mmask</option>";
+				} else {
+					echo "<option value='$_mmask'>$_mmask</option>";
+				}
+			}
+		}
+		echo "</td>
+		<td><input type=checkbox name=onboot[$_id] $_stat></td>
+		<td><input type=text name=note[$_id] value='$_note' size=25 class='valbox'></td>
+		<td style='text-align: right;' valign=middile><a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='$_URL_PATH/network_int.exh?tab=2&do_id=del&id=$_id';\">{$_PNG['delete']}</a><input type=checkbox name=del[$_id] value=$_id></td>
+		</tr>";
+	$x++;
+	}	
+}
+if(isset($do_id)&&$do_id=='add_new') {
+	$i=$x - 1;
+	echo "
+	<tr>
+        <td><input type=hidden name=id[new] value='new'>$x</td>
+        <td>{$_dd[$dev]}:$i</td>
+        <td><input type=text name=ip[new] value='' size=20 class='valbox'></td>
+	<td>
+	<select name=mask[new] size=1 class='valbox'>";
+	if(count($_CLASSIP)!=0) {
+		foreach($_CLASSIP as $_mmask) {
+			if($_mmask=='255.255.255.0') {
+				echo "<option value='$_mmask' selected>$_mmask</option>";
+			} else {
+				echo "<option value='$_mmask'>$_mmask</option>";
+			}
+		}
+	}
+	echo "</select></td>
+        <td><input type=checkbox name=onboot[new]></td>
+        <td><input type=text name=note[new] value='' size=25 class='valbox'></td>
+	<td></td>
+	</tr>";
+}
+if($x > 1) {
+?>
+<tr>
+<td style='text-align: right;' align=right valign=top colspan=7>
+<a href="#" onclick='do_delete();'>Delete</a> / <a href="#" onclick='dotoggle();'>Toggle</a> <?echo $_PNG['arrow_rtr'];?></td>
+</tr>
+<? } ?>
+<tr>
+<td align=right valign=bottom colspan=7 style='white-space: nowrap;'>
+Interface :<select name=dev size=1 class=textbox style='font-size: 9px;' onchange='chkshiftdev(this.value)'>
+<?
+if(count($_dd)!=0) {
+	foreach($_dd as $_dev => $_name) {
+		if($_int[$_dev]!=1) continue;
+		if($_dev==$dev) {
+			$_devs=$_dev;
+			echo "<option value='$_dev' selected>$_name</option>";
+		} else {
+			echo "<option value='$_dev'>$_name</option>";
+		}
+	}
+}
+?>
+</select>&nbsp;
+<input name=btadd type="button" value="Add New" class="button-small" onclick="if(chkvalidip()==true) self.location.href='<?echo $_URL_PATH;?>/network_int.exh?tab=2&do_id=add_new&dev=<?echo $dev;?>'">
+<?if($x > 1 && isset($_devs) && !file_exists("/var/sys/ui-network-save")) {?><input name=btshc class="button-small" type="button" value="Show Config" onclick='do_shc();'><?}?>
+</td>
+</tr>
+</tbody>
+</table>
+<?if($x > 1 && isset($_devs) && !file_exists("/var/sys/ui-network-save")) {?>
+<table class="data" width="100%" id=shc style='display: none;'>
+<tr>
+<td>
+<pre>
+<?
+exec("ifconfig |grep $_devs:[0-9]",$out,$ret);
+if(count($out)!=0) {
+	foreach($out as $int) {
+		list($_intt,)=preg_split("/\s+/",$int);
+   		$ph=popen("ifconfig $_intt","r" );
+   		while($line=fgets($ph)) echo htmlspecialchars($line);
+   		pclose($ph);
+	}
+}
+?>
+</pre>
+</td></tr></table>
+<?}?>
+<? }//tab==2 ?>
+<?if($tab==3) {?>
+<table class="data" width="100%">
+<thead class="blue"> 
+<tr>
+<td style='font-weight: bold;'>#</td> 
+<td style='font-weight: bold;'>Id</td>
+<td style='font-weight: bold;'>IP Address</td>
+<td style='font-weight: bold;'>Netmask</td>
+<td style='font-weight: bold;'>Mode</td>
+<td style='font-weight: bold;'>MTU</td>
+<td style='font-weight: bold;'>Active</td>
+<td style='font-weight: bold;'>Description</td>
+<td style='font-weight: bold;'>Opt</td>
+</tr></thead>
+<tbody>
+<?
+if(!isset($dev)||$dev=='') {
+	$dev=search_devname("vlan",$db_id);
+	if($dev=='') $dev='eth0';
+}
+$_dd=list_devname($db_id);
+$x=1;
+$result=db_query("select * from vlan where dev='$dev'",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_id=$row['id'];
+		$_vid=$row['vid'];
+		$_name=$row['name'];
+		$_dev=$row['dev'];
+		$_ip=$row['ip'];
+		$_mask=$row['mask'];
+		$_onboot=$row['onboot'];
+		$_flag=$row['flag'];
+		$_mtu=$row['mtu'];
+		$_note=unescape_str($row['note']);
+		$_stat='';
+		if($_onboot==1) $_stat='checked';
+		echo "
+		<tr>
+		<td><input type=hidden name=id[$_id] value='$_id'>$x</td>
+		<td><input type=text name=vid[$_id] value='$_vid' size=5 class='valbox'></td>
+		<td><input type=text name=ip[$_id] value='$_ip' size=20 class='valbox'></td>
+		<td>
+		<select name=mask[$_id] size=1 class='valbox'>
+		";
+		if(count($_CLASSIP)!=0) {
+			foreach($_CLASSIP as $_mmask) {
+				if($_mmask==$_mask) {
+					echo "<option value='$_mmask' selected>$_mmask</option>";
+				} else {
+					echo "<option value='$_mmask'>$_mmask</option>";
+				}
+			}
+		}
+		echo "
+		</select></td>
+		<td>
+		<select name=flag[$_id] size=1 class='valbox'>
+		";
+		foreach(array("Vlan"=>"0","Ethernet"=>"1") as $t1 => $t2) {
+			if($_flag=="$t2") {
+				echo "<option value='$t2' selected>$t1</option>";
+			} else {
+				echo "<option value='$t2'>$t1</option>";
+			}
+		}
+		echo "
+		</select></td>
+		<td><input type=text name=mtu[$_id] value='$_mtu' size=5 class='valbox'></td>
+		<td><input type=checkbox name=onboot[$_id] $_stat></td>
+		<td><input type=text name=note[$_id] value='$_note' size=25 class='valbox'></td>
+		<td style='text-align: right;' valign=middile><a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='$_URL_PATH/network_int.exh?tab=3&do_id=del&id=$_id';\">{$_PNG['delete']}</a><input type=checkbox name=del[$_id] value=$_id></td>
+		</tr>
+		";
+	$x++;
+	}	
+}
+if(isset($do_id)&&$do_id=='add_new') {
+	if($_vid=='') {
+		$_vid=2;
+	} else {
+		$_vid++;
+	}
+	echo "
+	<tr>
+        <td><input type=hidden name=id[new] value='new'>$x</td>
+        <td class=tdlist><input type=text name=vid[new] value='' size=5 class='valbox'></td>
+        <td><input type=text name=ip[new] value='' size=20 class='valbox'></td>
+	<td>
+	<select name=mask[new] size=1 class='valbox'>";
+	if(count($_CLASSIP)!=0) {
+		foreach($_CLASSIP as $_mmask) {
+			if($_mmask=='255.255.255.0') {
+				echo "<option value='$_mmask' selected>$_mmask</option>";
+			} else {
+				echo "<option value='$_mmask'>$_mmask</option>";
+			}
+		}
+	}
+	echo "
+	</select></td>
+	<td>
+	<select name=flag[new] size=1 class='valbox'>
+	";
+	foreach(array("Vlan"=>"0","Ethernet"=>"1") as $t1 => $t2) {
+		if($t2=="0") {
+			echo "<option value='$t2' selected>$t1</option>";
+		} else {
+			echo "<option value='$t2'>$t1</option>";
+		}
+	}
+	echo "
+	</select></td>
+	<td><input type=text name=mtu[new] value='1500' size=5 class='valbox'></td>
+        <td><input type=checkbox name=onboot[new]></td>
+        <td><input type=text name=note[new] value='' size=25 class='valbox'></td>
+	<td></td>
+      </tr>";
+}
+if($x > 1) {
+?>
+<tr>
+<td style='text-align: right;' align=right valign=top colspan=9>
+<a href="#" onclick='do_delete();'>Delete</a> / <a href="#" onclick='dotoggle();'>Toggle</a> <?echo $_PNG['arrow_rtr'];?></td>
+</tr>
+<? } ?>
+<tr>
+<td align=right valign=bottom colspan=9 style='white-space: nowrap;'>
+Interface :<select name=dev size=1 class=textbox style='font-size: 9px;' onchange='chkshiftdev(this.value)'>
+<?
+if(count($_dd)!=0) {
+	foreach($_dd as $_dev => $_name) {
+		if($_int[$_dev]!=1) continue;
+		if($_dev==$dev) {
+			$_devs=$_dev;
+			echo "<option value='$_dev' selected>$_name</option>";
+		} else {
+			echo "<option value='$_dev'>$_name</option>";
+		}
+	}
+}
+?>
+</select>&nbsp;
+<input name=btadd type="button" value="Add New" class="button-small" onclick="if(chkvalidip()==true) self.location.href='<?echo $_URL_PATH;?>/network_int.exh?tab=3&do_id=add_new&dev=<?echo $dev;?>'">
+<?if($x > 1 && isset($_devs) && !file_exists("/var/sys/ui-network-save")) {?><input name=btshc class="button-small" type="button" value="Show Config" onclick='do_shc();'><?}?>
+</td>
+</tr>
+</tbody>
+</table>
+<?if($x > 1 && isset($_devs) && !file_exists("/var/sys/ui-network-save")) {?>
+<table class="data" width="100%" id=shc style='display: none;'>
+<tr>
+<td>
+<pre>
+<?
+exec("ifconfig |grep $_devs.[0-9]",$out,$ret);
+if(count($out)!=0) {
+	foreach($out as $int) {
+		list($_intt,)=preg_split("/\s+/",$int);
+   		$ph=popen("ifconfig $_intt","r" );
+   		while($line=fgets($ph)) echo htmlspecialchars($line);
+   		pclose($ph);
+	}
+}
+?>
+</pre>
+</td></tr></table>
+<?}?>
+<? }//tab==3 ?>
+<table align=right>
+<tbody>
+<tr>
+<td><input name="btapply" value="Apply changes" type="button" class=button onclick="do_changes();"></td>
+<td><input name="btsave" value="Save" type="button" class=button onclick="do_submit();"> </td>  </tr> 
+</tbody>
+</table>
+
+<!-- end tab container -->
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?echo $tab;?>>
+</form>
+</body>
+</html>
+
+<?db_close($db_id); flush();?>

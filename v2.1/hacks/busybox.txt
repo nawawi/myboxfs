@@ -1,0 +1,148 @@
+init/init.c - line 574
+                /* Log the process name and args */
+                //message(LOG, "Starting pid %d, console %s: '%s'",
+                //                getpid(), a->terminal, cmdpath);
+
+
+init/init.c - line 1062
+       /* Hello world */
+        //message(MAYBE_CONSOLE | LOG, "init started:  %s", bb_msg_full_version);
+
+miscutils/crond.c - line 211 
+	bb_xdaemon(1, 1);
+
+procutils/ps.c - line 25
+// awie 22/09/2006 - hack
+int string_add_n(char **start, const char *string_add, size_t s) {
+        char *tmp_ptr = NULL;
+        size_t add_size;
+        size_t ss;
+        ss = s;
+        if(ss == 0) ss = strlen(string_add) + 1;
+        if(*start == NULL) {
+                *start = malloc(ss);
+                if(!(*start)) return -1;
+                strncpy(*start, string_add, ss);
+                if(s != 0) (*start)[ss] = '\0';
+                return 0;
+        }
+        add_size = strlen(*start);
+        tmp_ptr = realloc(*start, (add_size + ss) + 1);
+        if(tmp_ptr){
+                *start = tmp_ptr;
+                strncpy((*start) + add_size, string_add, ss);
+                (*start)[add_size + ss] = '\0';
+                return 0;
+        }
+        return -1;
+}
+
+char *string_replace(const char *string, const char *search_string, const char *replace_string){
+        char *str = NULL, *pos;
+        size_t spos;
+        int res = 0;
+
+        if((pos = strstr(string, search_string)) == NULL) return NULL;
+        spos = pos - string;
+        if (spos == 0) {
+                res += string_add_n(&str, replace_string, 0);
+                res += string_add_n(&str, string + strlen(search_string), 0);
+        } else{
+
+                res += string_add_n(&str, string, spos);
+                res += string_add_n(&str, replace_string, 0);
+                res += string_add_n(&str, string + strlen(search_string) + spos, 0);
+        }
+
+        if (res == 0) {
+                return str;
+        }
+        free(str);
+        return 0;
+}
+// awie end
+
+
+procutils/ps.c - line 126
+	//printf("  PID  Uid     VmSize Stat Command\n");
+        printf("  PID       VmSize Stat Command\n");
+
+procutils/ps.c - line 154
+		if(p->rss == 0)
+                    //len = printf("%5d %-8s        %s ", p->pid, p->user, p->state);
+                    len = printf("%5d %-5s        %s ", p->pid, "", p->state);
+                else
+                    //len = printf("%5d %-8s %6ld %s ", p->pid, p->user, p->rss, p->state);
+                    len = printf("%5d %-5s %6ld %s ", p->pid, "", p->rss, p->state);
+
+
+
+procutils/ps.c - line 168
+
+		// awie
+                        char *st;
+                        if(strstr(namecmd,"/bin/php -f /service/tools/")) {
+                                st=string_replace(namecmd, "/bin/php -f /service/tools/", "");
+                        } else if(strstr(namecmd,"/bin/php -Cq /service/init/")) {
+                                st=string_replace(namecmd, "/bin/php -Cq /service/init/", "");
+                        } else if(strstr(namecmd,"/bin/php /service/www/")) {
+                                st=string_replace(namecmd, "/bin/php /service/www/", "");
+                        } else if(strstr(namecmd,"/bin/php -f ")) {
+                                st=string_replace(namecmd, "/bin/php -f ", "");
+                        } else if(strstr(namecmd,"/bin/php -Cq ")) {
+                                st=string_replace(namecmd, "/bin/php -Cq ", "");
+                        } else if(strstr(namecmd,"snortd ")) {
+                                st="snortd";
+                        } else if(strstr(namecmd,"crond ")) {
+                                st="crond";
+                        } else if(strstr(namecmd,"dhcpd ")) {
+                                st="dhcpd";
+                        } else if(strstr(namecmd,"bcrelay ")) {
+                                st="bcrelay";
+                        } else {
+                                st=string_replace(namecmd, "/bin/", "");
+                        }
+                        if(st) {
+                                printf("%s\n", st);
+                        } else {
+                                printf("%s\n", namecmd);
+                        }
+
+
+--- procps/top.c        2006-07-01 06:42:12.000000000 +0800
++++ ../../src/busybox/procps/top.c      2006-09-25 07:23:07.000000000 +0800
+@@ -290,14 +290,14 @@
+ 
+        /* what info of the processes is shown */
+        printf("\e[7m%.*s\e[0m", scr_width,
+-               "  PID USER     STATUS   RSS  PPID %CPU %MEM COMMAND");
++               "  PID     STATUS   RSS  PPID %CPU %MEM COMMAND");
+ #define MIN_WIDTH \
+-       sizeof( "  PID USER     STATUS   RSS  PPID %CPU %MEM C")
++       sizeof( "  PID     STATUS   RSS  PPID %CPU %MEM C")
+ #else
+        printf("\e[7m%.*s\e[0m", scr_width,
+-               "  PID USER     STATUS   RSS  PPID %MEM COMMAND");
++               "  PID     STATUS   RSS  PPID %MEM COMMAND");
+ #define MIN_WIDTH \
+-       sizeof( "  PID USER     STATUS   RSS  PPID %MEM C")
++       sizeof( "  PID     STATUS   RSS  PPID %MEM C")
+ #endif
+ 
+        /*
+@@ -344,9 +344,9 @@
+                else
+                        sprintf(rss_str_buf, "%7ld", s->rss);
+                USE_FEATURE_TOP_CPU_USAGE_PERCENTAGE(pcpu = div((s->pcpu*pcpu_scale) >> pcpu_shift, 10);)
+-               col -= printf("\n%5d %-8s %s  %s%6d%3u.%c" \
++               col -= printf("\n%5d %-3s %s  %s%6d%3u.%c" \
+                                USE_FEATURE_TOP_CPU_USAGE_PERCENTAGE("%3u.%c") " ",
+-                               s->pid, s->user, s->state, rss_str_buf, s->ppid,
++                               s->pid, "", s->state, rss_str_buf, s->ppid,
+                                USE_FEATURE_TOP_CPU_USAGE_PERCENTAGE(pcpu.quot, '0'+pcpu.rem,)
+                                pmem.quot, '0'+pmem.rem);
+
+init/init.c
+/*message(LOG, "Process '%s' (pid %d) exited.  "
+                                                        "Scheduling it for restart.",
+                                                        a->command, wpid);*/

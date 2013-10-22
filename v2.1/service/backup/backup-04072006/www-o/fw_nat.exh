@@ -1,0 +1,902 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+chk_session();
+
+write_nocache();
+
+$_SYSID="fw_nat";
+
+$db_id=db_connect($_DB_NAME);
+
+if(chk_pri($_LOGIN['auth_id'],1)==1) {
+	if(isset($do_id)&&$do_id=='apply_chg') {
+		$msg='<script>waitcount();</script>';
+		echo_query("policy-restart");
+	}
+	
+	if($tab==1 || $tab==2) {
+		if($tab==1) {
+			$_table="policy_dnat";
+			$_table_misc_time="policy_dnat_show_time";
+			$_table_misc_note="policy_dnat_show_note";
+		}
+		if($tab==2) {
+			$_table="policy_snat";
+			$_table_misc_time="policy_snat_show_time";
+			$_table_misc_note="policy_snat_show_note";
+		}
+		if($col==1) {
+			if($do_id=='stat') {
+				if($stat==1) { $stat=0; } else { $stat=1; }
+				db_query("update $_table set stat='$stat' where id='$id'",$db_id);
+			}
+			if($do_id=='log') {
+				if($log==1) { $log=0; } else { $log=1; }
+				db_query("update $_table set log='$log' where id='$id'",$db_id);
+			}
+			if($do_id=='del') {
+				db_query("delete from $_table where id='$id'",$db_id);
+				reorder_policy($db_id,$_table);
+			}
+			if(isset($do_save)&&$do_save==2) {
+				if(count($del)!=0) {
+					foreach($del as $x) {
+						db_query("delete from $_table where id='$x'",$db_id);
+					}
+					reorder_policy($db_id,$_table);
+				}
+			}
+			if(isset($do_save)&&$do_save==4) {
+				if(count($del)!=0) {
+					foreach($del as $x) {
+						db_query("update $_table set stat='1' where id='$x'",$db_id);
+					}
+				}
+			}
+			if(isset($do_save)&&$do_save==5) {
+				if(count($del)!=0) {
+					foreach($del as $x) {
+						db_query("update $_table set stat='0' where id='$x'",$db_id);
+					}
+				}
+			}
+			if(isset($do_save)&&$do_save==6) {
+				if(count($del)!=0) {
+					foreach($del as $x) {
+						db_query("update $_table set log='1' where id='$x'",$db_id);
+					}
+				}
+			}
+			if(isset($do_save)&&$do_save==7) {
+				if(count($del)!=0) {
+					foreach($del as $x) {
+						db_query("update $_table set log='0' where id='$x'",$db_id);
+					}
+				}
+			}
+			// duplicate
+			if(isset($do_save)&&$do_save==8) {
+				if(count($del)!=0) {
+					$_res=db_query("select COUNT(*)+1 as id from $_table",$db_id);
+					if(db_num_rows($_res)!=0) { 
+						$_nid=sqlite_fetch_single($_res);
+					}
+					unset($_res);
+					if($_nid=='') $_nid=1;
+					foreach($del as $x) {
+						$result=db_query("select * from $_table where id='$x'",$db_id);
+						if(db_num_rows($result)!=0) {
+							while($row=db_fetch_array_assoc($result)) {
+								$_proto=$row['proto'];
+								$_src=$row['src'];
+								$_dst=$row['dst'];
+								$_dstp=$row['dstp'];
+								$_fwd=$row['fwd'];
+								$_fwdp=$row['fwdp'];
+								$_usetime=$row['usetime'];
+								$_timestart=$row['timestart'];
+								$_timeend=$row['timeend'];
+								$_log=$row['log'];
+								$_stat=$row['stat'];
+								$_note=$row['note'];
+								db_query("insert into $_table (id,proto,src,dst,dstp,fwd,fwdp,usetime,timestart,timeend,log,stat,note) values ('$_nid','$_proto','$_src','$_dst','$_dstp','$_fwd','$_fwdp','$_usetime','$_timestart','$_timeend','$_log','$_stat','$_note')",$db_id);
+								$_nid++;
+							}
+						}
+						unset($result,$_proto,$_src,$_dst,$_dstp,$_fwd,$_fwdp,$_usetime,$_timestart,$_timeend,$_log,$_stat,$_note);
+					}
+				}
+			}
+			if(isset($do_save)&&$do_save==3) {
+				if(count($del)!=0) {
+					foreach($del as $_zid) {
+						//$_zid=$del[0];
+						db_query("update $_table set id='-1' where id='$_zid'",$db_id);
+						db_query("update $_table set id='$_zid' where id='$shift_id'",$db_id);
+						db_query("update $_table set id='$shift_id' where id='-1'",$db_id);
+					}
+				}
+			}
+			if(isset($do_id)&&$do_id=='show_time') {
+				if($show_time==1) { $show_time=0; } else { $show_time=1; }
+				db_query("update misc set val='$show_time' where name='$_table_misc_time'",$db_id);
+			}
+			if(isset($do_id)&&$do_id=='show_note') {
+				if($show_note==1) { $show_note=0; } else { $show_note=1; }
+				db_query("update misc set val='$show_note' where name='$_table_misc_note'",$db_id);
+			}
+		}
+		if($col==2) {
+			if($do_id!='edit') {
+				if(isset($do_save)&&$do_save==1) {
+					if($stat!='') { $stat='1'; } else { $stat='0'; }
+					if($log!='') { $log='1'; } else { $log='0'; }
+					if($usetime!='') { $usetime='1'; } else { $usetime='0'; }
+					$note=escape_str($note);
+					$_nid=1;
+					if($position=='TOP') {
+						db_query("update $_table set id = id+1 where 1 > 0",$db_id);
+						$_nid=1;
+					} else {
+						$_res=db_query("select COUNT(*)+1 as id from $_table",$db_id);
+						if(db_num_rows($_res)!=0) { 
+							$_nid=sqlite_fetch_single($_res);
+						}
+					}
+					db_query("insert into $_table (id,proto,src,dst,dstp,fwd,fwdp,usetime,timestart,timeend,log,stat,note) values ('$_nid','$proto','$src','$dst','$dstp','$fwd','$fwdp','$usetime','$timestart','$timeend','$log','$stat','$note')",$db_id);
+					$msg='Setting saved!';
+				}
+			} else {
+				if(isset($do_save)&&$do_save==1) {
+					if($stat!='') { $stat='1'; } else { $stat='0'; }
+					if($log!='') { $log='1'; } else { $log='0'; }
+					if($usetime!='') { $usetime='1'; } else { $usetime='0'; }
+					$note=escape_str($note);
+					db_query("update $_table set proto='$proto',src='$src',dst='$dst',dstp='$dstp',fwd='$fwd',fwdp='$fwdp',usetime='$usetime',timestart='$timestart',timeend='$timeend',log='$log',stat='$stat',note='$note' where id='$id'",$db_id);
+					$msg='Setting updated!';
+				}
+			}
+		}
+	} // if tab==1 or tab==2
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied!.";
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+if(!isset($col)||$col=='') $col=1;
+
+if(($tab==1 || $tab==2) && ($col==1)) {
+	$result=db_query("select * from misc where name like \"policy_%\"",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_name=$row['name'];
+			$_val=$row['val'];
+			if($_name=='policy_dnat_show_time') $policy_dnat_show_time=$_val;
+			if($_name=='policy_dnat_show_note') $policy_dnat_show_note=$_val;
+			if($_name=='policy_snat_show_time') $policy_snat_show_time=$_val;
+			if($_name=='policy_snat_show_note') $policy_snat_show_note=$_val;
+		}
+		unset($_name,$_val);
+	}
+}
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/calendar.css" TYPE="text/css">
+<script language="javascript" src="<?echo $_URL_PATH;?>/j/strings.js"></script>
+<script language="javascript">
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+</script>
+<?if(($tab==1 || $tab==2) && ($col==2)) {?>
+<script type='text/javascript'>
+calendar=null;
+function showCalendar(id) {var el = document.getElementById(id);if (calendar != null) {calendar.hide();} else {var cal = new Calendar(true, null, selected, closeHandler);cal.weekNumbers = false;cal.showsTime = true;cal.time24 = true;cal.showsOtherMonths = false;calendar = cal;cal.setRange(1900, 2070);cal.create();}calendar.setDateFormat('%Y-%m-%d %H:%M');calendar.parseDate(el.value);calendar.sel = el;calendar.showAtElement(el, "Br");return false;}
+function selected(cal, date) {cal.sel.value = date;}
+function closeHandler(cal) {cal.hide();calendar = null;}
+</script>
+<script type="text/javascript" src="<?echo $_URL_PATH;?>/j/calendar.js"></script>
+<? } ?>
+<script language="javascript">
+	function do_submit() {
+<?if(($tab==1 || $tab==2) && ($col==2)) {?>
+		var src1=document.f.src1.value;
+		var src2=document.f.src2.value;
+		var dst1=document.f.dst1.value;
+		var dst2=document.f.dst2.value;
+		var fwd1=document.f.fwd1.value;
+		var fwd2=document.f.fwd2.value;
+		var dstp1=document.f.dstp1.value;
+		var dstp2=document.f.dstp2.value;
+		var fwdp1=document.f.fwdp1.value;
+		var fwdp2=document.f.fwdp2.value;
+		if(src1=='any') {
+			document.f.src.value='any';
+		} else {
+			if(src1=='') {
+				if(cpiplist(src2)&&src2!='') {
+					document.f.src.value=src2;
+				} else {
+					alert('Invalid Source Address');
+					return false;
+				}
+			} else {
+				document.f.src.value=src1;
+			}
+		} 
+
+		if(dst1=='any') {
+			document.f.dst.value='any';
+		} else {
+			if(dst1=='') {
+				if(cpiplist(dst2)&&dst2!='') {
+					document.f.dst.value=dst2;
+				} else {
+					alert('Invalid Source Address');
+					return false;
+				}
+			} else {
+				document.f.dst.value=dst1;
+			}
+		} 
+
+		if(fwd1=='') {
+			if(cpiplist(fwd2)&&fwd2!='') {
+				document.f.fwd.value=fwd2;
+			} else {
+				alert('Invalid Mapping Address');
+				return false;
+			}
+		} else {
+			document.f.fwd.value=fwd1;
+		} 
+ 
+		if(dstp1=='any') {
+			document.f.dstp.value='any';
+		} else {
+			if(dstp1=='') {
+				if(pm(dstp2)&&dstp2!='') {
+					document.f.dstp.value=dstp2;
+				} else {
+					alert('Invalid Destination Port');
+					return false;
+				}
+			} else {
+				document.f.dstp.value=dstp1;
+			}
+		} 
+		if(fwdp1=='any') {
+			document.f.fwdp.value='any';
+		} else {
+			if(fwdp1=='') {
+				if(pm(fwdp2)&&fwdp2!='') {
+					document.f.fwdp.value=fwdp2;
+				} else {
+					alert('Invalid Mapping Port');
+					return false;
+				}
+			} else {
+				document.f.fwdp.value=fwdp1;
+			}
+		}
+<? } //if tab==1 or tab==2 and col=2 ?>
+		document.f.btsubmit.disabled=true;
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	}
+<?if(($tab==1 || $tab==2) && ($col==2)) {?>
+	function chk_proto(val) {
+		if(val!='TCP' && val!='UDP' && val!='TCP/UDP') {
+			document.f.dstp1.options[1].selected=true;
+			document.f.dstp1.disabled=true;
+			document.f.dstp2.disabled=true;
+			document.f.fwdp1.options[1].selected=true;
+			document.f.fwdp1.disabled=true;
+			document.f.fwdp2.disabled=true;
+			document.f.dstp.value='any';
+			document.f.fwdp.value='any';
+		} 
+		if(val=='TCP' || val=='UDP' || val=='TCP/UDP') {
+			document.f.dstp1.disabled=false;
+			document.f.dstp2.disabled=false;
+			document.f.fwdp1.disabled=false;
+			document.f.fwdp2.disabled=false;
+		}
+	}
+<? } //if tab==1 or tab==2 and col=2 ?>
+	function dotoggle() {
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					document.f.elements[i].checked = !(document.f.elements[i].checked);
+    				}	
+			}
+  		}
+	}
+	function chkdel() {
+		var x='0';
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					if(document.f.elements[i].checked) x++;
+    				}	
+			}
+  		}
+		if(x==0) return false;
+		return true;
+	}
+	function do_delete(val) {
+		if(chkdel()!=false) {
+			if(val==2 && confirm('Are you sure you want to proceed?')) {
+				document.f.do_save.value=val;
+				document.f.submit();
+			} else {
+				document.f.do_save.value=val;
+				document.f.submit();
+			}
+			
+		}
+	}
+	function do_shift(id) {
+		if(chkdel()!=false) {
+			document.f.do_save.value='3';
+			document.f.shift_id.value=id;
+			document.f.submit();
+		}
+	}
+var k=0;
+function waitcount() { 
+ 	k=k+2;
+	if(k <= 100) {
+    		msg.innerHTML='Reloading.. Please wait..'+k+'%'; 
+    		setTimeout(waitcount,150);  
+	} else {
+		self.location.href='<?echo "$_URL_PATH/fw_nat.exh?tab=$tab&col=$col&col2=$col2";?>';
+	}
+}
+</script>
+<?if(($tab==1 || $tab==2) && ($col==2)) {?>
+<script language="javascript">
+var timeOK='0';
+function timeselect() {
+	if(document.f.usetime.checked==true) {
+		timeOK='1';
+		document.f.timestart.disabled=false;
+		document.f.timeend.disabled=false;
+	}
+	if(document.f.usetime.checked==false) {
+		timeOK='0';
+		document.f.timestart.disabled=true;
+		document.f.timeend.disabled=true;
+	}
+}
+</script>
+<? } ?>
+
+</head>
+<body scroll=auto>
+<form name=f method=post action="<?echo "$_URL_PATH/fw_nat.exh";?>" onsubmit="return do_submit();">
+<table border="0" cellpadding="4" cellspacing="4" width="700" align=center>
+<tr>
+<td align=center>
+
+<!-- main -->
+<fieldset>
+<legend>&nbsp;&nbsp;&nbsp;&nbsp;
+FIREWALL: NAT
+&nbsp;&nbsp;&nbsp;&nbsp;</legend>
+
+<table valign=top border=0>
+<tr>
+<td>
+<table border=0 cellpadding="2" cellspacing="2">
+<tr>
+<td align=center valign=middle>
+
+<table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr><td>
+<ul id="tabnav">
+<li class="<?if($tab==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=1) { echo "<a href=\"$_URL_PATH/fw_nat.exh?tab=1\">"; }?>Static NAT<?if($tab!=1) { echo "</a>"; }?></li>
+<li class="<?if($tab==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=2) { echo "<a href=\"$_URL_PATH/fw_nat.exh?tab=2\">"; }?>Source NAT<?if($tab!=2) { echo "</a>"; }?></li>
+</ul>
+</td></tr>
+<tr> 
+<td class="tabcont">
+
+<?if($tab==1 || $tab==2) { ?>
+
+<table width=100% border=0 cellpadding="2" cellspacing="2" class=tablist>
+<tr><td>
+<ul id="tabnav">
+<li class="<?if($col==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($col!=1) { echo "<a href=\"$_URL_PATH/fw_nat.exh?tab=$tab&col=1\">"; }?>Rules list<?if($col!=1) { echo "</a>"; }?></li>
+<li class="<?if($col==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($col!=2) { echo "<a href=\"$_URL_PATH/fw_nat.exh?tab=$tab&col=2\">"; }?><?if($do_id=='edit') { echo "Edit"; } else { echo "Add new"; }?><?if($col!=2) { echo "</a>"; }?></li>
+</ul>
+</td></tr>
+<tr> 
+<td class="tabcont">
+<?if($col==1) {
+
+if($tab==1) {
+	$_table="policy_dnat";
+	$_table_misc_time=$policy_dnat_show_time;
+	$_table_misc_note=$policy_dnat_show_note;
+} else {
+	$_table="policy_snat";
+	$_table_misc_time=$policy_snat_show_time;
+	$_table_misc_note=$policy_snat_show_note;
+}
+
+?>
+
+<?if($msg!='') {?>
+<table width="680" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span id=msg class=notice><?echo "$msg";?></span></td></tr>
+</table><br>
+<? }?>
+<table width="680" border=0 cellpadding="2" cellspacing="2" class=tablist>
+      <tr class=bgcolor3>
+        <td class=tdlistop>#</td>
+	<td class=tdlistop>Protocol</td>
+        <td class=tdlistop>Source</td>
+        <td class=tdlistop>Destination</td>
+	<td class=tdlistop>Port</td>
+        <td class=tdlistop>Map to IP</td>
+	<td class=tdlistop>Map to Port</td>
+<?if($_table_misc_time==1) {?>
+	<td class=tdlistop>Schedule</td>
+<? }?>
+<?if($_table_misc_note==1) {?>
+	<td class=tdlistop>Description</td>
+<? } ?>
+	<td class=tdlistop>Log</td>
+	<td class=tdlistop>Active</td>
+	<td class=tdlistop align=center>Opt</td>
+	<td class=tdlistop align=center></td>
+      </tr>
+<?
+$result=db_query("select * from $_table order by id ASC",$db_id);
+if(db_num_rows($result)!=0) {
+	$_cnt=1;
+	while($row=db_fetch_array_assoc($result)) {
+		$_id=$row['id'];
+		$_proto=$row['proto'];
+		$_src=$row['src'];
+		$_dst=$row['dst'];
+		$_dstp=$row['dstp'];
+		$_fwd=$row['fwd'];
+		$_fwdp=$row['fwdp'];
+		$_usetime=$row['usetime'];
+		$_timestart=$row['timestart'];
+		$_timeend=$row['timeend'];
+		$_log=$row['log'];
+		$_stat=$row['stat'];
+		$_note=unescape_str($row['note']);
+		if($stat!='') { $stat='1'; } else { $stat='0'; }
+		if($log!='') { $log='1'; } else { $log='0'; }
+		$_fwd="<font color=green>$_fwd</font>";
+		$_fwdp="<font color=green>$_fwdp</font>";
+		$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff;cursor: hand;'";
+		$lo="onclick=\"self.location.href='$_URL_PATH/fw_nat.exh?tab=$tab&col=2&id=$_id&do_id=edit';\" ";
+
+		$_srcl=preg_split("/\s+/",trim($_src));
+		if(count($_srcl)!=0) {
+			$_src='';
+			foreach($_srcl as $l) {
+				$_src .="$l<br>";
+			}
+			unset($l);
+		}
+		$_dstl=preg_split("/\s+/",trim($_dst));
+		if(count($_dstl)!=0) {
+			$_dst='';
+			foreach($_dstl as $l) {
+				$_dst .="$l<br>";
+			}
+			unset($l);
+		}
+
+		$_time='';
+		if($_usetime==1) {
+			if($_timestart!='' && $_timeend!='') {
+				$_time="Start: $_timestart<br>Stop: $_timeend";
+			} else {
+				if($_timestart!='') $_time="$_timestart";
+				if($_timeend!='') $_time="$_timeend";
+			}
+		}
+
+	echo "
+      <tr $lt>
+        <td class=tdlistb valign=middle $lo>$_cnt</td>
+        <td class=tdlistb valign=middle $lo>$_proto</td>
+        <td class=tdlistb valign=middle $lo>$_src</td>
+        <td class=tdlistb valign=middle $lo>$_dst</td>
+        <td class=tdlistb valign=middle $lo>$_dstp</td>
+        <td class=tdlistb valign=middle $lo>$_fwd</td>
+        <td class=tdlistb valign=middle $lo>$_fwdp</td>";
+	if($_table_misc_time==1) {
+		echo "<td class=tdlistb valign=middle $lo>$_time</td>";
+	}
+	if($_table_misc_note==1) {
+        	echo "<td class=tdlistb valign=middle $lo>$_note</td>";
+	}
+	echo "
+	<td class=tdlistb align=center><a href='$_URL_PATH/fw_nat.exh?tab=$tab&col=1&id=$_id&log=$_log&do_id=log'>{$_PNG_YESNO[$_log]}</a></td>
+	<td class=tdlistb align=center><a href='$_URL_PATH/fw_nat.exh?tab=$tab&col=1&id=$_id&stat=$_stat&do_id=stat'>{$_PNG_YESNO[$_stat]}</a></td>
+	<td class=tdlistb width=40 align=right valign=middle><a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='$_URL_PATH/fw_nat.exh?tab=$tab&col=1&id=$_id&stat=$_stat&do_id=del';\">{$_PNG['delete']}</a><input type=checkbox name=del[] value=$_id></td>
+	<td class=tdlistb width=5 align=right valign=middle><a href='#' onclick='do_shift($_id);'>{$_PNG['arrow_left']}</a></td>
+      </tr>
+	";
+	$_cnt++;
+	}
+$rr=12;
+if($_table_misc_time==1) {
+	$hh1="hide";
+} else {
+	$rr=$rr - 1;
+	$hh1="show";
+}
+if($_table_misc_note==1) {
+	$hh2="hide";
+} else {
+	$rr=$rr - 1;
+	$hh2="show";
+}
+echo "<tr>
+<td align=right valign=top class=tdlist colspan=$rr>[ <a href='$_URL_PATH/fw_nat.exh?tab=$tab&col=1&show_time=$_table_misc_time&do_id=show_time'>$hh1 schedule</a> / <a href='$_URL_PATH/fw_nat.exh?tab=$tab&col=1&show_note=$_table_misc_note&do_id=show_note'>$hh2 description</a> ]-[ <a href='#' onclick='do_delete(7);'>Nolog</a> / <a href='#' onclick='do_delete(6);'>Log</a> ]-[ <a href='#' onclick='do_delete(5);'>Disable</a> / <a href='#' onclick='do_delete(4);'>Enable</a> ]-[ <a href='#' onclick='do_delete(8);'>Duplicate</a> / <a href='#' onclick='do_delete(2);'>Delete</a> ] <a href='#' onclick='dotoggle();'>Toggle</a> {$_PNG['arrow_rtr']}</td>
+<td align=right valign=top class=tdlist></td>
+</tr>";
+
+} 
+if($_cnt < 1) {
+	if($tab==1) { 
+		$rr=14;
+	} else {
+		$rr=13;
+	}
+}
+?>
+<tr><td align=right valign=top colspan=<?echo ($rr+1);?>><input name=btapply type="button" value="Apply changes" class="button" onclick="self.location.href='<?echo "$_URL_PATH/fw_nat.exh?tab=$tab";?>&col=1&do_id=apply_chg';document.f.btapply.disabled=true;"></td></tr>
+</table>
+<? } //col==1 ?>
+<?if($col==2) {
+if($tab==1) {
+	$_table="policy_dnat";
+} else {
+	$_table="policy_snat";
+}
+
+if($do_id=='edit') {
+	$result=db_query("select * from $_table where id='$id'",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_proto=$row['proto'];
+			$_src=$row['src'];
+			$_dst=$row['dst'];
+			$_dstp=$row['dstp'];
+			$_fwd=$row['fwd'];
+			$_fwdp=$row['fwdp'];
+			$_usetime=$row['usetime'];
+			$_timestart=$row['timestart'];
+			$_timeend=$row['timeend'];
+			$_log=$row['log'];
+			$_stat=$row['stat'];
+			$_note=unescape_str($row['note']);
+		}
+	}
+}
+$list_array=ipname_array($db_id);
+$list_array2=ipnamemap_array($db_id);
+
+?>
+
+<?if($msg!='') {?>
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span class=notice><?echo "$msg";?></span></td></tr>
+</table><br>
+<? }?>
+<table width="600" border="0" cellpadding="6" cellspacing="0">
+<tr> 
+<td width="30%" valign="middle" class="tdcelltop">Protocol</td>
+<td width="70%" valign="middle" class="mtabletop">
+<select name=proto size=1 class=textbox onchange='chk_proto(this.value);'>
+<?
+foreach(array("TCP","UDP","TCP/UDP","any") as $p) {
+	if($p==$_proto) {
+		echo "<option value='$p' selected>$p</option>";
+	} else {
+		echo "<option value='$p'>$p</option>";
+	}
+}
+?>
+</select>
+</td>
+</tr>
+
+<!------------- src ------------------->
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Source</td>
+<td width="70%" valign="middle" class="mtable">
+
+<table border=0 cellpadding=1 cellspacing=1 size=98%>
+<tr>
+<td valign=top>
+<select name=src1 size=1 class=textbox onchange="if(this.value!='') {document.f.src2.disabled=true;}else{document.f.src2.disabled=false;}">
+<option value='' selected>User-defined</option>
+<?
+$srcf=0;
+foreach($list_array as $_list) {
+	if($_list==$_src) {
+		echo "<option value='$_list' selected>$_list</option>";
+		$srcf=1;
+	} else {
+		echo "<option value='$_list'>$_list</option>";
+	}
+}
+?>
+</select>
+</td></tr>
+<tr>
+<td valign=top><textarea cols=40 rows=5 class=textbox name=src2 <?if($srcf==1) echo "disabled";?>><?if($srcf==0) echo "$_src";?></textarea> separate by space</td>
+</tr>
+</table>
+
+
+</td>
+</tr>
+<!------------- end src ------------------->
+<!------------- dst ------------------->
+<tr> 
+<td width="30%" valign="top" class="tdcell">Destination</td>
+<td width="70%" valign="top" class="mtable">
+
+<table border=0 cellpadding=1 cellspacing=1 size=98%>
+<tr>
+<td valign=top>
+<select name=dst1 size=1 class=textbox onchange="if(this.value!='') {document.f.dst2.disabled=true;}else{document.f.dst2.disabled=false;}">
+<option value='' selected>User-defined</option>
+<?
+$dstf=0;
+foreach($list_array as $_list) {
+	if($_list==$_dst) {
+		echo "<option value='$_list' selected>$_list</option>";
+		$dstf=1;
+	} else {
+		echo "<option value='$_list'>$_list</option>";
+	}
+}
+?>
+</select>
+</td></tr>
+<tr>
+<td valign=top><textarea cols=40 rows=5 class=textbox name=dst2 <?if($dstf==1) echo "disabled";?>><?if($dstf==0) echo "$_dst";?></textarea> separate by space</td>
+</tr>
+</table>
+
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="top" class="tdcell">Destination Port</td>
+<td width="70%" valign="top" class="mtable">
+
+<table border=0 cellpadding=1 cellspacing=1 size=98%>
+<tr>
+<td valign=top>
+<select name=dstp1 size=1 class=textbox onchange="if(this.value!='') {document.f.dstp2.disabled=true;}else{document.f.dstp2.disabled=false;}">
+<option value='' selected>User-defined</option>
+<?
+unset($pp,$nn);
+$dstpf=0;
+foreach($_PORT_ARRAY as $pp => $nn) {
+	if("$pp"=="$_dstp") {
+		echo "<option value='$pp' selected>$pp</option>";
+		$dstpf=1;
+	} else {
+		echo "<option value='$pp'>$pp</option>";
+	}
+}
+?>
+</select>
+</td>
+</tr>
+<tr>
+<td valign=top>
+<input name="dstp2" type="text" class="textbox" size="20" value="<?if($dstpf==0) echo "$_dstp";?>" <?if($dstpf==1) echo "disabled";?>> eg; 80 or range 80:90
+</td>
+</tr>
+</table>
+
+</td>
+</tr>
+<!------------- end dst ------------------->
+<!------------- fwd ------------------->
+<tr> 
+<td width="30%" valign="top" class="tdcell">Map to IP</td>
+<td width="70%" valign="top" class="mtable">
+
+<table border=0 cellpadding=1 cellspacing=1 size=98%>
+<tr>
+<td valign=top>
+<select name=fwd1 size=1 class=textbox onchange="if(this.value!='') {document.f.fwd2.disabled=true;}else{document.f.fwd2.disabled=false;}">
+<option value='' selected>User-defined</option>
+<?
+$fwdf=0;
+foreach($list_array2 as $_list) {
+	if($_list==$_fwd) {
+		echo "<option value='$_list' selected>$_list</option>";
+		$fwdf=1;
+	} else {
+		echo "<option value='$_list'>$_list</option>";
+	}
+}
+?>
+</select>
+<td valign=top><input type=text name=fwd2 size=30 <?if($fwdf==1) echo "disabled";?> value='<?if($fwdf==0) echo "$_fwd";?>' class=textbox></td>
+</td></tr>
+</table>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="top" class="tdcell">Map to Port</td>
+<td width="70%" valign="top" class="mtable">
+
+<table border=0 cellpadding=1 cellspacing=1 size=98%>
+<tr>
+<td valign=top>
+<select name=fwdp1 size=1 class=textbox onchange="if(this.value!='') {document.f.fwdp2.disabled=true;}else{document.f.fwdp2.disabled=false;}">
+<option value='' selected>User-defined</option>
+<?
+unset($pp,$nn);
+$fwdpf=0;
+foreach($_PORT_ARRAY as $pp => $nn) {
+	if("$pp"=="$_fwdp") {
+		echo "<option value='$pp' selected>$pp</option>";
+		$fwdpf=1;
+	} else {
+		echo "<option value='$pp'>$pp</option>";
+	}
+}
+?>
+</select>
+</td>
+</tr>
+<tr>
+<td valign=top>
+<input name="fwdp2" type="text" class="textbox" size="20" value="<?if($fwdpf==0) echo "$_fwdp";?>" <?if($fwdpf==1) echo "disabled";?>> eg; 80 or range 80:90
+</td>
+</tr>
+</table>
+
+</td>
+</tr>
+<!------------- end fwd ------------------->
+<!------------- time ------------------->
+<tr> 
+<td width="30%" valign="middle" class="tdcell"><input type=checkbox name=usetime value=1 onclick="timeselect();" <?if($_usetime==1) echo "checked";?>> Schedule</td>
+<td width="70%" valign="middle" class="mtable">
+<strong>&nbsp;Start:&nbsp;</strong>
+<input type="text" name="timestart" id="timestart" size="20" value="<?echo $_timestart;?>" class="textbox" <?if(!isset($_usetime))echo "disabled";?>>
+&nbsp;<input type="image" src="<?echo $_URL_PATH;?>/i/calendar.png" alt="Start date selector" border="0" align="absmiddle" onclick="if(timeOK==0) return false; return showCalendar('timestart');">&nbsp;
+<strong>Stop:&nbsp;</strong>
+<input type="text" name="timeend" id="timeend" size="20" value="<?echo $_timeend;?>" class="textbox" <?if(!isset($_usetime))echo "disabled";?>>
+&nbsp;<input type="image" src="<?echo $_URL_PATH;?>/i/calendar.png" alt="End date selector" border="0" align="absmiddle" onclick="if(timeOK==0) return false; return showCalendar('timeend');">
+</td>
+</tr>
+<!------------- end time ------------------->
+<!------------- log ------------------->
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Logging</td>
+<td width="70%" valign="middle" class="mtable">
+<input name="log" type="checkbox" <?if($_log==1) echo "checked";?>> Log this rule
+</td>
+</tr>
+<!------------- end log ------------------->
+<!------------- active ------------------->
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Active</td>
+<td width="70%" valign="middle" class="mtable">
+<input name="stat" type="checkbox" <?if($_stat==1) echo "checked";?> <?if($do_id!='edit') echo "checked";?>> Enable this rule
+</td>
+</tr>
+<!------------- end active ------------------->
+<!------------- description ------------------->
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Description</td>
+<td width="70%" valign="middle" class="mtable">
+<input name="note" type="text" class="textbox" size="30" value="<?echo $_note;?>">
+</td>
+</tr>
+<!------------- end description ------------------->
+<?if($do_id!='edit') {?>
+<!------------- position ------------------->
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Rule position</td>
+<td width="70%" valign="middle" class="mtable">
+<select name=position size=1 class=textbox>
+<?
+unset($p);
+foreach(array("BOTTOM","TOP") as $p) {
+	echo "<option value='$p'>$p</option>";
+}
+?>
+</select>
+</td>
+</tr>
+<!------------- end position ------------------->
+<? } ?>
+</table>
+<tr><td align=right valign=top><input name=btsubmit type="submit" value="<?if($do_id=='edit') { echo "Update"; } else { echo "Save";}?>" class="button"></td></tr>
+
+<input type=hidden name=src value=''>
+<input type=hidden name=dst value=''>
+<input type=hidden name=fwd value=''>
+<input type=hidden name=dstp value=''>
+<input type=hidden name=fwdp value=''>
+
+<? } //col2 ?>
+
+
+</td>
+</tr>
+</table>
+<? } // tab==1 ?>
+
+</td>
+</tr>
+</table>
+
+</td>
+</tr>
+</table>
+
+<!-- end main -->
+
+</td>
+</tr>
+</table>
+</fieldset>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?echo $tab;?>>
+<input type=hidden name=col value=<?echo $col;?>>
+<input type=hidden name=shift_id value=''>
+<?if($do_id=='edit' && $col==2) {?>
+<input type=hidden name=do_id value=edit>
+<input type=hidden name=id value='<?echo $id;?>'>
+<script language="javascript">
+chk_proto('<?echo $_proto;?>');
+if(document.f.src2.value!='') document.f.src1.options[0].selected=true;
+if(document.f.srcp2.value!='') document.f.srcp1.options[0].selected=true;
+if(document.f.dst2.value!='') document.f.dst1.options[0].selected=true;
+if(document.f.dstp2.value!='') document.f.dstp1.options[0].selected=true;
+if(document.f.fwdp2.value!='') document.f.fwdp1.options[0].selected=true;
+</script>
+<? } ?>
+<?if($do_id!='edit' && $col==2) {?>
+<script language="javascript">
+document.f.src1.options[1].selected=true;
+document.f.src2.disabled=true;
+document.f.dst1.options[1].selected=true;
+document.f.dst2.disabled=true;
+document.f.dstp1.options[1].selected=true;
+document.f.dstp2.disabled=true;
+document.f.fwd1.options[0].selected=true;
+document.f.fwd2.disabled=false;
+document.f.fwdp1.options[1].selected=true;
+document.f.fwdp2.disabled=true;
+</script>
+<? } ?>
+</form>
+</body>
+</html>
+
+<?db_close($db_id); flush();?>

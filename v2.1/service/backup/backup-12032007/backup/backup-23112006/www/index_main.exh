@@ -1,0 +1,399 @@
+<?
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+include_once('graphsc.exl');
+
+$_CSF=mfs_license('CSF');
+$_IPS=mfs_license('IPS');
+$_ADR=mfs_license('ADR');
+$_ITS=mfs_license('ITS');
+$_PPTP=mfs_license('PPTP');
+$_ILB=mfs_license('ILB');
+$_IFS=mfs_license('IFS');
+$_LR=mfs_license('released');
+$_LE=mfs_license('expired');
+
+chk_session();
+write_nocache();
+$db_id=db_connect($_DB_NAME);
+$ipsv=0;
+$blkv=0;
+if(file_exists("/etc/ipsversion")) {
+	$ipsv=trim(file_get_contents("/etc/ipsversion"));
+}
+if(file_exists("/etc/blacklistversion")) {
+	$blkv=trim(file_get_contents("/etc/blacklistversion"));
+}
+
+if(!isset($show_status)||$show_status=='') $show_status=1;
+if(isset($news)&&$news==1) {
+echo <<<_END_
+<html>
+<head>
+<title>MyBox Firewall</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<LINK REL=StyleSheet HREF="$_URL_PATH/c/blue.css" TYPE="text/css">
+</head>
+<body bgcolor='#e7e9f2' leftmargin="0" topmargin="0" rightmargin="0" bottommargin="0">
+<table style='width: 100%;border: 0px;'>
+<tr> 
+<td style='font-size: 10px;'>
+_END_;
+$_nonews=0;
+$result=db_query("select val from misc where name='local_news'",$db_id);
+if(db_num_rows($result)!=0) {
+	$_nonews=db_fetch_single($result);
+}
+if($_nonews==0) {
+	if(isDomainResolves($_UPDATE['url'])) {
+		if(chkconnect('tcp',$_UPDATE['url'],80,5)!=0) {
+			if($fi=@fopen("http://{$_UPDATE['url']}/updates.html?chk=2&fvu=$fv&ipsvu=$ipsv&blkvu=$blkv","r")) {
+				while($buff=fgets($fi,2048)) {
+					$buff=trim($buff);
+					$mm .="$buff<br>";
+				}
+				fclose($fi);
+			}
+		} else {
+			$mm="- Failed to get latest news.<br>";
+		}
+	} else {
+		$mm="- Failed to get latest news, please check your DNS resolver.<br>";
+	}
+} else {
+	$mm="- News update disabled!";
+}
+	echo "- For latest news or services please visit our website <a href='http://www.mybox.net.my/' target=_new>http://www.mybox.net.my/</a><br><br>";
+	if(file_exists("/var/sys/updates_need_reboot")) {
+		echo "<font color=red><b>System updates completed, reboot required.</b></font><br>";
+	}
+	echo "$mm";
+	echo "</td></tr></table></body></html>";
+	chk_update();
+	exit;
+}
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<meta http-equiv=refresh content='300'; url='<?echo $_URL_PATH;?>/index_main.exh'>
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script language="javascript">
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+</script>
+</head>
+<body bgcolor='#ffffff' scroll=no style='margin-top:20px;'>
+
+<?if($show_status==1) {?>
+<table border=0 cellpadding=2 cellspacing=2 width="830" align=center style='margin-top: 10px;'>
+
+<tr>
+<td align=center colspan=2>
+<img src="<?echo $_URL_PATH;?>/i/login_logo.png" nosave border=0>
+<br><br>
+</td>
+</tr>
+<tr>
+<td style='text-align: center; vertical-align: top; padding-top: 0px; table-layout: fixed; width: 60%;'>
+<table style='width: 100%; border: 1px solid #ccc;'>
+<tr> 
+<td valign="middle" colspan=2 style='background-color: #336699; color: #ffffff; font-size: 11px; font-weight: bold;'>System Information</b></td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Firmware Version</td>
+<td valign="middle" class="tdvalue"> 
+<?
+echo trim(shell_exec("uname -v"));
+if(file_exists("/etc/firmware")) {
+	$fupdate=trim(file_get_contents("/etc/firmware"));
+	echo " UPDATE:$fupdate";
+}
+?>
+</td>
+</tr>
+<?if($ipsv!=0 && $_IPS==1){?>
+<tr> 
+<td valign="middle" class="tdname">IPS signature Version</td>
+<td valign="middle" class="tdvalue"> 
+<?
+echo "$ipsv";
+?>
+</td>
+</tr>
+<?}?>
+<?if($blkv!=0){?>
+<tr> 
+<td valign="middle" class="tdname">Blacklist DB Version</td>
+<td valign="middle" class="tdvalue"> 
+<?
+echo "$blkv";
+?>
+</td>
+</tr>
+<?}?>
+<tr> 
+<td valign="middle" class="tdname">System Uptime</td>
+<td valign="middle" class="tdvalue"> 
+<?echo mybox_uptime();?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">System Time</td>
+<td valign="middle" class="tdvalue"> 
+<?echo shell_exec("date");?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">License Id</td>
+<td valign="middle" class="tdvalue"> 
+<?echo mfs_license('pkg');?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">License owner</td>
+<td valign="middle" class="tdvalue"> 
+<?echo mfs_license('org');?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">License released</td>
+<td valign="middle" class="tdvalue"> 
+<?echo date('d-M-Y',$_LR);?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">License expired</td>
+<td valign="middle" class="tdvalue"> 
+<?if($_LE!='none') {
+	echo date('d-M-Y',$_LE);
+} else {
+	echo "No expiration";
+}
+?>
+</td>
+</tr>
+</table>
+<br>
+<table style='width: 100%; border: 1px solid #ccc;'>
+<tr> 
+<td valign="middle" style='background-color: #336699; color: #ffffff; font-size: 11px; font-weight: bold;'>System Messages</b></td>
+</tr>
+<tr> 
+<td valign="middle" style='border: 1px solid #d8e4f1; color: #ffffff; font-size: 11px; font-weight: bold;'>
+<iframe src="index_main.exh?news=1&fv=<?echo $fupdate;?>" scrolling="auto" frameborder="0" marginwidth='0' marginheight='0' noresize width="100%" height="100" style='border-style: solid;border-width: 0px; table-layout: fixed; overflow-x: hidden; background: #e7e9f2;'></iframe>
+</td>
+</tr>
+</table>
+</td>
+<td style='text-align: center; vertical-align: top; padding-top: 0px; table-layout: fixed; width: 30%;'>
+<table style='width: 100%; border: 1px solid #ccc;'>
+<tr> 
+<td valign="middle" style='background-color: #336699; color: #ffffff; font-size: 11px; font-weight: bold;'>System Health</b></td>
+</tr>
+<td valign=top>
+<?
+	$cpu=0;
+	$mem=0;
+	$strg=0;$ram=0;
+	$proc=0;
+	putenv("TERM=linux");
+	exec("procinfo",$buff,$ret);
+	if($ret==0) {
+        	$str=trim($buff[10]);
+        	list($t1,$t2,$t3,$t4)=preg_split("/\s+/",$str);
+		$t4=trim($t4,"%");
+		$idle=floor($t4);
+		$cpu=(100 - $idle);
+	}
+	if($idle=='') $idle=0;
+	if($cpu=='') $cpu=0;
+	unset($ret,$buff,$str);
+
+	exec("df",$buff,$ret);
+	if($ret==0) {
+		$str=trim($buff[1]);
+		list($p1,$p2,$p3,$p4,$ram)=preg_split("/\s+/",$str);
+		$ram=trim($ram,'%');
+		$str=trim($buff[2]);
+		list($p1,$p2,$p3,$p4,$strg)=preg_split("/\s+/",$str);
+		$strg=trim($strg,'%');
+	}
+	unset($ret,$buff,$str);
+
+	if($fi=fopen("/proc/meminfo","r")) {
+		$mtotal=0;$mfree=0;
+		while($buff=fgets($fi,150)) {
+			$buff=trim($buff);
+			if(preg_match("/^MemTotal:\s+(\d+)\s+kB/",$buff,$mm)) {
+				$mtotal=$mm[1];
+			}
+			if(preg_match("/^MemFree:\s+(\d+)\s+kB/",$buff,$mm)) {
+				$mfree=$mm[1];
+			}
+		}
+		fclose($fi);
+	}
+	unset($ret,$buff,$str);
+
+	$graph = new BAR_GRAPH("pBar");
+	$graph->values = "$cpu;100, $idle;100, $mfree;$mtotal, $ram;100, $strg;100";
+	$graph->labels = "<b>CPU Sys</b>,<b>CPU Idle</b>,<b>Memory</b>,<b>Ramdisk</b>,<b>Storage</b>";
+
+	$graph->graphBGColor = "white";
+	$graph->graphBorder = "1px solid none";
+	$graph->graphPadding = 1;
+	$graph->barColor = "#EA8F00,#EA8F00,#EA8F00,#EA8F00,#EA8F00";
+	$graph->barBGColor = "#e7e9f2";
+	$graph->barBorder = "1px outset black";
+	$graph->labelColor = "#000000";
+	$graph->labelBGColor = "#d8e4f1";
+	$graph->labelBorder = "1px solid none";
+	$graph->labelFont = "verdana,arial,sans-serif";
+	$graph->labelSize = "10";
+	$graph->barWidth = 12;
+	//$graph->showValues = 1;
+	echo $graph->create();
+?>
+</td>
+</tr>
+</table>
+<br>
+<table style='width: 100%; border: 1px solid #ccc;'>
+<tr> 
+<td colspan=2 valign="middle" style='background-color: #336699; color: #ffffff; font-size: 11px; font-weight: bold;'>Module Info</b></td>
+</tr>
+<?/*
+<tr> 
+<td valign="middle" class="tdname" style='width: 70%;'>Surf Filter</td>
+<td valign="middle" class="tdvalue" style='width: 30%;'> 
+<?
+if($_CSF==1) {
+	echo "<font style='color: green; font-weight: bold;'>Licensed</font>";
+} else {
+	echo "<font style='color: red; font-weight: bold;'>Unlicensed</font>";
+}
+?>
+</td>
+</tr>
+*/?>
+<tr> 
+<td valign="middle" class="tdname" style='width: 70%;'>Intrusion Prevention System</td>
+<td valign="middle" class="tdvalue" style='width: 30%;'> 
+<?
+if($_IPS==1) {
+	echo "<font style='color: green; font-weight: bold;'>Licensed</font>";
+} else {
+	echo "<font style='color: red; font-weight: bold;'>Unlicensed</font>";
+}
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname" style='width: 70%;'>Advance Routing Management</td>
+<td valign="middle" class="tdvalue" style='width: 30%;'> 
+<?
+if($_ADR==1) {
+	echo "<font style='color: green; font-weight: bold;'>Licensed</font>";
+} else {
+	echo "<font style='color: red; font-weight: bold;'>Unlicensed</font>";
+}
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname" style='width: 70%;'>Internet Traffic Shaper</td>
+<td valign="middle" class="tdvalue" style='width: 30%;'> 
+<?
+if($_ITS==1) {
+	echo "<font style='color: green; font-weight: bold;'>Licensed</font>";
+} else {
+	echo "<font style='color: red; font-weight: bold;'>Unlicensed</font>";
+}
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname" style='width: 70%;'>PPTP VPN Access</td>
+<td valign="middle" class="tdvalue" style='width: 30%;'> 
+<?
+if($_PPTP==1) {
+	echo "<font style='color: green; font-weight: bold;'>Licensed</font>";
+} else {
+	echo "<font style='color: red; font-weight: bold;'>Unlicensed</font>";
+}
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname" style='width: 70%;'>Internet Load Balancing</td>
+<td valign="middle" class="tdvalue" style='width: 30%;'> 
+<?
+if($_ILB==1) {
+	echo "<font style='color: green; font-weight: bold;'>Licensed</font>";
+} else {
+	echo "<font style='color: red; font-weight: bold;'>Unlicensed</font>";
+}
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname" style='width: 70%;'>Internet Failover System</td>
+<td valign="middle" class="tdvalue" style='width: 30%;'> 
+<?
+if($_IFS==1) {
+	echo "<font style='color: green; font-weight: bold;'>Licensed</font>";
+} else {
+	echo "<font style='color: red; font-weight: bold;'>Unlicensed</font>";
+}
+?>
+</td>
+</tr>
+</table>
+
+</td>
+</tr>
+
+</td>
+</tr>
+</table>
+
+
+<? } ?>
+<?if($show_status==2) {?>
+<table border=0 cellpadding=0 cellspacing=0 width=50% align=center style='margin-top: 10px;'>
+<tr>
+<td align="center">
+<form name=f method=post action="<?echo "$_URL_PATH/login.exh";?>" target=_top>
+<table width="100%" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span class=notice>Are you sure you want to proceed?</span></td></tr>
+</table><br>
+<table valign=top width="400" class="data">
+<tr> 
+<td valign="middle" class="tdname"><b>Reason</b></td>
+<td valign="middle" class="tdvalue"> 
+<input name="rebootreason" type="text" class="valbox" size="30" value="maintenance">&nbsp;
+<select name="just_logout" size=1 class="valbox">
+<option value=5>reboot</option>
+<option value=6>shutdown</option>
+</select>
+</td>
+</tr>
+<tr>
+<td colspan=2 align=right style='text-align: right;'>
+<input type=submit value='Proceed' class='button'><input type=button value='Discard' onclick='history.go(-1);' class='button'>
+</td>
+</tr>
+</table>
+</form>
+</td>
+</tr>
+</table>
+<? } ?>
+</body>
+</html>
+<?db_close($db_id); flush();?>

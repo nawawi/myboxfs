@@ -1,0 +1,88 @@
+#!/bin/php -Cq
+<?
+// arp.init - last update 11-Oct-2005
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+
+putenv("PATH=/bin:/service/tools:/service/init");
+
+if(!file_exists("/bin/arpd")) {
+	echo "! arpd binary not found or cannot execute\n";
+	slog("arpd binary not found or cannot execute");
+	exit(1);
+}
+$_QUIET=0;
+$_arp_start=0;
+$db_id=db_connect($_DB_NAME);
+$res=db_query("select val from misc where name='arp_start'",$db_id);
+if(db_num_rows($res)!=0) {
+	$_arp_start=sqlite_fetch_single($res);
+}
+
+function arp_status() {
+	global $_QUIET;
+	$pid=get_progpid("arpd");
+	if($pid!='') {
+		if($_QUIET==0) echo "* arpd (pid $pid) is running...\n";
+		return 0;
+	}
+	return 1;
+}
+
+function arp_start() {
+	global $_arp_start, $_DB_PATH, $_QUIET;
+	if($_arp_start==0) {
+		if($_QUIET==0) echo "* ARP agent disabled.\n";
+		exit(1);
+	}
+	touch("/var/sys/arpdb");
+	exec_cmd("arpd -b $_DB_PATH/arp.db");
+	if($_QUIET==0) {
+		echo "* Starting ARP agent\n";
+		slog("Starting ARP agent");
+	}
+	return 0;
+}
+
+function arp_stop() {
+	global $_DB_PATH, $_QUIET;
+	if(killall("arpd")==0) {
+		@unlink("$_DB_PATH/arp.db");
+		if($_QUIET==0) {
+			echo "* Shutting down ARP agent\n";
+			slog("Shutting down ARP agent");
+		}
+		return 0;
+	}
+	if($_QUIET==0) {
+		echo "* Shutting down ARP agent failed\n";
+		slog("Shutting down ARP agent failed");
+	}
+	return 1;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=arp_start();
+		break;
+	case 'stop':
+		$ret=arp_stop();
+		break;
+	case 'restart':
+		$ret=arp_stop();
+		sleep(2);
+		$ret=arp_start();
+		break;
+	case 'status':
+		$ret=arp_status();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/status]\n";
+		break;
+}
+flush();
+exit($ret);
+?>

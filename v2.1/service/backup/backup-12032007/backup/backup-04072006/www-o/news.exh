@@ -1,0 +1,37 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+chk_session();
+write_nocache();
+
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<meta http-equiv=refresh content='300'; url='<?echo $_URL_PATH;?>/main.exh'>
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script language="javascript">
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+</script>
+</head>
+<body bgcolor='#ffffff' leftmargin="0" topmargin="0" rightmargin="0" bottommargin="0">
+<?
+if(chkconnect('tcp','www.mybox.net.my',80,5)!=0) {
+	if($fi=fopen("http://www.mybox.net.my/news.txt","r")) {
+		while($buff=fgets($fi,2048)) {
+			echo "$buff";
+		}
+		fclose($fi);
+	} else {
+		echo "No latest news";
+	}
+} else {
+	echo "failed to get news from server!";
+}
+?>
+</body>
+</html>

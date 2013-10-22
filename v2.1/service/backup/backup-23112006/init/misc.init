@@ -1,0 +1,344 @@
+#!/bin/php -Cq
+<?
+// misc.init - last update 30-Jun-2006
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+putenv("PATH=/bin:/service/tools:/service/init");
+if(!file_exists("/bin/hwclock") || !file_exists("/bin/date")) {
+	echo "! hwclock or date binary not found or cannot execute\n";
+	slog("hwclock or date binary not found or cannot execute");
+	exit(1);
+}
+$_QUIET=0;
+
+function set_clock_timezone() {
+	global $_DB_NAME, $_QUIET;
+
+	$db_id=db_connect($_DB_NAME);
+	$_TIMEZONE='';
+	$_TIMEUTC='';
+	$_CLOCK_OPT='-s';
+	$result=db_query("select * from misc where name like \"time_%\"",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_val=$row['val'];
+			$_name=$row['name'];
+			if($_name=='time_zone') $_TIMEZONE="$_val";
+			if($_name=='time_utc') $_TIMEUTC="$_val";
+		}
+	}
+	if($_TIMEUTC==1) $_TIMEZONE='UTC';
+	if($_TIMEZONE=='') exit(1);
+
+	$_BASE=basename($_TIMEZONE);
+	$_DIR=trim(dirname($_TIMEZONE),'.');
+
+	if($_DIR!='') $_DIR="$_DIR/";
+	$_TIMEZONE="$_DIR$_BASE.gz";
+
+	if($_TIMEUTC==1) {
+		$_CLOCK_OPT="$_CLOCK_OPT -u";
+	} else {
+		$_CLOCK_OPT="$_CLOCK_OPT -l";
+	}
+
+	if($_QUIET==0) echo "* Loading Time Setting\n";
+
+	if(file_exists("/usr/share/zoneinfo/$_TIMEZONE")) {
+		@unlink("/etc/localtime");
+		@shell_exec("zcat /usr/share/zoneinfo/$_TIMEZONE > /etc/localtime");
+		$_BASE=str_replace('_',' ',$_BASE);
+		if($_QUIET==0) echo "* Setting timezone to $_BASE\n";
+	}
+
+	exec_cmd("hwclock $_CLOCK_OPT");
+	if($_QUIET==0) {
+		$date=trim(shell_exec("date"));
+		echo "* Setting clock to $date\n";
+		slog("Setting system clock");
+	}
+	db_close($db_id);
+	return 0;
+}
+
+function set_dns_host() {
+	global $_DB_NAME, $_QUIET;
+
+	$db_id=db_connect($_DB_NAME);
+
+	$_DNS_NAME=array();
+	$_hostname='';$_domainname='';
+
+	$result=db_query("select name from dns_name",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_DNS_NAME[]=$row['name'];
+		}
+	}
+	unset($result);
+	$result1=db_query("select * from misc",$db_id);
+	if(db_num_rows($result1)!=0) {
+		while($row=db_fetch_array_assoc($result1)) {
+			$_name=$row['name'];
+			$_val=$row['val'];
+			if($_name=="hostname") $_hostname="$_val";
+			if($_name=="domainname") $_domainname="$_val";
+		}
+	}
+	unset($result1);
+	if($_hostname=='') $_hostname='mfs.mybox.net.my';
+	if($_domainname=='') $_domainname='mybox.net.my';
+
+	@unlink("/var/sys/dnslist");
+	@unlink("/var/sys/dnslist.tmp");
+	if(count($_DNS_NAME)!=0) {
+		@unlink("/var/sys/nodnslist");
+		if($fi=fopen("/etc/resolv.conf.tmp","w")) {
+			foreach($_DNS_NAME as $dns) {
+				$dns=trim($dns);
+				if($dns=='') continue;
+				$test=0;
+				if(chkconnect('tcp',"$dns","53",1)!=0) {
+					fwrite($fi,"nameserver $dns\n");
+					$test=1;
+				}
+				if($test==0) {
+					if(chkconnect('udp',"$dns","53",1)!=0) {
+						fwrite($fi,"nameserver $dns\n");
+						$test=1;
+					}
+				}
+				if($test==0) append_to_file("/var/sys/dnslist","$dns\n");
+			}
+			fclose($fi);
+			@rename("/etc/resolv.conf.tmp","/etc/resolv.conf");
+			if($_QUIET==0) {
+				echo "* Setting DNS Resolver\n";
+				slog("Setting DNS Resolver");
+			}
+		}
+	} else {
+		@touch("/var/sys/nodnslist");
+	}
+
+	if(file_exists("/proc/sys/kernel/hostname")) {
+		save_to_file("/proc/sys/kernel/hostname","$_hostname\n");
+		save_to_file("/proc/sys/kernel/domainname","$_domainname\n");
+		if($_QUIET==0) {
+			echo "* Setting Hostname: $_hostname\n";
+			echo "* Setting Domainname: $_domainname\n";
+			slog("Setting system hostname/domainname");
+		}
+	}
+
+	if(file_exists("/etc/hosts.tmp")) @copy("/etc/hosts.tmp","/etc/hosts");
+	$result2=db_query("select * from hosts",$db_id);
+	if(db_num_rows($result2)!=0) {
+		while($row=db_fetch_array_assoc($result2)) {
+			$_ip=$row['ip'];
+			$_host=$row['host'];
+			append_to_file("/etc/hosts","$_ip\t\t$_host\n");
+		}
+	}
+	db_close($db_id);
+	@touch("/var/sys/dnschkrestart");
+	return 0;
+}
+
+function update_keymap($_KEYMAP) {
+	$_KEY=trim(shell_exec("find /usr/share/kbd/ -name $_KEYMAP"));
+	if(file_exists("$_KEY")) {
+		$_TMPFILE="/tmp/keymap.".time();
+		@shell_exec("cat $_KEY |gzip -d > $_TMPFILE && loadkmap < $_TMPFILE && rm -f $_TMPFILE");
+		if(!file_exists("$_TMPFILE")) return 0;
+	}
+	return 1;
+}
+
+function set_keymap($_kmap) {
+	global $_DB_NAME;
+	$_KEYMAP='';
+	$db_id=db_connect($_DB_NAME);
+	//echo "$_kmap\n";
+	if($_kmap=="load") {
+		$result=db_query("select val from misc where name='kbdmap'",$db_id);
+		if(db_num_rows($result)!=0) {
+			$_KEYMAP=db_fetch_single($result);
+		}
+		db_close($db_id);
+		if($_KEYMAP=='') $_KEYMAP="us";
+		$_KEYMAP="$_KEYMAP.bmap.gz";
+		if(update_keymap($_KEYMAP)==0) {
+			$_KEYMAP=basename($_KEYMAP,".bmap.gz");
+			echo "* Setting keymap to $_KEYMAP\n";
+			return 0;
+		}
+	} elseif($_kmap=="show") {
+		if(file_exists("/usr/share/kbd/KBDLIST.TXT")) {
+			system("more /usr/share/kbd/KBDLIST.TXT");
+			return 0;
+		}
+	} else {
+		if($_kmap!="show" && $_kmap!="0" && $_kmap!='') {
+			db_query("update misc set val='$_kmap' where name='kbdmap'",$db_id);
+			db_close($db_id);
+			$_KEYMAP="$_kmap";
+			if($_KEYMAP=='') $_KEYMAP="us";
+			$_KEYMAP="$_KEYMAP.bmap.gz";
+			if(update_keymap($_KEYMAP)==0) {
+				$_KEYMAP=basename($_KEYMAP,".bmap.gz");
+				echo "* Updating keymap to $_KEYMAP\n";
+				return 0;
+			}
+		}
+	}
+	return 1;
+}
+
+function mfsrestart() {
+	global $_QUIET;
+	$time=time();
+	save_to_file("/var/sys/chkprog_wait","$time");
+	killall("mfs-query.exc");
+	sleep(1);
+	$ppid=get_progpid("mfs-query.exc");
+	if($ppid!='') killall("mfs-query.exc");
+	sleep(1);
+	@unlink("/var/sys/chkprog_wait");
+	//shell_exec("/bin/chkprog >/dev/null 2>&1");
+	if($_QUIET==0) {
+		echo "* Restarting mfs-query.exc agent\n";
+		slog("Starting mfs-query.exc agent");
+	}
+	return 0;
+}
+
+
+function reset_passwd($col,$passwd2,$passwd1) {
+	global $_DB_NAME;
+
+	$db_id=db_connect($_DB_NAME);
+	if($col!='') {
+		$_ssh_pass='';
+		$_ssh_pass2=crypt($passwd2,$passwd1);
+
+		$result=db_query("select pass from service_ssh",$db_id);
+		if(db_num_rows($result)!=0) {
+			$_ssh_pass=db_fetch_single($result);
+		}
+
+		if($col==1) {
+			$result=db_query("select * from auth_login where pass=md5('$passwd2') and name!='admin'",$db_id);
+			if(db_num_rows($result)==0 && $_ssh_pass!=$_ssh_pass2) {
+				db_query("update auth_login set pass=md5('$passwd2') where name='admin'",$db_id);
+				$msg="Password for Admin access updated!.";
+			} else {
+				$msg="Password already used!.";
+			}
+		}
+		if($col==2) {
+			$result=db_query("select * from auth_login where pass=md5('$passwd2') and name!='look'",$db_id);
+			if(db_num_rows($result)==0 && $_ssh_pass!=$_ssh_pass2) {
+				db_query("update auth_login set pass=md5('$passwd2') where name='look'",$db_id);
+				$msg="Password for Look access updated!.";
+			} else {
+				$msg="Password already used!.";
+			}
+		}
+		if($col==3) {
+			$result=db_query("select * from auth_login where pass=md5('$passwd2') and name!='console'",$db_id);
+			if(db_num_rows($result)==0 && $_ssh_pass!=$_ssh_pass2) {
+				db_query("update auth_login set pass=md5('$passwd2') where name='console'",$db_id);
+				$msg="Password for Console access updated!.";
+			} else {
+				$msg="Password already used!.";
+			}
+		}
+		if($col==4) {
+			$result=db_query("select pass from auth_login where pass=md5('$passwd2')",$db_id);
+			if(db_num_rows($result)==0) {
+				db_query("update service_ssh set pass=php('crypt','$passwd2','$passwd1')",$db_id);
+				$msg="Password for SSH access with user mfs updated!.";
+				echo_query("ssh-passwd");
+			} else {
+				$msg="Password already used!.";
+			}
+		}
+		echo "* $msg\n";
+	}
+	db_close($db_id);
+}
+
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+$_firm=trim($_SERVER["argv"][2]);
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+
+switch($_SERVER["argv"][1]) {
+	case 'clock':
+		$ret=set_clock_timezone();
+		break;
+	case 'dnshost':
+		$ret=set_dns_host();
+		break;
+	case 'compresslog':
+		compress_log();
+		$ret=0;
+		break;
+	case 'queryreload':
+		$ret=mfsrestart();
+		break;
+	case 'keymap':
+		if(isset($_firm) && $_firm!='') {
+			$_kmap="$_firm";
+		} else {
+			$_kmap="load";
+		}
+		$ret=set_keymap($_kmap);
+		break;
+	case 'update_firmware':
+		if(isset($_firm) && $_firm!='') {
+			if(!file_exists($_firm)) {
+				die("$_firm not exist\n");
+			}
+			$rett=update_firmware($_firm);
+			if($rett==0) {
+				echo "* Firmware updated!\n";
+			} else {
+				echo "* Firmware update failed!\n";
+			}
+		} else {
+			echo "Usage: $_app update_firmware [fullpath/file]\n";
+		}
+		$ret=0;
+		break;
+	case 'slog':
+		if(isset($_firm) && $_firm!='') {
+			slog($_firm);
+		} else {
+			echo "Usage: $_app slog [text]\n";
+		}
+		$ret=0;
+		break;
+	case 'staticarp':
+		@static_arp();
+		$ret=0;
+		break;
+	default:
+		echo "Usage: $_app:\n";
+		echo "------ clock \n";
+		echo "------ dnshost \n";
+		echo "------ compresslog\n";
+		echo "------ keymap <keymap>|<show> - blank for reload current setting\n";
+		echo "------ queryreload\n";
+		echo "------ update_firmware [fullpath/file]\n";
+		echo "------ slog [text]\n";
+		break;
+}
+
+flush();
+exit($ret);
+
+?>

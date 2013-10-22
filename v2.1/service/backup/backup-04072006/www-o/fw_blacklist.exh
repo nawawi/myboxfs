@@ -1,0 +1,509 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+chk_session();
+
+write_nocache();
+
+$_SYSID="fw_blacklist";
+
+if(!isset($tab)||$tab=='') $tab=1;
+if(!isset($col)||$col=='') $col=1;
+
+$db_id=db_connect($_DB_BLACKLIST);
+$db_id2=db_connect($_DB_NAME);
+if(chk_pri($_LOGIN['auth_id'],1)==1) {
+	if(isset($do_id)&&$do_id=='apply_chg') {
+		$msg='<script>waitcount();</script>';
+		echo_query("policy-restart");
+	}
+	$_TABLE="policy_blacklist";
+	if($tab==2) $_TABLE="policy_blacklist_custom";
+	
+	if($col==1) {
+		if($do_id=='stat') {
+			if($stat==1) { $stat=0; } else { $stat=1; }
+			db_query("update $_TABLE set stat='$stat' where id='$id'",$db_id);
+			@touch("/var/sys/{$_TABLE}.lock");
+		}
+		if($do_id=='log') {
+			if($log==1) { $log=0; } else { $log=1; }
+			db_query("update $_TABLE set log='$log' where id='$id'",$db_id);
+			@touch("/var/sys/{$_TABLE}.lock");
+		}
+	}
+
+	if(isset($do_save)&&$do_save==1) {
+		if($do_id!='edit') {
+			if($stat!='') { $stat='1'; } else { $stat='0'; }
+			if($log!='') { $log='1'; } else { $log='0'; }
+			$note=escape_str($note);
+			$result=db_query("select ip from $_TABLE where ip='$ip'",$db_id);
+			if(db_num_rows($result)==0) {
+				db_query("insert into $_TABLE (ip,note,stat,log) values ('$ip','$note','$stat','$log')",$db_id);
+				$msg='Setting saved!';
+				@touch("/var/sys/{$_TABLE}.lock");
+			} else {
+				$msg="IP '$ip' already exist!";
+			}
+		}
+		if($do_id=='edit') {
+			if($stat!='') { $stat='1'; } else { $stat='0'; }
+			if($log!='') { $log='1'; } else { $log='0'; }
+			$note=escape_str($note);
+			db_query("update $_TABLE set ip='$ip',note='$note',stat='$stat',log='$log' where id='$id'",$db_id);
+			$msg='Setting updated!';
+			@touch("/var/sys/{$_TABLE}.lock");
+		}
+	}
+	if(isset($do_save)&&$do_save==2) {
+		if(count($del)!=0) {
+			foreach($del as $x) {
+				if($x!='') db_query("delete from $_TABLE where id='$x'",$db_id);
+			}
+			reorder_policy($db_id,"$_TABLE");
+			@touch("/var/sys/{$_TABLE}.lock");
+		}
+	}
+	if(isset($do_save)&&$do_save==4) {
+		if(count($del)!=0) {
+			foreach($del as $x) {
+				if($x!='') db_query("update $_TABLE set stat='1' where id='$x'",$db_id);
+			}
+			@touch("/var/sys/{$_TABLE}.lock");
+		}
+	}
+	if(isset($do_save)&&$do_save==5) {
+		if(count($del)!=0) {
+			foreach($del as $x) {
+				if($x!='') db_query("update $_TABLE set stat='0' where id='$x'",$db_id);
+			}
+		}
+	}
+	if(isset($do_save)&&$do_save==6) {
+		if(count($del)!=0) {
+			foreach($del as $x) {
+				if($x!='') db_query("update $_TABLE set log='1' where id='$x'",$db_id);
+			}
+			@touch("/var/sys/{$_TABLE}.lock");
+		}
+	}
+	if(isset($do_save)&&$do_save==7) {
+		if(count($del)!=0) {
+			foreach($del as $x) {
+				if($x!='') db_query("update $_TABLE set log='0' where id='$x'",$db_id);
+			}
+			@touch("/var/sys/{$_TABLE}.lock");
+		}
+	}
+	if(isset($do_id)&&$do_id=="del") {
+		if($id!='') {
+			db_query("delete from $_TABLE where id='$id'",$db_id);
+			reorder_policy($db_id,"$_TABLE");
+			@touch("/var/sys/{$_TABLE}.lock");
+		}
+	}
+	if(isset($do_id)&&$do_id=="save_opt") {
+		if($blacklist_block!='') {
+			db_query("update misc set val='$blacklist_block' where name='blacklist_block'",$db_id2);
+			@touch("/var/sys/{$_TABLE}.lock");
+		}
+		if($blacklist_line!='') {
+			db_query("update misc set val='$blacklist_line' where name='blacklist_line'",$db_id2);
+			@touch("/var/sys/{$_TABLE}.lock");
+		}
+	}
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied!.";
+	}
+}
+
+$_blacklist_block=0;
+$result=db_query("select val from misc where name='blacklist_block'",$db_id2);
+if(db_num_rows($result)!=0) {
+	$_blacklist_block=db_fetch_single($result);
+}
+$_blacklist_line=50;
+$result=db_query("select val from misc where name='blacklist_line'",$db_id2);
+if(db_num_rows($result)!=0) {
+	$_blacklist_line=db_fetch_single($result);
+}
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script language="javascript" src="<?echo $_URL_PATH;?>/j/strings.js"></script>
+<script language="javascript">
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+</script>
+
+<script language="javascript">
+	function do_submit() {
+		document.f.btsubmit.disabled=true;
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	}
+
+	function dotoggle() {
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					document.f.elements[i].checked = !(document.f.elements[i].checked);
+    				}	
+			}
+  		}
+	}
+	function chkdel() {
+		var x='0';
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					if(document.f.elements[i].checked) x++;
+    				}	
+			}
+  		}
+		if(x==0) return false;
+		return true;
+	}
+	function do_delete(val) {
+		if(chkdel()!=false) {
+			if(val==2 && confirm('Are you sure you want to proceed?')) {
+				document.f.do_save.value=val;
+				document.f.submit();
+			} else {
+				document.f.do_save.value=val;
+				document.f.submit();
+			}
+			
+		}
+	}
+
+
+var k=0;
+function waitcount() { 
+ 	k=k+2;
+	if(k <= 100) {
+    		msg.innerHTML='Reloading.. Please wait..'+k+'%'; 
+    		setTimeout(waitcount,200);  
+	} else {
+		self.location.href='<?echo "$_URL_PATH/fw_blacklist.exh?tab=$tab&col=$col";?>';
+	}
+}
+</script>
+
+
+</head>
+<body scroll=auto>
+<form name=f method=post action="<?echo "$_URL_PATH/fw_blacklist.exh";?>" onsubmit="return do_submit();">
+<table border="0" cellpadding="4" cellspacing="4" width="700" align=center>
+<tr>
+<td align=center>
+
+<!-- main -->
+<fieldset>
+<legend>&nbsp;&nbsp;&nbsp;&nbsp;
+FIREWALL: BLACKLIST
+&nbsp;&nbsp;&nbsp;&nbsp;</legend>
+
+<table valign=top border=0>
+<tr>
+<td>
+<table border=0 cellpadding="2" cellspacing="2">
+<tr>
+<td align=center valign=middle>
+
+<table width="680" border="0" cellpadding="0" cellspacing="0">
+<tr><td>
+<ul id="tabnav">
+<li class="<?if($tab==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=1) { echo "<a href=\"$_URL_PATH/fw_blacklist.exh?tab=1\">"; }?>Predefined<?if($tab!=1) { echo "</a>"; }?></li>
+<li class="<?if($tab==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=2) { echo "<a href=\"$_URL_PATH/fw_blacklist.exh?tab=2\">"; }?>Custom<?if($tab!=2) { echo "</a>"; }?></li>
+<li class="<?if($tab==3) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=3) { echo "<a href=\"$_URL_PATH/fw_blacklist.exh?tab=3\">"; }?>Setting<?if($tab!=3) { echo "</a>"; }?></li>
+</ul>
+</td></tr>
+<?if($tab==2) {?>
+<tr> 
+<td class="tabcont">
+<table width=100% border=0 cellpadding="2" cellspacing="2" class=tablist>
+<tr><td>
+<ul id="tabnav">
+<li class="<?if($col==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($col!=1) { echo "<a href=\"$_URL_PATH/fw_blacklist.exh?tab=$tab&col=1\">"; }?>IP list<?if($col!=1) { echo "</a>"; }?></li>
+<li class="<?if($col==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($col!=2) { echo "<a href=\"$_URL_PATH/fw_blacklist.exh?tab=$tab&col=2\">"; }?><?if($do_id=='edit') { echo "Edit"; } else { echo "Add new"; }?><?if($col!=2) { echo "</a>"; }?></li>
+</ul>
+</td></tr>
+<? } ?>
+<tr> 
+<td class="tabcont">
+<?if($msg!='') {?>
+<table width="680" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span id=msg class=notice><?echo "$msg";?></span></td></tr>
+</table><br>
+<? }?>
+<?if($col==1 && $tab!=3) {?>
+<table width="680" border=0 cellpadding="2" cellspacing="2" class=tablist>
+      <tr class=bgcolor3>
+        <td width=2% class=tdlistop>#</td>
+	<td class=tdlistop>IP Address</td>
+        <td class=tdlistop>Description</td>
+	<td class=tdlistop width=2% align=center>Log</td>
+	<td class=tdlistop width=2% align=center>Active</td>
+        <td width=2% class=tdlistop>Opt</td>
+      </tr>
+<?
+
+// counting
+$currentPage = $HTTP_SERVER_VARS["PHP_SELF"];
+$maxRows_Recordset=50;
+if(isset($pageNum_Recordset)) {
+	$pageNum_Recordset = $pageNum_Recordset;
+} else {
+	$pageNum_Recordset=0;
+}
+$startRow_Recordset=@($pageNum_Recordset * $maxRows_Recordset);
+$query_Recordset="select * from $_TABLE order by id ASC";
+$query_limit_Recordset=sprintf("%s LIMIT %d, %d", $query_Recordset, $startRow_Recordset, $maxRows_Recordset);
+$Recordset=db_query($query_limit_Recordset, $db_id);
+if(isset($totalRows_Recordset)) {
+	$totalRows_Recordset=$totalRows_Recordset;
+} else {
+	$all_Recordset=db_query($query_Recordset,$db_id);
+	$totalRows_Recordset=db_num_rows($all_Recordset);
+}
+$totalPages_Recordset=@ceil($totalRows_Recordset/$maxRows_Recordset)-1;
+$queryString_Recordset=null;
+if(!empty($_SERVER['QUERY_STRING'])) {
+	$params=explode("&", $_SERVER['QUERY_STRING']);
+  	$newParams=array();
+  	foreach ($params as $param) {
+		if(stristr($param, "pageNum_Recordset")==true) continue;
+		if(stristr($param, "totalRows_Recordset")==true) continue;
+		if(stristr($param, "maxRows_Recordset")==true) continue;
+		if(stristr($param, "tab")==true) continue;
+		if(stristr($param, "col")==true) continue;
+		if(stristr($param, "do_id")==true) continue;
+		array_push($newParams, $param);
+  	}
+  	if(count($newParams) != 0) {
+    		$queryString_Recordset="&" . implode("&", $newParams);
+  	}
+}
+$queryString_Recordset=sprintf("&totalRows_Recordset=%d%s&tab=$tab&col=$col",$totalRows_Recordset,$queryString_Recordset);
+if($pageNum_Recordset > 0) { 
+	$pagefirst=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, 0, $queryString_Recordset);
+	$pageprev=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, max(0, $pageNum_Recordset - 1), $queryString_Recordset);
+	$button1="<a href='$pagefirst'>{$_PNG['first']}</a>\n";
+	$button2="<a href='$pageprev'>{$_PNG['prev']}</a>\n";
+} else {
+	$button1="{$_PNG['first']}\n";
+	$button2="{$_PNG['prev']}\n";
+}
+if($pageNum_Recordset < $totalPages_Recordset) {
+	$pagenext=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, min($totalPages_Recordset, $pageNum_Recordset + 1), $queryString_Recordset);
+	$pagelast=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, $totalPages_Recordset, $queryString_Recordset);
+	$button3="<a href='$pagenext'>{$_PNG['next']}</a>\n";
+	$button4="<a href='$pagelast'>{$_PNG['last']}</a>\n";
+} else {
+	$button3="{$_PNG['next']}\n";
+	$button4="{$_PNG['last']}\n";
+}
+unset($pagefirst,$pageprev,$pagenext,$pagelast);
+$x=1;
+do {
+	$_id=$row['id'];
+	$_ip=$row['ip'];
+	$_note=unescape_str($row['note']);
+	$_stat=$row['stat'];
+	$_log=$row['log'];
+	if($_id=='') continue;
+	$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff;cursor: hand;'";
+	$lo='';
+	if($tab==2) $lo="onclick=\"self.location.href='$_URL_PATH/fw_blacklist.exh?tab=$tab&col=2&id=$_id&do_id=edit';\" ";
+	echo "
+      <tr $lt>
+        <td width=2% class=tdlistb $lo>$_id</td>
+        <td class=tdlistb $lo>$_ip</td>
+        <td class=tdlistb $lo>$_note</td>
+        <td class=tdlistb width=2% align=center><a href='$_URL_PATH/fw_blacklist.exh?tab=$tab&col=1&id=$_id&log=$_log&do_id=log&pageNum_Recordset=$pageNum_Recordset&totalPages_Recordset=$totalPages_Recordset'>{$_PNG_YESNO[$_log]}</a></td>
+        <td class=tdlistb width=2% align=center><a href='$_URL_PATH/fw_blacklist.exh?tab=$tab&col=1&id=$_id&stat=$_stat&do_id=stat&pageNum_Recordset=$pageNum_Recordset&totalPages_Recordset=$totalPages_Recordset'>{$_PNG_YESNO[$_stat]}</a></td>
+        <td width=2% class=tdlistb valign=middle align=right>";
+	if($tab==2) {
+		echo "<a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='$_URL_PATH/fw_blacklist.exh?tab=$tab&do_id=del&id=$_id&pageNum_Recordset=$pageNum_Recordset&totalPages_Recordset=$totalPages_Recordset';\">{$_PNG['delete']}</a>";
+	}
+	echo "<input type=checkbox name=del[] value=$_id></td>
+	</tr>";
+
+$x++;
+} while($row=db_fetch_array_assoc($Recordset));
+
+if($x > 1) {
+?>
+<tr>
+<td align=right valign=top class=tdlist colspan=6>[ <a href="#" onclick='do_delete(7);'>Nolog</a> / <a href="#" onclick='do_delete(6);'>Log</a> ]-[ <a href="#" onclick='do_delete(5);'>Disable</a> / <a href="#" onclick='do_delete(4);'>Enable</a> ] <?if($tab==2) {?><a href="#" onclick='do_delete(2);'>Delete</a> / <?}?><a href="#" onclick='dotoggle();'>Toggle</a> <?echo $_PNG['arrow_rtr'];?></td>
+</tr>
+<? } ?>
+<tr><td align=right valign=top colspan=6>
+<input name=btapply type="button" value="Apply changes" class="button-small" onclick="self.location.href='<?echo $_URL_PATH;?>/fw_blacklist.exh?tab=3&do_id=apply_chg';document.f.btapply.disabled=true;"></td></tr>
+</table>
+
+<? if($totalRows_Recordset > $maxRows_Recordset) { ?>
+<br>
+<script language="javascript">
+	function do_next() {
+		val=document.f.donum.value;
+		location.href='<?echo $currentPage;?>?pageNum_Recordset='+ val +'<?echo $queryString_Recordset;?>';
+	}
+</script>
+<table border="0" width="680" class=blockin>
+<tr>
+<td valign=midlle>
+<?echo "$button1$button2";?>
+</td>
+<?
+	$cur_page=$pageNum_Recordset + 1;
+	$last_page=abs($totalPages_Recordset + 1);
+	$cur_page=abs($cur_page);
+	if($last_page==0) $last_page=1;
+	if(strlen($last_page)==1) $last_page="0$last_page";
+	echo "<td valign=midlle align=center>Page ";
+	echo "<select name=donum size=1 class=textbox onchange='do_next();'>";
+	for($x=0;$x<$totalPages_Recordset+1;$x++){
+		$y=$x + 1;
+		$p=str_repeat('0',strlen($last_page)-strlen($y)).$y;
+		if($x==$pageNum_Recordset) {
+			echo "<option value='$x' selected>$p</option>";
+		} else {
+			echo "<option value='$x'>$p</option>";
+		}
+	}
+	echo "</select> of $last_page Pages</td>";
+?>
+<td valign=midlle align=right>
+<?echo "$button3$button4";?>
+</td>
+</tr>
+</table>
+<? } ?>
+<?if($tab==2){?></td></tr></table><? }?>
+
+<? } //col==1 && tab!=3 ?>
+<?if($col==2 && $tab!=3) {
+
+if($do_id=='edit') {
+	$result=db_query("select * from $_TABLE where id='$id'",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_id=$row['id'];
+			$_ip=$row['ip'];
+			$_stat=$row['stat'];
+			$_log=$row['log'];
+			$_note=unescape_str($row['note']);
+		}
+	}
+}
+?>
+<table width="680" border="0" cellpadding="6" cellspacing="0">
+<tr> 
+<td width="30%" valign="middle" class="tdcelltop">IP Address</td>
+<td width="70%" valign="middle" class="mtabletop">
+<input name="ip" type="text" class="textbox" size="30" value="<?echo $_ip;?>">
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Description</td>
+<td width="70%" valign="middle" class="mtable">
+<input name="note" type="text" class="textbox" size="30" value="<?echo $_note;?>">
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Logging</td>
+<td width="70%" valign="middle" class="mtable">
+<input name="log" type="checkbox" <?if($_log==1) echo "checked";?>> Log this rule
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Active</td>
+<td width="70%" valign="middle" class="mtable">
+<input name="stat" type="checkbox" <?if($_stat==1) echo "checked";?> <?if($do_id!='edit') echo "checked";?>> Enable this block
+</td>
+</tr>
+</table>
+<tr><td align=right valign=top><input name=btsubmit type="submit" value="<?if($do_id=='edit') { echo "Update"; } else { echo "Save";}?>" class="button"></td></tr>
+</table>
+<? } //col==2 && tab!=3 
+if($tab==3) {
+?>
+<script language="javascript">
+function blacklistopt_update() {
+	var opt=document.f.blacklist_block.value;
+	var bline=document.f.blacklist_line.value;
+	self.location.href='<?echo $_URL_PATH;?>/fw_blacklist.exh?tab=3&col=1&do_id=save_opt&blacklist_block='+opt+'&blacklist_line='+bline;
+}
+</script>
+<table width="680" border="0" cellpadding="6" cellspacing="0">
+<tr> 
+<td width="30%" valign="middle" class="tdcelltop">Blocking mode</td>
+<td width="70%" valign="middle" class="mtabletop">
+<select class="textbox" name="blacklist_block">
+<?
+foreach(array("0"=>"Inbound","1"=>"Outbound","2"=>"Both") as $opt => $optt) {
+	if($_blacklist_block==$opt) {
+		echo "<option value=$opt selected>$optt</option>";
+	} else {
+		echo "<option value=$opt>$optt</option>";
+	}
+}
+?>
+</select>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Row(s) display</td>
+<td width="70%" valign="middle" class="mtable">
+<input name="blacklist_line" type="text" class="textbox" size="5" value="<?echo $_blacklist_line;?>">
+</td>
+</tr>
+</table>
+<tr><td align=right><input name=btsave type="button" value="Update" class="button-small" onclick="blacklistopt_update();document.f.btsave.disabled=true;"></td></tr>
+
+<? } // tab==3 ?>
+</td>
+</tr>
+</table>
+
+</td>
+</tr>
+</table>
+
+
+
+<!-- end main -->
+
+</td>
+</tr>
+</table>
+</fieldset>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?echo $tab;?>>
+<input type=hidden name=col value=<?echo $col;?>>
+
+<input type=hidden name=shift_id value=''>
+<?if($col==1) {?>
+<input type=hidden name=pageNum_Recordset value='<?echo $pageNum_Recordset;?>'>
+<input type=hidden name=totalRows_Recordset value='<?echo $totalRows_Recordset;?>'>
+<? } ?>
+<?if($do_id=='edit' && $col==2) {?>
+<input type=hidden name=do_id value=edit>
+<input type=hidden name=id value='<?echo $id;?>'>
+<? } ?>
+
+</form>
+</body>
+</html>
+
+<?db_close($db_id); db_close($db_id2); flush();?>

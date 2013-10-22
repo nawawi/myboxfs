@@ -1,0 +1,482 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+include_once('ftp.exl');
+chk_session();
+write_nocache();
+
+if(isset($dou)&&$dou=='2') {
+	exit;
+} elseif(isset($dou)&&$dou=='1')  {
+	if(chk_pri($_LOGIN['auth_id'],1)==1) {
+		echo "<html><head><title>MyBox Firewall</title>";
+		echo "<script language='javascript'>";
+		echo "function do_scroll() {";
+		echo "if (scrolling) { window.scroll(1,500000);}";
+		echo "window.setTimeout('do_scroll()', 100);";
+		echo "}";
+		echo "scrolling = true;";
+		echo "do_scroll();";
+		echo "</script>";
+		echo "</head><body oncontextmenu='return false' scroll=auto onfocus='scrolling=false' onblur='scrolling=true;self.focus();' style='border: 0px; background: #F0F0F0;white-space: pre; font-size: 11px;font-family: courier new, courier;table-layout: fixed;'>";
+		echo "<pre style='border: 0px; background: #F0F0F0; white-space: pre; font-size: 11px;font-family: courier new, courier; table-layout: fixed;'>";
+		sysupdate_console_ftp();
+		echo "<br><br></pre><script>scrolling=false;</script></body></html>";
+	} else {
+		echo "Permission denied!";
+	}
+	exit;
+}
+
+$_SYSID="system_update";
+$msg='';
+if(chk_pri($_LOGIN['auth_id'],1)==1) {
+	if(isset($do_save)&&$do_save==1 && $tab==1) {
+		if($btype==0) {
+			if(move_uploaded_file("$filename","$_DOWNLOAD_PATH/$filename_name")) {
+				if(update_firmware("$_DOWNLOAD_PATH/$filename_name")!=0 && $msg=='') {
+					$msg="Firmware update failed!";
+					auditlog("UPDATE","({$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']})","Firmware update failed.");
+				}
+			}
+			if($msg=='') {
+				$msg='Firmware updated. You need to reboot the system.';
+				auditlog("UPDATE","({$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']})","Firmware updated.");
+			}
+		}
+		if($btype==1) {
+			if(move_uploaded_file("$filename","$_DOWNLOAD_PATH/$filename_name")) {
+				@rename("$_LICENSE_PATH","$_ROOT_DIR/mfs-license.exc.bak");
+				if(copy("$_DOWNLOAD_PATH/$filename_name","$_LICENSE_PATH")) {
+					$msg='License updated!';
+					auditlog("UPDATE","({$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']})","License updated.");
+				} else {
+					@rename("$_ROOT_DIR/mfs-license.exc.bak","$_LICENSE_PATH");
+				}
+			}
+			if($msg=='') {
+				$msg="Updating license failed!";
+				auditlog("UPDATE","({$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']})","License update failed.");
+			}
+		}
+		if($btype==2) {
+			if(move_uploaded_file("$filename","$_DOWNLOAD_PATH/$filename_name")) {
+				if(preg_match("/ipsrules\.(\d+)\.zip/",$filename_name,$mm)) {
+					@rename("$_DB_PATH/$_DB_IPS","$_DB_PATH/$_DB_IPS.bak");
+					if(execq_cmd("zcat $_DOWNLOAD_PATH/$filename_name |sqlite $_DB_PATH/$_DB_IPS")==0) {
+						$msg="IPS signature updated!";
+						auditlog("UPDATE","({$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']})","IPS signature updated.");
+						$_time=time();
+						$db_id=@db_connect($_DB_IPS);
+						@db_query("update policy_ips_info set updates='$_time' where id='1'",$db_id);
+						@db_close($db_id);
+						unset($db_id,$_time);
+					} else {
+						@rename("$_DB_PATH/$_DB_IPS.bak","$_DB_PATH/$_DB_IPS");
+					}
+				}
+				@unlink("$_DOWNLOAD_PATH/$filename_name");
+			}
+			if($msg=='') {
+				$msg='Updating IPS signature failed!';
+				auditlog("UPDATE","({$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']})","IPS signature update failed.");
+			}
+		}
+		if($btype==3) {
+			if(move_uploaded_file("$filename","$_DOWNLOAD_PATH/$filename_name")) {
+				if(preg_match("/blacklist\.(\d+)\.zip/",$filename_name,$mm)) {
+					@rename("$_DB_PATH/$_DB_BLACKLIST","$_DB_PATH/$_DB_BLACKLIST.bak");
+					if(execq_cmd("zcat $_DOWNLOAD_PATH/$filename_name |sqlite $_DB_PATH/$_DB_BLACKLIST")==0) {
+						$msg="Blacklist updated!";
+						auditlog("UPDATE","({$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']})","Blacklist updated.");
+						$_time=time();
+						$db_id=@db_connect($_DB_BLACKLIST);
+						@db_query("update policy_blacklist_info set updates='$_time' where id='1'",$db_id);
+						@db_close($db_id);
+						unset($db_id,$_time);
+					} else {
+						@rename("$_DB_PATH/$_DB_BLACKLIST.bak","$_DB_PATH/$_DB_BLACKLIST");
+					}
+				}
+				@unlink("$_DOWNLOAD_PATH/$filename_name");
+			}
+			if($msg=='') {
+				$msg='Updating Blacklist database failed!';
+				auditlog("UPDATE","({$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']})","Blacklist update failed.");
+			}
+		}
+	}
+	if(isset($do_save)&&$do_save==1 && $tab==2) {
+		chk_update();
+	}
+	if(isset($do_save)&&$do_save==1 && $tab==3) {
+		$db_id=db_connect($_DB_NAME);
+		if($ustat!='') $ustat=1;
+		if($ustat=='') $ustat=0;
+		if($udate=='') $udate='2';
+		db_query("update misc set val='$ustat' where name='update_stat'",$db_id);
+		db_query("update misc set val='$udate' where name='update_date'",$db_id);
+		db_close($db_id);
+		$msg="Setting updated!";
+	}
+
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied!.";
+	}
+}
+if(!isset($tab)||$tab=='') $tab=1;
+$rrid=rand().'.'.time();
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script language="javascript" src="<?echo $_URL_PATH;?>/j/strings.js"></script>
+<script language="javascript">
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+</script>
+<script language="javascript">
+<?if($tab==1){?>
+function check_imgfile() {
+	var file=document.f.filename.value;
+	if(file=='') { return false; }
+	file=basename(file);
+	var fv="<?echo trim(file_get_contents("/etc/firmware"));?>";
+	if(fv=='') {$fv=0;}
+	uf=Trim(file);
+	var m1=/myboxOS\.(\d+)\.zip/;
+	var ret=uf.match(m1);
+	if(ret!=null) { 
+		if(ret[1] < fv) {
+			if(!confirm("You are attempt to update older image than current.\nAre you want to proceed?")) {
+				return false;
+			}
+		}
+		if(ret[1] >= fv) {
+			if(!confirm("Firmware already up to date.\nAre you want to proceed?")) {
+				return false;
+			}
+		}
+		return true;
+	}
+	error("Invalid Firmware file!");
+	return false;
+}
+function check_ipssig() {
+	var file=document.f.filename.value;
+	if(file=='') { return false; }
+	file=basename(file);
+	var ipsv="<?echo trim(file_get_contents("/etc/ipsversion"));?>";
+	if(fv=='') {$fv=0;}
+	uf=Trim(file);
+	var m1=/ipsrules\.(\d+)\.zip/;
+	var ret=uf.match(m1);
+	if(ret!=null) { 
+		if(ret[1] < fv) {
+			if(!confirm("You are attempt to update older signature than current.\nAre you want to proceed?")) {
+				return false;
+			}
+		}
+		if(ret[1] >= ipsv) {
+			if(!confirm("IPS Signature already up to date.\nAre you want to proceed?")) {
+				return false;
+			}
+		}
+		return true;
+	}
+	error("Invalid IPS Signature file!");
+	return false;
+}
+function check_licensefile() {
+	var file=document.f.filename.value;
+	if(file=='') { return false; }
+	file=basename(file);
+	uf=Trim(file);
+	if(uf!="mfs-license.exc") {
+		error("Invalid license file!");
+		return false;
+	}
+	return true;
+}
+
+function check_blacklistfile() {
+	var file=document.f.filename.value;
+	if(file=='') { return false; }
+	file=basename(file);
+	uf=Trim(file);
+	var blkv="<?echo trim(file_get_contents("/etc/ipsversion"));?>";
+	if(fv=='') {$fv=0;}
+	var m1=/blacklist\.(\d+)\.zip/;
+	var ret=uf.match(m1);
+	if(ret!=null) { 
+		if(ret[1] < fv) {
+			if(!confirm("You are attempt to update older database than current.\nAre you want to proceed?")) {
+				return false;
+			}
+		}
+		if(ret[1] >= blkv) {
+			if(!confirm("Blacklist database already up to date.\nAre you want to proceed?")) {
+				return false;
+			}
+		}
+		return true;
+	}
+	error("Invalid Blacklist file!");
+	return false;
+}
+<? } ?>
+<?if($tab==1){?>
+function winupload() {
+	var LeftPosition = (screen.width) ? (screen.width-375)/2 : 0;
+	var TopPosition = (screen.height) ? (screen.height-95)/2 : 0;
+	var settings='width=375,height=95,top='+TopPosition+',left='+LeftPosition+',scrollbars=0,status=0,resizable=0';
+	var file=basename(document.f.filename.value);
+	var url='<?echo $_URL_PATH;?>/pg.exh?mid=<?echo $rrid;?>&mf='+file;
+	window.open(url,'aa<?echo time();?>',settings);
+	return true;
+}
+<?}?>
+<?if($tab==2){?>
+function do_update() {
+	document.getElementById("xxid").style.display='';
+	document.getElementById('xxid2').src='system_update.exh?dou=1';
+}
+<?}?>
+function do_submit() {
+	<?if($tab==1){?>
+	var type=document.f.btype.value;
+	if(type==0) {
+		if(!check_imgfile()) { return false; };
+	}
+	if(type==1) {
+		if(!check_licensefile()) { return false; };
+	}
+	if(type==2) {
+		if(!check_ipssig()) { return false; };
+	}
+	if(type==3) {
+		if(!check_blacklistfile()) { return false; };
+	}
+	winupload();
+	<?}?>
+	document.f.btsave.disabled=true;
+	document.f.do_save.value='1';
+	document.f.submit();
+	return true;
+}
+</script>
+</head>
+<body onload="parent.left_frame.switchmenu('sub1');" scroll=auto>
+<form name=f method=post action="<?echo "$_URL_PATH/system_update.exh";?>" enctype="multipart/form-data">
+<input type=hidden name=UPLOAD_METTER_ID value='<?echo $rrid;?>'>
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 10px;'>
+<tr>
+<td>
+<p class="sectitle"><b>System:</b> Updates</p><br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="<?echo "$_URL_PATH/system_update.exh?tab=1";?>" <?if($tab==1){?>class="tabact"<?}?>>Local</a></li>
+<li><a href="<?echo "$_URL_PATH/system_update.exh?tab=2";?>" <?if($tab==2){?>class="tabact"<?}?>>Remote</a></li>
+<li><a href="<?echo "$_URL_PATH/system_update.exh?tab=3";?>" <?if($tab==3){?>class="tabact"<?}?>>Setting</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td> 
+<br>
+
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><?if(isset($msg)&&$msg!='') {?><span id=msg class=notice><?echo "$msg";?></span><?}else{echo "<span id=msg class=notice style='display: none;'></span>";}?></td></tr>
+</table><br>
+
+<!-- tab container -->
+<?if($tab==1) {?>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td valign="middle" class="tdname">Update type</td>
+<td valign="middle" class="tdvalue"> 
+<select name=btype size=1 class=valbox>
+<?
+$_opptype[0]="System Firmware";
+$_opptype[1]="Mybox License";
+$_opptype[2]="IPS Signature";
+$_opptype[3]="Blacklist Database";
+$doftp=0;
+foreach($_opptype as $val => $bt) {
+	if($btype==$val) {
+		echo "<option value='$val' selected>$bt</option>";
+	} else {
+		echo "<option value='$val'>$bt</option>";
+	}
+}
+?>
+</select>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">File Upload</td>
+<td valign="middle" class="tdvalue"> 
+<input name="filename" type="file" class="filebox" size="35"> 
+</td>
+</tr>
+</tbody>
+</table>
+<?}//tab==1?>
+<?if($tab==2){
+
+$ipsv=0;$blkv=0;$fv=0;
+if(file_exists("/etc/ipsversion")) {
+	$ipsv=trim(file_get_contents("/etc/ipsversion"));
+}
+if(file_exists("/etc/blacklistversion")) {
+	$blkv=trim(file_get_contents("/etc/blacklistversion"));
+}
+if(file_exists("/etc/firmware")) {
+	$fv=trim(file_get_contents("/etc/firmware"));
+}
+if(file_exists("/etc/updates")) {
+	$upds=file_get_contents("/etc/updates");
+} else {
+	chk_update();
+}
+$fvu="No update available";
+$ipsvu="No update available";
+$blkvu="No update available";
+$fvg='grarrow';
+$ipsg='grarrow';
+$blkg='grarrow';
+$du=0;
+if($upds!='') {
+	list($fvu1,$ipsvu1,$blkvu1)=preg_split("/,/",$upds);
+	list($fvu,$fvm)=explode("|",$fvu1);
+	list($ipsvu,$ipsm)=explode("|",$ipsvu1);
+	list($blkvu,$blkm)=explode("|",$blkvu1);
+	if($fvu <= $fv) {
+		$fvu="Updated";$fvg="gbarrow";$du++;
+	}
+	if($ipsvu <= $ipsv) {
+		$ipsvu="Updated";$ipsg="gbarrow";$du++;
+	}
+	if($blkvu <= $blkv) {
+		$blkvu="Updated";$blkg="gbarrow";$du++;
+	}
+}
+?>
+<table width="100%" class=data>
+<thead class="blue">
+<tr>
+<td style='font-weight: bold;'>Update type</td>
+<td style='font-weight: bold;'>Current version</td>
+<td style='font-weight: bold;' colspan=2>Update Available</td>
+</tr>
+</thead>
+<tbody>
+<tr style='background-color: #ffffff;'>
+<td>Firmware</td>
+<td><?echo $fv;?></td>
+<td><?echo $fvu;?></td>
+<td style='text-align: center; width: 5%; table-layout: fixed; white-space: nowrap;'><name="sini1"><?echo $_PNG[$fvg];?></td>
+</tr>
+<tr style='background-color: #ffffff;'>
+<td>IPS Signature</td>
+<td><?echo $ipsv;?></td>
+<td><?echo $ipsvu;?></td>
+<td style='text-align: center; width: 5%; table-layout: fixed; white-space: nowrap;'><name="sini2"><?echo $_PNG[$ipsg];?></td>
+</tr>
+<tr style='background-color: #ffffff;'>
+<td>Blacklist Database</td>
+<td><?echo $blkv;?></td>
+<td><?echo $blkvu;?></td>
+<td style='text-align: center; width: 5%; table-layout: fixed; white-space: nowrap;'><name="sini2"><?echo $_PNG[$blkg];?></td>
+</tr>
+<tr id='xxid' style='display: none;'>
+<td colspan=4 align=right style='text-align: left;'>
+<iframe id="xxid2" src="system_update.exh?dou=2" scrolling="auto" frameborder="0" marginwidth='0' marginheight='0' noresize width="100%" height="200" style='border-style: solid;border-width: 0px; table-layout: fixed; overflow-x: hidden;'></iframe>
+<br>[<a href="#" onclick="document.getElementById('xxid').style.display='none';">Close</a>]
+</td>
+</tr>
+</tbody>
+</table>
+<?}//tab==2?>
+<?if($tab==3) {
+$db_id=db_connect($_DB_NAME);
+$result=db_query("select * from misc where name like \"update_%\"",$db_id);
+$_udate=2;
+$_ustat=0;
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_name=$row['name'];
+		$_val=$row['val'];
+		if($_name=='update_stat') $_ustat=$_val;
+		if($_name=='update_date') $_udate=$_val;
+	}
+}
+db_close($db_id); 
+?>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td valign="middle" class="tdname">Active</td>
+<td valign="middle" class="tdvalue"><input type=checkbox name=ustat <?if($_ustat==1)echo "checked";?>> Enable auto update</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Check and update every</td>
+<td valign="middle" class="tdvalue"> 
+<select name="udate" size=1 class=valbox>
+<?for($x=1;$x<31;$x++) {
+	$t=$x;
+	if(strlen($x)==1)$t="0$x";
+	if($_udate==$x) {
+		echo "<option value='$x' selected>$t</option>";
+	} else {
+		echo "<option value='$x'>$t</option>";
+	}
+}?>
+</select> day(s)
+</td>
+</tr>
+</tbody>
+</table>
+<?}//tab==3?>
+<table align=right>
+<tbody>
+<tr>
+<td><?if($tab==2) {
+	if($du!=3) {
+?>
+<input name="btsave" value="Update" type="button" class=button onclick="do_update();">
+	<?}?>
+<input name="btsave" value="Check Update" type="button" class=button onclick="do_submit();">
+<?} else {?>
+<input name="btsave" value="Update" type="button" class=button onclick="do_submit();">
+<?}?></td> </tr> 
+</tbody>
+</table>
+<!-- end tab container -->
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value='<?echo $tab;?>'>
+</form>
+</body>
+</html>
+
+<?flush();?>

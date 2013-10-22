@@ -1,0 +1,4 @@
+CC=gcc
+CFLAGS=-O2 -Wall -W -Wpointer-arith -Wbad-function-cast -Wcast-qual -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations -Wnested-externs -Winline 
+LDFLAGS=
+LIBS=

@@ -1,0 +1,55 @@
+#!/bin/php
+<?
+	$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+	include_once('clib.exl');
+
+	if(isset($just_login)&&$just_login==1) {
+		check_login($passwd);
+		chk_session();
+		$ErrorMsg='';
+		if($_LOGIN['auth_id']!='admin' && $_LOGIN['auth_id']!='look') {
+			ulog("Password incorrect");
+			header("Location: $_URL_PATH/?msgid=1");
+			exit;
+		} 
+		ulog("Access granted");
+		header("Location: $_URL_PATH/");
+		exit;	
+	}
+	if(isset($just_logout)&&$just_logout==1) {
+		chk_session();
+		ulog("Session logout.");
+		do_logout();
+		header("Location: $_URL_PATH/?msgid=3");
+		exit;
+	}
+	if(isset($just_logout)&&$just_logout==5) {
+		chk_session();
+		if(chk_pri($_LOGIN['auth_id'],1)==1) {
+			$auth=$_LOGIN['auth_id'];
+			if($_LOGIN['auth_addr']=='') {
+				$auth_addr=getenv("REMOTE_ADDR");
+			} else {
+				$auth_addr=$_LOGIN['auth_addr'];
+			}
+			slog("($auth@$auth_addr) Rebooting system -> $rebootreason");
+			do_logout();
+			echo_query("mfs-reboot");
+			header("Location: $_URL_PATH/?msgid=5");
+		}
+		exit;
+	}
+	if(isset($just_logout)&&$just_logout==6) {
+		chk_session();
+		if(chk_pri($_LOGIN['auth_id'],1)==1) {
+			slog("System shutdown.");
+			do_logout();
+			echo_query("mfs-shutdown");
+			header("Location: $_URL_PATH/?msgid=6");
+		}
+		exit;
+	}
+	ulog("Invalid login request. Please re-login.");
+	header("Location: $_URL_PATH/?msgid=4");
+	exit;
+?>

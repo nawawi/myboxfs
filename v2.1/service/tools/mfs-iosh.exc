@@ -1,0 +1,1061 @@
+<?
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once("clib.exl");
+putenv("PATH=/bin:/service/tools:/service/init");
+@chdir("/config");
+## variable setting
+$_ttype['1']="ext";
+$_ttype['2']="dmz";
+$_ttype['3']="int";
+$_sstat['0']="off";
+$_sstat['1']="on";
+$_updown['0']="down";
+$_updown['1']="up";
+$_enab['0']="disabled";
+$_enab['1']="enabled";
+$_enab1['0']="disable";
+$_enab1['1']="enable";
+$_vflag['0']="vlan";
+$_vflag['1']="ethernet";
+
+function mybox_do_exit($no) {
+	echo "mfs-iosh.exc-$no\n";
+	exit($no);
+}
+
+function mybox_print_error($txt) {
+	echo "% $txt\n";
+}
+
+function mybox_cunescape_str($str) {
+	if($str!='') {
+		if(strpos($str,"\\&quot;")!==FALSE || strpos($str,"\\&#039;")!==FALSE) {
+			return str_replace(array("\&quot;","\&#039;"),array('"',"'"),$str);
+		}
+		return str_replace(array("&quot;","&#039;"),array('"',"'"),$str);	
+	}
+	return $str;
+}
+function _cmd_ipaddr($line) {
+	global $_DB_NAME, $_CLASSIP, $_ttype, $_sstat, $_updown;
+	$db_id=mybox_db_connect($_DB_NAME);
+
+	list($cmd,$option)=preg_split("/\s+/",$line);
+
+	if($option=='') mybox_do_exit(1);
+	if($option=='add' || $option=='edit') {
+		$ok=0;
+		$_name='';$_dev='';$_ip='0.0.0.0';$_mask='255.255.255.0';$_mtu='1500';$_type='3';$_onboot='0';$_note='';
+		$_sql='';
+		$buff=" $line ";
+		if(preg_match("/\s+name=(.*?)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$val=mybox_escape_str($val);
+				$val=strtoupper($val);
+				$test=mybox_db_query("select name from ipaddr where name='$val'",$db_id);
+				if($option=='add') {
+					if(mybox_db_num_rows($test)!=0) {
+						mybox_print_error("Interface name '$val' already exists");
+						@mybox_db_close($db_id);return;
+					}
+				} elseif($option=='edit') {
+					if(mybox_db_num_rows($test)==0) {
+						mybox_print_error("Interface name '$val' not exists");
+						@mybox_db_close($db_id);return;
+					}
+				}
+				$_name="$val";
+				unset($test);
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+dev=(.*?)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				if(!preg_match("/^eth(\d+)/",$val,$mm)) {
+					mybox_print_error("Invalid interface device '$val'");
+					@mybox_db_close($db_id);return;
+				}
+				if($option=='add') {
+					$test=mybox_db_query("select dev from ipaddr where dev='$val'",$db_id);
+				} elseif($option=='edit') {
+					$test=mybox_db_query("select dev from ipaddr where dev='$val' and name!='$_name'",$db_id);
+				}
+				if(mybox_db_num_rows($test)!=0) {
+					mybox_print_error("Interface device '$val' already exists");
+					@mybox_db_close($db_id);return;
+				}
+				$_dev="$val";
+				$_sql .="dev='$val',";
+				unset($test);
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+ip=(.*?)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				if($option=='add') {
+					$test=mybox_db_query("select ip from ipaddr where ip='$val'",$db_id);
+				} elseif($option=='edit') {
+					$test=mybox_db_query("select ip from ipaddr where ip='$val' and name!='$_name'",$db_id);
+				}
+				if(mybox_db_num_rows($test)!=0) {
+					mybox_print_error("IP Address '$val' already exists");
+					@mybox_db_close($db_id);return;
+				}
+				if(!mybox_check_ipv4($val)) {
+					mybox_print_error("Invalid IP Address '$val'");
+					@mybox_db_close($db_id);return;
+				}
+				$_ip="$val";
+				$_sql .="ip='$val',";
+				unset($test);
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+nmask=(.*?)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				if(count($_CLASSIP)!=0) {
+					foreach($_CLASSIP as $_mmask) {
+						if($_mmask==$val) {
+							$_mask="$val";
+							$_sql .="nmask='$val',";
+						}
+					}
+				}
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+mtu=(\d+)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$_mtu="$val";$_sql .="mtu='$val',";
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+type=(EXT|DMZ|INT|ext|dmz|int)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$val=strtolower($val);
+				foreach($_ttype as $tl => $tt) {
+					$tt=strtolower($tt);
+					if($tt==$val) {
+						$_type="$tl";$_sql .="type='$tl',";
+					}
+				}
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+(up|down)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$val=strtolower($val);
+				foreach($_updown as $i => $b) {
+					$b=strtolower($b);
+					if($b=="$val") {
+						$_onboot=$i;
+						$_sql .="onboot='$i',";
+					}
+				}
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+note=\[(.*?)\]\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$_note=mybox_escape_str($val);
+				$_sql .="note='$_note',";
+				$ok++;
+			}
+		}
+		if($_note=='') {
+			if(preg_match("/\s+note=(.*?)\s+/",$buff,$mm)) {
+				$val=trim($mm[1]);
+				if($val!='') {
+					$_note=mybox_escape_str($val);
+					$_sql .="note='$_note',";
+					$ok++;
+				}
+			}
+		}
+		if($ok!=0 && $_name!='') {
+			if($option=='add' && $_dev!='') {
+				mybox_db_query("insert into ipaddr (name,dev,ip,mask,mtu,type,onboot,note) values ('$_name','$_dev','$_ip','$_mask','$_mtu','$_type','$_onboot','$_note')",$db_id);
+			} elseif($option=='edit') {
+				if($_sql!='') {
+					$_sql=trim($_sql,",");
+					mybox_db_query("update ipaddr set $_sql where name='$_name'",$db_id);
+				} else {
+					@mybox_db_close($db_id);mybox_do_exit(1);
+				}
+			}
+			@mybox_db_close($db_id);mybox_do_exit(0);
+		}
+		mybox_do_exit(1);
+	} elseif($option=='del') {
+		$line=trim($line);
+		if(preg_match("/^$cmd\s+$option\s+(.*)/",$line,$nn)) {
+			if($nn[1]!='') {
+				$nm=preg_split("/\s+/",$nn[1]);
+				if(count($nm)!=0) {
+					foreach($nm as $ln) {
+						$ln=strtoupper($ln);
+						mybox_db_query("delete from ipaddr where name='$ln'",$db_id);
+					}
+					@mybox_db_close($db_id);
+					mybox_do_exit(0);
+				}
+			}
+		}
+		mybox_do_exit(1);
+	} elseif($option=='print') {
+		list($cmd,$option,$start,$end)=preg_split("/\s+/",$line);
+		if($start=='') $start=0;
+		if($end=='') $end=50;
+		$_int=mybox_if_dev_up_array();
+		$_opr['0']="ERR";
+		$_opr['1']="OK";
+		$_cnt=1;$_tac=0;
+		$exit=0;
+		$result=mybox_db_query("select * from ipaddr limit $start, $end",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_id=$row['id'];
+				$_name=mybox_cunescape_str($row['name']);
+				$_dev=$row['dev'];
+				$_ip=$row['ip'];
+				$_mask=$row['mask'];
+				$_mtu=$row['mtu'];
+				$_type=$row['type'];
+				$_onboot=$row['onboot'];
+				$_note=mybox_cunescape_str($row['note']);
+				$_stat='';
+				$_oper=0;
+				if($_int[$_dev]==1) {
+					$_oper=1;
+				}
+				$_stat=$_updown[$_onboot];
+				if($_note!='') {
+					if(preg_match("/\s+/",$_note)) {
+						$_note="note=[$_note]";
+					} else { 
+						$_note="note=$_note";
+					}
+				}
+				$buff="name=$_name dev=$_dev ip=$_ip nmask=$_mask mtu=$_mtu type={$_ttype[$_type]} $_note $_stat [{$_opr[$_oper]}]";
+				$buff=preg_replace("/\s+/"," ",$buff);
+				echo "$buff\n";
+			}
+		} else {
+			$exit=2;
+		}
+		@mybox_db_close($db_id);
+		mybox_do_exit($exit);
+	} elseif($option=='reload') {
+		echo "%% Reloading configuration..\n";
+		mybox_exec_cmd("/service/init/network.init restart");
+		@mybox_db_close($db_id);
+		mybox_do_exit(0);
+	} 
+	@mybox_db_close($db_id);
+	mybox_do_exit(1);
+}
+
+function _cmd_vip($line) {
+	global $_DB_NAME, $_CLASSIP, $_sstat, $_updown;
+	$db_id=mybox_db_connect($_DB_NAME);
+
+	list($cmd,$option)=preg_split("/\s+/",$line);
+
+	if($option=='') mybox_do_exit(1);
+	if($option=='add' || $option=='edit') {
+		$ok=0;
+		$_pname='';$_ip='';$_mask='255.255.255.0';$_onboot='0';$_note='';
+		$_sql='';
+		$buff=" $line ";
+		if($option=='add') {
+			if(preg_match("/\s+parent=(.*?)\s+/",$buff,$mm)) {
+				$val=trim($mm[1]);
+				if($val!='') {
+					$val=mybox_escape_str($val);
+					$val=strtoupper($val);
+					$test=mybox_db_query("select dev from ipaddr where name='$val'",$db_id);
+					if(mybox_db_num_rows($test)==0) {
+						mybox_print_error("Parent Interface '$val' not exists");
+						@mybox_db_close($db_id);return;
+					} else {
+						$_pname=mybox_db_fetch_single($test);
+					}
+					unset($test);
+					$ok++;
+				}
+			}
+		} elseif($option=='edit') {
+			if(preg_match("/\s+name=(.*?)\s+/",$buff,$mm)) {
+				$val=trim($mm[1]);
+				if($val!='') {
+					$val=strtoupper($val);
+					list($_pname,$_pid)=preg_split("/:/",$val);
+					if($_pname=='' || ($_pid=='' || !preg_match("/\d+/",$_pid)) ) {
+						mybox_print_error("Virtual Interface '$val' not exists");
+						@mybox_db_close($db_id);return;
+					}
+					$test=mybox_db_query("select dev from ipaddr where name='$_pname'",$db_id);
+					if(mybox_db_num_rows($test)==0) {
+						mybox_print_error("Parent Interface '$val' not exists");
+						@mybox_db_close($db_id);return;
+					} else {
+						$_pname=mybox_db_fetch_single($test);
+					}
+					unset($test);
+					$ok++;
+				}
+			}
+		}
+		if(preg_match("/\s+ip=(.*?)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$test=mybox_db_query("select ip from ipalias where ip='$val'",$db_id);
+				if(mybox_db_num_rows($test)!=0) {
+					mybox_print_error("IP Address '$val' already exists");
+					@mybox_db_close($db_id);return;
+				}
+				if(!mybox_check_ipv4($val)) {
+					mybox_print_error("Invalid IP Address '$val'");
+					@mybox_db_close($db_id);return;
+				}
+				$_ip="$val";
+				$_sql .="ip='$_ip',";
+				unset($test);
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+nmask=(.*?)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				if(count($_CLASSIP)!=0) {
+					foreach($_CLASSIP as $_mmask) {
+						if($_mmask==$val) {
+							$_mask="$val";
+							$_sql .="nmask='$val',";
+						}
+					}
+				}
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+(up|down)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$val=strtolower($val);
+				foreach($_updown as $i => $b) {
+					$b=strtolower($b);
+					if($b=="$val") {
+						$_onboot=$i;
+						$_sql .="onboot='$i',";
+					}
+				}
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+note=\[(.*?)\]\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$_note=mybox_escape_str($val);
+				$_sql .="note='$_note',";
+				$ok++;
+			}
+		}
+		if($_note=='') {
+			if(preg_match("/\s+note=(.*?)\s+/",$buff,$mm)) {
+				$val=trim($mm[1]);
+				if($val!='') {
+					$_note=mybox_escape_str($val);
+					$_sql .="note='$_note',";
+					$ok++;
+				}
+			}
+		}
+		if($ok!=0 && $_pname!='' && $_ip!='') {
+			if($option=='add') {
+				$pid=0;
+				$test=mybox_db_query("select count(pid) from ipalias",$db_id);
+				if(mybox_db_num_rows($test)!=0) {
+					$pid=mybox_db_fetch_single($test);
+				}
+				if($pid=='') $pid=0;
+				mybox_db_query("insert into ipalias (pid,dev,ip,mask,onboot,note) values ('$pid','$_pname','$_ip','$_mask','$_onboot','$_note')",$db_id);
+			} elseif($option=='edit') {
+				if($_sql!='') {
+					$_sql=trim($_sql,",");
+					if($_pid!='') {
+						mybox_db_query("update ipalias set $_sql where pid='$_pid' and dev='$_pname'",$db_id);
+					} else {
+						@mybox_db_close($db_id);mybox_do_exit(1);
+					}
+				} else {
+					@mybox_db_close($db_id);mybox_do_exit(1);
+				}
+			}
+			@mybox_db_close($db_id);mybox_do_exit(0);
+		}
+		mybox_do_exit(1);
+	} elseif($option=='del') {
+		$line=trim($line);
+		if(preg_match("/^$cmd\s+$option\s+(.*)/",$line,$nn)) {
+			if($nn[1]!='') {
+				if($nn[1]=='all') {
+					mybox_db_query("delete from ipalias",$db_id);
+					@mybox_db_close($db_id);
+					mybox_do_exit(0);
+				} else {
+					$_dd=mybox_list_namedev($db_id);
+					$nm=preg_split("/\s+/",$nn[1]);
+					if(count($nm)!=0) {
+						foreach($nm as $ln) {
+							$ln=strtoupper($ln);
+							list($xname,$xpid)=preg_split("/:/",$ln);
+							$xdev=$_dd[$xname];
+							if($xpid!='' && $xdev!='') mybox_db_query("delete from ipalias where pid='$xpid' and dev='$xdev'",$db_id);
+						}
+						@mybox_db_flush($db_id);
+						$test=mybox_db_query("select id from ipalias",$db_id);
+						if(mybox_db_num_rows($test)!=0) {
+							$xid='1';$xpid='0';
+							while($row=mybox_db_fetch_assoc($test)) {
+								$_id=$row['id'];
+								mybox_db_query("update ipalias set id='$xid',pid='$xpid' where id='$_id'",$db_id);
+								$xid++;$xpid++;
+							}
+						}
+						@mybox_db_close($db_id);
+						mybox_do_exit(0);
+					}
+				}
+			}
+		}
+		mybox_do_exit(1);
+	} elseif($option=='print') {
+		list($cmd,$option,$start,$end)=preg_split("/\s+/",$line);
+		if($start=='') $start=0;
+		if($end=='') $end=50;
+		$_ddv=mybox_list_devname($db_id);
+		$_int=mybox_if_vip_up_array();
+		$_opr['0']="ERR";
+		$_opr['1']="OK";
+		$_cnt=1;$_tac=0;
+		$exit=0;
+		$result=mybox_db_query("select * from ipalias limit $start, $end",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_id=$row['id'];
+				$_pid=$row['pid'];
+				$_dev=$row['dev'];
+				$_pname="{$_ddv[$_dev]}:{$_pid}";
+				$_ip=$row['ip'];
+				$_mask=$row['mask'];
+				$_onboot=$row['onboot'];
+				$_note=mybox_cunescape_str($row['note']);
+				$_stat='';
+				$_oper=0;
+				if($_int[$_dev]==1) {
+					$_oper=1;
+				}
+				$_stat=$_updown[$_onboot];
+				if($_note!='') {
+					if(preg_match("/\s+/",$_note)) {
+						$_note="note=[$_note]";
+					} else { 
+						$_note="note=$_note";
+					}
+				}
+				$buff="name=$_pname ip=$_ip nmask=$_mask $_note $_stat [{$_opr[$_oper]}]";
+				$buff=preg_replace("/\s+/"," ",$buff);
+				echo "$buff\n";
+			}
+		} else {
+			$exit=2;
+		}
+		@mybox_db_close($db_id);
+		mybox_do_exit($exit);
+	} elseif($option=='reload') {
+		echo "%% Reloading configuration..\n";
+		mybox_exec_cmd("/service/init/network.init restart");
+		@mybox_db_close($db_id);
+		mybox_do_exit(0);
+	} 
+	@mybox_db_close($db_id);
+	mybox_do_exit(1);
+}
+
+function _cmd_vlan($line) {
+	global $_DB_NAME, $_CLASSIP, $_sstat, $_updown, $_vflag;
+	$db_id=mybox_db_connect($_DB_NAME);
+
+	list($cmd,$option)=preg_split("/\s+/",$line);
+
+	if($option=='') mybox_do_exit(1);
+	if($option=='add' || $option=='edit') {
+		$ok=0;
+		$_pname='';$_pid='';$_ip='';$_mask='255.255.255.0';$_mtu='1500';$_flag='0';$_onboot='0';$_note='';
+		$_sql='';
+		$buff=" $line ";
+		if($option=='add') {
+			if(preg_match("/\s+parent=(.*?)\s+/",$buff,$mm)) {
+				$val=trim($mm[1]);
+				if($val!='') {
+					$val=mybox_escape_str($val);
+					$val=strtoupper($val);
+					$test=mybox_db_query("select dev from ipaddr where name='$val'",$db_id);
+					if(mybox_db_num_rows($test)==0) {
+						mybox_print_error("Parent Interface '$val' not exists");
+						@mybox_db_close($db_id);return;
+					} else {
+						$_pname=mybox_db_fetch_single($test);
+					}
+					unset($test);
+					$ok++;
+				}
+			}
+		} elseif($option=='edit') {
+			if(preg_match("/\s+name=(.*?)\s+/",$buff,$mm)) {
+				$val=trim($mm[1]);
+				if($val!='') {
+					$val=strtoupper($val);
+					list($_pname,$_pid)=preg_split("/./",$val);
+					if($_pname=='' || ($_pid=='' || !preg_match("/\d+/",$_pid)) ) {
+						mybox_print_error("VLAN Interface '$val' not exists");
+						@mybox_db_close($db_id);return;
+					}
+					$test=mybox_db_query("select dev from ipaddr where name='$_pname'",$db_id);
+					if(mybox_db_num_rows($test)==0) {
+						mybox_print_error("Parent Interface '$val' not exists");
+						@mybox_db_close($db_id);return;
+					} else {
+						$_pname=mybox_db_fetch_single($test);
+					}
+					unset($test);
+					$ok++;
+				}
+			}
+		}
+		if(preg_match("/\s+vid=(\d+)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$test=mybox_db_query("select vid from vlan where vid='$val'",$db_id);
+				if(mybox_db_num_rows($test)!=0) {
+					mybox_print_error("VLAN Id '$val' already exists");
+					@mybox_db_close($db_id);return;
+				}
+				$_pid="$val";
+				$_sql .="vid='$val',";
+				unset($test);
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+ip=(.*?)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$test=mybox_db_query("select ip from ipalias where ip='$val'",$db_id);
+				if(mybox_db_num_rows($test)!=0) {
+					mybox_print_error("IP Address '$val' already exists");
+					@mybox_db_close($db_id);return;
+				}
+				if(!mybox_check_ipv4($val)) {
+					mybox_print_error("Invalid IP Address '$val'");
+					@mybox_db_close($db_id);return;
+				}
+				$_ip="$val";
+				$_sql .="ip='$_ip',";
+				unset($test);
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+nmask=(.*?)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				if(count($_CLASSIP)!=0) {
+					foreach($_CLASSIP as $_mmask) {
+						if($_mmask==$val) {
+							$_mask="$val";
+							$_sql .="nmask='$val',";
+						}
+					}
+				}
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+mtu=(\d+)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$_mtu="$val";$_sql .="mtu='$val',";
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+flag=(VLAN|ETHERNET|vlan|ethernet)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$val=strtolower($val);
+				foreach($_vflag as $tl => $tt) {
+					$tt=strtolower($tt);
+					if($tt==$val) {
+						$_flag="$tl";$_sql .="flag='$tl',";
+					}
+				}
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+(up|down)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$val=strtolower($val);
+				foreach($_updown as $i => $b) {
+					$b=strtolower($b);
+					if($b=="$val") {
+						$_onboot=$i;
+						$_sql .="onboot='$i',";
+					}
+				}
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+note=\[(.*?)\]\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$_note=mybox_escape_str($val);
+				$_sql .="note='$_note',";
+				$ok++;
+			}
+		}
+		if($_note=='') {
+			if(preg_match("/\s+note=(.*?)\s+/",$buff,$mm)) {
+				$val=trim($mm[1]);
+				if($val!='') {
+					$_note=mybox_escape_str($val);
+					$_sql .="note='$_note',";
+					$ok++;
+				}
+			}
+		}
+		if($ok!=0 && $_pname!='' && $_ip!='' && $_pid!='') {
+			if($option=='add') {
+				mybox_db_query("insert into vlan (vid,dev,ip,mask,flag,mtu,onboot,note) values ('$_pid','$_pname','$_ip','$_mask','$_flag','$_mtu','$_onboot','$_note')",$db_id);
+			} elseif($option=='edit') {
+				if($_sql!='') {
+					$_sql=trim($_sql,",");
+					if($_pid!='') {
+						mybox_db_query("update vlan set $_sql where vid='$_pid' and dev='$_pname'",$db_id);
+					} else {
+						@mybox_db_close($db_id);mybox_do_exit(1);
+					}
+				} else {
+					@mybox_db_close($db_id);mybox_do_exit(1);
+				}
+			}
+			@mybox_db_close($db_id);mybox_do_exit(0);
+		}
+		mybox_do_exit(1);
+	} elseif($option=='del') {
+		$line=trim($line);
+		if(preg_match("/^$cmd\s+$option\s+(.*)/",$line,$nn)) {
+			if($nn[1]!='') {
+				if($nn[1]=='all') {
+					mybox_db_query("delete from vlan",$db_id);
+					@mybox_db_close($db_id);
+					mybox_do_exit(0);
+				} else {
+					$_dd=mybox_list_namedev($db_id);
+					$nm=preg_split("/\s+/",$nn[1]);
+					if(count($nm)!=0) {
+						foreach($nm as $ln) {
+							$ln=strtoupper($ln);
+							list($xname,$xpid)=preg_split("/\./",$ln);
+							$xdev=$_dd[$xname];
+							if($xpid!='' && $xdev!='') mybox_db_query("delete from vlan where vid='$xpid' and dev='$xdev'",$db_id);
+						}
+						@mybox_db_close($db_id);
+						mybox_do_exit(0);
+					}
+				}
+			}
+		}
+		mybox_do_exit(1);
+	} elseif($option=='print') {
+		list($cmd,$option,$start,$end)=preg_split("/\s+/",$line);
+		if($start=='') $start=0;
+		if($end=='') $end=50;
+		$_ddv=mybox_list_devname($db_id);
+		$_int=mybox_if_vlan_up_array();
+		$_opr['0']="ERR";
+		$_opr['1']="OK";
+		$_cnt=1;$_tac=0;
+		$exit=0;
+		$result=mybox_db_query("select * from vlan limit $start, $end",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_id=$row['id'];
+				$_pid=$row['vid'];
+				$_dev=$row['dev'];
+				$_pname="{$_ddv[$_dev]}.{$_pid}";
+				$_ip=$row['ip'];
+				$_mask=$row['mask'];
+				$_flag=$_vflag[$row['flag']];
+				$_mtu=$row['mtu'];
+				$_onboot=$row['onboot'];
+				$_note=mybox_cunescape_str($row['note']);
+				$_stat='';
+				$_oper=0;
+				if($_int[$_dev]==1) {
+					$_oper=1;
+				}
+				$_stat=$_updown[$_onboot];
+				if($_note!='') {
+					if(preg_match("/\s+/",$_note)) {
+						$_note="note=[$_note]";
+					} else { 
+						$_note="note=$_note";
+					}
+				}
+				$buff="name=$_pname ip=$_ip nmask=$_mask flag=$_flag mtu=$_mtu $_note $_stat [{$_opr[$_oper]}]";
+				$buff=preg_replace("/\s+/"," ",$buff);
+				echo "$buff\n";
+			}
+		} else {
+			$exit=2;
+		}
+		@mybox_db_close($db_id);
+		mybox_do_exit($exit);
+	} elseif($option=='reload') {
+		echo "%% Reloading configuration..\n";
+		mybox_exec_cmd("/service/init/network.init restart");
+		@mybox_db_close($db_id);
+		mybox_do_exit(0);
+	} 
+	@mybox_db_close($db_id);
+	mybox_do_exit(1);
+}
+
+function _cmd_acl($line) {
+	global $_DB_NAME, $_sstat, $_enab, $_enab1;
+	$db_id=mybox_db_connect($_DB_NAME);
+
+	list($cmd,$option)=preg_split("/\s+/",$line);
+
+	if($option=='') mybox_do_exit(1);
+
+	if($option=='add' || $option=='edit') {
+		$ok=0;
+		$_ip='';$_https=0;$_ssh=0;$_stat='0';$_ftp='0';$_note='';
+		$_sql='';
+		$buff=" $line ";
+		if(preg_match("/\s+ip=(.*?)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$test=mybox_db_query("select ip from accesslist where ip='$val'",$db_id);
+				if($option=='add') {
+					if(mybox_db_num_rows($test)!=0) {
+						mybox_print_error("IP Address '$val' already exists");
+						@mybox_db_close($db_id);return;
+					}
+				} elseif($option=='edit') {
+					if(mybox_db_num_rows($test)==0) {
+						mybox_print_error("IP Address '$val' not exists");
+						@mybox_db_close($db_id);return;
+					}
+				}
+				if(!mybox_check_ipv4($val)) {
+					mybox_print_error("Invalid IP Address '$val'");
+					@mybox_db_close($db_id);return;
+				}
+				$_ip="$val";
+				unset($test);
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+https=(on|off|On|Off|ON|OFF)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$val=strtolower($val);
+				foreach($_sstat as $i => $b) {
+					$b=strtolower($b);
+					if($b=="$val") {
+						$_https=$i;
+						$_sql .="https='$i',";
+					}
+					
+				}
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+ssh=(on|off|On|Off|ON|OFF)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$val=strtolower($val);
+				foreach($_sstat as $i => $b) {
+					$b=strtolower($b);
+					if($b=="$val") {
+						$_ssh=$i;
+						$_sql .="ssh='$i',";
+					}
+					
+				}
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+ftp=(on|off|On|Off|ON|OFF)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$val=strtolower($val);
+				foreach($_sstat as $i => $b) {
+					$b=strtolower($b);
+					if($b=="$val") {
+						$_ftp=$i;
+						$_sql .="ftp='$i',";
+					}
+					
+				}
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+all=(on|off|On|Off|ON|OFF)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$val=strtolower($val);
+				foreach($_sstat as $i => $b) {
+					$b=strtolower($b);
+					if($b=="$val") {
+						$_https=$i;$_ssh=$i;$_ftp=$i;
+						$_sql .="https='$i,ssh='$i',ftp='$i',";
+					}
+				}
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+(enable|disable)\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$val=strtolower($val);
+				foreach($_enab1 as $i => $b) {
+					$b=strtolower($b);
+					if($b=="$val") {
+						$_stat=$i;
+						$_sql .="stat='$i',";
+					}
+				}
+				$ok++;
+			}
+		}
+		if(preg_match("/\s+note=\[(.*?)\]\s+/",$buff,$mm)) {
+			$val=trim($mm[1]);
+			if($val!='') {
+				$_note=mybox_escape_str($val);
+				$_sql .="note='$_note',";
+				$ok++;
+			}
+		}
+		if($_note=='') {
+			if(preg_match("/\s+note=(.*?)\s+/",$buff,$mm)) {
+				$val=trim($mm[1]);
+				if($val!='') {
+					$_note=mybox_escape_str($val);
+					$_sql .="note='$_note',";
+					$ok++;
+				}
+			}
+		}
+		if($ok!=0 && $_ip!='') {
+			if($option=='add') {
+				mybox_db_query("insert into accesslist (ip,ssh,https,ftp,stat,note) values ('$_ip','$_ssh','$_https','$_ftp','$_stat','$_note')",$db_id);
+			} elseif($option=='edit' && $_sql!='') {
+				$_sql=trim($_sql,",");
+				mybox_db_query("update accesslist set $_sql where ip='$_ip'",$db_id);
+			} else {
+				@mybox_db_close($db_id);mybox_do_exit(1);
+			}
+			@mybox_db_close($db_id);
+		} else {
+			mybox_do_exit(1);
+		}
+		mybox_do_exit(0);
+	} elseif($option=='print') {
+		$exit=0;
+		$result=mybox_db_query("select * from accesslist",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_id=$row['id'];
+				$_ip=$row['ip'];
+				$_ssh=$row['ssh'];
+				$_https=$row['https'];
+				$_ftp=$row['ftp'];
+				$_stat=$row['stat'];
+				$_note=mybox_cunescape_str($row['note']);
+				$_stat=$_enab[$_stat];
+				$_https=$_sstat[$_https];
+				$_ftp=$_sstat[$_ftp];
+				$_ssh=$_sstat[$_ssh];
+				if($_note!='') {
+					if(preg_match("/\s+/",$_note)) {
+						$_note="note=[$_note]";
+					} else { 
+						$_note="note=$_note";
+					}
+				}
+				$buff="ip=$_ip https=$_https ssh=$_ssh ftp=$_ftp $_note $_stat";
+				$buff=preg_replace("/\s+/"," ",$buff);
+				if($buff!='') echo "$buff\n";
+			}
+		} else {
+			$exit=2;
+		}
+
+		@mybox_db_close($db_id);
+		mybox_do_exit($exit);
+	} elseif($option=='passwd') {
+		$ok=0;
+		$ptype='';
+
+		$buff=" $line ";
+		if(preg_match("/\s+type=(admin|look|console|ssh|ftp)\s+passwd=(.*?)\s+/",$buff,$mm)) {
+			$ptype=trim($mm[1]);
+			$pass=trim($mm[2]);
+			if($ptype!='' && $pass!='') {
+				$ptype=strtolower($ptype);
+				$_ssh_pass='';
+				$_ssh_pass2=crypt($pass,$pass);
+
+				$result=mybox_db_query("select pass from service_ssh",$db_id);
+				if(mybox_db_num_rows($result)!=0) {
+					$_ssh_pass=mybox_db_fetch_single($result);
+				}
+
+				$_ftp_pass='';
+				$_ftp_pass2=crypt($pass,$pass);
+
+				$result=mybox_db_query("select pass from service_ftp",$db_id);
+				if(mybox_db_num_rows($result)!=0) {
+					$_ftp_pass=mybox_db_fetch_single($result);
+				}
+
+				if($ptype=='admin') {
+					$result=mybox_db_query("select * from auth_login where pass=md5('$pass') and name!='admin'",$db_id);
+					if(mybox_db_num_rows($result)==0 && ($_ssh_pass!=$_ssh_pass2) && ($_ftp_pass!=$_ftp_pass2)) {
+						mybox_db_query("update auth_login set pass=md5('$pass') where name='admin'",$db_id);$ok++;
+					}		
+				}
+				if($ptype=='look') {
+					$result=mybox_db_query("select * from auth_login where pass=md5('$pass') and name!='look'",$db_id);
+					if(mybox_db_num_rows($result)==0 && ($_ssh_pass!=$_ssh_pass2) && ($_ftp_pass!=$_ftp_pass2)) {
+						mybox_db_query("update auth_login set pass=md5('$pass') where name='look'",$db_id);$ok++;
+					}
+				}
+				if($ptype=='console') {
+					$result=mybox_db_query("select * from auth_login where pass=md5('$pass') and name!='console'",$db_id);
+					if(mybox_db_num_rows($result)==0 && ($_ssh_pass!=$_ssh_pass2) && ($_ftp_pass!=$_ftp_pass2)) {
+						mybox_db_query("update auth_login set pass=md5('$pass') where name='console'",$db_id);$ok++;
+					}
+				}
+				if($ptype=='ssh') {
+					$result=mybox_db_query("select pass from auth_login where pass=md5('$pass')",$db_id);
+					if(mybox_db_num_rows($result)==0 && ($_ftp_pass!=$_ftp_pass2)) {
+						mybox_db_query("update service_ssh set pass=php('crypt','$pass','$pass')",$db_id);$ok++;
+						mybox_echo_query("ssh-passwd");
+					}
+				}
+				if($ptype=='ftp') {
+					$result=mybox_db_query("select pass from auth_login where pass=md5('$pass')",$db_id);
+					if(mybox_db_num_rows($result)==0 && ($_ssh_pass!=$_ssh_pass2)) {
+						mybox_db_query("update service_ftp set pass=php('crypt','$pass','$pass')",$db_id);$ok++;
+						mybox_echo_query("ftp-passwd");
+					}
+				}
+				if($ok!=0) {
+					@mybox_db_close($db_id);mybox_do_exit(0);
+				} else {
+					mybox_print_error("Password already used!.");
+					@mybox_db_close($db_id);mybox_do_exit(0);
+				}
+			} else {
+				@mybox_db_close($db_id);
+				mybox_do_exit(1);
+			}
+		} 
+		mybox_do_exit(1);
+	} elseif($option=='del') {
+		$line=trim($line);
+		if(preg_match("/^$cmd\s+$option\s+(.*)/",$line,$nn)) {
+			if($nn[1]!='') {
+				$nm=preg_split("/\s+/",$nn[1]);
+				$d=0;
+				if(count($nm)!=0) {
+					foreach($nm as $ln) {
+						if(mybox_check_ipv4($ln)) {
+							mybox_db_query("delete from accesslist where ip='$ln'",$db_id);
+							$d++;
+						}
+					}
+					@mybox_db_close($db_id);
+					if($d!=0) {
+						mybox_do_exit(0);
+					}
+					mybox_do_exit(1);
+				}
+			}
+		}
+		mybox_do_exit(1);
+		return;
+	} elseif($option=='reload') {
+		echo "%% Reloading configuration..\n";
+		mybox_exec_cmd("/service/init/policy.init acl_reload quiet");
+		@mybox_db_close($db_id);
+		mybox_do_exit(0);
+	}
+	@mybox_db_close($db_id);
+	mybox_do_exit(1);
+}
+
+function _cmd_session($line) {
+	list($cmd,$option,$pid)=preg_split("/\s+/",$line);
+	if($option=='') mybox_do_exit(1);
+	if($option=="print") {
+		mybox_session_print();
+		mybox_do_exit(0);
+	} elseif($option=="kill") {
+		if($pid!='') {
+			mybox_session_kill($pid);
+			mybox_do_exit(0);
+		}
+	}
+	mybox_do_exit(1);
+}
+
+function cmd_processor($line) {
+	list($cmd,$option)=preg_split("/\s+/",$line);
+        switch(strtolower($cmd)) {
+                case 'ipaddr': 
+			_cmd_ipaddr($line);
+			break;
+                case 'vip': 
+			_cmd_vip($line);
+			break;
+                case 'vlan': 
+			_cmd_vlan($line);
+			break;
+                case 'acl': 
+			_cmd_acl($line);
+			break;
+                case 'session': 
+			_cmd_session($line);
+			break;
+		default: break;
+        }
+	return $ret;
+}
+if(isset($_SERVER["argv"][1]) && $_SERVER["argv"][1]!='') {
+	$buff=trim($_SERVER["argv"][1]);
+	cmd_processor($buff);
+}
+mybox_do_exit(0);
+?>

@@ -1,0 +1,3 @@
+/usr/include/bits/typesizes.h
+//#define __FD_SETSIZE            1024
+#define __FD_SETSIZE            32768

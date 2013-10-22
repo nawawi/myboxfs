@@ -1,0 +1,453 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+chk_session();
+
+$_SYSID="diag_logread";
+
+if(!isset($grep)||$grep=='') $grep=0;
+if(!isset($str)||$str=='') $str='';
+if(!isset($sort)||$sort=='') $sort=1;
+
+$_sortimg[1]=$_PNG['desc'];
+$_sortimg[2]=$_PNG['asc'];
+
+if(isset($sort)&&$sort==1) $sort2=2;
+if(isset($sort)&&$sort==2) $sort2=1;
+
+$logfile=$fo;
+
+// counting
+$currentPage = $HTTP_SERVER_VARS["PHP_SELF"];
+$maxRows_Recordset=50;
+if(!isset($pageNum_Recordset)||$pageNum_Recordset=='') $pageNum_Recordset=0;
+$startRow_Recordset=@($pageNum_Recordset * $maxRows_Recordset);
+if($startRow_Recordset < 0) $startRow_Recordset=0;
+$row_Recordset=array();
+
+if($grep==1 && $str!='') {
+	$fo=trim($fo,',');
+	$flist=preg_split("/,/",$fo);
+	unset($fo);
+	if(count($flist)!=0) {
+		foreach($flist as $fo) {
+			if(file_exists("$_LOG_PATH/$fo")) {
+				$line2=file2array("$_LOG_PATH/$fo");
+				foreach($line2 as $tt) {
+					$tt=trim($tt);
+					if($tt!='') $line[]="$tt";
+				}
+				unset($line2);
+			}
+		}
+		if(count($line)!=0) {
+			$line2=array();
+			if($sort==1) {
+				$t=count($line)-1;
+				foreach($line as $ln) {
+					$line2[$t]=$ln;
+					$t--;
+				}
+			} else {
+				$line2=$line;
+			}
+			$i=0;
+			for($x=$startRow_Recordset;$x < count($line);$x++) {
+				$buff=$line2[$x];
+				$buff=trim($buff);
+				if($buff!='' && $i !=$maxRows_Recordset) {
+					if(stristr($buff,$str)) {
+						array_push($row_Recordset,$buff);
+						$i++;
+					}
+				}
+			}
+		}
+	}
+} else {
+	if(file_exists("$_LOG_PATH/$fo")) {
+		$line=file2array("$_LOG_PATH/$fo");
+		if(count($line)!=0) {
+			if($sort==1) {
+				$t=count($line)-1;
+				foreach($line as $ln) {
+					$line2[$t]=$ln;
+					$t--;
+				}
+			} else {
+				$line2=$line;
+			}
+			$i=0;
+			for($x=$startRow_Recordset;$x < count($line);$x++) {
+				$buff=$line2[$x];
+				$buff=trim($buff);
+				if($buff!='' && $i!=$maxRows_Recordset) {
+					array_push($row_Recordset,$buff);
+					$i++;
+				}
+			}
+		}
+	}
+}
+if(isset($totalRows_Recordset)&&$totalRows_Recordset!='') {
+	$totalRows_Recordset=$totalRows_Recordset;
+} else {
+	$totalRows_Recordset=count($line);
+}
+
+$totalPages_Recordset=@ceil($totalRows_Recordset/$maxRows_Recordset)-1;
+$queryString_Recordset=null;
+if(!empty($_SERVER['QUERY_STRING'])) {
+	$params=explode("&", $_SERVER['QUERY_STRING']);
+  	$newParams=array();
+  	foreach ($params as $param) {
+		if(stristr($param, "pageNum_Recordset")==true) continue;
+		if(stristr($param, "totalRows_Recordset")==true) continue;
+		if(stristr($param, "maxRows_Recordset")==true) continue;
+		if(stristr($param, "fo")==true) continue;
+		if(stristr($param, "grep")==true) continue;
+		if(stristr($param, "str")==true) continue;
+		if(stristr($param, "sort")==true) continue;
+		array_push($newParams, $param);
+  	}
+  	if(count($newParams) != 0) {
+    		$queryString_Recordset="&" . implode("&", $newParams);
+  	}
+}
+
+$queryString_Recordset=sprintf("&totalRows_Recordset=%d%s&fo=%s&grep=%d&str=%s&sort=%d", 
+	$totalRows_Recordset, 
+	$queryString_Recordset,
+	$logfile,$grep,$str,$sort2);
+
+if($pageNum_Recordset > 0) { 
+	$pagefirst=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, 0, $queryString_Recordset);
+	$pageprev=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, max(0, $pageNum_Recordset - 1), $queryString_Recordset);
+	$button1="<a href='$pagefirst'>{$_PNG['first']}</a>\n";
+	$button2="<a href='$pageprev'>{$_PNG['prev']}</a>\n";
+} else {
+	$button1="{$_PNG['first']}\n";
+	$button2="{$_PNG['prev']}\n";
+}
+if($pageNum_Recordset < $totalPages_Recordset) {
+	$pagenext=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, min($totalPages_Recordset, $pageNum_Recordset + 1), $queryString_Recordset);
+	$pagelast=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, $totalPages_Recordset, $queryString_Recordset);
+	$button3="<a href='$pagenext'>{$_PNG['next']}</a>\n";
+	$button4="<a href='$pagelast'>{$_PNG['last']}</a>\n";
+} else {
+	$button3="{$_PNG['next']}\n";
+	$button4="{$_PNG['last']}\n";
+}
+unset($pagefirst,$pageprev,$pagenext,$pagelast);
+unset($x,$buff,$line,$line2);
+?>
+
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<meta http-equiv=refresh content='300'; url='<?echo "$_URL_PATH/diag_logread.exh?fo=$logfile&sort=$sort2&grep=$grep&str=$str";?>'>
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script language="javascript">
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+</script>
+</head>
+<body scroll=auto>
+<table border=0 cellpadding=0 cellspacing=0 width="98%" align="center">
+<tr><td>
+<table class="data" width="100%"> 
+<?if(strstr($fo,"firewall-")) {?>
+<thead class="blue">
+<tr>
+<td widht=2% style='font-weight: bold; table-layout: fixed;' onclick="self.location.href='<?echo "$_URL_PATH/diag_logread.exh?fo=$logfile&sort=$sort2&grep=$grep&str=$str";?>';">&nbsp;<?echo $_sortimg[$sort];?>Date</td>
+<td style='font-weight: bold; table-layout: fixed;'>Protocol</td>
+<td style='font-weight: bold; table-layout: fixed;'>Source</td>
+<td style='font-weight: bold; table-layout: fixed;'>Port</td>
+<td style='font-weight: bold; table-layout: fixed;'>Destination</td>
+<td style='font-weight: bold; table-layout: fixed;'>Port</td>
+<td style='font-weight: bold; table-layout: fixed;'>Direction</td>
+<td style='font-weight: bold; table-layout: fixed;'>Action</td>
+<td style='font-weight: bold; table-layout: fixed;'>Description</td></tr>
+</thead>
+<tbody>
+<?
+$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff;cursor: hand;'";
+if(count($row_Recordset)>0) {
+	foreach($row_Recordset as $line) {
+		$line=trim($line);
+		if(preg_match("/^\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]\s+PROTO=([^>]+)\s+TYPE=([^>]+)\s+ACTION=([^>]+)\s+DESCRIPTION=([^>]+)\s+SRC=([^>]+)\s+SRC_PORT=([^>]+)\s+DST=([^>]+)\s+DST_PORT=([^>]+)\s+MAC=(\S+)/",$line,$mm)) {
+			$time="{$mm[2]}/{$mm[1]}/{$mm[3]} {$mm[4]}:{$mm[5]}:{$mm[6]}";
+			$date=date('l d-M-Y h:i:s A',strtotime($time));
+			$mac='';$src='';$dst='';$src_po='';$dst_po='';$proto='';
+			$desc='';$action='';
+			$proto=trim($mm[7]);
+			$type=trim($mm[8]);
+			$action=trim($mm[9]);
+			$desc=trim($mm[10]);
+			$src=trim($mm[11]);
+			$src_po=trim($mm[12]);
+			$dst=trim($mm[13]);
+			$dst_po=trim($mm[14]);
+			$mac=trim($mm[15]);
+
+			if($src=='') $src='any';
+			if($srcp=='') $srcp='any';
+			if($dst=='') $dst='any';
+			if($dstp=='') $dstp='any';
+			if($action=='PASS') $action='<font color=green>PASS</font>';
+			if($action=='DROP') $action='<font color=red>DROP</font>';
+			echo "<tr $lt>";
+			echo "<td style='table-layout: fixed; width: 225px;'>$date</td>";
+			echo "<td style='table-layout: fixed;'>$proto</td>";
+			echo "<td style='table-layout: fixed;'>$src</td>";
+			echo "<td style='table-layout: fixed;'>$srcp</td>";
+			echo "<td style='table-layout: fixed;'>$dst</td>";
+			echo "<td style='table-layout: fixed;'>$dstp</td>";
+			echo "<td style='table-layout: fixed;'>$type</td>";
+			echo "<td style='table-layout: fixed;'>$action</td>";
+			echo "<td style='table-layout: fixed;'>$desc</td></tr>";
+		}
+		unset($time,$date,$line,$date,$proto,$src,$srcp,$dst,$dstp,$type,$action,$desc);
+	}
+	
+}
+
+} elseif(strstr($fo,"ips-")) {?>
+<thead class="blue">
+<tr>
+<td widht=2% style='font-weight: bold; table-layout: fixed;' onclick="self.location.href='<?echo "$_URL_PATH/diag_logread.exh?fo=$logfile&sort=$sort2&grep=$grep&str=$str";?>';">&nbsp;<?echo $_sortimg[$sort];?>Date</td>
+<td style='font-weight: bold; table-layout: fixed;'>Source</td>
+<td style='font-weight: bold; table-layout: fixed;'>Destination</td>
+<td style='font-weight: bold; table-layout: fixed;'>Signature</td>
+<td style='font-weight: bold; table-layout: fixed;'>Description</td>
+<td style='font-weight: bold; table-layout: fixed;'>Action</td></tr>
+</thead>
+<tbody>
+<?
+$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff;cursor: hand;'";
+if(count($row_Recordset)>0) {
+	foreach($row_Recordset as $line) {
+		$line=trim($line);
+		if(preg_match("/\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]\s+SRC=(\S+)\s+DST=(\S+)\s+SIG=(\S+)\s+MSG=([^>]+)\s+ACTION=(\S+)/",$line,$mm)) {
+			$time="{$mm[2]}/{$mm[1]}/{$mm[3]} {$mm[4]}:{$mm[5]}:{$mm[6]}";
+			$date=date('l d-M-Y h:i:s A',strtotime($time));
+			$src=$mm[7];
+			$dst=$mm[8];
+			$sig=$mm[9];
+			$msg=trim($mm[10]);
+			$action=$mm[11];
+			if($action=='PASS') $action='<font color=green>PASS</font>';
+			if($action=='DROP') $action='<font color=red>DROP</font>';
+			echo "<tr $lt>";
+			echo "<td style='table-layout: fixed; width: 225px;'>$date</td>";
+			echo "<td style='table-layout: fixed;'>$src</td>";
+			echo "<td style='table-layout: fixed;'>$dst</td>";
+			echo "<td style='table-layout: fixed;'>$sig</td>";
+			echo "<td style='table-layout: fixed;'>$msg</td>";
+			echo "<td style='table-layout: fixed;'>$action</td></tr>";
+			unset($date,$src,$dst,$sig,$action,$msg);
+		}
+		unset($time,$date);
+	}
+}
+
+} elseif(strstr($fo,"portscan-")) {?>
+<thead class="blue">
+<tr>
+<td widht=2% style='font-weight: bold; table-layout: fixed;' onclick="self.location.href='<?echo "$_URL_PATH/diag_logread.exh?fo=$logfile&sort=$sort2&grep=$grep&str=$str";?>';">&nbsp;<?echo $_sortimg[$sort];?>Date</td>
+<td style='font-weight: bold; table-layout: fixed;'>Source</td>
+<td style='font-weight: bold; table-layout: fixed;'>Destination</td>
+<td style='font-weight: bold; table-layout: fixed;'>Message</td></tr>
+</thead>
+<tbody>
+<?
+$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff;cursor: hand;'";
+if(count($row_Recordset)>0) {
+	foreach($row_Recordset as $line) {
+		$line=trim($line);
+		if(preg_match("/\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]\s+SRC=(\S+)\s+DST=(\S+)\s+MSG=(.*)/",$line,$mm)) {
+			$time="{$mm[2]}/{$mm[1]}/{$mm[3]} {$mm[4]}:{$mm[5]}:{$mm[6]}";
+			$date=date('l d-M-Y h:i:s A',strtotime($time));
+			$src=$mm[7];
+			$dst=$mm[8];
+			$msg=trim($mm[9]);
+			echo "<tr $lt>";
+			echo "<td style='table-layout: fixed; width: 225px;'>$date</td>";
+			echo "<td style='table-layout: fixed;'>$src</td>";
+			echo "<td style='table-layout: fixed;'>$dst</td>";
+			echo "<td style='table-layout: fixed;'>$msg</td></tr>";
+		}
+		unset($time,$date);
+	}
+}
+
+} elseif(strstr($fo,"auth-")) {?>
+<thead class="blue">
+<tr>
+<td widht=2% style='font-weight: bold; table-layout: fixed;' onclick="self.location.href='<?echo "$_URL_PATH/diag_logread.exh?fo=$logfile&sort=$sort2&grep=$grep&str=$str";?>';">&nbsp;<?echo $_sortimg[$sort];?>Date</td>
+<td style='font-weight: bold; table-layout: fixed;'>Type</td>
+<td style='font-weight: bold; table-layout: fixed;'>User</td>
+<td style='font-weight: bold; table-layout: fixed;'>From</td>
+<td style='font-weight: bold; table-layout: fixed;'>Message</td></tr>
+</thead>
+<tbody>
+<?
+$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff;cursor: hand;'";
+if(count($row_Recordset)>0) {
+	foreach($row_Recordset as $line) {
+		$line=trim($line);
+		if(preg_match("/\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]\s+TYPE=(\S+)\s+USER=(\S+)\s+IP=(\S+)\s+MSG=(.*)/",$line,$mm)) {
+			$time="{$mm[2]}/{$mm[1]}/{$mm[3]} {$mm[4]}:{$mm[5]}:{$mm[6]}";
+			$date=date('l d-M-Y h:i:s A',strtotime($time));
+			$type=$mm[7];
+			$user=$mm[8];
+			$ip=$mm[9];
+			$msg=trim($mm[10]);
+			echo "<tr $lt>";
+			echo "<td style='table-layout: fixed; width: 225px;'>$date</td>";
+			echo "<td style='table-layout: fixed;'>$type</td>";
+			echo "<td style='table-layout: fixed;'>$user</td>";
+			echo "<td style='table-layout: fixed;'>$ip</td>";
+			echo "<td style='table-layout: fixed;'>$msg</td></tr>";
+		}
+		unset($time,$date);
+	}
+}
+
+} elseif(strstr($fo,"httpsd-")) {?>
+<thead class="blue">
+<tr>
+<td widht=2% style='font-weight: bold; table-layout: fixed;' onclick="self.location.href='<?echo "$_URL_PATH/diag_logread.exh?fo=$logfile&sort=$sort2&grep=$grep&str=$str";?>';">&nbsp;<?echo $_sortimg[$sort];?>Date</td>
+<td style='font-weight: bold; table-layout: fixed;'>From</td>
+<td style='font-weight: bold; table-layout: fixed;'>Action</td>
+<td style='font-weight: bold; table-layout: fixed;'>Status</td>
+<td style='font-weight: bold; table-layout: fixed;'>Referrer</td>
+<td style='font-weight: bold; table-layout: fixed;'>Browser</td></tr>
+</thead>
+<tbody>
+<?
+$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff;cursor: hand;'";
+if(count($row_Recordset)>0) {
+	foreach($row_Recordset as $line) {
+		$line=trim($line);
+		if(preg_match("/\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]\s+FROM=(\S+)\s+ACTION=([^>]+)\s+STATUS=([^>]+)\s+REFERRER=([^>]+)\s+BROWSER=(.*)/",$line,$mm)) {
+			$time="{$mm[2]}/{$mm[1]}/{$mm[3]} {$mm[4]}:{$mm[5]}:{$mm[6]}";
+			$date=date('l d-M-Y h:i:s A',strtotime($time));
+			$from=trim($mm[7]);
+			$action=trim($mm[8]);
+			$status=trim($mm[9]);
+			$referrer=trim($mm[10]);
+			$browser=trim($mm[11]);
+			echo "<tr $lt>";
+			echo "<td style='table-layout: fixed; width: 225px;'>$date</td>";
+			echo "<td style='table-layout: fixed;'>$from</td>";
+			echo "<td style='table-layout: fixed;'>$action</td>";
+			echo "<td style='table-layout: fixed;'>$status</td>";
+			echo "<td style='table-layout: fixed;'>$referrer</td>";
+			echo "<td style='table-layout: fixed;'>$browser</td></tr>";
+		}
+		unset($time,$date);
+	}
+}
+
+} elseif(strstr($fo,"audit-")) {?>
+<thead class="blue">
+<tr>
+<td widht=2% style='font-weight: bold; table-layout: fixed;' onclick="self.location.href='<?echo "$_URL_PATH/diag_logread.exh?fo=$logfile&sort=$sort2&grep=$grep&str=$str";?>';">&nbsp;<?echo $_sortimg[$sort];?>Date</td>
+<td style='font-weight: bold; table-layout: fixed;'>Type</td>
+<td style='font-weight: bold; table-layout: fixed;'>User</td>
+<td style='font-weight: bold; table-layout: fixed;'>Messages</td>
+</thead>
+<tbody>
+<?
+$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff;cursor: hand;'";
+if(count($row_Recordset)>0) {
+	foreach($row_Recordset as $line) {
+		$line=trim($line);
+		if(preg_match("/\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]\s+TYPE=(\S+)\s+WHO=(\S+)\s+MSG=(.*)/",$line,$mm)) {
+			$time="{$mm[2]}/{$mm[1]}/{$mm[3]} {$mm[4]}:{$mm[5]}:{$mm[6]}";
+			$date=date('l d-M-Y h:i:s A',strtotime($time));
+			$type=$mm[7];
+			$who=$mm[8];
+			$msg=$mm[9];
+			echo "<tr $lt>";
+			echo "<td style='table-layout: fixed; width: 225px;'>$date</td>";
+			echo "<td style='table-layout: fixed;'>$type</td>";
+			echo "<td style='table-layout: fixed;'>$who</td>";
+			echo "<td style='table-layout: fixed;'>$msg</td></tr>";
+			unset($type,$who,$msg);
+		}
+		unset($time,$date);
+	}
+}
+
+} else {?>
+<thead class="blue">
+<tr>
+<td widht=2% style='font-weight: bold; table-layout: fixed;' onclick="self.location.href='<?echo "$_URL_PATH/diag_logread.exh?fo=$logfile&sort=$sort2&grep=$grep&str=$str";?>';">&nbsp;<?echo $_sortimg[$sort];?>Date</td>
+<td style='font-weight: bold; table-layout: fixed;'>Messages</td></tr>
+</thead>
+<tbody>
+<?
+$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff;cursor: hand;'";
+if(count($row_Recordset)>0) {
+	foreach($row_Recordset as $line) {
+		$line=trim($line);
+		if(preg_match("/\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]\s+(.*)/",$line,$mm)) {
+			$time="{$mm[2]}/{$mm[1]}/{$mm[3]} {$mm[4]}:{$mm[5]}:{$mm[6]}";
+			$date=date('l d-M-Y h:i:s A',strtotime($time));
+			$text=str_add_break($mm[7],100);
+			echo "<tr $lt><td style='table-layout: fixed; width: 225px;'>$date</td>";
+			echo "<td style='table-layout: fixed;'>$text</td></tr>";
+		}
+	}
+}
+} ?>
+</tbody>
+</table>
+<? if($totalRows_Recordset > $maxRows_Recordset) { ?>
+<script language="javascript">
+	function do_next() {
+		val=document.e.donum.value;
+		location.href='<?echo $currentPage;?>?pageNum_Recordset='+ val +'<?echo $queryString_Recordset;?>';
+	}
+</script>
+<table width="100%" class="data" style='background: #ffffff;'>
+<tbody>
+<tr><form name=e method=get action='<?echo $currentPage;?>'>
+<td valign=middle align=left style='text-align: left; border: 0px;'>
+<?echo "$button1$button2";?>
+</td>
+<?
+	$cur_page=$pageNum_Recordset + 1;
+	$last_page=abs($totalPages_Recordset + 1);
+	$cur_page=abs($cur_page);
+	if($last_page==0) $last_page=1;
+	if(strlen($last_page)==1) $last_page="0$last_page";
+	echo "<td valign=midlle align=center style='text-align: center; border: 0px;'>Page ";
+	echo "<select name=donum size=1 class=valbox onchange='do_next();'>";
+	for($x=0;$x<$totalPages_Recordset+1;$x++){
+		$y=$x + 1;
+		$p=str_repeat('0',strlen($last_page)-strlen($y)).$y;
+		if($x==$pageNum_Recordset) {
+			echo "<option value='$x' selected>$p</option>";
+		} else {
+			echo "<option value='$x'>$p</option>";
+		}
+	}
+	echo "</select> of $last_page Pages</td>";
+?>
+<td valign=middle align=right style='text-align: right; border: 0px;'>
+<?echo "$button3$button4";?>
+</td>
+</tr></form>
+</tbody>
+</table>
+<? } ?>
+</td></tr></table>
+</body>
+</html>
+<?flush();?>

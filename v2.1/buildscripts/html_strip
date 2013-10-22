@@ -1,0 +1,15 @@
+<?
+$fi=fopen("php://stdin","r");
+$tok=0;
+while($buff=fgets($fi,1024)) {
+	if(strstr($buff,"<html>")) $tok=1;
+	if(strstr($buff,"</html>")) $tok=0;
+	if($tok==1) {
+		$buff=preg_replace("/\n|\r|\t/", "",$buff);		
+		$buff=preg_replace("/echo <<<_END_/", "\necho <<<_END_\n",$buff);		
+		$buff=preg_replace("/_END_;/", "\n_END_;\n",$buff);		
+	}
+	echo "$buff";
+}
+fclose($fi);
+?>

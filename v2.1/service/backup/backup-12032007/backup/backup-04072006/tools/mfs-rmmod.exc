@@ -1,0 +1,35 @@
+#!/bin/php -f
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once("clib.exl");
+putenv("PATH=/bin:/service/tools:/service/init");
+
+if(file_exists("/proc/modules")) {
+	$_nic=array();
+	if(file_exists("/lib/modules/drivers.txt")) {
+		$buff=file("/lib/modules/drivers.txt");
+		if(count($buff)!=0) {
+			foreach($buff as $line) {
+				$line=trim($line);
+				if(!strstr($line,"kernel/drivers/net")) continue;
+				$line=basename($line);
+				$line=basename($line,".ko");
+				$_nic[$line]=1;
+			}
+		}
+	}
+	unset($buff,$line);
+	$buff=file("/proc/modules");
+	if(count($buff)!=0) {
+		foreach($buff as $line) {
+			$line=trim($line);
+			list($mods,$p1,$p2,$tmp)=preg_split("/\s+/",$line);
+			if($p2!=0) continue;
+			if($_nic[$mods]==1) continue;
+			exec_cmd("modprobe --remove $mods");
+		}
+	}
+	unset($buff,$line);
+}
+
+?>

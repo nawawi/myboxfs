@@ -1,0 +1,200 @@
+#!/bin/php -Cq
+<?
+// shaper.init - last update 30-Jun-2006
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+putenv("PATH=/bin:/service/tools:/service/init");
+
+$_QUIET=0;
+
+if(!file_exists("/bin/q_show") || !file_exists("/bin/q_parser") || !file_exists("/bin/q_checkcfg") || !file_exists("/bin/tc")) {
+	echo "! tc or htb tools binary not found or cannot execute\n";
+	slog("tc or htb tools binary not found or cannot execute");
+	exit(1);
+}
+
+function shaper_chk_config($dev) {
+	return shell_exec("/bin/q_checkcfg $dev 1000000 1000000 /etc/htb/$dev.conf 1>/dev/null 2>&1");
+}
+
+function shaper_config() {
+	global $_DB_NAME, $_PORT_ARRAY, $_QUIET;
+	$db_id=db_connect($_DB_NAME);
+	$list_array=list_devname($db_id);
+	$list_devname=name2dev_array($db_id);
+	$list_cnf=array();
+	if(!is_dir("/etc/htb")) mkdirr("/etc/htb");
+	if(count($list_array)!=0) {
+		foreach($list_array as $dev => $_name) {
+			$result=db_query("select * from htb_class where dev='$dev' and stat='1';",$db_id);
+			if(db_num_rows($result)!=0) {
+				@unlink("/etc/htb/$dev.conf");
+				$fi=fopen("/etc/htb/$dev.conf","a");
+				if(!$fi) continue;
+				$list_cnf[]="$dev";
+				while($row=db_fetch_array_assoc($result)) {
+					$_cname=$row['cname'];
+					$_bandwidth=$row['bandwidth'];
+					$_climit=$row['climit'];
+					$_burst=$row['burst'];
+					$_priority=$row['priority'];
+					fwrite($fi,"class $_cname {\n");
+					fwrite($fi,"\tbandwidth $_bandwidth;\n");
+					fwrite($fi,"\tlimit $_climit;\n");
+					fwrite($fi,"\tburst $_burst;\n");
+					fwrite($fi,"\tpriority $_priority;\n");
+					$result2=db_query("select * from htb_client where cname='$_cname' and stat='1';",$db_id);
+					if(db_num_rows($result2)!=0) {
+						while($row2=db_fetch_array_assoc($result2)) {
+							$_cid=$row2['id'];
+							$_cbandwidth=$row2['bandwidth'];
+							$_cclimit=$row2['climit'];
+							$_cburst=$row2['burst'];
+							$_cpriority=$row2['priority'];
+							$_cmark=$row2['mark'];
+							$_csrc=trim($row2['src']);
+							$_csrcp=trim($row2['srcp']);
+							$_cdst=trim($row2['dst']);
+							$_cdstp=trim($row2['dstp']);
+							fwrite($fi,"\tclient client_$_cid {\n");
+							fwrite($fi,"\t\tbandwidth $_bandwidth;\n");
+							fwrite($fi,"\t\tlimit $_climit;\n");
+							fwrite($fi,"\t\tburst $_cburst;\n");
+							fwrite($fi,"\t\tpriority $_priority;\n");
+							if($_cmark!=0 || $_cmark!='') fwrite($fi,"\t\tmark $_cmark;\n");
+							if($_csrc!='any') {
+								$_srcl=preg_split("/\s+/",$_csrc);
+								if(count($_srcl)!=0) {
+									fwrite($fi,"\t\t\tsrc {\n");
+										foreach($_srcl as $src) {
+											if($list_devname[$src]!='') $src=$list_devname[$src];
+											if($_csrcp!='') {
+												if($_PORT_ARRAY[$_csrcp]!='') $_csrcp=$_PORT_ARRAY[$_csrcp];
+												$src="$src $_csrcp";
+											}
+											fwrite($fi,"\t\t\t\t$src;\n");	
+										}
+									fwrite($fi,"\t\t\t};\n");
+								}
+							}
+							if($_cdst!='any') {
+								$_dstl=preg_split("/\s+/",$_cdst);
+								if(count($_dstl)!=0) {
+									fwrite($fi,"\t\t\tdst {\n");
+										foreach($_dstl as $dst) {
+											if($list_devname[$dst]!='') $dst=$list_devname[$dst];
+											if($_dstpp!='') {
+												if($_PORT_ARRAY[$_cdstp]!='') $_cdstp=$_PORT_ARRAY[$_cdstp];
+												$dst="$dst $_cdstp";
+											}
+											fwrite($fi,"\t\t\t\t$dst;\n");	
+										}
+									fwrite($fi,"\t\t\t};\n");
+								}
+							}
+							fwrite($fi,"\t};\n");
+							unset($_srcl,$_dstl,$src,$dst);
+						}
+					}
+					fwrite($fi,"};\n");
+				} // class
+				fwrite($fi,"class default { bandwidth 8; };\n");
+				fclose($fi);
+			} // if db
+			
+			unset($result,$dev,$_cname);
+		}
+
+	}
+	db_close($db_id);
+	@unlink("/etc/htb/shaper.qos");@touch("/etc/htb/shaper.qos");
+	if(count($list_cnf)!=0) {
+		foreach($list_cnf as $dev) {
+			if(file_exists("/etc/htb/$dev.conf")) {
+				if(shaper_chk_config($dev)==0) {
+					shell_exec("/bin/q_parser $dev 1000000 1000000 /etc/htb/$dev.conf |grep -v '^Error' | sed -e 's/^[ ]*echo/#echo/g' -e 's/\$TC/echo/g' > /tmp/$dev-qos && sh /tmp/$dev-qos >> /etc/htb/shaper.qos && rm -f /tmp/$dev-qos");
+				}
+			}
+		}
+	}
+	if($_QUIET==0) {
+		echo "* Writing Shaper config..\n";
+		slog("Writing Shaper config");
+	}
+	return 0;
+}
+
+function shaper_start() {
+	global $_QUIET;
+	shaper_config();
+	if(file_exists("/etc/htb/shaper.qos")) {
+		if(exec_cmd("/bin/tc -b /etc/htb/shaper.qos")==0) {
+			if($_QUIET==0) {
+				echo "* Starting network shaper\n";
+				slog("Starting network shaper");
+			}
+			return 0;
+		}
+	}
+	if($_QUIET==0) {
+		echo "* Starting network shaper failed\n";
+		slog("Starting network shaper failed");
+	}
+	return 1;
+}
+
+function shaper_stop() {
+	global $_DB_NAME, $_QUIET;
+	$db_id=db_connect($_DB_NAME);
+	$list_array=list_devname($db_id);
+	if(count($list_array)!=0) {
+		foreach($list_array as $dev => $_name) {
+			exec_cmd("/bin/tc qdisc del dev $dev root");
+			exec_cmd("/bin/tc qdisc del dev $dev ingress");
+		}
+	}
+	emptydir("/etc/htb");
+	db_close($db_id);
+	if($_QUIET==0) {
+		echo "* Stopping network shaper\n";
+		slog("Stopping network shaper");
+	}
+	return 0;
+}
+
+function shaper_status($dev) {
+	system("q_show --interface $dev --file /etc/htb/$dev.conf -1");
+	return 0;
+}
+
+$_app=basename($_SERVER["argv"][0]);
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=shaper_start();
+		break;
+	case 'stop':
+		$ret=shaper_stop();
+		break;
+	case 'restart':
+		$ret=shaper_stop();
+		sleep(1);
+		$ret=shaper_start();
+		break;
+	case 'status':
+		if($_SERVER["argv"][2]!='') {
+			shaper_status($_SERVER["argv"][2]);
+		}
+		$ret=0;
+		break;
+	case 'config':
+		$ret=shaper_config();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/config/status <dev>]\n";
+		break;
+}
+
+flush();
+exit($ret);
+?>

@@ -1,0 +1,28 @@
+# /etc/profile
+# Mybox wide environment and startup programs
+# for login setup
+
+ulimit -S -c 0 > /dev/null 2>&1
+ulimit -n 64000 > /dev/null 2>&1
+umask 077
+
+grepn() { echo ${1%%$2*};}
+grepv() { echo ${1##*$2};}
+
+read_cmdline() {
+        read p < /proc/cmdline
+        for f in $p; do
+                local name=$(grepn $f =) value=$(grepv $f =)
+		unset $name
+	done
+}
+unset p
+unset f
+unset OLDPWD
+export HOME=/config
+export USER=mfs
+export SHELL=/bin/sh
+export PATH=/bin:/service/tools:/service/init
+export INPUTRC=/etc/inputrc
+export PS1="\\h:\\W> "
+cd $HOME

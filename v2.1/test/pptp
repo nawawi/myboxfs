@@ -1,0 +1,15 @@
+<?
+function get_pptp_localip($dev) {
+	return exec("ifconfig |tr -d '\n' |grep $dev |awk '{print $7}' |sed -e 's/addr://g'");
+}
+function get_pptp_extip($dev) {
+	$buff=exec("last | grep ppp | grep still |sed -e 's/still logged in//g'");
+	if($buff!='') {
+		if(preg_match("/(\S+)\s+(\S+)\s+(\S+)\s+(.*)/",$buff,$match)) {
+			$user=$match[1];
+			$tty=$match[2];
+			$ip=$match[3];
+			$time=$match[4];
+		}
+	}
+}
