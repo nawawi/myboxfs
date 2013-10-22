@@ -1,0 +1,2 @@
+make clean
+./configure --prefix=/usr --disable-nsl --build=i686-mybox-linux --host=i686-mybox-linux --enable-shared=no --enable-static=yes

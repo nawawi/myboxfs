@@ -1,0 +1,68 @@
+update /var/www/html/cacti-0.8.6c/rra/localhostsnmp_load_5min_450.rrd --template load_5min 1112167202:0.72
+update /var/www/html/cacti-0.8.6c/rra/localhostsnmp_load_15min_449.rrd --template load_15min 1112167202:0.61
+update /var/www/html/cacti-0.8.6c/rra/localhostsnmp_load_1min_448.rrd --template load_1min 1112167202:1.03
+
+/usr/bin/rrdtool create \
+/var/www/html/cacti-0.8.6c/rra/localhostsnmp_load_1min_448.rrd \
+--step 300  \
+DS:load_1min:GAUGE:600:0:500 \
+RRA:AVERAGE:0.5:1:600 \
+RRA:AVERAGE:0.5:6:700 \
+RRA:AVERAGE:0.5:24:775 \
+RRA:AVERAGE:0.5:288:797 \
+RRA:MAX:0.5:1:600 \
+RRA:MAX:0.5:6:700 \
+RRA:MAX:0.5:24:775 \
+RRA:MAX:0.5:288:797 \
+
+/usr/bin/rrdtool create \
+/var/www/html/cacti-0.8.6c/rra/localhostsnmp_load_15min_449.rrd \
+--step 300  \
+DS:load_15min:GAUGE:600:0:500 \
+RRA:AVERAGE:0.5:1:600 \
+RRA:AVERAGE:0.5:6:700 \
+RRA:AVERAGE:0.5:24:775 \
+RRA:AVERAGE:0.5:288:797 \
+RRA:MAX:0.5:1:600 \
+RRA:MAX:0.5:6:700 \
+RRA:MAX:0.5:24:775 \
+RRA:MAX:0.5:288:797 \
+
+/usr/bin/rrdtool create \
+/var/www/html/cacti-0.8.6c/rra/localhostsnmp_load_5min_450.rrd \
+--step 300  \
+DS:load_5min:GAUGE:600:0:500 \
+RRA:AVERAGE:0.5:1:600 \
+RRA:AVERAGE:0.5:6:700 \
+RRA:AVERAGE:0.5:24:775 \
+RRA:AVERAGE:0.5:288:797 \
+RRA:MAX:0.5:1:600 \
+RRA:MAX:0.5:6:700 \
+RRA:MAX:0.5:24:775 \
+RRA:MAX:0.5:288:797 \
+
+
+/usr/bin/rrdtool graph - \
+--imgformat=PNG \
+--start=-86400 \
+--end=-300 \
+--title="localhost-snmp - Load Average" \
+--rigid \
+--base=1000 \
+--height=120 \
+--width=500 \
+--alt-autoscale-max \
+--lower-limit=0 \
+--units-exponent=0 \
+--vertical-label="processes in the run queue" \
+DEF:a="/var/www/html/cacti-0.8.6c/rra/localhostsnmp_load_1min_448.rrd":load_1min:AVERAGE \
+DEF:b="/var/www/html/cacti-0.8.6c/rra/localhostsnmp_load_5min_450.rrd":load_5min:AVERAGE \
+DEF:c="/var/www/html/cacti-0.8.6c/rra/localhostsnmp_load_15min_449.rrd":load_15min:AVERAGE \
+CDEF:cdefg=TIME,1112176483,GT,a,a,UN,0,a,IF,IF,TIME,1112176483,GT,b,b,UN,0,b,IF,IF,TIME,1112176483,GT,c,c,UN,0,c,IF,IF,+,+ \
+AREA:a#EACC00:"1 Minute Average"  \
+GPRINT:a:LAST:" Current\:%8.2lf\n"  \
+STACK:b#EA8F00:"5 Minute Average"  \
+GPRINT:b:LAST:" Current\:%8.2lf\n"  \
+STACK:c#FF0000:"15 Minute Average"  \
+GPRINT:c:LAST:"Current\:%8.2lf\n"  \
+LINE1:cdefg#000000:"Total" 

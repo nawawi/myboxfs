@@ -1,0 +1,49 @@
+#!/bin/bash -e
+
+START=$(pwd)
+SRC_DIR=/usr/src/iptables
+KERNEL_SRC=/usr/src/linux
+KERNEL_BASE=$START/kernel_base
+IPP2P_SRC=/usr/src/ipp2p
+
+#IPVS_SRC=/usr/src/ipvsadm
+
+if [ ! -d "$SRC_DIR" ]; then
+	echo "$SRC_DIR not exist"
+	exit;
+fi
+
+if [ ! -d "$KERNEL_SRC" ]; then
+	echo "$KERNEL_SRC not exist"
+	exit;
+fi
+rm -rf /tmp/iptables
+mkdir -p $KERNEL_BASE
+cd $SRC_DIR
+make clean
+make DO_IPV6=0 KERNEL_DIR=$KERNEL_SRC BINDIR=/bin LIBDIR=/lib MANDIR=/tmp/iptables
+make DO_IPV6=0 BINDIR=/tmp/iptables/bin LIBDIR=/tmp/iptables/lib MANDIR=/tmp/iptables install
+echo
+echo "################ IPP2P MAKE START ################"
+cd $IPP2P_SRC
+make clean
+make KERNEL_SRC=$KERNEL_SRC IPTABLES_SRC=$SRC_DIR
+cp -v $IPP2P_SRC/libipt_ipp2p.so /tmp/iptables/lib/iptables
+echo "################ IPP2P MAKE END ################"
+echo
+sleep 2
+cd $START
+#rm -rfv /tmp/iptables/man* /tmp/iptables/bin/iptables-restore
+rm -rfv /tmp/iptables/man*
+cd /tmp/iptables
+strip -v /tmp/iptables/bin/*
+upx-kernel /tmp/iptables/bin/*
+sleep 1
+tar -jcvf iptables.bz2 bin lib |sort
+mv -v iptables.bz2 $KERNEL_BASE
+#cd $IPVS_SRC
+#make clean
+#make
+#cp -v ipvsadm $KERNEL_BASE/bin
+#strip -v $KERNEL_BASE/bin/ipvsadm
+#upx-kernel -9 $KERNEL_BASE/bin/ipvsadm

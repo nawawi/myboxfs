@@ -1,0 +1,520 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.so');
+chk_session();
+
+write_nocache();
+$_SYSID="network_route";
+
+$db_id=db_connect($_DB_NAME);
+
+if(chk_pri($_LOGIN['auth_id'],1)==1) {
+	if($tab==1) {
+		if(isset($do_id)&&$do_id=='apply_chg') {
+			echo_query("network-restart");
+			$msg="<script>waitcount();</script>";
+		}
+		if(isset($do_save)&&$do_save==1) {
+			if($wan_stat=='') $wan_stat=0;
+			if($wan_stat!='') $wan_stat=1;
+			if($lo_stat=='') $lo_stat=0;
+			if($lo_stat!='') $lo_stat=1;
+			if($fa_stat=='') $fa_stat=0;
+			if($fa_stat!='') $fa_stat=1;
+			$wan_note=escape_str($wan_note);
+			$lo_note=escape_str($lo_note);
+			$fa_note=escape_str($fa_note);
+			if($wan_ip!='') {
+				db_query("update gateway set ip='$wan_ip',stat='$wan_stat',note='$wan_note' where id='0'",$db_id);
+			}
+			if($lo_ip!='' && mfs_license('ILB')==1) {
+				$lo_dev=get_gw_devname($db_id,$lo_ip);
+				if($lo_dev!='NULL') {
+					db_query("update gateway set dev='$lo_dev' where id='1'",$db_id);
+				}
+				db_query("update gateway set ip='$lo_ip',stat='$lo_stat',note='$lo_note' where id='1'",$db_id);
+			}
+			if($fa_ip!='' && mfs_license('IFS')==1) {
+				$fa_dev=get_gw_devname($db_id,$fa_ip);
+				if($lo_dev!='NULL') {
+					db_query("update gateway set dev='$fa_dev' where id='2'",$db_id);
+				}
+				db_query("update gateway set ip='$fa_ip',stat='$fa_stat',note='$fa_note' where id='2'",$db_id);
+			}
+			if(mfs_license('IFS')==1) {
+				$fa_link=trim($fa_link);
+				$list=preg_split('/\s+/',$fa_link);
+				if(count($list)!=0) {
+					foreach($list as $ip) {
+						if(preg_match("/^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\:(tcp|udp)\/(\d+)$/",$ip)) {
+							$fa_link1 .="$ip ";
+						}
+					}
+				} else {
+					if(preg_match("/^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\:(tcp|udp)\/(\d+)$/",$fa_link)) {
+						$fa_link1="$fa_link";
+					}
+				}
+				$fa_link=trim($fa_link1);
+				if($fa_timeout!='') db_query("update misc set val='$fa_timeout' where name='fa_timeout'",$db_id);
+				if($fa_idle!='') db_query("update misc set val='$fa_idle' where name='fa_idle'",$db_id);
+				if($fa_switch!='') db_query("update misc set val='$fa_switch' where name='fa_switch'",$db_id);
+				if($fa_link!='') db_query("update misc set val='$fa_link' where name='fa_link'",$db_id);
+			}	
+			$msg="Setting updated!.";
+		}
+	}
+	if($tab==2 && mfs_license('ADR')==1) {
+		if(isset($do_id)&&$do_id=='apply_chg') {
+			echo_query("network-restart");
+			$msg="<script>waitcount();</script>";
+		}
+		if(isset($do_save)&&$do_save==1) {
+			if(count($id)!=0) {
+				$x=0;
+				db_query("delete from route",$db_id);
+				foreach($id as $_pid => $_rest) {
+					$_ip=$ip[$_pid];
+					$_mask=$mask[$_pid];
+					$_stat=$stat[$_pid];
+					$_gateway=$gateway[$_pid];
+					$_note=escape_str($note[$_pid]);
+					if($_ip=='' || $_gateway=='') continue;
+					if($_mask=='') {
+						$_m=ipcalc($_ip);
+						$_mask=$_m['netmask'];
+					}
+					if($_stat!='') $_stat='1';
+					if($_stat=='') $_stat='0';
+					db_query("insert into route (id,ip,mask,gateway,note,stat) values ('$x','$_ip','$_mask','$_gateway','$_note','$_stat')",$db_id);
+					$x++;
+				}
+			}
+		}
+		if(isset($do_save)&&$do_save==2) {
+			if(count($del)!=0) {
+				foreach($del as $id) {
+					if($id!='') db_query("delete from route where id='$id'",$db_id);
+				}
+			}
+		}
+		if(isset($do_id)&&$do_id==del) {
+			if($id!='') db_query("delete from route where id='$id'",$db_id);
+		}
+	}
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied!.";
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script language="javascript" src="<?echo $_URL_PATH;?>/j/strings.js"></script>
+<script language="javascript">
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+</script>
+<script language="javascript">
+	function dotoggle() {
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					document.f.elements[i].checked = !(document.f.elements[i].checked);
+    				}	
+			}
+  		}
+	}
+	function do_submit() {
+		document.f.btsubmit.disabled=true;
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	}
+	function chkdel() {
+		var x='0';
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					if(document.f.elements[i].checked) x++;
+    				}	
+			}
+  		}
+		if(x==0) return false;
+		return true;
+	}
+	function do_delete() {
+		if(chkdel()!=false) {
+			if(confirm('Are you sure you want to proceed?')) {
+				document.f.do_save.value='2';
+				document.f.submit();
+			}
+		}
+	}
+
+var k=0;
+function waitcount() { 
+ 	k=k+2;
+	if(k <= 100) {
+    		msg.innerHTML='Reloading.. Please wait..'+k+'%'; 
+    		setTimeout(waitcount,200);  
+	} else {
+		self.location.href='<?echo "$_URL_PATH/network_route.html?tab=$tab&col=$col&col2=$col2";?>';
+	}
+}
+
+</script>
+</head>
+<body scroll=auto>
+<form name=f method=post action="<?echo "$_URL_PATH/network_route.html";?>" onsubmit="return do_submit();">
+<table border="0" cellpadding="4" cellspacing="4" width="700" align=center>
+<tr>
+<td align=center>
+
+<!-- main -->
+<fieldset>
+<legend>&nbsp;&nbsp;&nbsp;&nbsp;
+NETWORK: ROUTING
+&nbsp;&nbsp;&nbsp;&nbsp;</legend>
+
+<table valign=top border=0>
+<tr>
+<td>
+<table border=0 cellpadding="2" cellspacing="2">
+<tr>
+<td align=center valign=middle>
+
+<table width="650" border="0" cellpadding="0" cellspacing="0">
+<tr><td>
+<ul id="tabnav">
+<li class="<?if($tab==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=1) { echo "<a href=\"$_URL_PATH/network_route.html?tab=1\">"; }?>Gateway<?if($tab!=1) { echo "</a>"; }?></li>
+<?if(mfs_license('ADR')==1){?>
+<li class="<?if($tab==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=2) { echo "<a href=\"$_URL_PATH/network_route.html?tab=2\">"; }?>Static routes<?if($tab!=2) { echo "</a>"; }?></li>
+<? } ?>
+</ul>
+</td></tr>
+<tr> 
+<td class="tabcont">
+
+<?if($tab==1) {?>
+<script language="javascript">
+function chk_fa() {
+	if(document.f.fa_stat.checked==true) {
+		document.f.fa_timeout.disabled=false;
+		document.f.fa_idle.disabled=false;
+		document.f.fa_switch.disabled=false;
+		document.f.fa_link.disabled=false;
+	} else {
+		document.f.fa_timeout.disabled=true;
+		document.f.fa_idle.disabled=true;
+		document.f.fa_switch.disabled=true;
+		document.f.fa_link.disabled=true;
+	}
+}
+function chk_lo() {
+	if(document.f.lo_stat.checked==true) {
+		document.f.fa_timeout.disabled=true;
+		document.f.fa_idle.disabled=true;
+		document.f.fa_switch.disabled=true;
+		document.f.fa_link.disabled=true;
+		document.f.fa_stat.disabled=true;
+	} else {
+		document.f.fa_stat.disabled=false;
+		if(document.f.fa_stat.checked==true) {
+			document.f.fa_timeout.disabled=false;
+			document.f.fa_idle.disabled=false;
+			document.f.fa_switch.disabled=false;
+			document.f.fa_link.disabled=false;
+		} else {
+			document.f.fa_timeout.disabled=true;
+			document.f.fa_idle.disabled=true;
+			document.f.fa_switch.disabled=true;
+			document.f.fa_link.disabled=true;
+		}
+	}
+}
+
+</script>
+
+<?if($msg!='') {?>
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span id=msg class=notice><?echo "$msg";?></span></td></tr>
+</table><br>
+<? }?>
+<table width="600" border=0 cellpadding="2" cellspacing="2" class=tablist>
+      <tr class=bgcolor3>
+        <td class=tdlistop>Role</td>
+        <td class=tdlistop>Device</td>
+	<td class=tdlistop>IP Address</td>
+	<td class=tdlistop>Active</td>
+        <td class=tdlistop>Description</td>
+      </tr>
+<?
+$_gw=array();
+$result=db_query("select * from gateway",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_id=$row['id'];
+		$_dev=$row['dev'];
+		$_ip=$row['ip'];
+		$_note=unescape_str($row['note']);
+		$_stat=$row['stat'];
+		if($_id==0) {
+			$_wan_ip=$_ip;
+			$_wan_stat=$_stat;
+			$_wan_dev=$_dev;
+			if($_wan_stat==1) $_wan_stat1='checked';
+			$_wan_note=$_note;
+		}
+		if($_id==1) {
+			$_lo_ip=$_ip;
+			$_lo_stat=$_stat;
+			$_lo_dev=$_dev;
+			if($_lo_stat==1) $_lo_stat1='checked';
+			$_lo_note=$_note;
+		}
+		if($_id==2) {
+			$_fa_ip=$_ip;
+			$_fa_stat=$_stat;
+			$_fa_dev=$_dev;
+			if($_fa_stat==1) $_fa_stat1='checked';
+			$_fa_note=$_note;
+		}
+	}
+}
+$result=db_query("select * from misc where name like \"fa_%\" ",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_name=$row['name'];
+		$_val=$row['val'];
+		if($_name=='fa_timeout') $_fa_timeout=$_val;
+		if($_name=='fa_idle') $_fa_idle=$_val;
+		if($_name=='fa_switch') $_fa_switch=$_val;
+		if($_name=='fa_link') $_fa_link=trim($_val);
+	}
+}
+
+echo "
+<tr>
+<td class=tdlist>Primary</td>
+<td class=tdlist>WAN</td>
+<td class=tdlist><input type=text name=wan_ip value='$_wan_ip' size=25 class='textbox'></td>
+<td class=tdlist><input type=checkbox name=wan_stat $_wan_stat1></td>
+<td class=tdlist><input type=text name=wan_note value='$_wan_note' size=20 class='textbox'></td>
+</tr>";
+?>
+<?if(mfs_license('ILB')==1) {?>
+<tr>
+<td class=tdlist>WAN Load Balancing</td>
+<td class=tdlist><?echo $_lo_dev;?></td>
+<?echo "
+<td class=tdlist><input type=text name=lo_ip value='$_lo_ip' size=25 class='textbox'></td>
+<td class=tdlist><input type=checkbox name=lo_stat $_lo_stat1 onclick='chk_lo();'></td>
+<td class=tdlist><input type=text name=lo_note value='$_lo_note' size=20 class='textbox'></td>
+</tr>";?>
+</tr>
+<? } //if ILB==1 ?>
+<?if(mfs_license('IFS')==1) {?>
+<tr>
+<td class=tdlist>Internet Failover</td>
+<td class=tdlist><?echo $_fa_dev;?></td>
+<?echo "
+<td class=tdlist><input type=text name=fa_ip value='$_fa_ip' size=25 class='textbox'></td>
+<td class=tdlist><input type=checkbox name=fa_stat $_fa_stat1 onclick='chk_fa();'></td>
+<td class=tdlist><input type=text name=fa_note value='$_fa_note' size=20 class='textbox'></td>
+</tr>";?>
+
+<tr class=bgcolor3>
+<td class=tdlistop colspan=5>Link Failover Setting</td>
+</tr>
+<tr>
+<td class=tdlist colspan=5 align=center valign=middle>
+<br>
+<table width="90%" border="0" cellpadding="6" cellspacing="0">
+<tr> 
+<td width="30%" valign="middle" class="tdcelltop">Link Timeout</td>
+<td width="70%" valign="middle" class="mtabletop"> 
+<input name="fa_timeout" type="text" class="textbox" size="10" value="<?echo $_fa_timeout;?>"> second(s) connection timeout
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Link Idle check</td>
+<td width="70%" valign="middle" class="mtable"> <input name="fa_idle" type="text" class="textbox" size="10" value="<?echo $_fa_idle;?>"> second(s) idle before next process
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Link switch check</td>
+<td width="70%" valign="middle" class="mtable"> <input name="fa_switch" type="text" class="textbox" size="10" value="<?echo $_fa_idle;?>"> minutes(s) to reroute primary gateway
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="top" class="tdcell">Link to check</td>
+<td width="70%" valign="top" class="mtable">
+
+<table border=0 cellpadding=1 cellspacing=1>
+<tr><td valign=top> 
+<textarea name="fa_link" class="textbox" cols=30 rows=3>
+<?
+$list=preg_split('/\s+/',$_fa_link);
+if(count($list)!=0) {
+	foreach($list as $ip) {
+		if($ip!='') echo "$ip ";
+	}
+} else {
+	if($_fa_link!='') echo "$_fa_link";
+}	
+?>
+</textarea></td>
+<td valign=middle>Each link separate by space and only valid with format ip:protocol/port.<br>eg; 192.168.0.1:tcp/80
+</td></tr></table>
+<script>chk_fa();chk_lo();</script>
+</td>
+</tr>
+</table>
+</br>
+</td>
+</tr>
+<? } //if IFS==1 ?>
+
+<tr><td align=right valign=top colspan=5>
+<input name=btapply type="button" value="Apply changes" class="button-small" onclick="self.location.href='<?echo $_URL_PATH;?>/network_route.html?tab=1&do_id=apply_chg';document.f.btapply.disabled=true;"><input name=btsubmit type="submit" value="Save" class="button-small"><input name=btadd type="button" value="<?if($do_id=="show_stat") { echo "Hide config";} else { echo "Show config"; }?>" class="button-small" onclick="self.location.href='<?echo $_URL_PATH;?>/network_route.html?tab=1&do_id=<?if($do_id!="show_stat") echo "show_stat";?>'"></td></tr>
+</table>
+<?if($do_id=="show_stat") {?>
+<br>
+<table width="600" border=0 cellpadding="2" cellspacing="2">
+<tr>
+<td>
+<pre>
+<?
+$ph=popen("ip route show table main","r" );
+while($line=fgets($ph)) echo htmlspecialchars($line);
+pclose($ph);
+$ph=popen("ip route show table 200","r" );
+while($line=fgets($ph)) echo htmlspecialchars($line);
+pclose($ph);
+$ph=popen("ip route show table 201","r" );
+while($line=fgets($ph)) echo htmlspecialchars($line);
+pclose($ph);
+$ph=popen("ip route show table 222","r" );
+while($line=fgets($ph)) echo htmlspecialchars($line);
+pclose($ph);
+?>
+</pre>
+</td></tr></table>
+<? } // do_id==show_stat ?>
+<? } // tab==1 ?>
+
+<?if($tab==2 && mfs_license('ADR')==1) {?>
+
+<?if($msg!='') {?>
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span id=msg class=notice><?echo "$msg";?></span></td></tr>
+</table><br>
+<? }?>
+<table width="600" border=0 cellpadding="2" cellspacing="2" class=tablist>
+      <tr class=bgcolor3>
+        <td class=tdlistop>#</td>
+        <td class=tdlistop>Netaddress</td>
+	<td class=tdlistop>Netmask</td>
+	<td class=tdlistop>Gateway</td>
+	<td class=tdlistop>Active</td>
+        <td class=tdlistop>Description</td>
+        <td class=tdlistop>Opt</td>
+      </tr>
+<?
+
+$result=db_query("select * from route",$db_id);
+$x=1;
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_id=$row['id'];
+		$_ip=$row['ip'];
+		$_mask=$row['mask'];
+		$_gateway=$row['gateway'];
+		$_note=unescape_str($row['note']);
+		$_stat=$row['stat'];
+		$_stat1='';
+		if($_stat==1) $_stat1='checked';
+
+	echo "
+      <tr>
+        <td class=tdlist><input type=hidden name=id[$_id] value='id'>$x</td>
+        <td class=tdlist><input type=text name=ip[$_id] value='$_ip' size=20 class='textbox'></td>
+        <td class=tdlist><input type=text name=mask[$_id] value='$_mask' size=20 class='textbox'></td>
+        <td class=tdlist><input type=text name=gateway[$_id] value='$_gateway' size=20 class='textbox'></td>
+        <td class=tdlist align=center><input type=checkbox name=stat[$_id] $_stat1></td>
+        <td class=tdlist><input type=text name=note[$_id] value='$_note' size=25 class='textbox'></td>
+        <td class=tdlist valign=middile><a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='$_URL_PATH/network_route.html?tab=1&do_id=del&id=$_id';\">{$_PNG['delete']}</a><input type=checkbox name=del[$_id] value=$_id></td>
+      </tr>";
+	$x++;
+	}	
+}
+if(isset($do_id)&&$do_id=='add_new' && chk_pri($_LOGIN['auth_id'],1)==1) {
+	echo "
+      <tr>
+        <td class=tdlist><input type=hidden name=id[new] value='id'>$x</td>
+        <td class=tdlist><input type=text name=ip[new] value='' size=20 class='textbox'></td>
+        <td class=tdlist><input type=text name=mask[new] value='' size=20 class='textbox'></td>
+        <td class=tdlist><input type=text name=gateway[new] value='' size=20 class='textbox'></td>
+        <td class=tdlist align=center><input type=checkbox name=stat[new]></td>
+        <td class=tdlist><input type=text name=note[new] value='' size=20 class='textbox'></td>
+	<td class=tdlist></td>
+      </tr>";
+}
+if($x > 1) {
+?>
+<tr>
+<td align=right valign=top class=tdlist colspan=7><a href="#" onclick='do_delete();'>Delete</a> / <a href="#" onclick='dotoggle();'>Toggle</a> <?echo $_PNG['arrow_rtr'];?></td>
+</tr>
+<? } ?>
+<tr><td align=right valign=top colspan=7 style='white-space: nowrap;'><input name=btadd type="button" value="Add New" class="button-small" onclick="self.location.href='<?echo $_URL_PATH;?>/network_route.html?tab=2&do_id=add_new'"><input name=btapply type="button" value="Apply changes" class="button-small" onclick="self.location.href='<?echo $_URL_PATH;?>/network_route.html?tab=2&do_id=apply_chg';document.f.btapply.disabled=true;"><input name=btsubmit type="submit" value="Save" class="button-small"><?if($x>1){?><input name=btadd type="button" value="<?if($do_id=="show_stat") { echo "Hide config";} else { echo "Show config"; }?>" class="button-small" onclick="self.location.href='<?echo $_URL_PATH;?>/network_route.html?tab=2&do_id=<?if($do_id!="show_stat") echo "show_stat";?>'"><?}?></td></tr>
+</table>
+<?if($do_id=="show_stat") {?>
+<br>
+<table width="600" border=0 cellpadding="2" cellspacing="2">
+<tr>
+<td>
+<pre>
+<?
+$ph=popen("route -n","r" );
+while($line=fgets($ph)) echo htmlspecialchars($line);
+pclose($ph);
+?>
+</pre>
+</td></tr></table>
+<? } // do_id==show_stat ?>
+<? }//tab==2 ?>
+
+</td>
+</tr>
+
+
+</table>
+</td>
+</tr>
+</table>
+
+<!-- end main -->
+
+</td>
+</tr>
+</table>
+</fieldset>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?echo $tab;?>>
+</form>
+</body>
+</html>
+
+<?db_close($db_id); flush();?>

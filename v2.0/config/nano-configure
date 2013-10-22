@@ -1,0 +1,6 @@
+make distclean
+CC=icc ./configure --prefix=/ --disable-nsl --build=i686-mybox-linux --host=i686-mybox-linux \
+--sysconfdir=/etc \
+--enable-tiny
+make
+cp -v src/nano /bin

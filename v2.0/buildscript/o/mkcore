@@ -1,0 +1,457 @@
+#!/bin/bash -e
+
+START_POINT=$(pwd)
+cd $START_POINT
+
+MOD_DIR=$START_POINT/kernel/modules/lib/modules
+ROOT_DIR=/root/devel/core_fs
+ETCPASSWD="console:x:0:0:console:/etc:/bin/login"
+ETCGROUP="console:x:0:console"
+SYS_DIR="
+dev proc tmp bin lib etc service/tools \
+service/www usr/share/tabset var/spool/cron/crontabs \
+var/spool/mqueue var/sys var/run var/log \
+var/sys/iptraf \
+var/sys/iptraf \
+var/log/iptraf \
+var/run/iptraf"
+K_REL=/root/devel/core_fs/lib/modules/2.4.27-myboxSE/
+KBD_LIB=/lib/kbd/keymaps/i386
+ZONE_INFO=/usr/share/zoneinfo
+LOGIN_UTIL=/root/source/login-awie/
+#SQLITE=/root/source/SQLite-1.0.3/modules/sqlite.so
+IPVS_ADM=/root/source/ipvsadm-1.21/
+ZENDLIB=/usr/local/Zend/lib/Optimizer-2.5.7/php-5.0.x/ZendOptimizer.so
+SNMPMIB=/usr/share/snmp
+SHAPER=/root/source/rshaper-awie
+DROPBEAR=/root/source/dropbear
+
+BINARY_LIST="
+/bin/bash
+/usr/bin/wget
+/sbin/insmod
+/usr/bin/host
+/bin/netstat
+/bin/ps
+/usr/bin/top
+/bin/ping
+/sbin/arping
+/usr/sbin/traceroute
+/usr/sbin/tcpdump
+/sbin/ip
+/sbin/syslogd
+/sbin/klogd
+/usr/bin/openssl
+/usr/bin/ssh
+/usr/bin/nbtscan
+/usr/local/sbin/microcode_ctl
+/bin/egrep
+/bin/grep
+/bin/mount
+/bin/umount
+/usr/bin/sqlite
+/usr/bin/php-cgi
+/usr/bin/php-cli
+/usr/sbin/sendmail.sendmail
+/bin/mail
+/usr/bin/rrdtool
+/usr/sbin/snmpd
+/usr/bin/snmpwalk
+/usr/sbin/ntpdate
+/bin/gzip
+/sbin/depmod
+/usr/bin/nmap
+/bin/iptraf
+/bin/cfconv
+/bin/rawtime
+/bin/rvnamed
+/usr/bin/snort
+/bin/pppd
+/bin/pptpd
+/bin/pptpctrl
+/bin/bcrelay
+/usr/sbin/dnet
+/sbin/route
+/bin/nice"
+
+TERMLIST="
+/usr/share/terminfo/x/xterm
+/usr/share/terminfo/l/linux
+/usr/share/terminfo/v/vt100"
+
+BUSYBOX_SRC="/root/source/busybox"
+if [ ! -f "$BUSYBOX_SRC/busybox.links" ]; then
+	echo "busybox not compile yet"
+	exit
+fi
+
+BUSYBOXLINK="$(cat $BUSYBOX_SRC/busybox.links |sed -e 's/\/sbin\///g' -e 's/\/bin\///g' |grep -v '^\/')"
+MINIHTTPD="/root/source/mini_httpd-1.19-awie/mini_httpd"
+
+if [ ! -x "$MINIHTTPD" ]; then
+	echo "minihttpd not compile yet"
+	exit
+fi
+
+if [ -d "$ROOT_DIR" ]; then
+        echo -n "recreate $ROOT_DIR ?[y/n]: "
+        read ans
+        if [ "$ans" = "y" ]; then
+                rm -rfv $ROOT_DIR
+        fi
+fi
+#sh do_php_compress
+sh zend_encode
+
+for d in $SYS_DIR; do
+	mkdir -vp $ROOT_DIR/$d
+done
+
+if [ -d "$ROOT_DIR/dev" ]; then
+	cd $ROOT_DIR/dev
+	mknod console c 5 1
+	mknod ram0 b 1 0
+	mknod null c 1 3
+fi
+
+cd $START_POINT
+
+cp -av /usr/share/tabset/* $ROOT_DIR/usr/share/tabset
+
+for l in $TERMLIST; do
+        lb=$(dirname $l)
+        mkdir -vp $ROOT_DIR/$lb
+        cp -v $l $ROOT_DIR/$lb
+done
+
+#cp -v $START_POINT/config/version $ROOT_DIR/
+#cp -v $START_POINT/config/version $ROOT_DIR/etc
+mkdir -p $ROOT_DIR/service
+cp -av $START_POINT/service_enc/* $ROOT_DIR/service
+cp -av $START_POINT/config/pptpd/pptpd.conf $ROOT_DIR/etc
+cp -av $START_POINT/config/pptpd/ppp $ROOT_DIR/etc
+cp -av /usr/share/nmap $ROOT_DIR/usr/share
+# 25/11/2004 - hardcoded into script
+#cp -av $START_POINT/config/iproute2 $ROOT_DIR/etc
+cp -v $START_POINT/config/shells $ROOT_DIR/etc/shells
+cp -av $START_POINT/config/defaults $ROOT_DIR/etc
+cp -v $START_POINT/config/snmpd.conf $ROOT_DIR/etc
+cp -v $START_POINT/config/syslog.conf $ROOT_DIR/etc
+cp -v $START_POINT/config/resolv.conf $ROOT_DIR/etc
+cp -v $START_POINT/config/php.ini $ROOT_DIR/etc
+cp -v $START_POINT/config/sendmail.cf $ROOT_DIR/etc
+cp -v $START_POINT/config/inputrc $ROOT_DIR/etc
+cp -v $START_POINT/config/devfsd.conf $ROOT_DIR/etc
+cp -v $START_POINT/config/fstab $ROOT_DIR/etc
+cp -v $START_POINT/config/bashrc $ROOT_DIR/etc/bashrc
+cp -v $START_POINT/config/services $ROOT_DIR/etc
+cp -v $START_POINT/config/protocols $ROOT_DIR/etc
+cp -v $START_POINT/config/openssl.cnf $ROOT_DIR/etc
+cp -v $START_POINT/config/openssl.pem $ROOT_DIR/etc
+cp -v $START_POINT/config/httpd.cnf $ROOT_DIR/etc
+cp -v $START_POINT/config/inittab $ROOT_DIR/etc
+cp -v $START_POINT/config/rc.bootup $ROOT_DIR
+cp -v $START_POINT/config/rc.init $ROOT_DIR/etc
+cp -v $START_POINT/config/rc.start $ROOT_DIR/etc
+cp -v $START_POINT/config/modules.conf $ROOT_DIR/etc
+cp -v /etc/microcode.dat $ROOT_DIR/etc
+cp -v $START_POINT/config/libfunc $ROOT_DIR/etc
+cp -v $START_POINT/config/rc.shutdown $ROOT_DIR/etc
+cp -av $START_POINT/config/fonts $ROOT_DIR/usr/share
+cp -v $START_POINT/config/httpd_wrapper $ROOT_DIR/bin/httpd_wrapper
+
+for f in $ROOT_DIR/etc/defaults/; do
+	cat $f |gzip -9 > $f.gz
+	mv -v $f.gz $f
+	chmod 600 $f
+done
+cp -av $START_POINT/config/snort_rules $ROOT_DIR/etc/defaults
+cd $ROOT_DIR/etc/defaults
+tar -zcvf snort_rules.tgz snort_rules && rm -rfv $ROOT_DIR/etc/defaults/snort_rules
+cd $ROOT_DIR
+chmod 600 $ROOT_DIR/etc/defaults/snort_rules.tgz
+
+chmod -v 700 $ROOT_DIR/service/www/*.html
+chmod -v 700 $ROOT_DIR/service/tools/*
+chmod -v 700 $ROOT_DIR/service/init/*
+chmod -v 600 $ROOT_DIR/service/kernel/*
+chmod -v 600 $ROOT_DIR/etc/ppp
+chmod -v 600 $ROOT_DIR/etc/pptpd.conf
+chmod -v 600 $ROOT_DIR/etc/defaults
+chmod -v 600 $ROOT_DIR/etc/snmpd.conf
+chmod -v 600 $ROOT_DIR/etc/shells
+chmod -v 600 $ROOT_DIR/etc/syslog.conf
+chmod -v 700 $ROOT_DIR/etc/rc.shutdown
+chmod -v 600 $ROOT_DIR/etc/inputrc
+chmod -v 700 $ROOT_DIR/rc.bootup
+chmod -v 700 $ROOT_DIR/etc/rc.init
+chmod -v 700 $ROOT_DIR/etc/rc.start
+chmod -v 600 $ROOT_DIR/etc/bashrc
+chmod -v 600 $ROOT_DIR/etc/fstab
+chmod -v 600 $ROOT_DIR/etc/devfsd.conf
+chmod -v 600 $ROOT_DIR/etc/services
+chmod -v 600 $ROOT_DIR/etc/protocols
+chmod -v 600 $ROOT_DIR/etc/openssl.pem
+chmod -v 600 $ROOT_DIR/etc/httpd.cnf
+chmod -v 600 $ROOT_DIR/etc/libfunc
+chmod -v 700 $ROOT_DIR/bin/httpd_wrapper
+
+if [ -d "$SNMPMIB" ]; then
+	cp -av $SNMPMIB $ROOT_DIR/usr/share
+	chmod -R 600 $ROOT_DIR/usr/share/snmp
+fi
+
+cd $ROOT_DIR
+
+echo "$ETCPASSWD" > $ROOT_DIR/etc/passwd
+echo "$ETCGROUP" > $ROOT_DIR/etc/group
+
+chmod -v 600 $ROOT_DIR/etc/passwd
+chmod -v 600 $ROOT_DIR/etc/group
+
+for t in /lib/libnss_files*; do
+        cp -av $t $ROOT_DIR/lib
+        [ ! -L "$t" ] && strip $ROOT_DIR/lib/$(basename $t)
+done
+for t in /lib/libnss_dns*; do
+        cp -av $t $ROOT_DIR/lib
+        [ ! -L "$t" ] && strip $ROOT_DIR/lib/$(basename $t)
+done
+
+function copy_binary() {
+        if [ -z "$1" ]; then
+                echo "Usage: $0 binary";
+                exit;
+        fi
+
+        file=$1
+
+        if [ -x "$file" ]; then
+                dirname=$(dirname $file)
+                basename=$(basename $file)
+                bindir="$ROOT_DIR/bin"
+        else
+                echo "file '$file' not found"
+                exit
+        fi
+
+        cp -v $file $bindir
+        chmod -v a-srwx $bindir/$basename
+        chmod -v u+rwx $bindir/$basename
+        strip $bindir/$basename
+        #upx-kernel -9 $bindir/$basename
+        echo "++ compressing.. $bindir/$basename"
+        upx-kernel -q --best $bindir/$basename >/dev/null
+
+        LO=$(ldd $file |tr -d '^\t' |sed -e 's/=>//g' |cut -d ' ' -f 3)
+        if [ "$LO" != "" ]; then
+                for f in $LO; do
+                        LS=
+                        if [ -n "$f" ]; then
+                                echo "++ $f"
+                                fd=
+                                if [ -L "$f" ]; then
+                                        fd=$(dirname $f)
+                                        #LS=$(ls -l $f |cut -d '>' -f 2 |tr -d '^ ')
+                                        LS=$(readlink $f)
+                                        LS="$fd/$LS"
+                                else
+                                        LS=$f
+                                fi
+                                if [ -e "$LS" ]; then
+                                        d=$(dirname $f)
+                                        if [ ! -d "$ROOT_DIR/$d" ]; then
+                                                mkdir -vp $ROOT_DIR/lib
+                                        fi
+                                        bd1=$(basename $LS)
+                                        bd2=$(basename $f)
+                                        if [ ! -f "$ROOT_DIR/lib/$bd1" ]; then
+                                                cp -av $LS $ROOT_DIR/lib
+                                                strip $ROOT_DIR/lib/$bd1
+                                        fi
+                                        if [ ! -f "$ROOT_DIR/lib/$bd2" ]; then
+                                                cp -av $f $ROOT_DIR/lib
+                                                strip $ROOT_DIR/lib/$bd2
+                                        fi
+                                fi
+                        fi
+                done
+        fi
+}
+
+for x in $BINARY_LIST; do
+        if [ -x "$x" ]; then
+                copy_binary "$x"
+        fi
+done
+
+if [ -x "$BUSYBOX_SRC" ]; then
+        copy_binary "$BUSYBOX_SRC/busybox"
+        cd $ROOT_DIR/bin
+        #echo "+ busybox hold init program that upx cant handle on booting process"
+        #echo "+ decompressing..."
+        #upx-kernel -qd $ROOT_DIR/bin/busybox >/dev/null
+        for b in $BUSYBOXLINK; do
+                ln -sfv busybox $b
+        done
+fi
+
+ln -sfv bash sh
+ln -sfv insmod modprobe
+ln -sfv insmod rmmod
+ln -sfv insmod lsmod
+
+if [ -x "$MINIHTTPD" ]; then
+        copy_binary "$MINIHTTPD"
+        mv -v $ROOT_DIR/bin/$(basename $MINIHTTPD) $ROOT_DIR/bin/httpd
+fi
+
+if [ -d "$LOGIN_UTIL" ]; then
+        copy_binary "$LOGIN_UTIL/login"
+        copy_binary "$LOGIN_UTIL/login_shell"
+	cp -v $START_POINT/config/login_reset $ROOT_DIR/bin
+	chmod 700 $ROOT_DIR/bin/login_reset
+fi
+
+if [ -d "/tmp/iptables" ]; then
+	copy_binary "/tmp/iptables/bin/iptables"
+	copy_binary "/tmp/iptables/bin/iptables-save"
+	cp -av /tmp/iptables/lib/iptables $ROOT_DIR/lib
+	strip -v $ROOT_DIR/lib/iptables/*
+fi
+
+if [ -d "$IPVS_ADM" ]; then
+	copy_binary $IPVS_ADM/ipvsadm
+	cp -av $IPVS_ADM/ipvsadm-save $ROOT_DIR/bin
+	chmod 700 $ROOT_DIR/bin/ipvsadm-save
+fi
+
+cd $START_POINT
+
+if [ -d "$KBD_LIB" ]; then
+	rm -rfv /tmp/lib
+	mkdir -p /tmp/$KBD_LIB
+	cp -a $KBD_LIB/* /tmp/$KBD_LIB
+	for f in $(find /tmp/lib/* -name '*.*map*');do
+        	_dir=$(dirname $f)
+        	case $f in *.gz)
+                	#echo "GZIP $f"
+                	gunzip -v $f
+                ;;
+                	*)
+                #echo $f
+        	esac
+	done
+	for f in $(find /tmp/lib/* -name '*.*map*' |sort );do
+        	_f=$(echo $f |sed -e 's/\.kmap//g' -e 's/\.map//g')
+        	./bin-script/loadkeys-b -b $f > $_f.bmap
+	done
+	mkdir -p $ROOT_DIR/usr/share
+	cp -av /tmp/lib/* $ROOT_DIR/usr/share
+	sync
+	rm -rfv /tmp/lib
+	find $ROOT_DIR/usr/share/kbd/* -name '*.kmap' |xargs rm -fv
+	echo "creating kbd map list"
+	rm -f $ROOT_DIR/usr/share/kbd/KBDLIST.TXT /tmp/KBDLIST.TXT
+	for f in $(find $ROOT_DIR/usr/share/kbd/* -name '*.bmap' |sort); do
+		echo $(basename $f) >> /tmp/KBDLIST.TXT
+		gzip -9 $f
+	done
+	mv -v /tmp/KBDLIST.TXT $ROOT_DIR/usr/share/kbd/KBDLIST.TXT
+	chmod 600 $ROOT_DIR/usr/share/kbd/KBDLIST.TXT
+	
+fi
+
+
+if [ -d "$ZONE_INFO" ]; then
+	mkdir -p $ROOT_DIR/usr/share/zoneinfo
+        cd /usr/share/zoneinfo
+        LS=$(find . -type f -or -type l | grep '^./[A-Z]' | sort)
+        for x in $LS; do
+                _dir=$(dirname $x)
+                if [ "$_dir" != "." ]; then
+			mkdir -p $ROOT_DIR/usr/share/zoneinfo/$_dir
+			cp -av $x $ROOT_DIR/usr/share/zoneinfo/$_dir
+                else
+			cp -av $x $ROOT_DIR/usr/share/zoneinfo
+		fi 
+                _dir=
+        done
+	cd $ROOT_DIR/usr/share
+	chmod -R 600 zoneinfo
+	echo "creating zoneinfo list"
+	cd $ROOT_DIR/usr/share/zoneinfo
+	rm -f $ROOT_DIR/usr/share/zoneinfo/ZONELIST.TXT /tmp/ZONELIST.TXT
+	for f in $(find . -type f -or -type l | grep '^./[A-Z]' | sort);do
+		#echo $(basename $f) >> /tmp/ZONELIST.TXT
+		echo $f |sed -e 's/\.\///g' >> /tmp/ZONELIST.TXT
+		gzip -9 $f
+	done
+	mv -v /tmp/ZONELIST.TXT $ROOT_DIR/usr/share/zoneinfo/ZONELIST.TXT
+	chmod 600 $ROOT_DIR/usr/share/zoneinfo/ZONELIST.TXT
+fi
+
+cd $START_POINT
+cd $ROOT_DIR
+chmod -v 700 *
+if [ -f "bin/sendmail.sendmail" ]; then
+	mv -v bin/sendmail.sendmail bin/sendmail
+fi
+cd $START_POINT
+
+if [ ! -d "$MOD_DIR" ]; then
+	echo "kernel modules not found"
+	exit
+fi
+
+#if [ ! -f "$SQLITE" ]; then
+#	echo "sqlite not compile yet"
+#	exit
+#fi
+#cp -av $SQLITE $ROOT_DIR/lib
+#strip $ROOT_DIR/lib/$(basename $SQLITE)
+
+if [ -f "$ZENDLIB" ]; then
+	cp -v $ZENDLIB $ROOT_DIR/lib
+	strip $ROOT_DIR/lib/$(basename $ZENDLIB)
+fi
+
+
+if [ -d "$SHAPER" ]; then
+	if [ ! -f "$SHAPER/rshaper.o" ]; then
+		echo "rshaper not compile yet"
+		exit
+	fi
+	mkdir -p $K_REL/misc
+	cp -av $SHAPER/rshaper.o  $K_REL/misc
+	copy_binary $SHAPER/rshaperctl
+fi
+
+if [ -d "$DROPBEAR" ]; then
+	if [ ! -f "$DROPBEAR/dropbear" ]; then
+		echo "dropbear not compile yet"
+		exit
+	fi
+	copy_binary $DROPBEAR/dropbear
+	mv -v $ROOT_DIR/bin/dropbear $ROOT_DIR/bin/sshd
+	copy_binary $DROPBEAR/dropbearkey
+	mv -v $ROOT_DIR/bin/dropbearkey $ROOT_DIR/bin/sshdkey
+fi
+
+#for f in $START_POINT/init.d/*; do
+#	cp -av $f $ROOT_DIR/etc/init.d
+#	chmod 700 $ROOT_DIR/etc/init.d/$(basename $f)
+#done
+
+if [ -f "mkmods" ]; then
+	sh mkmods
+	cd $START_POINT
+	cp -av kernel/*.bz2 $ROOT_DIR/tmp
+fi
+
+rm -fv $K_REL/build
+rm -rfv $K_REL/pcmcia
+
+echo "+++++++++++++++++++++++++++++++++++++++++++++++"
+TOTAL=$(du -kc $ROOT_DIR |grep total |tr -s '\t' ':' |cut -d ':' -f 1)
+echo "IMAGE SIZE=$TOTAL KB"

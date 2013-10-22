@@ -1,0 +1,793 @@
+This is a FAQ for the pptp-server mailing list.
+It is being compiled by Phil Van Baren (pptpd@vibrationresearch.com)
+If you have any additions or corrections for this list, please let me know.
+
+
+1.0 Basic questions
+
+1.1 Where can I get the PPTPD program
+
+	The primary web site is http://poptop.lineo.com/
+
+1.1.1 Where can I find installation instructions?
+
+	For kernel 2.2.x and pppd 2.3.11
+	    http://www.vibres.com/pptpd/example.html
+	For kernel 2.4.x and pppd 2.4.0
+	    http://home.swbell.net/berzerke/2.4_Kernel_PPTPD-HOWTO.txt
+
+1.2 Is there a mailing list?
+
+	Yes.  See this web page for subscription and submission details:
+	http://lists.schulte.org/mailman/listinfo/pptp-server
+
+1.3 Is there an archive of the pptp-server mailing list?
+
+	Yes: http://lists.schulte.org/pipermail/pptp-server/
+
+1.4 Can I search the pptp-server mailing list archive?
+
+	Yes: http://poptop.lineo.com/#mailinglist
+
+1.5. Where can I find detailed info on PPTP and encryption?
+
+	Microsoft has a chapter in the Windows 2000 Resource Kit on this topic.
+	This chapter is currently available on their web site:
+
+	http://www.microsoft.com/WINDOWS2000/library/resources/reskit/samplechapters/inbe/inbe_vpn_hueq.asp
+
+	Microsoft also has a "Using PPTP" whitepaper, available from:
+
+	http://www.microsoft.com/ntserver/commserv/techdetails/prodarch/pptpwp.asp
+
+	The references/links section of the PoPToP web site has many more links.
+		http://poptop.lineo.com
+
+2.0 Browsing support
+
+2.1 How does Windows know which IP address belongs to machine names listed in
+    the Network Neighborhood?
+
+	This mapping can be found from a WINS server, or from the LMHOSTS
+	file, or both.  If you have both, Windows looks to the WINS server
+	first, and if it doesn't find the answer there, will look in the
+	LMHOSTS file. 
+	If you enable the "Use DNS for NetBIOS name resolution" option
+	in the Network control panel, Windows will also look to the HOSTS
+	file and a DNS server to map NetBIOS (Windows) machine names to
+	IP addresses.  The order of precedence is:
+
+	1) Check to see if it is the local machine name.
+	2) Check its cache of remote names. Any name that is resolved is
+	   placed in a cache where it will remain for 10 minutes.
+	3) Try the WINS Server.
+	4) Try broadcasting.
+	5) Check the LMHOSTS file, if the system is configured to use 
+	   the LMHOSTS file.
+	6) Try the HOSTS file, if so configured.
+	7) Try a DNS server, if so configured.
+
+	The HOSTS and LMHOSTS files are in c:\windows in Win9x, and in
+	c:\winnt\system32\drivers\etc in WinNT and Win2000.
+	The HOSTS and LMHOSTS basic format is <IP> <NAME>.  For example:
+		192.168.1.1	gateway	
+		192.168.1.2	doorway
+	When the name resolution is properly configured, you can access
+	"\\machinename\sharename".  
+
+	Name resolution and browsing are two different things, so you can
+	have name resolution working while browsing does not work (i.e. you
+	can access "\\machinename\sharename" but machinename doesn't show up
+	in the Network Neighborhood), or you can have browsing working
+	while name resolution does not work (i.e. machinename shows up in
+	Network Neighborhood, but when you double-click it you get an error
+	message that says windows cannot find the machine.)
+
+2.2 Will Network Neighborhood browsing work without a WINS server?
+
+	Yes.  If you have pptpd and samba running on the same machine, and
+	samba is accessible to the VPN machines, then your VPN machines will
+	be able to get the browse list from the samba machine.
+	To enable browsing support on the Samba server, set the following
+	option in /etc/smb.conf:
+		browse list = yes
+	When browse lists are working properly you can see the list of machines
+	in the file /var/lock/samba/browse.dat on the samba server.
+
+2.3 What needs to be done to enable WINS support?
+
+	When using a WINS server, all client machines on the network must be
+	configured to use the WINS server, because the WINS server will
+	only know about machines that are configured with the WINS server
+	address.
+
+	For machines on the local network, the WINS server configuration
+	is set in the Network control panel, under the TCP/IP properties.
+
+	For VPN machines, the WINS server address can be either manually
+	configured in the Properties for the Dial-up Networking connection,
+	under the TCP/IP Settings button, or automatically configured by
+	the server by adding the line
+		ms-wins 192.168.1.1
+	to your /etc/ppp/options.pptp file (where the 192.168.1.1 must be
+	the address of your WINS server.)
+
+	Samba makes a decent WINS server.  To enable WINS support in Samba,
+	set the following option in /etc/smb.conf:
+		wins support = yes
+
+2.4 Why wouldn't I want to use an LMHOSTS file for windows name resolution?
+
+	Because you have to properly maintain the list of machine names
+	and IP addresses in an LMHOSTS file on each and every machine on
+	your network, and on all of the VPN client machines.  This makes
+	maintenance more difficult.
+
+2.5 Why would I want to use an LMHOSTS file for windows name resolution?
+2.6 Why wouldn't I sant to use a WINS server?
+
+	The answer is the same for both of these questions:
+	Name resolution through the LMHOSTS file is faster than going
+	through a WINS server.  Much faster, if your WINS server is on
+	a slow network link.
+
+2.7 Why would I want to use a WINS server?
+
+	When a WINS server is properly set up, and all machines on your
+	network are using the WINS server, then there is no maintenence
+	of machine names and IP addresses required -- it is all automatically
+	taken care of by the WINS server. 
+
+2.8 What happens if I have my system configured with both WINS and LMHOSTS?
+
+	Per Microsoft, the system will first check with the WINS server,
+	and then look in the LMHOSTS file (backwards from the order used
+	with DNS lookups).  This means the LMHOSTS file would only be used
+	as a backup if it can't find the answer on the WINS server.
+	As a result, if you have WINS configured the name resolution will
+	always first go to the WINS server, which may significantly slow
+	down the name resolution process if your WINS server is on a slow
+	network link.
+
+	For more details, see:
+	  http://support.microsoft.com/support/kb/articles/Q119/4/93.asp
+
+2.9 I swear I have everything configured properly, but browsing still does
+    not work!  What could be wrong?
+
+	It could just be a matter of patience.  Network Neighborhood takes
+	a little time after the network connection is established before it
+	will allow browsing.  If you wait 30 to 60 seconds after connecting
+	the VPN before you try to browse Network Neighborhood, you might
+	have better success.
+	Another trick is to access a share on the samba machine first, and
+	then browse the Network Neighborhood.
+	Also, remember that generating browse lists may take up to 15 minutes,
+	so it could be up to 15 minutes after starting, or restarting,
+	samba for the browse list to show all machines on the network.
+
+3.0 OpenBSD related items
+
+3.1 I'm using OpenBSD as a PPTP client, and get LCP messages timing out,
+    what might be the problem?
+
+	It could be that the OpenBSD kernel GRE device is swallowing all
+	of the GRE packets, and not allowing the PPTP client to get the GRE
+	packets.  Try rebuilding the kernel with the GRE device disabled.
+
+	i.e. comment out the "pseudo-device gre 1" line in the 
+	kernel configuration file.
+
+3.2 How do I get PoPToP to work with FreeBSD's version of PPP?
+
+	Configure PoPToP using the command:
+		./configure --with-bsdppp
+
+3.3 Where can I find more information?
+
+	Read the FreeBSD PPTP HOWTO at:
+	  http://heyer.supranet.net/pptp/
+
+4.0 Uncategorized
+
+4.1 What ports are required for ipchains?
+
+	pptpd uses TCP port 1723 for the control connection, and protocol 47
+	for the data connection.  Note that the latter is a PROTOCOL,
+	not a port.
+
+	To open these using ipchains:
+
+	ipchains -A input -p TCP -d 0.0.0.0/0 1723 -j ACCEPT
+	ipchains -A input -p 47 -j ACCEPT
+
+	ipchains -A output -p TCP -s 0.0.0.0/0 1723 -j ACCEPT
+	ipchains -A output -p 47 -j ACCEPT
+
+	You can see PPTP traffic using the command:
+	    tcpdump -i eth0 -n proto 47 or port 1723
+	where eth0 is the network interface on which the VPN connection
+	is coming in.  You should set protocol 47 traffic going in and out,
+	and protocol 6, port 1723 traffic going in and out.  If not, then
+	check your firewalls.
+
+	Also, you must enable packet forwarding in the kernel, and allow
+	packet forwarding between the pptp network and the local network.
+	If your pptpd network address is 192.168.2.0/24 and your local
+	network is 192.168.1.0/24, then you would do this with the following
+	commands
+	    ipchains -P forward DENY
+	    echo "1" > /proc/sys/net/ipv4/ip_forward
+	    ipchains -A forward -s 192.168.1.0/24 -d 192.168.2.0/24 -j ACCEPT
+	    ipchains -A forward -s 192.168.2.0/24 -d 192.168.1.0/24 -j ACCEPT
+
+	If both networks are the same range the above two rules would be the 
+	same as each other, so you would only need to list one of them.
+
+4.2 How can I assign IP addresses based on user names?
+
+	Configure PoPToP with the command:
+		./configure --with-pppd-ip-alloc
+
+	Then BUILD and INSTALL PoPToP as usual.  List the IP addresses as
+	the last parameter on each chap-secrets line.  For example:
+
+		tom	*	toms-pw		192.168.1.40
+		dick	*	dicks-pw	192.168.1.41
+		harry	*	harrys-pw	192.168.1.42
+
+	Will give tom the IP 192.168.1.40, dick .41, and harry .42.
+
+4.3 How can I use /etc/smbpasswd for chap authentication?
+
+	There is a patch available for this which was posted to
+	the pptp-server mailing list a while back:
+
+	http://lists.schulte.org/pipermail/pptp-server/2000-April/002190.html
+
+	Apply this patch to the pppd program, rebuild, and then put
+	&/etc/smbpasswd in the chap-secrets file where you would normally
+	put the plain text password string.
+
+4.4 Can I force incoming connections to use encryption?
+
+	Not out of the box, but there a pppd patch available from:
+	    http://smop.de
+	Apply this patch to pppd-2.3.11 after applying the mppe patches,
+	and then rebuild and reinstall that package.
+	To enable the feature, add the options "require-mppe" and
+	"require-mppe-stateless" to your /etc/ppp/options.pptp file.
+
+4.5 Can I force incoming connections to only use 128-bit encryption?
+
+	Yes, I have received 2 confirmations that the following will work:
+
+	Apply the patch from http://smop.de (see question
+	4.4, above) which allows you to force encryption, and then list only
+	the mppe-128 option in the pppd configuration file.
+	Then your /etc/ppp/options.pptp file would contain:
+		+chap
+		+chapms
+		+chapms-v2
+		mppe-128
+		mppe-stateless
+		require-mppe
+		require-mppe-stateless
+	In particular, note the mppe-40 option is NOT listed.
+	As a result, if 128-bit encryption is not used, pptpd will disconnect.
+
+5.0 Microsoft
+
+5.1 Where can I find the various Microsoft Dial-Up Networking updates?
+
+	Win95:
+	 http://www.microsoft.com/NTServer/nts/downloads/recommended/dun13win95/sysreq.asp
+	 http://www.microsoft.com/windows95/downloads/contents/WURecommended/S_WUNetworking/vpn/Default.asp
+
+	Win98:
+	 http://www.microsoft.com/NTServer/nts/downloads/recommended/dun13win98.asp
+	 http://www.microsoft.com/windows98/downloads/contents/WURecommended/S_WUNetworking/VPN/Default.asp
+
+	Win98 128-bit update:
+	 Currently unavailable?
+
+	Win98SE 128-bit update:
+	 This update is now available at http://windowsupdate.microsoft.com
+	 Click on Product Updates, and then look in the Communications section.
+
+7.0 Troubleshooting    
+
+-------------------    
+
+
+7.1 Setting debug for PoPTop    
+
+
+
+If you want to enable debugging follow these steps:    
+
+1. Edit the /etc/syslog.conf file and add the line:    
+
+	daemon.*;local2.*	/var/log/pptpd.log    
+
+
+2. Restart the syslog daemon:    
+
+	[/etc/rc.d/init.d/syslogd restart]    
+
+
+3. Make sure the options file you are using (i.e. /etc/ppp/options) has the following:    
+
+
+	debug    
+
+
+Setting the debug option here affects all PPP and PPTP connections.    
+
+
+4. Edit the /etc/pptpd.conf file to contain the following:    
+
+
+	debug    
+
+
+
+pptpd errors and messages should now start showing up in /var/log/pptpd.log    
+
+
+
+
+7.2 Client side errors:    
+
+
+Windows Client 95/98    
+
+
+7.2.1. Error 629: You have disconnected from the computer you dialed.....    
+
+
+	Possible causes:    
+
+	- pptpd daemon not running    
+	- pptpctrl not setup properly in /etc/inetd.conf    
+	- Windows networking is in a confused state
+	  (if the message comes immediately after you press "connect"
+	   with no delay, then it probably is because your Windows client
+	   is confused.  Reboot the client machine and try again.)
+
+	Possible solutions:    
+
+	- run the pptpd daemon [pptpd -d]    
+	- setup pptpctrl per README.inetd instructions    
+	- don't forget the #1 debugging tool for Windows:
+	    reboot your Windows machine and try it again
+
+
+7.2.2. Error 645: The microsoft Dial-up adapter is in use or not responding properly.    
+
+
+	Possible causes:    
+
+	- VPN software not setup correctly by OEM Manufacturer.    
+	  The usual cause of this error is not having 2 dial-up networking
+	  adapters installed in the Network Control Panel.  When you are
+	  making a VPN connection through a modem you need 1 dial-up adapter
+	  for the modem connection, and a second dial-up adapter for the VPN.
+
+	Possible solutions:    
+
+	- Go to the Network Control Panel and install a second Dial-Up Adapter.
+
+	or
+
+	- Go to the Windows Add/Remove Programs control panel, "Windows Setup"
+	  tab, Communications component, and remove Virtual Private Networking
+	  support.  Then reboot your computer, go back to the same tab, and
+	  reinstall Virtual Private Networking support.
+
+	Also be sure to install the latest updates to VPN from Microsoft.
+
+
+7.2.3. Error 650: The Remote Access server is not responding.      
+
+
+	Possible causes:    
+
+	- There is a problem with packets getting through    
+
+
+	Possible solutions:    
+
+	- Check firewalls between you and server.      
+
+	Make sure all can pass protocol 47 (GRE) and tcp port 1723.    
+
+
+7.2.4. Error 691: Access denied because username and/or password is invalid on the domain. 	    
+
+
+	Possible causes: 	    
+
+	- check /etc/ppp/chap-secrets file for existence/correcteness      
+
+
+	Possible solutions:    
+
+- Edit the /etc/ppp/chap-secrets file on the server to include the username and password.  Possibly  use     
+DOMAINNAME\\username for windows clients.  The message log may contain more hints about what is  expected.  
+   
+
+
+7.2.4.5  Error 720: Dial-Up Networking could not negotiate a compatible set
+	of network protocols you specified in the Server Type settings.
+
+	Possible causes:
+
+	- Your pppd options file is empty, or doesn't have the proper options
+	  to establish the connection.  Make sure the pppd options file
+	  referred to in /etc/pptpd.conf is correct.
+		option /etc/ppp/options.pptp
+	  Note: the default value for this parameter is /etc/ppp/options
+
+	- Make sure you have the latest Dial-Up networking updates installed
+	  on your Windows machine.
+	  
+7.2.5. Error 742: The remote server does not support encryption.      
+
+
+	Possible causes:    
+
+	- ppp_mppe module not loaded    
+
+
+	Possible solutions:    
+
+	[insmod ppp_mppe]     
+
+	or    
+
+	include 'alias ppp-compress-18 ppp_mppe' in the /etc/conf.modules file    
+
+	    
+
+7.2.6. Error 751: The remote computer refused the connection.....    
+
+
+	Possible causes:    
+
+	- pptpd daemon not running    
+
+	- pptpctrl not setup properly in /etc/inetd.conf    
+
+
+	Possible solutions:    
+
+	- run the pptpd daemon [pptpd -d]    
+
+	- setup pptpctrl per README.inetd instructions    
+
+7.2.7.	Can see machines from the local network in Network Neighborhood, but
+	get "\\machinename is not accessible" errors when trying to
+	double-click on them.
+
+	Solution: This can be caused by 2 things:
+	1) The ipchains rules don't enable forwarding between the pptp connection
+	   and the local network.  You should have an ipchains rule like the following
+	   (see section 4.1, above, for more information):
+	        # Enable packet forwarding to/from the pptpd connection
+		# This is the critical rule to allow traffic from the local
+		# network to make it to the pptpd connection, and vice versa
+	        ipchains -A forward -s 192.168.1.0/24 -d 192.168.1.0/24 -j ACCEPT
+	2) The ipchains rules are Masquerading before they are forwarding.
+	   The 'ipchains -A forward -s 192.168.1.0/24 -d 192.168.1.0/24 -j ACCEPT'
+	   must be listed BEFORE any 'ipchains -A forward -j MASQ' rule.
+
+	3) The c:\windows\hosts and c:\windows\lmhosts don't list the proper
+	   IP address/machine name connections.  Check to see that all of your local
+	   network machines are listed in BOTH of these files on the machine dialing
+	   in to the network through Virtual Private Networking.
+
+	Having a properly configured WINS server will also help resolve
+	browsing problems.   See the question above about browsing support.
+
+7.3 Server side errors:    
+
+In this section the error is proceeded by where it most likely would be seen.    
+
+
+	console:  This error would show up on the console    
+
+	    log:  This error would show up in one of the logs (i.e. /var/log/messages)    
+
+
+
+7.3.1a. console: createHostSocket: Address already in use    
+
+	or    
+
+7.3.1b. log: MGR:  Couldn't create host socket    
+
+
+	Possible causes:    
+
+	pptpd is already running.     
+
+	Some other daemon may be using the 1723 port.    
+
+
+	Possible solutions:    
+
+	1. Use 'ps ax | grep pptpd' to check to see if pptpd is already running.    
+
+	2. Edit /etc/inittab and comment out the reference to pptpd.  The type:    
+
+		init Q    
+
+		pptpd -d    
+
+	3. Reconfigure the other daemon not to use port 1723.    
+
+
+7.3.2. log:modprobe  cannot locate module ppp-compress-18 (or 21,24, 26)     
+
+
+	Possible causes:    
+
+	The compression modules for PPP are not loaded    
+
+
+	Possible solutions:    
+
+	insmod the following modules:ppp_mppe (for 18), bsd_comp (for 21), ppp_deflate (for 24 and 26).    
+
+		or    
+
+	Add the following lines to /etc/conf.modules:
+		alias ppp-compress-18 ppp_mppe
+		alias ppp-compress-21 bsd_comp
+		alias ppp-compress-24 ppp_deflate
+		alias ppp-compress-26 ppp_deflate
+
+	Also, make sure you have applied the mppe patches and rebuilt the
+	kernel properly.  When everything is compiled properly, you should 
+	have the module file /lib/modules/2.2.??/net/ppp_mppe.o.
+	(A little side note: if you configure the kernel with ppp support
+	built into the kernel, as opposed to modules, then you will not
+	have any of the ppp*.o modules, but the support will be built into
+	the kernel.  It may be useful to configure this to use modules, however
+	because then you can make changes and recompile without having to
+	reboot the machine.)
+
+	If no /usr/src/linux/drivers/net/ppp_mppe.c file exists, then you
+	haven't applied the mppe patches to the ppp-2.3.?? source, or haven't
+	done the "make kernel" step when building ppp-2.3.??.
+
+	If the /usr/src/linux/drivers/net/ppp_mppe.o file exists, but 
+	the /lib/modules/2.2.??/net/ppp_mppe.o file does not exist,
+	then you probably built the modules, but didn't	install them.
+	To install the network driver modules:
+		cd /usr/src/linux
+		make modules_install SUBDIRS=drivers/net
+		depmod -a
+
+	If no ppp_mppe.o file exists, then check your kernel configuration to 
+	make sure you have enabled the Network device support->ppp to build
+	as a module, and try to rebuild the networking modules using:
+		cd /usr/src/linux
+		make modules SUBDIRS=drivers/net
+		make modules_install SUBDIRS=drivers/net
+		depmod -a
+
+
+7.3.3. log:modprobe  cannot locate module char-major-108    
+
+
+	Possible causes:    
+
+	The kernel ppp modules are changing in the 2.4.* kernels, and will
+	use char-major-108.  pppd knows about this, and checks if
+	char-major-108 exists.  When you are using 2.2.* kernels which
+	don't have char-major-108, you will get this message.  This doesn't
+	cause any problems, but you can hide the message by adding the
+	following line to your /etc/conf.modules file:
+		alias char-major-108 off    
+
+7.3.4.	Get "pptpd[952]: CTRL: PTY read or GRE write failed"
+	errors in your log file
+
+	This indicates that the pppd connection was closed, and doesn't
+	necessarily indicate any problem.  You should look at the lines
+	immediately preceeding that line to see why the connection was
+	closed.  The following is a NORMAL connection termination sequence:
+
+		pppd[23778]: Modem hangup
+		pppd[23778]: Connection terminated.
+		pppd[23778]: Connect time 27.9 minutes.
+		pppd[23778]: Sent 65095 bytes, received 1049035 bytes.
+		pppd[23778]: Exit.
+		pptpd[23776]: GRE: read error: Bad file descriptor
+		pptpd[23776]: CTRL: PTY read or GRE write failed (pty,gre)=(-1,-1)
+	
+	The following is an abnormal termination due to failing to find
+	the pppd program.  The solution is to make sure your pppd program
+	is installed and that pptpctrl knows where to find it.  Typically
+	pppd would be located in /usr/sbin/pppd.
+
+		pptpd[24089]: CTRL (PPPD Launcher): Failed to launch PPP daemon.
+		pptpd[24089]: CTRL: PPPD launch failed!
+		pptpd[24088]: Error reading from pppd: Input/output error
+		pptpd[24088]: CTRL: GRE read or PTY write failed (gre,pty)=(6,5)
+
+	The following is an abnormal termination due to incorrect options
+	in the /etc/ppp/options.pptp (or /etc/ppp/options) file.
+	The solution is to correct the pppd options listed in that file.
+
+		pppd[24094]: In file /etc/ppp/options.pptp: unrecognized option 'garbage'
+		pptpd[24093]: Error reading from pppd: Input/output error
+		pptpd[24093]: CTRL: GRE read or PTY write failed (gre,pty)=(6,5)
+	
+7.3.5.	Get "pptpd[24120]: GRE: read(fd=5,buffer=804d9c0,len=8196) from
+	     PTY failed: status = -1 error = Input/output error"
+	    "pptpd[24120]: CTRL: PTY read or GRE write failed (pty,gre)=(5,6)"
+	    "pptpd[24120]: CTRL: Client 12.72.37.31 control connection finished"
+	errors in your log file when the pptpd program is running on a machine
+	behind a masq'ed firewall.
+
+	Solution:  Apply the ip_masq_vpn.patch patch file to kernel.
+	    Also, look at Linux VPN Masquerade HOWTO: Patching and configuring 
+	    kernel for VPN Masquerade support for details.
+	ftp://ftp.rubyriver.com/pub/jhardin/masquerade/ip_masq_vpn.html
+	ftp://ftp.rubyriver.com/pub/jhardin/masquerade/VPN-howto/VPN-Masquerade.html 
+
+7.3.6.	Get "pptpd[952]: CTRL: Error with select(), quitting"
+	errors in your log file
+
+	This typically is an indication that the other end terminated
+	the pptpd control connection.  As with the "GRE read or PTY write
+	failed" error message, you should look at the previous lines in
+	the /var/log/debug file for an indication of what caused the
+	termination.  It may just be a normal call termination.
+	If it is an abnormal termination, be sure to also check the client
+	side for error messages about why the link was terminated.
+
+7.3.7.	Get "pppd[7359]: Cannot determine ethernet address for proxy ARP"
+	errors in your log file
+
+	Solution: Message posted on the pptp-server mailing list:
+
+	Q: I connect and authenticate fine to the PPTP server but when I try to
+	ping anything on the subnet I get this error.  Can anyone help me out?
+
+	A: This is a common problem. basically, you have proxyarp as an option
+	for pppd. ARP is the mechanism that tcp/ip (and others) use to determine
+	if an address is present on the local network or not. For an ip to be
+	reachable without routing (present on the local network) it has to be
+	in the same subnet as the rest of the computers.
+
+	You have most likely chosen local/remote ip addresses that are not on
+	the same subnet as the 'protected' network. There is no point in using
+	ARP if your clients are on a different subnet. 
+
+	To fix it, change the local/remote ips to addresses on your protected
+	network, or disable proxyarp and use routing to interconnect the
+	networks.
+
+	You will also need to be sure that ip forwarding and proxy arp are
+	enabled in the kernel.. to do this you do:
+	    echo 1 > /proc/sys/net/ipv4/ip_forward
+	    echo 1 > /proc/sys/net/ipv4/conf/all/proxy_arp
+ 
+	For routing to work (i.e. to have the local/remote ip addresses NOT
+	on the same network as the 'protected' network and interconnect the
+	VPN network and the 'protected' network using routing tables),
+	the computers on the protected network need to have the linux box
+	as a gateway
+
+7.3.8.	Get "pppd[5581]: The remote system is required to authenticate itself"
+	    "pppd[5581]: but I couldn't find any suitable secret (password)
+		         for it to use to do so."
+	errors in your log file
+
+	Solution: Make sure your /etc/ppp/chap-secrets has appropriate
+	usernames and passwords in it, that it is "chown root.root" and
+	"chmod 600".  If you specify a servername as the second parameter
+	in the chap-secrets file, then you must also list that name using
+	the "name" parameter in /etc/ppp/options.pptp.
+
+7.3.9.	Get "Sent [LCP ConfReq id=0x1 <asyncmap 0x0> <auth chap 81>
+	    <magic 0xe6251907> <pcomp> <accomp>"
+	    "...last message repeated 9 times"
+	    "LCP: timeout sending Config-Requests"
+	errors in your log file
+
+	This typically means the GRE data link is not making it from your
+	client to your server, typically because of firewalls.  Remember
+	that pptpd requires both a control connection (TCP port 1723) and
+	a data connection (GRE protocol = TCP/IP protocol 47).  Check all
+	of the firewalls between your two machines to make sure they are
+	allowing both types of traffic to pass in both directions.
+
+7.3.10.	Get "CTRL: EOF or bad error reading ctrl packet length."
+	    "CTRL: couldn't read packet header (exit)"
+	    "CTRL: CTRL read failed"
+
+	Solution: At least 1 report indicates that this problem can be solved
+	by installing the Microsoft DUN patches to Windows98SE
+
+7.3.10.	The VPN link works for a while, but then stops working,
+	and the /var/log/debug file shows the following:
+		pppd[10544]: rcvd [Compressed data] 10 32 ae 68 c0 8e e1 92 ... 
+
+	Solution: Patch the /usr/src/linux/drivers/net/ppp_mppe.c file with
+	the patch:
+
+	http://www.vibrationresearch.com/pptpd/ppp_mppe_compressed_data_fix.diff
+
+	and then recompile and reinstall the ppp_mppe.o module
+
+7.3.11. The VPN link works for a while, but then stops working,
+	and the /var/log/debug file shows messages like the following:
+		pppd[11170]: sent [LCP ProtRej id=0xb 51 19 ...
+		pppd[11170]: rcvd [proto=0xbe1b] df 60 4e 4e ...
+		pppd[11170]: Unsupported protocol 0xbe1b received
+	(where the hex data and the protocol numbers may vary)
+
+	This is probably caused by dropped packets with mppe running in
+	stateful mode (i.e. mppe-stateless disabled).  In stateful mode,
+	decryption of a packet requires successful decryption of the previous
+	packet.  In stateless mode, a packet can always be decrypted as long
+	as the sequence number is known.
+
+	Solution: add the "mppe-stateless" option to the /etc/ppp/options.pptp
+	file.
+
+7.4 Errors while building pppd, pptpd, and kernel modules
+
+7.4.1.	Get PPP_VERSION or PPP_MAGIC undefined error message while compiling ppp kernel modules
+
+	Solution: add the following lines to /usr/src/linux/include/linux/if_ppp.h
+		#define PPP_VERSION "2.3.11"
+		#define PPP_MAGIC   0x5002  /* Magic value for the ppp structure */
+
+7.4.2.	Get "structure has no member named `tty_pushing'" error messages while compiling ppp kernel modules
+
+	This is probably because the mppe patches you used were for an older version
+	of the kernel, and the ppp structure in the header file if_pppvar.h changed
+	in the version of the kernel you have.
+
+	Solution: apply the patch http://www.vibrationresearch.com/pptpd/if_ppp_2.2.17.diff
+		to the kernel sources.
+
+7.4.3.	Get symbols not defined for ppp_mppe module when doing "depmod -a"
+
+	Solution: Quick answer is you probably followed instructions to 
+	comment out the '#include "rc4_skey.c"' line from the file
+	linux/drivers/net/ppp_mppe.c when it should have been left in.
+	If you are using the rc4* sources from SSLeay-0.9.0, you must
+	NOT comment out this line, and you must also make sure the
+	rc4_skey.c file gets copied from the SSLeay sources into the
+	linux/drivers/net directory.
+
+	Longer answer is: you probably are missing some of the rc4* files
+	(most likely rc4_skey.c)  This typically happens when getting rc4*
+	files from a different source than was suggested in the corresponding
+	patch file.  If I remember right, if you use the SSLeay-0.6.6 files
+	you don't have an rc4_skey.c file and must comment out the #include
+	that references it.  If you use the SSLeay-0.9.0 files you will have
+	the rc4_skey.c file, and must NOT comment out the #include line.
+	Using OpenSSL-0.9.5 may have different requirements.
+	The best solution is to use the complete patch for your appropriate
+	ppp version from the following ftp server, as these patches include
+	the rc4* files:
+		ftp://ftp.binarix.com/pub/ppp-mppe/
+
+7.4.4.	Get other errors after applying kernel patches for ppp_mppe.
+
+	Make sure your patch files are in Unix format (and not DOS format)
+	before you apply the patches.  The dos2unix utility will do this
+	conversion.
+
+	If the patch files are in DOS format, the line continuation escapes
+	(i.e. \<LF>) will turn into (\<CR><LF>) which is no longer a line
+	continuation escape code.
+

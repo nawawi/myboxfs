@@ -1,0 +1,25 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.so');
+include_once('ftp.so');
+chk_session();
+
+write_nocache();
+
+if($fname=='' || $type=='') exit;
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+</head>
+<body bgcolor=black>
+<pre>
+<?ftp_con($type,$fname);?>
+</pre>
+</body>
+</html>

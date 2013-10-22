@@ -1,0 +1,317 @@
+#!/bin/php -q
+<?
+// mfs-query.exc - last update 14-Oct-2005
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.so');
+putenv("PATH=/bin:/service/tools:/service/init");
+
+$cmd_array=array();
+$cmd_array['https-restart']='/service/init/https.init restart';
+$cmd_array['https-cert']='/service/init/https.init cert';
+$cmd_array['https-config']='/service/init/https.init config';
+$cmd_array['ssh-restart']='/service/init/ssh.init restart';
+$cmd_array['ssh-passwd']='/service/init/ssh.init passwd';
+$cmd_array['snmp-restart']='/service/init/snmp.init restart';
+$cmd_array['syslog-restart']='/service/init/syslog.init restart';
+$cmd_array['pptp-restart']='/service/init/pptp.init restart';
+$cmd_array['pptp-start']='/service/init/pptp.init start';
+$cmd_array['network-restart']='/service/init/network.init restart';
+$cmd_array['ips-restart']='/service/init/ips.init restart';
+$cmd_array['policy-restart']='/service/init/policy.init restart';
+$cmd_array['cron-restart']='/service/init/cron.init restart';
+$cmd_array['shaper-restart']='/service/init/shaper.init restart';
+$cmd_array['route-flush-cache']='/bin/ip route flush cache';
+$cmd_array['update-dnshost']='/service/init/misc.init dnshost';
+$cmd_array['update-clock']='/service/init/misc.init clock';
+$cmd_array['arp-flush-cache']='/service/tools/mfs-query.exc f';
+$cmd_array['failover-restart']='/service/tools/mfs-link.exc >/dev/null 2>&1 &';
+$cmd_array['dhcp-restart']='/service/init/dhcp.init restart';
+
+$cmd_array['mfs-reboot']='/bin/reboot';
+$cmd_array['mfs-shutdown']='/bin/poweroff';
+$cmd_array['cmd-stop']='cmd-stop';
+
+function read_query() {
+	global $cmd_array;
+	if(!file_exists("/var/sys/mfsque")) return;
+	$buff=file("/var/sys/mfsque");
+	@unlink("/var/sys/mfsque");
+	if(count($buff)!=0) {
+		foreach($buff as $line) {
+			$line=trim($line);
+			if($line=='') continue;
+			$cmd=$cmd_array[$line];
+			if($cmd!='') {
+				if($line=='mfs-reboot') {
+					sleep(5);
+					exec_quite("$cmd");
+				} elseif($line=='mfs-shutdown') {
+					sleep(5);
+					exec_quite("$cmd");
+				} elseif($line=='policy-restart') {
+					sleep(3);
+					exec_quite("$cmd");
+				} elseif($line=='failover-restart') {
+					@killall("mfs-link.exc");
+					sleep(1);
+					@shell_exec("$cmd");	
+				} elseif($line=='cmd-stop') {
+					cmd_stop();
+					sleep(1);	
+				} else {
+					exec_quite("$cmd");
+					sleep(1);
+				}
+			}
+		}
+	}
+}
+
+function cmd_stop() {
+	if(file_exists("/var/sys/cmd_stop")) {
+		$fi=file("/var/sys/cmd_stop");
+		if(count($fi)!=0) {
+			foreach($fi as $line) {
+				$line=trim($line);
+				killall("$line");
+			}
+		}
+	}
+	@unlink("/var/sys/cmd_stop");
+}
+
+function chk_consolelogin() {
+	if(!file_exists("/var/sys/.chklogin")) return 1;
+
+	$buf=file("/var/sys/.chklogin");
+	if(count($buf)!=0) {
+		$fo=fopen("/var/sys/.chklogin.tmp","w");
+		for($x=0;$x<count($buf);$x++) {
+			$list=trim($buf[$x]);
+			if($list=='') continue;
+			list($pid,$time)=preg_split("/:/",$list);
+			if($pid!='' && $time!='') {
+				$timelogin=strtotime($time);
+				$timelogin=$timelogin+60*60*1;
+				$timenow=time();
+				if($timelogin!='' &&  $timenow >= $timelogin) {
+					exec_quite("kill -9 $pid");
+					$list='';
+				}	
+			}
+			if($list!='') fwrite($fo,"$list\n");
+		}
+		fclose($fo);
+		@copy("/var/sys/.chklogin.tmp","/var/sys/.chklogin");
+		@unlink("/var/sys/.chklogin.tmp");
+	}
+	return 0;
+}
+function chk_idsblock() {
+	$_IDS_BLOCK=array();
+	if(file_exists("/var/sys/ipsblock")) {
+		$_IDS_BLOCK=unserialize(file_get_contents("/var/sys/ipsblock"));
+		foreach($_IDS_BLOCK as $src => $keyb) {
+        		foreach($keyb as $dst => $keyval) {
+				$block=$keyval[0];
+				$time=$keyval[1];
+				if(time() >= $time && $time!=0) {
+					$dstl='';
+					if($dst!='any') $dstl="-d $dst";
+					exec_quite("iptables -D IPS-DROP -s $src $dstl -j DROP");
+					if($dst!='any') { 
+						slog("IPS: release DROP from $src to $dst");
+					} else {
+						slog("IPS: release DROP from $src");
+					}
+					unset($_IDS_BLOCK[$src][$dst]);
+					if($_IDS_BLOCK[$src]==array()) unset($_IDS_BLOCK[$src]);
+				}
+       			}
+		}
+		file_put_contents("/var/sys/ipsblock",serialize($_IDS_BLOCK));
+	}
+	$_EMP=unserialize(file_get_contents("/var/sys/payloaddir"));
+	if(count($_EMP)!=0) {
+		foreach($_EMP as $dir) {
+			emptypayloddir($dir,$dir);
+		}
+	}
+	return 0;
+}
+
+function check_dnslist() {
+	if(!file_exists("/var/sys/.dnslist")) return;
+	if(file_exists("/var/sys/dnschkrestart")) {
+		@unlink("/var/sys/.dnslist");
+		@unlink("/var/sys/.dnslist.tmp");
+		@unlink("/var/sys/dnschkrestart");
+		return;
+	}
+	$buff=file("/var/sys/.dnslist");
+	@unlink("/var/sys/.dnslist");
+	@unlink("/var/sys/.dnslist.tmp");
+	$_array_list=array();
+	if(count($buff)!=0) {
+		foreach($buff as $dns) {
+			$dns=trim($dns);
+			if($dns=='') continue;
+			$test=0;
+			if(chkconnect('tcp',"$dns","53",3)!=0) {
+				$_array_list[]="$dns";
+				$test=1;
+			}
+			if($test==0) {
+				if(chkconnect('udp',"$dns","53",3)!=0) {
+					$_array_list[]="$dns";
+					$test=1;
+				}
+			}
+			if($test==0) append_to_file("/var/sys/.dnslist.tmp","$dns\n");
+		}
+	}
+	unset($dns);
+	if(count($_array_list)!=0) {
+		if($fi=fopen("/etc/resolv.conf.tmp","w")) {
+			foreach($_array_list as $dns) {
+				if($dns=='') continue;
+				fputs($fi,"nameserver $dns\n");
+			}
+			fclose($fi);
+			@copy("/etc/resolv.conf.tmp","/etc/resolv.conf");
+			@unlink("/etc/resolv.conf.tmp");
+		}
+	}
+	if(file_exists("/var/sys/.dnslist.tmp")) {
+		copy("/var/sys/.dnslist.tmp","/var/sys/.dnslist");
+		@unlink("/var/sys/.dnslist.tmp");
+	}
+	return 1;
+}
+
+function query_check() {
+	$pid=pcntl_fork();
+	if($pid==-1) {
+		slog("Query: query_check() fork failed!");
+		return 1;
+    	} else if($pid) {
+		exit;
+	} else {
+		for(;;) {
+			@chdir("/");
+			read_query();
+			sleep(1);
+		}
+		exit;
+	}
+	return 1;
+}
+
+function query_ips() {
+	$pid=pcntl_fork();
+	if($pid==-1) {
+		slog("Query: query_ips() fork failed!");
+		return 1;
+    	} else if($pid) {
+		exit;
+	} else {
+		for(;;) {
+			@chdir("/");
+			chk_idsblock();
+			sleep(1);
+		}
+		exit;
+	}
+	return 1;
+}
+
+function query_other() {
+	$pid=pcntl_fork();
+	if($pid==-1) {
+		slog("Query: query_other() fork failed!");
+		return 1;
+    	} else if($pid) {
+		exit;
+	} else {
+		for(;;) {
+			@chdir("/");
+			check_dnslist();
+			chk_pptpuser();
+			//chk_consolelogin();
+			sleep(1);
+		}
+		exit;
+	}
+	return 1;
+}
+
+function delete_arp() {
+	$pid=pcntl_fork();
+	if($pid==-1) {
+		slog("Query: delete_arp() fork failed!");
+		return 1;
+    	} else if($pid) {
+		exit;
+	} else {
+		if($fi=popen("dnet arp show","r")) {
+			while($buff=fgets($fi,1024)) {
+				$buff=trim($buff);
+				if($buff=='') continue;
+				list($addr,$hw)=preg_split("/at/",$buff);
+				$addr=trim($addr);
+				if($addr!='') {
+					exec_quite("dnet arp delete $addr");
+				}
+				unset($addr,$hw);
+			}
+			pclose($fi);
+		}
+		exit;
+	}
+	return 1;
+}
+
+function chk_ntp($server) {
+	$pid=pcntl_fork();
+	if($pid==-1) {
+		slog("Query: chk_ntp($server) fork failed!");
+		return 1;
+    	} else if($pid) {
+		exit;
+	} else {
+		if(exec_cmd("ntpdate $server")==0) {
+			exec_quite("hwclock -w");
+		}
+		exit;
+	}
+	return 1;
+}
+
+$_app=basename($_SERVER["argv"][0]);
+switch($_SERVER["argv"][1]) {
+	case 'q':
+		$ret=query_check();
+		break;
+	case 'i':
+		$ret=query_ips();
+		break;
+	case 'o':
+		$ret=query_other();
+		break;
+	case 'f':
+		$ret=delete_arp();
+		break;
+	case 'n':
+		if(isset($_SERVER["argv"][2])&&$_SERVER["argv"][2]!='') {
+			chk_ntp($_SERVER["argv"][2]);
+		}
+		break;
+	case 'l':
+		compress_log();
+		break;
+	default:
+		echo "Usage: $_app [q:i:o:f:n:l]\n";
+		break;
+}
+exit(0);
+?>

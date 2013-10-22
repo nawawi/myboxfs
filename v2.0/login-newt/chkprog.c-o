@@ -1,0 +1,93 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+extern int file_exist(char *s);
+extern void rmspace(char *x);
+extern void splitc(char *first, char *rest, char divider);
+
+int chkpid(char *prog) {
+	FILE *f;
+	char grep[150];
+	char buff[10];
+	int cnt=0;
+	snprintf(grep,sizeof(grep),"ps ax |grep '%s' |grep -v grep |awk '{print $1}'",prog);
+	if(f=popen(grep,"r")) {
+		while(fgets(buff, sizeof(buff) - 1, f)) cnt++;
+		pclose(f);
+        }
+        return cnt;
+}
+
+int mysystem(char *cmd) {
+	FILE *p;
+	char buf[256];
+	snprintf(buf,sizeof(buf),"%s >/dev/null 2>&1",cmd);
+	if(p=popen(buf,"r")) {
+		pclose(p);
+		return 0;
+	}
+	return 1;
+}
+
+int do_ping(char *ip, char *dev) {
+	char cmd[150];
+	snprintf(cmd,sizeof(cmd),"arping -qb %d -c 1 -w 1 -I %s",atoi(ip),dev);
+	mysystem(cmd);
+	return 0;
+}
+
+void chkfailover(void) {
+	FILE *f;
+	char buff[150];
+	char ipgw[25], gwdev[5], ipfa[25], fadev[5];
+
+	if(file_exist("/var/sys/.load_fa")) {
+		if(f=fopen("/var/sys/.load_fa","r")) {
+			while(fgets(buff, sizeof(buff) - 1, f)) {
+				rmspace(buff);
+				splitc(ipgw,buff,'|');
+				splitc(gwdev,buff,'|');
+				splitc(ipfa,buff,'|');
+				splitc(fadev,buff,'|');
+				do_ping(ipgw,gwdev);
+				do_ping(ipfa,fadev);
+			}
+			fclose(f);
+		}
+	}
+}
+
+int main(void) {
+	chkfailover();
+	if(file_exist("/var/run/chkprog")) {
+		unlink("/var/run/chkprog");
+		exit(1);
+	}
+	system("echo > /var/run/chkprog");
+	if(!chkpid("mfs-query.exc q")) {
+		system("/service/tools/mfs-query.exc q >/dev/null 2>&1 &");
+	}
+	if(file_exist("/var/sys/.chk_snmp")) {
+		if(!chkpid("snmpd")) {
+			mysystem("/service/init/snmp.init restart");
+		}
+	}
+	if(file_exist("/var/sys/.chk_https")) {
+		if(!chkpid("mfs-miniserv.exc")) {
+			mysystem("/service/init/https.init restart");
+		}
+	}
+	if(file_exist("/var/sys/.chk_ssh")) {
+		if(!chkpid("sshd")) {
+			mysystem("/service/init/ssh.init restart");
+		}
+	}
+	if(file_exist("syslogd")) {
+		if(!chkpid("sshd")) {
+			mysystem("/service/init/syslog.init restart");
+		}
+	}
+	unlink("/var/run/chkprog");
+	exit(0);
+}

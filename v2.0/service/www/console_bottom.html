@@ -1,0 +1,52 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.so');
+chk_session();
+//write_nocache();
+
+	if(isset($cmd) && $cmd!='') {
+		$command=$cmd;
+		$values=$value;
+		$select[$cmd]='selected';
+		$c1=$cmd;
+		$c2=$value;
+		unset($cmd,$value);
+	}
+	if(isset($do)&& $do==1) {
+		$load="onload='do_console();';";
+	} else {
+		unset($load);
+	}
+	unset($do);
+
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<style type="text/css">
+body {
+background: #005a8f;
+}
+.td_tab { font-weight: normal; font-style: normal; font-family: arial, helvetica, sans-serif; }
+</style>
+<script language="javascript"><!--
+	defaultStatus="Console";
+      	function set_scroll() {
+		if(document.f.e.checked) {
+	      		parent.console_main.scrolling=true;
+		} else {
+			parent.console_main.scrolling=false;
+	    	}
+	}
+//--></script>
+</head>
+<body bgcolor="#005a8f" leftmargin="0" topmargin="0" marginwidth="0" marginheight="0" oncontextmenu="return false" oncontextmenu="return false" scroll=no border=0>
+<div align=right class=td_tab><form name=f><font class=td_tab color=#ffffff>AutoScroll <input type=checkbox name=e onclick='set_scroll();' checked></font></form>
+</body>
+</html>
+<?flush();?>

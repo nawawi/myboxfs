@@ -1,0 +1,10 @@
+<?
+// Mybox default License 2 hour uptime
+
+$_MYBOX_LICENSE['type']='demo';
+$_MYBOX_LICENSE['demo_valid']='h:1';
+$_MYBOX_LICENSE['org']='unknown';
+$_MYBOX_LICENSE['valid_after']='0';
+$_MYBOX_LICENSE['valid_until']='0';
+$_LICENSE_LOAD=1;
+?>

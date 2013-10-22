@@ -1,0 +1,226 @@
+#!/bin/php -Cq
+<?
+
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once("clib.so");
+putenv("PATH=/bin:/service/tools:/service/init");
+
+declare(ticks = 1);
+ob_implicit_flush(true);
+
+function ignore_signal($signo) {}
+
+function add_history($line) {
+	if(isset($line) && $line !== "" && $line != 'mfs_exec') {
+		readline_add_history($line);
+	}
+}
+
+function save_history() {
+	if(count(readline_list_history()) >= 100) readline_clear_history();
+	readline_write_history("/etc/.cli_history");
+}
+function _close_exit($id=1) {
+	printf("\033[H\033[J");
+	if($id==0) {
+		echo "bye!\n";
+	} else {
+		echo "TimeOut!\n";
+	}
+	readline_write_history("/etc/.cli_history");
+	exit($id);
+}
+
+function _help($no=0) {
+	if($no==0) {
+		echo " show                   - show config\n";
+		echo " set                    - setting config\n";
+		echo " service                - manage services\n";
+		echo " reboot                 - reboot the system\n";
+		echo " shutdown               - shutdown the system\n";
+		echo " exit                   - exit from EXEC\n";
+		echo " help                   - show this help\n";
+	}
+	if($no==1) {
+		echo " uptime                 - show system uptime\n";
+		echo " date                   - show system date\n";
+		echo " clock                  - show hardware clock\n";
+		echo " mem                    - show system memory usage\n";
+		echo " disk                   - show system disk usage\n";
+ 		echo " dir                    - show directory contents\n";
+ 		echo " dns                    - show dns setting\n";
+ 		echo " ipaddr                 - show ip setting\n";
+ 		echo " adm-acl                - show ip setting\n";
+		echo " help                   - show this help\n";
+	}
+}
+
+function _cmd_show($array_cmd) {
+	$cmd=$array_cmd[0];
+	$option=trim($array_cmd[1]);
+	if($option=='') {
+		echo "Unkown option. Try '$cmd ?' for help\n";
+		return;
+	}
+	switch($option) {
+		case 'uptime':
+			system("uptime");
+			break;
+		case 'clock':
+			system("hwclock");
+			break;
+		case 'date':
+			system("date");
+			break;
+		case 'mem':
+			system("free");
+			break;
+		case 'disk':
+			system("df -kh");
+			break;
+		case 'dir':
+			system("ls -la |more");
+			break;
+		case '?':case 'help':
+			_help(1);
+			break; 
+		default:
+			echo "Unkown option -> $option. Try '$cmd ?' for help\n";
+			break;
+	}
+}
+
+function _tab_complete($h) {
+	$ret=array();
+	$ret[]="help";
+	$ret[]="show";
+	$ret[]="uptime";
+	$ret[]="clock";
+	$ret[]="date";
+	$ret[]="proc";
+	$ret[]="mem";
+	$ret[]="disk";
+	$ret[]="dir";
+	$ret[]="cwd";
+	$ret[]="ipconfig";
+	$ret[]="acl";
+	$ret[]="service";
+	$ret[]="shutdown";
+	$ret[]="history";
+	$ret[]="reboot";
+	return $ret;
+}
+
+function _history() {
+	$history=readline_list_history();
+	if(count($history)!=0) {
+		foreach($history as $num => $list) {
+			echo " $num $list\n";
+		}
+	}
+}
+
+function _cmd_service($array_cmd) {
+	$cmd=$array_cmd[0];
+	$srv=$array_cmd[1];
+	if(file_exists("/service/init/$srv.init")) {
+		system("/service/init/$srv.init {$array_cmd[2]} {$array_cmd[3]}");  
+	} else {
+		echo "service not exist\n";
+	}
+}
+
+function _interpreter($array_cmd) {
+        switch(strtolower($array_cmd[0])) {
+                case '?':case 'help':  
+			_help(0);
+			break;
+		case 'show':case 'sh':
+			_cmd_show($array_cmd);
+			break;
+		case 'set':
+			_cmd_set($array_cmd);
+			break;
+		case 'service':
+			_cmd_service($array_cmd);
+			break;
+		case 'reboot':
+			system("reboot");
+			break;
+		case 'shutdown':
+			system("poweroff");
+			break;
+
+		case 'mfs_exec':
+			putenv("SHELL=/bin/bash");
+			putenv("HOME=/");
+			putenv("BASH_ENV=");
+			putenv("HISTFILE=/etc/.bash_history");
+			putenv("HISTFILESIZE=100");
+			putenv("HISTSIZE=100");
+			putenv("PS1='\\h> '");
+			passthru("/bin/bash");
+			@chdir("/system");
+			break;
+                case 'exit':case 'quit':case 'bye': 
+			_close_exit(0);
+		default:
+			echo "Unkown command -> {$array_cmd[0]}. Try '?' for help\n";
+			break;
+        }
+
+}
+
+function _get_hostname() {
+	$_hostname='mfs';
+	if(file_exists("/proc/sys/kernel/hostname")) {
+		list($_hostname,)=preg_split("/\./",file_get_contents("/proc/sys/kernel/hostname"));
+	}
+	return trim($_hostname);
+}
+
+function _get_timeout() {
+	global $_DB_NAME;
+	$_session=0;
+	$db_id=db_connect($_DB_NAME);
+	$result=db_query("select * from misc where name='www_session'",$db_id);
+	if(db_num_rows($result)!=0) {
+		$_timeout=db_fetch_single($result);
+	}
+	db_close($db_id);
+	if($_timeout!=0) {
+		$_session=time()+60*$_timeout;
+	} else {
+		$_session=$_timeout;
+	}
+	return $_session;
+}
+
+function main() {
+	pcntl_signal(SIGINT, SIG_IGN);
+	pcntl_signal(SIGTSTP, "ignore_signal");
+	pcntl_signal(SIGALRM, "_close_exit");
+
+	readline_read_history(".history");
+	readline_completion_function("_tab_complete");
+
+	$_timeout=_get_timeout();
+	$_prompt=_get_hostname();
+	@chdir("/system");
+	while(1) {
+		pcntl_alarm($_timeout);
+		$line=readline("$_prompt> ");
+		add_history($line);
+		$cmd=preg_split("/\s+/",$line);
+		if(count($cmd)!=0) {
+			_interpreter($cmd);flush();
+		}
+		clearstatcache();
+		flush();
+	}
+}
+
+main();
+exit();
+
+?>

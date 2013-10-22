@@ -1,0 +1,81 @@
+/usr/bin/rrdtool create \
+/var/www/html/cacti-0.8.6c/rra/localhostsnmp_cpu_nice_445.rrd \
+--step 300  \
+DS:cpu_nice:COUNTER:600:0:100 \
+RRA:AVERAGE:0.5:1:600 \
+RRA:AVERAGE:0.5:6:700 \
+RRA:AVERAGE:0.5:24:775 \
+RRA:AVERAGE:0.5:288:797 \
+RRA:MAX:0.5:1:600 \
+RRA:MAX:0.5:6:700 \
+RRA:MAX:0.5:24:775 \
+RRA:MAX:0.5:288:797 \
+
+/usr/bin/rrdtool create \
+/var/www/html/cacti-0.8.6c/rra/localhostsnmp_cpu_system_446.rrd \
+--step 300  \
+DS:cpu_system:COUNTER:600:0:100 \
+RRA:AVERAGE:0.5:1:600 \
+RRA:AVERAGE:0.5:6:700 \
+RRA:AVERAGE:0.5:24:775 \
+RRA:AVERAGE:0.5:288:797 \
+RRA:MAX:0.5:1:600 \
+RRA:MAX:0.5:6:700 \
+RRA:MAX:0.5:24:775 \
+RRA:MAX:0.5:288:797 \
+
+/usr/bin/rrdtool create \
+/var/www/html/cacti-0.8.6c/rra/localhostsnmp_cpu_user_447.rrd \
+--step 300  \
+DS:cpu_user:COUNTER:600:0:100 \
+RRA:AVERAGE:0.5:1:600 \
+RRA:AVERAGE:0.5:6:700 \
+RRA:AVERAGE:0.5:24:775 \
+RRA:AVERAGE:0.5:288:797 \
+RRA:MAX:0.5:1:600 \
+RRA:MAX:0.5:6:700 \
+RRA:MAX:0.5:24:775 \
+RRA:MAX:0.5:288:797 \
+	
+update /var/www/html/cacti-0.8.6c/rra/localhostsnmp_cpu_system_446.rrd --template cpu_system 1112177702:54254647
+update /var/www/html/cacti-0.8.6c/rra/localhostsnmp_cpu_nice_445.rrd --template cpu_nice 1112177702:19672
+update /var/www/html/cacti-0.8.6c/rra/localhostsnmp_cpu_user_447.rrd --template cpu_user 1112177702:279241121
+[root@ceri lib]# cat /proc/stat
+cpu  279241516 19672 53422907 980835698 1159101 515794 316027
+
+update /var/www/html/cacti-0.8.6c/rra/localhostsnmp_cpu_system_446.rrd --template cpu_system 1112167202:54163481
+update /var/www/html/cacti-0.8.6c/rra/localhostsnmp_cpu_nice_445.rrd --template cpu_nice 1112167202:19672
+update /var/www/html/cacti-0.8.6c/rra/localhostsnmp_cpu_user_447.rrd --template cpu_user 1112167202:278786213
+
+/usr/bin/rrdtool graph - \
+--imgformat=PNG \
+--start=-86400 \
+--end=-300 \
+--title="localhost-snmp - CPU Usage" \
+--rigid \
+--base=1000 \
+--height=120 \
+--width=500 \
+--alt-autoscale-max \
+--lower-limit=0 \
+--vertical-label="percent" \
+DEF:a="/var/www/html/cacti-0.8.6c/rra/localhostsnmp_cpu_system_446.rrd":cpu_system:AVERAGE \
+DEF:b="/var/www/html/cacti-0.8.6c/rra/localhostsnmp_cpu_user_447.rrd":cpu_user:AVERAGE \
+DEF:c="/var/www/html/cacti-0.8.6c/rra/localhostsnmp_cpu_nice_445.rrd":cpu_nice:AVERAGE \
+CDEF:cdefbc=TIME,1112165726,GT,a,a,UN,0,a,IF,IF,TIME,1112165726,GT,b,b,UN,0,b,IF,IF,TIME,1112165726,GT,c,c,UN,0,c,IF,IF,+,+ \
+AREA:a#FF0000:"System"  \
+GPRINT:a:LAST:"Current\:%8.2lf %s"  \
+GPRINT:a:AVERAGE:"Average\:%8.2lf %s"  \
+GPRINT:a:MAX:"Maximum\:%8.2lf %s\n"  \
+STACK:b#0000FF:"User"  \
+GPRINT:b:LAST:"  Current\:%8.2lf %s"  \
+GPRINT:b:AVERAGE:"Average\:%8.2lf %s"  \
+GPRINT:b:MAX:"Maximum\:%8.2lf %s\n"  \
+STACK:c#00FF00:"Nice"  \
+GPRINT:c:LAST:"  Current\:%8.2lf %s"  \
+GPRINT:c:AVERAGE:"Average\:%8.2lf %s"  \
+GPRINT:c:MAX:"Maximum\:%8.2lf %s\n"  \
+LINE1:cdefbc#000000:"Total"  \
+GPRINT:cdefbc:LAST:" Current\:%8.2lf %s"  \
+GPRINT:cdefbc:AVERAGE:"Average\:%8.2lf %s"  \
+GPRINT:cdefbc:MAX:"Maximum\:%8.2lf %s" 

@@ -1,0 +1,96 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.so');
+@setcookie('clickedFolder','1');
+chk_session();
+write_nocache();
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/tblue.css" TYPE="text/css">
+<style type="text/css">
+body {
+background: white url("<?echo $_URL_PATH;?>/i/dotted.png");
+background-repeat: repeat-y;
+background-position: right;
+background-attachment: fixed;
+scrollbar-arrow-color:#FFFFFF;
+scrollbar-base-color:#8E8792;
+scrollbar-shadow-color:#8E8792;
+scrollbar-face-color:#AEA2B4;
+scrollbar-highlight-color:#DDDDDD;
+scrollbar-dark-shadow-color:#8E8792;
+scrollbar-3d-light-color:#8E8792;
+}
+</style>
+<script language="javascript">
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+	function do_console() {
+		LeftPosition = (screen.width) ? (screen.width-620)/2 : 0;
+		TopPosition = (screen.height) ? (screen.height-530)/2 : 0;
+		settings='width=620,height=530,top='+TopPosition+',left='+LeftPosition+',scrollbars=0,status=1,resizable=1';
+		window.open("<?echo $_URL_PATH;?>/console.html","console<?echo time();?>",settings);
+		return;
+	}
+</script>
+<script language="javascript" src="<?echo $_URL_PATH;?>/j/ua.js"></script>
+<script language="javascript" src="<?echo $_URL_PATH;?>/j/ftiens4.js"></script>
+</head>
+<body scroll=auto>
+<table border=0 width=80%>
+<tr>
+<td align="justify" valign=middle>
+<font size=-2><a style="font-size:7pt;text-decoration:none;color:silver" href="http://www.treemenu.net/" target=_blank></a></font>
+<script type="text/javascript">
+function dummyop() {};
+USETEXTLINKS = 1;
+STARTALLOPEN = 0;
+PERSERVESTATE = 1;
+ICONPATH='i/t/';
+foldersTree = gFld("&nbsp;&nbsp;MFS Menu", "javascript:parent.left_frame.dummyop()");
+foldersTree.iconSrc = ICONPATH + "harddisk.png";
+aux1 = insFld(foldersTree, gFld("System", "javascript:parent.left_frame.dummyop()"));
+ insDoc(aux1, gLnk("R", "General", "<?echo $_URL_PATH;?>/system_general.html"));
+ insDoc(aux1, gLnk("R", "Access list", "<?echo $_URL_PATH;?>/system_acl.html"));
+ insDoc(aux1, gLnk("R", "Services", "<?echo $_URL_PATH;?>/system_services.html"));
+ insDoc(aux1, gLnk("R", "Backup", "<?echo $_URL_PATH;?>/system_backup.html"));
+ insDoc(aux1, gLnk("R", "Update", "<?echo $_URL_PATH;?>/system_update.html"));
+ insDoc(aux1, gLnk("R", "Notification", "<?echo $_URL_PATH;?>/system_alert.html"));
+aux2 = insFld(foldersTree, gFld("Network", "javascript:parent.left_frame.dummyop()"));
+ insDoc(aux2, gLnk("R", "Interfaces", "<?echo $_URL_PATH;?>/network_int.html"));
+ insDoc(aux2, gLnk("R", "Routing/gateway", "<?echo $_URL_PATH;?>/network_route.html"));
+<?if(mfs_license('ITS')==1){?>
+ insDoc(aux2, gLnk("R", "Traffic shaper", "<?echo $_URL_PATH;?>/network_shaper.html"));
+<? } ?>
+aux3 = insFld(foldersTree, gFld("Firewall", "javascript:parent.left_frame.dummyop()"));
+ insDoc(aux3, gLnk("R", "Rules", "<?echo $_URL_PATH;?>/fw_rules.html"));
+<?if(mfs_license('NAT')==1){?>
+ insDoc(aux3, gLnk("R", "NAT", "<?echo $_URL_PATH;?>/fw_nat.html"));
+<? } ?>
+<?if(mfs_license('IPS')==1){?>
+ insDoc(aux3, gLnk("R", "IPS", "<?echo $_URL_PATH;?>/fw_ips.html"));
+<? } ?>
+<?if(mfs_license('VPN')==1){?>
+aux4 = insFld(foldersTree, gFld("VPN Access", "javascript:parent.left_frame.dummyop()"));
+ insDoc(aux4, gLnk("R", "PPTP", "<?echo $_URL_PATH;?>/vpn_pptp.html"));
+<? } ?>
+aux5 = insFld(foldersTree, gFld("Diagnostics", "javascript:parent.left_frame.dummyop()"));
+<?if(!file_exists("/var/sys/nolog")) {?>
+ insDoc(aux5, gLnk("R", "Local logs", "<?echo $_URL_PATH;?>/diag_logs.html"));
+<? } ?>
+ insDoc(aux5, gLnk("R", "Graphs", "<?echo $_URL_PATH;?>/diag_graphs.html"));
+ insDoc(aux5, gLnk("R", "NetCache", "<?echo $_URL_PATH;?>/diag_netcache.html"));
+ insDoc(aux5, gLnk("R", "NetTools", "javascript:parent.left_frame.do_console();"));
+initializeDocument();
+</script>
+</td>
+</tr>
+</table>
+</body>
+</html>
+<?flush();?>

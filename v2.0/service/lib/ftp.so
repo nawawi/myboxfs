@@ -1,0 +1,97 @@
+<?
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("closed. not parent");
+
+function ftp_con($type,$fname) {
+	global $_DB_NAME, $_DOWNLOAD_PATH, $_DB_PATH, $_SQLITE_BINARY;
+	global $_LOGIN;
+	$tname='RESTORE';
+	if($type==1) $tname='BACKUP';
+	$val=array();
+	$db_id=db_connect($_DB_NAME);
+	$result=db_query("select * from misc where name like \"ftp_%\"",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_name=$row['name'];
+			$_val=$row['val'];
+			$val[$_name]=$_val;
+		}
+	}
+	$ftpserver=$val['ftp_server'];
+	$ftpuser=$val['ftp_user'];
+	$ftppass=$val['ftp_pass'];
+	$ftppath=$val['ftp_path'];
+	$ftppassive=$val['ftp_passive'];
+
+	$conn_id=@ftp_connect($ftpserver); 
+	$login_result=@ftp_login($conn_id, $ftpuser, $ftppass); 
+	if ((!$conn_id) || (!$login_result)) { 
+		slog("$tname: ({$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}) Connecting to $ftpserver with user $ftpuser failed!");
+		echo("Connecting to $ftpserver with user $ftpuser failed!<br>");
+		return 1; 
+   	} else {
+
+	}
+	$systype = @ftp_systype($conn_id);
+	@ftp_pasv($conn_id,$ftppassive);
+	slog("$tname: Connectting to $ftpserver system type $systype");
+	echo("Connecting to $ftpserver system type $systype\n");
+	if($ftppassive=='TRUE') {
+		slog("$tname: ({$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}) Using passive transfer mode");
+		echo("Using passive transfer mode<br>");
+	} else {
+		slog("$tname: Using native transfer mode");
+		echo("Using native transfer mode<br>");
+	}
+	if($type==1) @ftp_mkdir($conn_id,$ftppath);
+	if(@!ftp_chdir($conn_id, $ftppath)) { 
+   		slog("$tname: ({$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}) Couldn't change remote directory '$ftppath'");
+		echo("Couldn't change remote directory '$ftppath'<br>");
+		return 1;
+	} else {
+	   	slog("$tname: Change remote directory to '$ftppath'");
+		echo("Change remote directory to '$ftppath'<br>");	
+	}
+	chdir($_DOWNLOAD_PATH);
+	if($type==1) {
+		if(file_exists("$_DOWNLOAD_PATH/$fname")) {	
+			$upload=@ftp_put($conn_id, $fname, $fname, FTP_BINARY);
+			if(!$upload) { 
+				slog("$tname: ({$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}) uploading file $fname failed.");
+				echo("uploading file $fname failed.<br>");
+			} else { 
+				slog("$tname: uploading file $fname.");
+				echo("uploading file $fname.<br>");
+			}
+			@unlink("$_DOWNLOAD_PATH/$fname");
+		}
+	} else {
+		$upload=@ftp_get($conn_id, $fname, $fname, FTP_BINARY); 
+		if(!$upload) { 
+			slog("$tname: ({$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}) getting file $fname failed.");
+			echo("getting file $fname failed.<br>");
+		} else { 
+			slog("$tname: ({$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}) getting file $fname.");
+			echo("getting file $fname.<br>");
+			if(file_exists("$_DOWNLOAD_PATH/$fname")) {
+				@copy("$_DB_PATH/$_DB_NAME","$_DB_PATH/$_DB_NAME".".bak");
+				@unlink("$_DB_PATH/$_DB_NAME");
+				if(exec_cmd("cat $_DOWNLOAD_PATH/$fname |$_SQLITE_BINARY $_DB_PATH/$_DB_NAME")==0) {
+					echo("Restore succeed.<br>");
+					slog("$tname: ({$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}) restore succeed.");
+					@unlink("$_DOWNLOAD_PATH/$fname");
+					@unlink("$_DB_PATH/$_DB_NAME".".bak");
+				} else {
+					@copy("$_DB_PATH/$_DB_NAME".".bak","$_DB_PATH/$_DB_NAME");
+					echo("Restore failed.<br>");
+					slog("$tname: ({$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}) restore failed.");
+				}
+			}
+		}
+	}
+	@ftp_close($conn_id);
+	slog("$tname: ({$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}) Closing remote connection.");
+	echo("Closing remote connection.<br>");
+	return 0;
+}
+
+?>

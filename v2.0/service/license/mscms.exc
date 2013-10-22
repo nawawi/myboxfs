@@ -1,0 +1,20 @@
+<?
+// 1 = enterprise 2 = mini
+
+$_SET_MYBOX_LICENSE=1;
+$_MYBOX_ORG="MSC Management Services Sdn. Bhd.";
+$_MYBOX_KEY="!mscms98745*";
+$_MYBOX_LICENSE=array();
+if($_SET_MYBOX_LICENSE==1) {
+	$_MYBOX_LICENSE['type']='mscms2005-Mfsv20501';
+	$_MYBOX_LICENSE['org']=$_MYBOX_ORG;
+	$_MYBOX_LICENSE['key']=$_MYBOX_KEY;
+	$_MYBOX_LICENSE['standard_system']=1;
+	$_MYBOX_LICENSE['traffic_shaper']=1;
+	$_MYBOX_LICENSE['reporting']=1;
+	$_MYBOX_LICENSE['nat']=1;
+	$_MYBOX_LICENSE['ips']=1;
+	$_MYBOX_LICENSE['vpn']=1;
+}
+
+?>

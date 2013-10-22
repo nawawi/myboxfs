@@ -1,0 +1,11 @@
+#!/bin/php
+<?
+	$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+	include_once('clib.so');
+	chk_session();
+	write_nocache();
+	if(isset($_LOGIN['auth_id'])&&($_LOGIN['auth_id']=='admin' || $_LOGIN['auth_id']=='look')) {
+		index_frame();
+	}
+	index_login();
+?>

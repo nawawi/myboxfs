@@ -1,0 +1,2251 @@
+<html><head>
+<title>Unix Multi-Process Programming and Inter-Process Communications (IPC)</title></head>
+
+<body>
+
+<p align="center"><img src="multi-process_files/lupg_toolbar.gif" alt="" usemap="#lupg_map" height="40" width="360"><map name="lupg_map"><area shape="rect" coords="3,0 37,39" href="http://www.actcom.co.il/%7Echoo/lupg" alt="LUPG home"><area shape="rect" coords="67,0 102,39" href="http://www.actcom.co.il/%7Echoo/lupg/tutorials/index.html" alt="Tutorials"><area shape="rect" coords="138,0 170,39" href="http://www.actcom.co.il/%7Echoo/lupg/related-material.html" alt="Related material"><area shape="rect" coords="213,0 232,39" href="http://www.actcom.co.il/%7Echoo/lupg/project-ideas/index.html" alt="Project Ideas"><area shape="rect" coords="272,0 290,39" href="http://www.actcom.co.il/%7Echoo/lupg/essays/index.html" alt="Essays"><area shape="rect" coords="324,0 355,39" href="mailto:choo@actcom.co.il" alt="Send comments"></map>
+<br>[<a href="http://www.actcom.co.il/%7Echoo/lupg/index.html">LUPG Home</a>]  [<a href="http://www.actcom.co.il/%7Echoo/lupg/tutorials/index.html">Tutorials</a>]  [<a href="http://www.actcom.co.il/%7Echoo/lupg/related-material.html">Related Material</a>] [<a href="http://www.actcom.co.il/%7Echoo/lupg/essays/index.html">Essays</a>] [<a href="http://www.actcom.co.il/%7Echoo/lupg/project-ideas/index.html">Project Ideas</a>] [<a href="mailto:choo@actcom.co.il">Send Comments</a>]<br><img src="multi-process_files/good_bar.gif" alt=""></p> 
+
+v1.2
+
+<h1>Unix Multi-Process Programming and Inter-Process Communications (IPC)</h1>
+
+Table Of Contents:
+<ol>
+<li> <a href="#preface">Preface And Motivation</a>
+</li><li> <a href="#whatis">What Is A Unix Process</a>
+</li><li> <a href="#fork">Process Creation</a>
+  <ol>
+  <li> <a href="#process_creation_fork_syscall">The <code>fork()</code> System Call</a>
+  </li></ol>
+</li><li> <a href="#sigchld">Child Process Termination</a>
+  <ol>
+  <li> <a href="#child_death_wait_syscall">The <code>wait()</code> System Call</a>
+  </li><li> <a href="#child_death_async">Asynchronous Child Death Notification</a>
+  </li></ol>
+</li><li> <a href="#pipe">Communications Via Pipes</a>
+  <ol>
+  <li> <a href="#pipe_whatis">What Is A Pipe?</a>
+  </li><li> <a href="#pipes_pipe_syscall">The <code>pipe()</code> System Call</a>
+  </li><li> <a href="#pipes_two_way">Two-Way Communications With Pipes</a>
+  </li></ol>
+</li><li> <a href="#namedpipes">Named Pipes</a>
+  <ol>
+  <li> <a href="#named_pipe_whatis">What Is A Named Pipe?</a>
+  </li><li> <a href="#named_pipe_create">Creating A Named Pipe With The <code>mknod</code> Command</a>
+  </li><li> <a href="#named_pipe_open">Opening A Named Pipe For Reading Or Writing</a>
+  </li><li> <a href="#named_pipe_read_write">Reading/Writing From/To A Named Pipe</a>
+  </li><li> <a href="#named_pipe_example">Named Pipe - A Complete Example</a>
+  </li></ol>
+</li><li> <a href="#sockets">Few Words About Sockets</a>
+</li><li> <a href="#sysv_ipc">System V IPC</a>
+  <ol>
+  <li> <a href="#sysv_ipc_permissions">Permission Issues</a>
+    <ol>
+    <li> <a href="#sysv_ipc_permissions_private_vs_public">Private Vs. Public</a>
+    </li><li> <a href="#sysv_ipc_permissions_modes">Access Permission Modes - The 'ipc_perm' Structure</a>
+    </li><li> <a href="#sysv_ipc_permissions_sys_utils">System Utilities To Administer System-V IPC Resources</a>
+    </li></ol>
+  </li><li> <a href="#msgqueue">Using Message Queues</a>
+    <ol>
+    <li> <a href="#msgqueue_what">What Are Message Queues?</a>
+    </li><li> <a href="#msgqueue_create">Creating A Message Queue - <code>msgget()</code></a>
+    </li><li> <a href="#msgqueue_msgbuf">The Message Structure - <code>struct msgbuf</code></a>
+    </li><li> <a href="#msgqueue_msgsnd">Writing Messages Onto A Queue - <code>msgsnd()</code></a>
+    </li><li> <a href="#msgqueue_msgrcv">Reading A Message From The Queue - <code>msgrcv()</code></a>
+    </li><li> <a href="#msgqueue_example">Message Queues - A Complete Example</a>
+    </li></ol>
+  </li><li> <a href="#semaphores">Process Synchronization With Semaphores</a>
+    <ol>
+    <li> <a href="#semaphores_whatis">What Is A Semaphore? What Is A Semaphore Set?</a>
+    </li><li> <a href="#semaphores_create">Creating A Semaphore Set - <code>semget()</code></a>
+    </li><li> <a href="#semaphores_set_get">Setting And Getting Semaphore Values With <code>semctl()</code></a>
+    </li><li> <a href="#semaphores_mutex">Using Semaphores For Mutual Exclusion With <code>semop()</code></a>
+    </li><li> <a href="#semaphores_counter">Using Semaphores For Producer-Consumer Operations With <code>semop()</code></a>
+    </li><li> <a href="#semaphores_example">Semaphores - A Complete Example</a>
+    </li></ol>
+  </li><li> <a href="#shmem">Shared Memory</a>
+    <ol>
+    <li> <a href="#shmem_background">Background - Virtual Memory Management Under Unix</a>
+    </li><li> <a href="#shmem_shmget">Allocating A Shared Memory Segment</a>
+    </li><li> <a href="#shmem_shmat_shmdt">Attaching And Detaching A Shared Memory Segment</a>
+    </li><li> <a href="#shmem_data_placement">Placing Data In Shared Memory</a>
+    </li><li> <a href="#shmem_shmctl">Destroying A Shared Memory Segment</a>
+    </li><li> <a href="#shmem_example">A Complete Example</a>
+    </li></ol>
+  </li><li> <a href="#ftok">A Generalized SysV Resource ID Creation - <code>ftok()</code></a>
+  </li></ol>
+</li></ol>
+
+<hr size="4">
+
+<a name="preface">
+<font color="brown"><h2>Preface And Motivation</h2></font>
+</a>
+<p>
+One of the strong features of Unix-like operating systems, is their
+ability to run several processes simultaneously, and let them all share
+the CPU(s), memory, and other resources. Any none-trivial system developed
+on Unix systems will sooner or later resort to splitting its tasks into
+more than one process. True, many times threads will be preferred (thought
+these are candidates for a separate tutorial), but the methods used in
+both of them tend to be rather similar - how to start and stop processes,
+how to communicate with other processes, how to synchronize processes.
+</p>
+
+<p>
+We'll try to learn here the various features that the system supplies us
+with in order to answer these questions. One should note that dealing
+with multi-process systems takes a slightly different approach than dealing
+with a single-process program - events happen to occur in parallel, debugging
+is more complicated, and there's always the risk of having a bug cause
+endless process creation that'll bring your system to a halt. In fact,
+when i took a course that tried teaching these subjects, at the week
+we had to deliver one of the exercises, the system hardly managed to
+survive the bunch of students running buggy programs that create new
+processes endlessly, or leaving background processes running into endless
+loop, and so on. OK, lets stop intimidating, and get to see how it's done.
+</p>
+
+<hr size="4">
+
+<a name="whatis">
+<font color="brown"><h2>What Is A Unix Process</h2></font>
+</a>
+<p>
+Before we talk about processes, we need to understand exactly what a process
+is. If you know exactly what it is, and are familiar with the notion
+of 'Re-entrancy', you may <a href="#fork">skip to the next section...</a>
+</p>
+
+<p>
+You didn't skip? OK. Lets try to write a proper definition:
+</p>
+
+<dl>
+<dt><u>Unix Process</u>
+</dt><dd>An entity that executes a given piece of code, has its own execution stack,
+    its own set of memory pages, its own file descriptors table, and a unique
+    process ID.
+</dd>
+</dl>
+
+<p>
+As you might understand from this definition, a process is not a program.
+several processes may be executing the same computer program at the same
+time, for the same user or for several different users. For example, there
+is normally one copy of the 'tcsh' shell on the system, but there may be
+many tcsh processes running - one for each interactive connection of a user
+to the system. It might be that many different processes will try to
+execute the same piece of code at the same time, perhaps trying to utilize
+the same resources, and we should be ready to accommodate such situations.
+This leads us to the concept of 'Re-entrancy'.
+</p>
+
+<dl>
+<dt>Re-entrancy
+</dt><dd>The ability to have the same function (or part of a code) being in some
+    phase of execution, more than once at the same time.
+</dd>
+</dl>
+
+<p>
+This re-entrancy might mean that two or more processes try to execute this
+piece of code at the same time. it might also mean that a single process tries
+to execute the same function several times simultaneously. How this may be
+possible?  a simple example is a recursive function. The process starts
+executing it, and somewhere in the middle (before exiting the function), it
+calls the same function again. This means that the function should only use
+local variables to save its state information, for example.
+</p>
+
+<p>
+Of-course, with a multi-process code, we don't have conflicts of variables,
+because normally the data section of each process is separate from that of
+other processes (so process A that runs program P and process B that runs
+the same program P, have distinct copies of the global variable 'i' of that
+program), but there might be other resources that would cause a piece of
+code to be non-reentrant. For example, if the program opens a file and writes
+some data to it, and two processes try to run the program at the same time,
+the contents of the file might be ruined in an unpredictable way. This is why
+a program must protect itself by using some kind of 'locking' mechanism,
+that will only allow one process at a time to open the file and write
+data into the file. An example of such a mechanism is the usage of semaphores,
+which will be discussed later on.
+</p>
+
+<hr size="4">
+
+<a name="fork">
+<font color="brown"><h2>Process Creation</h2></font>
+</a>
+<p>
+As you might (hopefully) already know, it is possible for a user to run
+a process in the system, suspend it (Ctrl-Z), and move it to the background
+(using the 'bg' command). If you're not familiar with this, you would do best
+to read the 'Job Control' section of the 'csh' manual page (or of 'bash', if
+that is the shell you normally use). However, we are interested in learning
+how to create new processes from within a C program.
+</p>
+
+<hr>
+
+<a name="process_creation_fork_syscall">
+<font color="brown"><h4>The <code>fork()</code> System Call</h4></font>
+</a>
+<p>
+The <code>fork()</code> system call is the basic way to create a new process.
+It is also a very unique system call, since it returns twice(!) to the caller.
+Sounds confusing? good. This confusion stems from the attempt to define as
+few systems calls as possible, it seems. OK, lets see:
+<br><br>
+</p><dl>
+<dt><code>fork()</code>
+</dt><dd>This system call causes the current process to be split into two
+processes - a parent process, and a child process. All of the memory pages
+used by the original process get duplicated during the <code>fork()</code>
+call, so both parent and child process see the exact same image. The only
+distinction is when the call returns. When it returns in the parent process,
+its return value is the process ID (PID) of the child process. When it
+returns inside the child process, its return value is '0'. If for some reason
+this call failed (not enough memory, too many processes, etc.), no new
+process is created, and the return value of the call is '-1'. In case the
+process was created successfully, both child process and parent process
+continue from the same place in the code where the <code>fork()</code> call
+was used.
+</dd>
+</dl>
+<p></p>
+
+<p>
+To make things clearer, lets see an example of a code that uses this
+system call to create a child process that prints (you guessed it)
+"hello world" to the screen, and exits.
+</p>
+<hr width="40%">
+<pre><code>
+#include &lt;unistd.h&gt;	<font color="brown">/* defines fork(), and pid_t.      */</font>
+#include &lt;sys/wait.h&gt;	<font color="brown">/* defines the wait() system call. */</font>
+
+<font color="brown">/* storage place for the pid of the child process, and its exit status. */</font>
+pid_t child_pid;
+int child_status;
+
+<font color="brown">/* lets fork off a child process... */</font>
+child_pid = fork();
+
+<font color="brown">/* check what the fork() call actually did */</font>
+switch (child_pid) {
+    case -1:	<font color="brown">/* fork() failed */</font>
+	perror("fork");	<font color="brown">/* print a system-defined error message */</font>
+	exit(1);
+    case 0:	<font color="brown">/* fork() succeeded, we're inside the child process */</font>
+	printf("hello world\n");
+	exit(0);	<font color="brown">/* here the CHILD process exits, not the parent. */</font>
+    default:	<font color="brown">/* fork() succeeded, we're inside the parent process */</font>
+	wait(&amp;child_status);	<font color="brown">/* wait till the child process exits */</font>
+}
+<font color="brown">/* parent's process code may continue here... */</font>
+</code></pre>
+<hr width="40%">
+
+<p>
+Notes:
+</p><ul>
+<li> The <code>perror()</code> function prints an error message based on
+     the value of the errno variable, to stderr.
+</li><li> The <code>wait()</code> system call waits until any child process exits,
+     and stores its exit status in the variable supplied. There are a set of
+     macros to check this status, that will be explained in the next section.
+</li></ul>
+<p></p>
+
+<p>
+<em>Note: <code>fork()</code> copies also a memory area known as the 'U Area'
+(or User Area). This area contains, amongst other things, the file descriptor
+table of the process. This means that after returning from the
+<code>fork()</code> call, the child process inherits all files that were open
+in the parent process. If one of them reads from such an open file, the
+read/write pointer is advanced for both of them. On the other hand, files
+opened after the call to <code>fork()</code> are not shared by both processes.
+Further more, if one process closes a shared file, it is still kept open
+in the other process.
+</em>
+</p>
+
+<hr size="4">
+
+<a name="sigchld">
+<font color="brown"><h2>Child Process Termination</h2></font>
+</a>
+<p>
+Once we have created a child process, there are two possibilities. Either
+the parent process exits before the child, or the child exits before the
+parent. Now, Unix's semantics regarding parent-child process relations
+state something like this:
+</p><ul>
+<li>When a child process exits, it is not immediately cleared off the
+process table. Instead, a signal is sent to its parent process, which
+needs to acknowledge it's child's death, and only then the child process
+is completely removed from the system. In the duration before the parent's
+acknowledgment and after the child's exit, the child process is in a state
+called "zombie". (for info about Unix signals, please refer to our
+<a href="http://www.actcom.co.il/%7Echoo/lupg/tutorials/signals/signals-programming.html">Unix signals programming</a> tutorial).
+</li><li>When a process exits (terminates), if it had any child processes, they
+become orphans. An orphan process is automatically inherited by the 'init'
+process (process number 1 on normal Unix systems), and becomes a child
+of this 'init' process. This is done to ensure that when the process
+terminates, it does not turn into a zombie, because 'init' is written to
+properly acknowledge the death of its child processes.
+</li></ul>
+<p></p>
+
+<p>
+When the parent process is not properly coded, the child remains in the
+zombie state forever. Such processes can be noticed by running the 'ps'
+command (shows the process list), and seeing processes having the string
+"&lt;defunct&gt;" as their command name.
+</p>
+
+<hr>
+
+<a name="child_death_wait_syscall">
+<font color="brown"><h4>The <code>wait()</code> System Call</h4></font>
+</a>
+<p>
+The simple way of a process to acknowledge the death of a child process
+is by using the <code>wait()</code> system call. As we mentioned earlier,
+When <code>wait()</code> is called, the process is suspended until
+one of its child processes exits, and then the call returns with the exit
+status of the child process. If it has a zombie child process, the call
+returns immediately, with the exit status of that process.
+</p>
+
+<hr>
+
+<a name="child_death_async">
+<font color="brown"><h4>Asynchronous Child Death Notification</h4></font>
+</a>
+<p>
+The problem with calling <code>wait()</code> directly, is that usually
+you want the parent process to do other things, while its child process
+executes its code. Otherwise, you're not really enjoying multi-processes,
+do you?  That problem has a solution by using signals. When a child
+process dies, a signal, SIGCHLD (or SIGCLD) is sent to its parent process.
+Thus, using a proper signal handler, the parent will get an asynchronous
+notification, and then when it'll call <code>wait()</code>, the system
+assures that the call will return immediately, since there is already
+a zombie child. Here is an example of our "hello world" program, using
+a signal handler this time.
+</p>
+
+<hr width="40%">
+<pre><code>
+#include &lt;stdio.h&gt;     <font color="brown">/* basic I/O routines.   */</font>
+#include &lt;unistd.h&gt;    <font color="brown">/* define fork(), etc.   */</font>
+#include &lt;sys/types.h&gt; <font color="brown">/* define pid_t, etc.    */</font>
+#include &lt;sys/wait.h&gt;  <font color="brown">/* define wait(), etc.   */</font>
+#include &lt;signal.h&gt;    <font color="brown">/* define signal(), etc. */</font>
+
+<font color="brown">/* first, here is the code for the signal handler */</font>
+void catch_child(int sig_num)
+{
+    <font color="brown">/* when we get here, we know there's a zombie child waiting */</font>
+    int child_status;
+
+    wait(&amp;child_status);
+    printf("child exited.\n");
+}
+
+.
+.
+<font color="brown">/* and somewhere in the main() function ... */</font>
+.
+.
+
+<font color="brown">/* define the signal handler for the CHLD signal */</font>
+signal(SIGCHLD, catch_child);
+
+<font color="brown">/* and the child process forking code... */</font>
+{
+    int child_pid;
+    int i;
+
+    child_pid = fork();
+    switch (child_pid) {
+        case -1:         <font color="brown">/* fork() failed */</font>
+            perror("fork");
+            exit(1);
+        case 0:          <font color="brown">/* inside child process  */</font>
+            printf("hello world\n");
+            sleep(5);    <font color="brown">/* sleep a little, so we'll have */</font>
+                         <font color="brown">/* time to see what is going on  */</font>
+            exit(0);
+        default:         <font color="brown">/* inside parent process */</font>
+            break;
+    }
+    <font color="brown">/* parent process goes on, minding its own business... */</font>
+    <font color="brown">/* for example, some output...                         */</font>
+    for (i=0; i&lt;10; i++) {
+        printf("%d\n", i);
+        sleep(1);    <font color="brown">/* sleep for a second, so we'll have time to see the mix */</font>
+    }
+}
+</code></pre>
+<hr width="40%">
+
+<p>
+Lets examine the flow of this program a little:
+
+</p><ol>
+<li> A signal handler is defined, so whenever we receive a SIGCHLD, catch_child
+will be called.
+</li><li> We call <code>fork()</code> to spawn a child process.
+</li><li> The parent process continues its control flow, while the child
+process is doing its own chores.
+</li><li> When the child calls <code>exit()</code>, a CHLD signal is sent by
+the system to the parent.
+</li><li> The parent process' execution is interrupted, and its CHLD signal handler,
+catch_child, is invoked.
+</li><li> The <code>wait()</code> call in the parent causes the child to be
+completely removed off the system.
+</li><li> finally, the signal handler returns, and the parent process continues
+execution at the same place it was interrupted in.
+</li></ol>
+<p></p>
+
+<hr size="4">
+
+<a name="pipe">
+<font color="brown"><h2>Communications Via Pipes</h2></font>
+</a>
+<p>
+Once we got our processes to run, we suddenly realize that they cannot
+communicate. After all, often when we start one process from another, they
+are supposed to accomplish some related tasks. One of the mechanisms that
+allow related-processes to communicate is the pipe, or the anonymous pipe.
+</p>
+
+<hr>
+
+<a name="pipe_whatis">
+<font color="brown"><h4>What Is A Pipe?</h4></font>
+</a>
+<p>
+One of the mechanisms that allow related-processes to communicate is the pipe,
+or the anonymous pipe. A pipe is a one-way mechanism that allows two
+related processes (i.e. one is an ancestor of the other) to send a byte
+stream from one of them to the other one. Naturally, to use such a channel
+properly, one needs to form some kind of protocol in which data is sent over
+the pipe. Also, if we want a two-way communication, we'll need two
+pipes, and a lot of caution...
+</p>
+
+<p>
+The system assures us of one thing: The order in which data is written to the
+pipe, is the same order as that in which data is read from the pipe. The system
+also assures that data won't get lost in the middle, unless one of the
+processes (the sender or the receiver) exits prematurely.
+</p>
+
+<hr>
+
+<a name="pipes_pipe_syscall">
+<font color="brown"><h4>The <code>pipe()</code> System Call</h4></font>
+</a>
+<p>
+This system call is used to create a read-write pipe that may later
+be used to communicate with a process we'll fork off. The call takes
+as an argument an array of 2 integers that will be used to save the
+two file descriptors used to access the pipe. The first to read from
+the pipe, and the second to write to the pipe. Here is how to use this
+function:
+</p>
+
+<hr width="40%">
+<pre><code>
+<font color="brown">/* first, define an array to store the two file descriptors */</font>
+int pipes[2];
+
+<font color="brown">/* now, create the pipe */</font>
+int rc = pipe(pipes);
+if (rc == -1) { <font color="brown">/* pipe() failed */</font>
+    perror("pipe");
+    exit(1);
+}
+</code></pre>
+<hr width="40%">
+
+<p>
+If the call to <code>pipe()</code> succeeded, a pipe will be created,
+pipes[0] will contain the number of its read file descriptor, and
+pipes[1] will contain the number of its write file descriptor.
+</p>
+
+<p>
+Now that a pipe was created, it should be put to some real use. To do this,
+we first call <code>fork()</code> to create a child process, and then use
+the fact that the memory image of the child process is identical to the
+memory image of the parent process, so the pipes[] array is still defined
+the same way in both of them, and thus they both have the file descriptors
+of the pipe. Further more, since the file descriptor table is also copied
+during the fork, the file descriptors are still valid inside the child
+process.
+</p>
+
+<p>
+Lets see an example of a two-process system in which one (the parent process)
+reads input from the user, and sends it to the other (the child), which then
+prints the data to the screen. The sending of the data is done using the pipe,
+and the protocol simply states that every byte passed via the pipe represents
+a single character typed by the user.
+</p>
+
+<hr width="40%">
+<pre><code>
+#include &lt;stdio.h&gt;    <font color="brown">/* standard I/O routines.                */</font>
+#include &lt;unistd.h&gt;   <font color="brown">/* defines pipe(), amongst other things. */</font>
+
+<font color="brown">/* this routine handles the work of the child process. */</font>
+void do_child(int data_pipe[]) {
+    int c;	<font color="brown">/* data received from the parent. */</font>
+    int rc;	<font color="brown">/* return status of read().       */</font>
+
+    <font color="brown">/* first, close the un-needed write-part of the pipe. */</font>
+    close(data_pipe[1]);
+
+    <font color="brown">/* now enter a loop of reading data from the pipe, and printing it */</font>
+    while ((rc = read(data_pipe[0], &amp;c, 1)) &gt; 0) {
+	putchar(c);
+    }
+
+    <font color="brown">/* probably pipe was broken, or got EOF via the pipe. */</font>
+    exit(0);
+}
+
+<font color="brown">/* this routine handles the work of the parent process. */</font>
+void do_parent(int data_pipe[])
+{
+    int c;	<font color="brown">/* data received from the user. */</font>
+    int rc;	<font color="brown">/* return status of getchar().  */</font>
+
+    <font color="brown">/* first, close the un-needed read-part of the pipe. */</font>
+    close(data_pipe[0]);
+
+    <font color="brown">/* now enter a loop of read user input, and writing it to the pipe. */</font>
+    while ((c = getchar()) &gt; 0) {
+	<font color="brown">/* write the character to the pipe. */</font>
+        rc = write(data_pipe[1], &amp;c, 1);
+	if (rc == -1) { <font color="brown">/* write failed - notify the user and exit */</font>
+	    perror("Parent: write");
+	    close(data_pipe[1]);
+	    exit(1);
+        }
+    }
+
+    <font color="brown">/* probably got EOF from the user. */</font>
+    close(data_pipe[1]); <font color="brown">/* close the pipe, to let the child know we're done. */</font>
+    exit(0);
+}
+
+<font color="brown">/* and the main function. */</font>
+int main(int argc, char* argv[])
+{
+    int data_pipe[2]; <font color="brown">/* an array to store the file descriptors of the pipe. */</font>
+    int pid;       <font color="brown">/* pid of child process, or 0, as returned via fork.    */</font>
+    int rc;        <font color="brown">/* stores return values of various routines.            */</font>
+
+    <font color="brown">/* first, create a pipe. */</font>
+    rc = pipe(data_pipe);
+    if (rc == -1) {
+	perror("pipe");
+	exit(1);
+    }
+
+    <font color="brown">/* now fork off a child process, and set their handling routines. */</font>
+    pid = fork();
+
+    switch (pid) {
+	case -1:	<font color="brown">/* fork failed. */</font>
+	    perror("fork");
+	    exit(1);
+	case 0:		<font color="brown">/* inside child process.  */</font>
+	    do_child(data_pipe);
+	    <font color="brown">/* NOT REACHED */</font>
+	default:	<font color="brown">/* inside parent process. */</font>
+	    do_parent(data_pipe);
+	    <font color="brown">/* NOT REACHED */</font>
+    }
+
+    return 0;	<font color="brown">/* NOT REACHED */</font>
+}
+
+</code></pre>
+<hr width="40%">
+
+<p>
+As we can see, the child process closed the write-end of the pipe (since
+it only needs to read from the pipe), while the parent process closed
+the read-end of the pipe (since it only needs to write to the pipe).
+This closing of the un-needed file descriptor was done to free up a file
+descriptor entry from the file descriptors table of the process. It isn't
+necessary in a small program such as this, but since the file descriptors
+table is limited in size, we shouldn't waste unnecessary entries.
+</p>
+
+<p>
+The complete source code for this example may be found in the file
+<a href="http://users.actcom.co.il/%7Echoo/lupg/tutorials/multi-process/one-way-pipe.c">one-way-pipe.c</a>.
+</p>
+
+<hr>
+
+<a name="pipes_two_way">
+<font color="brown"><h4>Two-Way Communications With Pipes</h4></font>
+</a>
+<p>
+In a more complex system, we'll soon discover that this one-way communications
+is too limiting. Thus, we'd want to be able to communication in both
+directions - from parent to child, and from child to parent. The good news
+is that all we need to do is open two pipes - one to be used in each direction.
+The bad news, however, is that using two pipes might cause us to get into
+a situation known as 'deadlock':
+</p>
+
+<dl>
+<dt><u>Deadlock</u>
+</dt><dd>A situation in which a group of two or more processes are all waiting
+    for a set of resources that are currently taken by other processes in
+    the same group, or waiting for events that are supposed to be sent
+    from other processes in the group.
+</dd>
+</dl>
+
+<p>
+Such a situation might occur when two processes communicate via two pipes.
+Here are two scenarios that could led to such a deadlock:
+</p>
+
+<ol>
+<li> Both pipes are empty, and both processes are trying to read from their
+     input pipes. Each one is blocked on the read (cause the pipe is empty),
+     and thus they'll remain stuck like this forever.
+</li><li> This one is more complicated. Each pipe has a buffer of limited size
+     associated with it. When a process writes to a pipe, the data is placed
+     on the buffer of that pipe, until it is read by the reading process.
+     If the buffer is full, the <code>write()</code> system call gets blocked
+     until the buffer has some free space. The only way to free space on the
+     buffer, is by reading data from the pipe.<br>
+     Thus, if both processes write data, each to its 'writing' pipe, until
+     the buffers are filled up, both processes will get blocked on the
+     <code>write()</code> system call. Since no other process is reading
+     from any of the pipes, our two processes have just entered a deadlock.
+</li></ol>
+
+<p>
+Lets see an example of a (hopefully) deadlock-free program in which one
+process reads input from the user, writes it to the other process via a pipe.
+the second process translates each upper-case letter to a lower-case letter
+and sends the data back to the first process. Finally, the first process
+writes the data to standard output.
+</p>
+
+<hr width="40%">
+<pre><code>
+#include &lt;stdio.h&gt;    <font color="brown">/* standard I/O routines.                  */</font>
+#include &lt;unistd.h&gt;   <font color="brown">/* defines pipe(), amongst other things.   */</font>
+#include &lt;ctype.h&gt;    <font color="brown">/* defines isascii(), toupper(), and other */</font>
+                      <font color="brown">/* character manipulation routines.        */</font>
+
+<font color="brown">/* function executed by the user-interacting process. */</font>
+void user_handler(int input_pipe[], int output_pipe[])
+{
+    int c;    <font color="brown">/* user input - must be 'int', to recognize EOF (= -1). */</font>
+    char ch;  <font color="brown">/* the same - as a char. */</font>
+    int rc;   <font color="brown">/* return values of functions. */</font>
+
+    <font color="brown">/* first, close unnecessary file descriptors */</font>
+    close(input_pipe[1]); <font color="brown">/* we don't need to write to this pipe.  */</font>
+    close(output_pipe[0]); <font color="brown">/* we don't need to read from this pipe. */</font>
+
+    <font color="brown">/* loop: read input, send via one pipe, read via other */</font>
+    <font color="brown">/* pipe, and write to stdout. exit on EOF from user.   */</font>
+    while ((c = getchar()) &gt; 0) {
+        /* note - when we 'read' and 'write', we must deal with a char, */
+        /* rather then an int, because an int is longer then a char,    */
+        /* and writing only one byte from it, will lead to unexpected   */
+        /* results, depending on how an int is stored on the system.    */
+        ch = (char)c;
+	<font color="brown">/* write to translator */</font>
+        rc = write(output_pipe[1], &amp;ch, 1);
+	if (rc == -1) { <font color="brown">/* write failed - notify the user and exit. */</font>
+	    perror("user_handler: write");
+	    close(input_pipe[0]);
+	    close(output_pipe[1]);
+	    exit(1);
+        }
+	<font color="brown">/* read back from translator */</font>
+	rc = read(input_pipe[0], &amp;ch, 1);
+	c = (int)ch;
+	if (rc &lt;= 0) { <font color="brown">/* read failed - notify user and exit. */</font>
+	    perror("user_handler: read");
+	    close(input_pipe[0]);
+	    close(output_pipe[1]);
+	    exit(1);
+        }
+	<font color="brown">/* print translated character to stdout. */</font>
+	putchar(c);
+    }
+
+    <font color="brown">/* close pipes and exit. */</font>
+    close(input_pipe[0]);
+    close(output_pipe[1]);
+    exit(0);
+}
+
+<font color="brown">/* now comes the function executed by the translator process. */</font>
+void translator(int input_pipe[], int output_pipe[])
+{
+    int c;    <font color="brown">/* user input - must be 'int', to recognize EOF (= -1). */</font>
+    char ch;  <font color="brown">/* the same - as a char. */</font>
+    int rc;   <font color="brown">/* return values of functions. */</font>
+
+    <font color="brown">/* first, close unnecessary file descriptors */</font>
+    close(input_pipe[1]); <font color="brown">/* we don't need to write to this pipe.  */</font>
+    close(output_pipe[0]); <font color="brown">/* we don't need to read from this pipe. */</font>
+
+    <font color="brown">/* enter a loop of reading from the user_handler's pipe, translating */</font>
+    <font color="brown">/* the character, and writing back to the user handler.              */</font>
+    while (read(input_pipe[0], &amp;ch, 1) &gt; 0) {
+	<font color="brown">/* translate any upper-case letter to lower-case. */</font>
+        c = (int)ch;
+
+	if (isascii(c) &amp;&amp; isupper(c))
+            c = tolower(c);
+
+        ch = (char)c;
+        <font color="brown">/* write translated character back to user_handler. */</font>
+        rc = write(output_pipe[1], &amp;ch, 1);
+        if (rc == -1) { <font color="brown">/* write failed - notify user and exit. */</font>
+            perror("translator: write");
+            close(input_pipe[0]);
+            close(output_pipe[1]);
+            exit(1);
+        }
+    }
+
+    <font color="brown">/* close pipes and exit. */</font>
+    close(input_pipe[0]);
+    close(output_pipe[1]);
+    exit(0);
+}
+
+<font color="brown">/* and finally, the main function: spawn off two processes, */</font>
+<font color="brown">/* and let each of them execute its function.               */</font>
+int main(int argc, char* argv[])
+{
+    <font color="brown">/* 2 arrays to contain file descriptors, for two pipes. */</font>
+    int user_to_translator[2];
+    int translator_to_user[2];
+    int pid;       <font color="brown">/* pid of child process, or 0, as returned via fork.    */</font>
+    int rc;        <font color="brown">/* stores return values of various routines.            */</font>
+
+    <font color="brown">/* first, create one pipe. */</font>
+    rc = pipe(user_to_translator);
+    if (rc == -1) {
+	perror("main: pipe user_to_translator");
+	exit(1);
+    }
+    <font color="brown">/* then, create another pipe. */</font>
+    rc = pipe(translator_to_user);
+    if (rc == -1) {
+	perror("main: pipe translator_to_user");
+	exit(1);
+    }
+
+    <font color="brown">/* now fork off a child process, and set their handling routines. */</font>
+    pid = fork();
+
+    switch (pid) {
+	case -1:	<font color="brown">/* fork failed. */</font>
+	    perror("main: fork");
+	    exit(1);
+	case 0:		<font color="brown">/* inside child process.  */</font>
+	    translator(user_to_translator, translator_to_user); <font color="brown">/* line 'A' */</font>
+	    <font color="brown">/* NOT REACHED */</font>
+	default:	<font color="brown">/* inside parent process. */</font>
+	    user_handler(translator_to_user, user_to_translator); <font color="brown">/* line 'B' */</font>
+	    <font color="brown">/* NOT REACHED */</font>
+    }
+
+    return 0;	<font color="brown">/* NOT REACHED */</font>
+}
+</code></pre>
+<hr width="40%">
+
+<p>
+A few notes:
+</p><ol>
+<li> Character handling: <u><code>isascii()</code></u> is a function that
+     checks if the given character code is a valid ASCII code.
+     <u><code>isupper()</code></u> is a function that checks if a
+     given character is an upper-case letter. <u><code>tolower()</code></u>
+     is a function that translates an upper-case letter to its equivalent
+     lower-case letter.
+</li><li> Note that both functions get an input_pipe and an output_pipe array.
+     However, when calling the functions we must make sure that the array
+     we give one as its input pipe - we give the other as its output pipe,
+     and vice versa. Failing to do that, the user_handler function will
+     write a character to one pipe, and then both functions will try to
+     read from the other pipe, thus causing both of them to block, as this
+     other pipe is still empty.
+</li><li> Try to think: what will happen if we change the call in line 'A' above
+     to:<br><br>
+     <code>
+     translator(user_to_translator, user_to_translator); <font color="brown">/* line 'A' */</font>
+     </code><br><br>
+     and the code of line 'B' above to:<br><br>
+     <code>
+     user_handler(translator_to_user, translator_to_user); <font color="brown">/* line 'B' */</font>
+     </code>
+</li><li> Think harder now: what if we leave line 'A' as it was in the original
+     program, and only modify line 'B' as in the previous question?
+</li></ol>
+<p></p>
+
+<p>
+The complete source code for this example may be found in the file
+<a href="http://users.actcom.co.il/%7Echoo/lupg/tutorials/multi-process/two-way-pipe.c">two-way-pipe.c</a>.
+</p>
+
+<hr size="4">
+
+<a name="namedpipes">
+<font color="brown"><h2>Named Pipes</h2></font>
+</a>
+<p>
+One limitation of anonymous pipes is that only processes 'related' to the
+process that created the pipe (i.e. siblings of that process.) may
+communicate using them. If we want two un-related processes to communicate via
+pipes, we need to use named pipes.
+</p>
+
+<hr>
+
+<a name="named_pipe_whatis">
+<font color="brown"><h4>What Is A Named Pipe?</h4></font>
+</a>
+<p>
+A named pipe (also called a named FIFO, or just FIFO) is a pipe whose access
+point is a file kept on the file
+system. By opening this file for reading, a process gets access to the
+reading end of the pipe. By opening the file for writing, the process gets
+access to the writing end of the pipe. If a process opens the file for
+reading, it is blocked until another process opens the file for writing.
+The same goes the other way around.
+</p>
+
+<hr>
+
+<a name="named_pipe_create">
+<font color="brown"><h4>Creating A Named Pipe With The <code>mknod</code> Command</h4></font>
+</a>
+<p>
+A named pipe may be created either via the 'mknod' (or its newer replacement,
+'mkfifo'), or via the <code>mknod()</code> system call (or by the
+POSIX-compliant <code>mkfifo()</code> function). To create a named pipe
+with the file named 'prog_pipe', we can use the following command:
+<br><br>
+<code>
+mknod prog_pipe p
+</code>
+<br><br>
+We could also provide a full path to where we want the named pipe created.
+If we then type 'ls -l prog_pipe', we will see something like this:
+<br>
+</p><pre><code>
+prw-rw-r--   1 choo     choo            0 Nov  7 01:59 prog_pipe
+</code></pre>
+<br>
+The 'p' on the first column denotes this is a named pipe. Just like
+any file in the system, it has access permissions, that define which
+users may open the named pipe, and whether for reading, writing or both.
+<p></p>
+
+<hr>
+
+<a name="named_pipe_open">
+<font color="brown"><h4>Opening A Named Pipe For Reading Or Writing</h4></font>
+</a>
+<p>
+Opening a named pipe is done just like opening any other file in the system,
+using the <code>open()</code> system call, or using the <code>fopen()</code>
+standard C function. If the call succeeds, we get a file descriptor (in the
+case of <code>open()</code>, or a 'FILE' pointer (in the case of
+<code>fopen()</code>), which we may use either for reading or for writing,
+depending on the parameters passed to <code>open()</code> or to
+<code>fopen()</code>.
+</p>
+
+<hr>
+
+<a name="named_pipe_read_write">
+<font color="brown"><h4>Reading/Writing From/To A Named Pipe</h4></font>
+</a>
+<p>
+Reading from a named pipe is very similar to reading from a file, and the same
+goes for writing to a named pipe. Yet there are several differences:
+</p><ol>
+<li> <u>Either Read Or Write</u> - a named pipe cannot be opened for both
+      reading and writing. The process opening it must choose one mode, and
+      stick to it until it closes the pipe.
+</li><li> <u>Read/Write Are Blocking</u> - when a process reads from a named pipe
+      that has no data in it, the reading process is blocked. It does not
+      receive an end of file (EOF) value, like when reading from a file. When
+      a process tries to write to a named pipe that has no reader (e.g. the
+      reader process has just closed the named pipe), the writing process
+      gets blocked, until a second process re-opens the named pipe.
+</li></ol>
+<p></p>
+
+<p>
+Thus, when writing a program that uses a named pipe, we must take these 
+limitations into account. We could also turn the file descriptor via which
+we access the named pipe to a non-blocking mode. This, however, is out of
+the scope of our tutorial. For info about how to do that, and how to handle
+a non-blocking pipe, please refer to the manual pages of 'open(2)', fcntl(2),
+read(2) and write(2).
+</p>
+
+<hr>
+
+<a name="named_pipe_example">
+<font color="brown"><h4>Named Pipe - A Complete Example</h4></font>
+</a>
+<p>
+As an example to an obscure usage of named pipes, we will borrow some idea
+from a program that allows one to count how many times they have been
+"fingered" lately. As you might know, on many Unix systems, there is a finger
+daemon, that accepts requests from users running the "finger" program, with
+a possible user name, and tells them when this user last logged on, as well
+as some other information. Amongst other thing, the finger daemon also checks
+if the user has a file named '.plan' (that is dot followed by "plan") in her
+home directory. If there is such a file, the finger daemon opens it, and
+prints its contents to the client. For example, on my Linux machine,
+fingering my account might show something like:
+<br>
+</p><pre><code>
+[choo@simey1 ~]$ finger choo
+Login: choo                             Name: guy keren
+Directory: /home/choo                   Shell: /bin/tcsh
+On since Fri Nov  6 15:46 (IDT) on tty6
+No mail.
+Plan:
+- Breed a new type of dogs.
+- Water the plants during all seasons.
+- Finish the next tutorial on time.
+</code></pre>
+<br>
+As you can see, the contents of the '.plan' file has been printed out.
+<p></p>
+
+<p>
+This feature of the finger daemon may be used to create a program that
+tells the client how many times i was fingered. For that to work, we first
+create a named pipe, where the '.plan' file resides:
+<br><br>
+<code>
+mknod /home/choo/.plan p
+</code>
+<br><br>
+If i now try to finger myself, the output will stop before showing the 'plan'
+file. How so? this is because of the blocking nature of a named pipe. When
+the finger daemon opens my '.plan' file, there is no write process, and thus
+the finger daemon blocks. Thus, don't run this on a system where you expect
+other users to finger you often.
+</p>
+
+<p>
+The second part of the trick, is compiling the
+<a href="http://users.actcom.co.il/%7Echoo/lupg/tutorials/multi-process/named-pipe-plan.c">named-pipe-plan.c</a> program, and running it.
+note that it contains the full path to the '.plan' file, so change that to
+the appropriate value for your account, before compiling it. When you run
+the program, it gets into an endless loop of opening the named pipe in
+writing mode, write a message to the named pipe, close it, and sleep for
+a second. Look at the program's source code for more information. A sample
+of its output looks like this:
+<br>
+</p><pre><code>
+[choo@simey1 ~]$ finger choo
+Login: choo                             Name: guy keren
+Directory: /home/choo                   Shell: /bin/tcsh
+On since Fri Nov  6 15:46 (IDT) on tty6
+No mail.
+Plan:
+I have been fingered 8 times today
+</code></pre>
+<br>
+When you're done playing, stop the program, and don't forget to remove the
+named pipe from the file system.
+<p></p>
+
+<hr size="4">
+
+<a name="sockets">
+<font color="brown"><h2>Few Words About Sockets</h2></font>
+</a>
+<p>
+Various sockets-based mechanisms may be used to communicate amongst
+processes. The underlying communications protocol may be TCP, UDP, IP,
+or any other protocol from the TCP/IP protocols family. There is also
+a socket of type 'Unix-domain', which uses some protocol internal to the
+operating system to communicate between processes all residing on a single
+machine. Unix-domain sockets are similar to named pipes in that the
+communicating processes use a file in the system to connect to establish
+a connection.  For more information about programming with sockets, please
+refer to our tutorial about
+<a href="http://www.actcom.co.il/%7Echoo/lupg/tutorials/internetworking/internet-theory.html">
+internetworking with Unix sockets</a>.
+</p>
+
+<hr size="4">
+
+<a name="sysv_ipc">
+<font color="brown"><h2>System V IPC</h2></font>
+</a>
+<p>
+Many variants of Unix these days support a set of inter-process
+communications
+methods, which are derived from Unix System V release 4, originating
+from AT&amp;T Bell laboratories. These mechanisms include message
+queues (used
+for sending and receiving messages), shared memory (used to allow
+several processes share data in memory) and semaphores (used to
+co-ordinate access by several
+processes, to other resources). Each of these resource types is handled
+by the
+system, and unlike anonymous pipes, may out-live the process that
+created it.
+These resources also have some security support by the system, that
+allows one
+to specify which processes may access a given message queue, for
+example.
+</p>
+
+<p>
+The fact that these resources are global to the system has two contradicting
+implications. On one hand, it means that if a process exits, the data it
+sent through a message queue, or placed in shared memory is still there,
+and can be collected by other processes. On the other hand, this also means
+that the programmer has to take care of freeing these resources, or they
+occupy system resources until the next reboot, or until being removed by
+hand.
+</p>
+
+<p>
+I am going to make a statement here about these communications mechanisms,
+that might annoy some readers: System V IPC mechanisms are evil regarding
+their implementation, and should not be used unless there is a very good
+reason. One of the problem with these mechanism, is that one cannot use
+the <code>select()</code> (or its replacement, <code>poll()</code>) with
+them, and thus a process waiting for a message to be placed in a message
+queue, cannot be notified about messages coming via other resources (e.g.
+other message queues, pipes or sockets).
+In my opinion, this limitation is an oversight by the designers of these
+mechanisms. Had they used file descriptors to denote IPC resources (like
+they are used for pipes, sockets and files) life would be easier.
+</p>
+
+<p>
+Another problem with System V IPC is their system-global nature. The total 
+number of message queues that may live in the system, for example, is shared
+by all processes. Worse than that, the number of messages waiting in all
+messages queues is also limited globally. One process spewing many such
+messages will break all processes using message queues. The same goes
+for other such resources. There are various other limitations imposed
+by API (Application programming interface). For example, one may wait
+on a limited set of semaphores at the same time. If you want more than
+this, you have to split the waiting task, or re-design your application.
+</p>
+
+<p>
+Having said that, there are still various applications where using
+system V IPC (we'll call it SysV IPC, for short) will save you a large
+amount of time. In these cases, you should go ahead and use these mechanism -
+just handle with care.
+</p>
+
+<hr>
+
+<a name="sysv_ipc_permissions">
+<font color="brown"><h3>Permission Issues</h3></font>
+</a>
+<p>
+Before delving into the usage of the different System V IPC mechanisms,
+we will describe the security model used to limit access to these resources.
+</p>
+
+<a name="sysv_ipc_permissions_private_vs_public">
+<font color="brown"><h4>Private Vs. Public</h4></font>
+</a>
+<p>
+Each resource in SysV IPC may be either private or public. Private means
+that it may be accessed only by the process that created it, or by child
+processes of this process. Public means that it may be <u>potentially</u>
+accessed by any process in the system, except when access permission
+modes state otherwise.
+</p>
+
+<hr>
+
+<a name="sysv_ipc_permissions_modes">
+<font color="brown"><h4>Access Permission Modes - The 'ipc_perm' Structure</h4></font>
+</a>
+<p>
+SysV IPC resources may be protected using access mode permissions, much like
+files and directories are protected by the Unix system. Each such resource
+has an owning user and an owning group. Permission modes define if and how
+processes belonging to different users in the system may access this resource.
+Permissions may be set separately for the owning user, for users from the owning
+group, and everyone else. permissions may be set for reading the resource
+(e.g. reading messages from a message queue), or writing to the resource
+(e.g. sending a message on a queue, changing the value of a semaphore).
+A structure of type 'ipc_perm', which is defined as follows:
+<br>
+</p><pre><code>
+struct ipc_perm
+{
+  key_t  key;   /* key identifying the resource                     */
+  ushort uid;   /* owner effective user ID and effective group ID   */
+  ushort gid;
+  ushort cuid;  /* creator effective user ID and effective group ID */
+  ushort cgid;
+  ushort mode;  /* access modes                                     */
+  ushort seq;   /* sequence number                                  */
+};
+</code></pre>
+These fields have the following meanings:
+<ul>
+<li> <u>key</u> - the identifier of the resource this structure refers to.
+</li><li> <u>uid</u> - effective user ID owning the resource.
+</li><li> <u>gid</u> - effective group ID owning the resource.
+</li><li> <u>cuid</u> - effective user ID that created the resource.
+</li><li> <u>cgid</u> - effective group ID that created the resource.
+</li><li> <u>mode</u> - access permission modes for the given resource. This is
+     a bit field, with the lowest 9 bits denoting access flags, and are
+     a bit-wise 'or' of the following (octal) values:
+     <ul>
+     <li> <u>0400</u> - owning user may read from this resource.
+     </li><li> <u>0200</u> - owning user may write to this resource.
+     </li><li> <u>0040</u> - owning group may read from this resource.
+     </li><li> <u>0020</u> - owning group may write to this resource.
+     </li><li> <u>0004</u> - every other user may read from this resource.
+     </li><li> <u>0002</u> - every other user may write to this resource.
+     </li></ul>
+</li><li> <u>seq</u> - used to keep system-internal info about the resource.
+     for further info, check your kernel's sources (you are working
+     on a system with free access to its source code, right?).
+</li></ul>
+<p></p>
+
+<p>
+Part of the SysV IPC API allows us to modify the access permissions
+for the resources. We will encounter them when discussing the different
+IPC methods.
+</p>
+
+<hr>
+
+<a name="sysv_ipc_permissions_sys_utils">
+<font color="brown"><h4>System Utilities To Administer System-V IPC Resources</h4></font>
+</a>
+<p>
+Since SysV IPC resources live outside the scope of a single process, there
+is a need to manage them somehow - delete resources that were left by 
+irresponsible processes (or process crashes); check the number of existing
+resources of each type (especially to find if the system-global limit was
+reached), etc. Two utilities were created for handling these jobs: 'ipcs' -
+to check usage of SysV IPC resources, and 'ipcrm' - to remove such resources.
+</p>
+
+<p>
+Running 'ipcs' will show us statistics separately for each of the three
+resource types (shared memory segments, semaphore arrays and message queues).
+For each resource type, the command will show us some statistics for each
+resource that exists in the system. It will show its identifier, owner,
+size of resources it occupies in the system, and permission flags. We may
+give 'ipcs' a flag to ask it to show only resources of one type ('-m' for
+shared Memory segments, -q for message Queues and '-s' for Semaphore arrays).
+We may also use 'ipcs' with the '-l' flag to see the system enforced limits
+on these resources, or the '-u' flag to show us usage summary. Refer to
+the manual page of 'ipcs' for more information.
+</p>
+
+<p>
+The 'ipcrm' command accepts a resource type ('shm', 'msg' or 'sem') and a
+resource ID, and removes the given resource from the system. We need to have
+the proper permissions in order to delete a resource.
+</p>
+
+<hr size="4">
+
+<a name="msgqueue">
+<font color="brown"><h3>Using Message Queues</h3></font>
+</a>
+<p>
+One of the problems with pipes is that it is up to you, as a programmer,
+to establish the protocol. Now, usually this protocol is based on sending
+separate messages. With a stream taken from a pipe, it means you have
+to somehow parse the bytes, and separate them to packets. Another problem
+is that data sent via pipes always arrives in a FIFO order. This means
+that before you can read any part of the stream, you have to consume all
+the bytes sent before the piece you're looking for, and thus you need to
+construct your own queuing mechanism on which you place the data you just
+skipped, to be read later. If that's what you're interested at, this
+is a good time to get acquainted with message queues.
+</p>
+
+<hr>
+
+<a name="msgqueue_what">
+<font color="brown"><h4>What Are Message Queues?</h4></font>
+</a>
+<p>
+A message queue is a queue onto which messages can be placed. A message
+is composed of a message type (which is a number), and message data.
+A message queue can be either private, or public. If it is private, it can
+be accessed only by its creating process or child processes of that creator. 
+If it's public, it can be accessed by any process that knows the queue's key.
+Several processes may write messages onto a message queue, or read messages
+from the queue. Messages may be read by type, and thus not have to be
+read in a FIFO order as is the case with pipes.
+</p>
+
+<hr>
+
+<a name="msgqueue_create">
+<font color="brown"><h4>Creating A Message Queue - <code>msgget()</code></h4></font>
+</a>
+<p>
+In order to use a message queue, it has to be created first. The
+<code>msgget()</code> system call is used to do just that. This system call
+accepts two parameters - a queue key, and flags. The key may be one of:
+</p><ul>
+<li> <u>IPC_PRIVATE</u> - used to create a private message queue.
+</li><li> <u>a positive integer</u> - used to create (or access) a
+     publicly-accessible message queue.
+</li></ul>
+The second parameter contains flags that control how the system call is to
+be processed. It may contain flags like IPC_CREAT or IPC_EXCL, which behave
+similar to O_CREAT and O_EXCL in the <code>open()</code> system call,
+and will be explained later, and it also contains access permission bits.
+The lowest 9 bits of the flags are used to define access permission for
+the queue, much like similar 9 bits are used to control access to files.
+the bits are separated into 3 groups - user, group and others. In each set,
+the first bit refers to read permission, the second bit - to write permission,
+and the third bit is ignored (no execute permission is relevant to message
+queues).<br><br>
+Lets see an example of a code that creates a private message queue:
+<p></p>
+
+<hr width="40%">
+<pre><code>
+#include &lt;stdio.h&gt;     <font color="brown">/* standard I/O routines.            */</font>
+#include &lt;sys/types.h&gt; <font color="brown">/* standard system data types.       */</font>
+#include &lt;sys/ipc.h&gt;   <font color="brown">/* common system V IPC structures.   */</font>
+#include &lt;sys/msg.h&gt;   <font color="brown">/* message-queue specific functions. */</font>
+
+<font color="brown">/* create a private message queue, with access only to the owner. */</font>
+int queue_id = msgget(IPC_PRIVATE, 0600); <font color="brown">/* &lt;-- this is an octal number. */</font>
+if (queue_id == -1) {
+    perror("msgget");
+    exit(1);
+}
+</code></pre>
+<hr width="40%">
+
+<p>
+A few notes about this code:
+</p><ol>
+<li> the system call returns an integer identifying the created queue. Later
+     on we can use this key in order to access the queue for reading and
+     writing messages.
+</li><li> The queue created belongs to the user whose process created the queue.
+     Thus, since the permission bits are '0600', only processes run on behalf
+     of this user will have access to the queue.
+</li></ol>
+<p></p>
+
+<hr>
+
+<a name="msgqueue_msgbuf">
+<font color="brown"><h4>The Message Structure - <code>struct msgbuf</code></h4></font>
+</a>
+<p>
+Before we go to writing messages to the queue or reading messages from it,
+we need to see how a message looks. The system defines a structure named
+'msgbuf' for this purpose. Here is how it is defined:
+<br><br>
+</p><pre><code>
+struct msgbuf {
+    long mtype;     <font color="brown">/* message type, a positive number (cannot be zero). */</font>
+    char mtext[1];  <font color="brown">/* message body array. usually larger than one byte. */</font>
+};
+</code></pre>
+<br><br>
+The message type part is rather obvious. But how do we deal with a message
+text that is only 1 byte long? Well, we actually may place a much larger
+text inside a message. For this, we allocate more memory for a msgbuf
+structure than <code>sizeof(struct msgbuf)</code>. Lets see how we create
+an "hello world" message:
+<p></p>
+
+<hr width="40%">
+<pre><code>
+<font color="brown">/* first, define the message string */</font>
+char* msg_text = "hello world";
+<font color="brown">/* allocate a message with enough space for length of string and */</font>
+<font color="brown">/* one extra byte for the terminating null character.            */</font>
+struct msgbuf* msg =
+        (struct msgbuf*)malloc(sizeof(struct msgbuf) + strlen(msg_text));
+<font color="brown">/* set the message type. for example - set it to '1'. */</font>
+msg-&gt;mtype = 1;
+<font color="brown">/* finally, place the "hello world" string inside the message. */</font>
+strcpy(msg-&gt;mtext, msg_text);
+</code></pre>
+<hr width="40%">
+
+<p>
+Few notes:
+</p><ol>
+<li> When allocating a space for a string, one always needs to allocate
+     one extra byte for the null character terminating the string. In our
+     case, we allocated <code>strlen(msg_text)</code> more than the size
+     of "<code>struct msgbuf</code>", and didn't need to allocate an extra
+     place for the null character, cause that's already contained in the
+     msgbuf structure (the 1 byte of mtext there).
+</li><li> We don't need to place only text messages in a message. We may also
+     place binary data. In that case, we could allocate space as large as
+     the msgbuf struct plus the size of our binary data, minus one byte.
+     Of-course then to copy the data to the message, we'll use a function
+     such as <code>memset()</code>, and not <code>strcpy()</code>.
+</li></ol>
+<p></p>
+
+<hr>
+
+<a name="msgqueue_msgsnd">
+<font color="brown"><h4>Writing Messages Onto A Queue - <code>msgsnd()</code></h4></font>
+</a>
+<p>
+Once we created the message queue, and a message structure, we can place it
+on the message queue, using the <code>msgsnd()</code> system call. This system
+call copies our message structure and places that as the last message on the
+queue. It takes the following parameters:
+</p><ol>
+<li> <u><code>int msqid</code></u> - id of message queue, as returned from
+     the <code>msgget()</code> call.
+</li><li> <u><code>struct msgbuf* msg</code></u> - a pointer to a properly
+     initializes message structure, such as the one we prepared in the
+     previous section.
+</li><li> <u><code>int msgsz</code></u> - the size of the data part (mtext) of
+     the message, in bytes.
+</li><li> <u><code>int msgflg</code></u> - flags specifying how to send the message.
+     may be a logical "or" of the following:
+     <ul>
+     <li> <u><code>IPC_NOWAIT</code></u> - if the message cannot be sent
+     immediately, without blocking the process, return '-1', and set
+     <code>errno</code> to <code>EAGAIN</code>.
+     </li></ul>
+     to set no flags, use the value '0'.
+</li></ol>
+So in order to send our message on the queue, we'll use <code>msgsnd()</code>
+like this:
+<br><br>
+<pre><code>
+int rc = msgsnd(queue_id, msg, strlen(msg_text)+1, 0);
+if (rc == -1) {
+    perror("msgsnd");
+    exit(1);
+}
+</code></pre>
+<br><br>
+Note that we used a message size one larger than the length of the string,
+since we're also sending the null character. <code>msgsnd()</code> assumes
+the data in the message to be an arbitrary sequence of bytes, so it cannot
+know we've got the null character there too, unless we state that explicitly.
+<p></p>
+
+<hr>
+
+<a name="msgqueue_msgrcv">
+<font color="brown"><h4>Reading A Message From The Queue - <code>msgrcv()</code></h4></font>
+</a>
+<p>
+We may use the system call <code>msgrcv()</code> In order to read a message
+from a message queue. This system call accepts the following list of
+parameters:
+</p><ol>
+<li> <u><code>int msqid</code></u> - id of the queue, as returned from
+     <code>msgget()</code>.
+</li><li> <u><code>struct msgbuf* msg</code></u> - a pointer to a pre-allocated
+     msgbuf structure. It should generally be large enough to contain a
+     message with some arbitrary data (see more below).
+</li><li> <u><code>int msgsz</code></u> - size of largest message text we wish
+     to receive. Must NOT be larger than the amount of space we allocated
+     for the message text in 'msg'.
+</li><li> <u><code>int msgtyp</code></u> - Type of message we wish to read.
+     may be one of:
+     <ul>
+     <li> <u>0</u> - The first message on the queue will be returned.
+     </li><li> <u>a positive integer</u> -  the first message on the
+          queue whose type (mtype) equals this integer (unless a certain
+	  flag is set in msgflg, see below).
+     </li><li> <u>a negative integer</u> - the first message on the queue
+          whose type is less than or equal to the absolute value of this
+          integer.
+     </li></ul>
+</li><li> <u><code>int msgflg</code></u> - a logical 'or' combination of any
+     of the following flags:
+     <ul>
+     <li> <u><code>IPC_NOWAIT</code></u> - if there is no message on the queue
+          matching what we want to read, return '-1', and set
+          <code>errno</code> to <code>ENOMSG</code>.
+     </li><li> <u><code>MSG_EXCEPT</code></u> - if the message type parameter
+          is a positive integer, then return the first message whose type
+          is NOT equal to the given integer.
+     </li><li> <u><code>MSG_NOERROR</code></u> - If a message with a text part
+          larger than 'msgsz' matches what we want to read, then truncate
+          the text when copying the message to our msgbuf structure.
+	  If this flag is not set and the message text is too large,
+          the system call returns '-1', and <code>errno</code> is set
+          to <code>E2BIG</code>.
+     </li></ul>
+</li></ol>
+Lets then try to read our message from the message queue:
+<p></p>
+
+<hr width="40%">
+<pre><code>
+<font color="brown">/* prepare a message structure large enough to read our "hello world". */</font>
+struct msgbuf* recv_msg =
+     (struct msgbuf*)malloc(sizeof(struct msgbuf)+strlen("hello world"));
+<font color="brown">/* use msgrcv() to read the message. We agree to get any type, and thus */</font>
+<font color="brown">/* use '0' in the message type parameter, and use no flags (0).         */</font>
+int rc = msgrcv(queue_id, recv_msg, strlen("hello world")+1, 0, 0);
+if (rc == -1) {
+    perror("msgrcv");
+    exit(1);
+}
+</code></pre>
+<hr width="40%">
+
+<p>
+A few notes:
+</p><ol>
+<li> If the message on the queue was larger than the size of "hello world"
+     (plus one), we would get an error, and thus exit.
+</li><li> If there was no message on the queue, the <code>msgrcv()</code> call
+     would have blocked our process until one of the following happens:
+     <ul>
+     <li> a suitable message was placed on the queue.
+     </li><li> the queue was removed (and then <code>errno</code> would be set
+          to <code>EIDRM</code>).
+     </li><li> our process received a signal (and then <code>errno</code> would
+          be set to <code>EINTR</code>.
+     </li></ul>
+</li></ol>
+Now that you've seen all the different parts, you're invited to look
+at the <a href="http://users.actcom.co.il/%7Echoo/lupg/tutorials/multi-process/private-queue-hello-world.c">private-queue-hello-world.c</a>
+program, for the complete program.
+<p></p>
+
+<hr>
+
+<a name="msgqueue_example">
+<font color="brown"><h4>Message Queues - A Complete Example</h4></font>
+</a>
+<p>
+As an example of using non-private message queues, we will show a program,
+named <a href="http://users.actcom.co.il/%7Echoo/lupg/tutorials/multi-process/public-queue/queue_sender.c">"queue_sender"</a>, that creates
+a message queue, and then starts sending messages with different priorities
+onto the queue. A second program, named
+<a href="http://users.actcom.co.il/%7Echoo/lupg/tutorials/multi-process/public-queue/queue_reader.c">"queue_reader"</a>, may be run that
+reads the messages from the queue, and does something with them (in our
+example - just prints their contents to standard output). The "queue_reader"
+is given a number on its command line, which is the priority of messages that
+it should read. By running several copies of this program simultaneously, we
+can achieve a basic level of concurrency. Such a mechanism may be used by a
+system in which several clients may be sending requests of different types,
+that need to be handled differently. The complete source code may be
+found in the <a href="http://users.actcom.co.il/%7Echoo/lupg/tutorials/multi-process/public-queue">public-queue</a> directory.
+</p>
+
+<hr size="4">
+
+<a name="semaphores">
+<font color="brown"><h3>Process Synchronization With Semaphores</h3></font>
+</a>
+<p>
+One of the problems when writing multi-process application is the need
+to synchronize various operations between the processes. Communicating
+requests using pipes, sockets and message queues is one way to do it.
+however, sometimes we need to synchronize operations amongst more than two
+processes, or to synchronize access to data resources that might be accessed
+by several processes in parallel. Semaphores are a means supplied with SysV
+IPC that allow us to synchronize such operations.
+</p>
+
+<hr>
+
+<a name="semaphores_whatis">
+<font color="brown"><h4>What Is A Semaphore? What Is A Semaphore Set?</h4></font>
+</a>
+<p>
+A semaphore is a resource that contains an integer value, and allows processes
+to synchronize by testing and setting this value in a single atomic operation.
+This means that the process that tests the value of a semaphore and sets it
+to a different value (based on the test), is guaranteed no other process
+will interfere with the operation in the middle.
+</p>
+
+<p>
+Two types of operations
+can be carried on a semaphore: wait and signal. A set operation first checks
+if the semaphore's value equals some number. If it does, it decreases its
+value and returns. If it does not, the operation blocks the calling process
+until the semaphore's value reaches the desired value. A signal operation
+increments the value of the semaphore, possibly awakening one or more
+processes that are waiting on the semaphore. How this mechanism can be put
+to practical use will be explained soon.
+</p>
+
+<p>
+A <u>semaphore set</u> is a structure that stores a group of semaphores
+together, and possibly allows the process to commit a transaction on part
+or all of the semaphores in the set together. In here, a transaction means
+that we are guaranteed that either all operations are done successfully,
+or none is done at all. Note that a semaphore set is not a general parallel
+programming concept, it's just an extra mechanism supplied by SysV IPC.
+</p>
+
+<hr>
+
+<a name="semaphores_create">
+<font color="brown"></font></a><h4><a name="semaphores_create"><font color="brown">Creating A Semaphore Set - <code>semget()</code></font></a></h4>
+
+<p>
+Creation of a semaphore set is done using the <code>semget()</code> system
+call. Similarly to the creation of message queues, we supply some ID for
+the set, and some flags (used to define access permission mode and a few
+options). We also supply the number of semaphores we want to have in the
+given set. This number is limited to <code>SEMMSL</code>, as defined
+in file <code>/usr/include/sys/sem.h</code>. Lets see an example:
+<br>
+</p><pre><code>
+<font color="brown">/* ID of the semaphore set.     */</font>
+int sem_set_id_1;
+int sem_set_id_2;
+
+<font color="brown">/* create a private semaphore set with one semaphore in it, */</font>
+<font color="brown">/* with access only to the owner.                           */</font>
+sem_set_id_1 = semget(IPC_PRIVATE, 1, IPC_CREAT | 0600);
+if (sem_set_id_1 == -1) {
+    perror("main: semget");
+    exit(1);
+}
+
+<font color="brown">/* create a semaphore set with ID 250, three semaphores */</font>
+<font color="brown">/* in the set, with access only to the owner.           */</font>
+sem_set_id_2 = semget(250, 3, IPC_CREAT | 0600);
+if (sem_set_id_2 == -1) {
+    perror("main: semget");
+    exit(1);
+}
+</code></pre>
+<br>
+Note that in the second case, if a semaphore set with ID 250 already existed,
+we would get access to the existing set, rather than a new set be created. This
+works just like it worked with message queues.
+<p></p>
+
+<hr>
+
+<a name="semaphores_set_get">
+<font color="brown"><h4>Setting And Getting Semaphore Values With <code>semctl()</code></h4></font>
+</a>
+<p>
+After the semaphore set is created, we need to initialize the value of
+the semaphores in the set. We do that using the <code>semctl()</code> system
+call. Note that this system call has other uses, but they are not
+relevant to our needs right now. Lets assume we want to set the values of the
+three semaphores in our second set to values 3, 6 and 0, respectively. The
+ID of the first semaphore in the set is '0', the ID of the second semaphore
+is '1', and so on.
+</p>
+
+<hr width="40%">
+<pre><code>
+<font color="brown">/* use this to store return values of system calls.   */</font>
+int rc;
+
+<font color="brown">/* initialize the first semaphore in our set to '3'.  */</font>
+rc = semctl(sem_set_id_2, 0, SETVAL, 3);
+if (rc == -1) {
+    perror("main: semctl");
+    exit(1);
+}
+
+<font color="brown">/* initialize the second semaphore in our set to '6'. */</font>
+rc = semctl(sem_set_id_2, 1, SETVAL, 6);
+if (rc == -1) {
+    perror("main: semctl");
+    exit(1);
+}
+
+<font color="brown">/* initialize the third semaphore in our set to '0'.  */</font>
+rc = semctl(sem_set_id_2, 2, SETVAL, 0);
+if (rc == -1) {
+    perror("main: semctl");
+    exit(1);
+}
+</code></pre>
+<hr width="40%">
+
+<p>
+There are one comment to be made about the way we used <code>semctl()</code>
+here. According to the manual, the last parameter for this system call
+should be a union of type <code>union semun</code>. However, since the
+<code>SETVAL</code> (set value) operation only uses the <code>int val</code>
+part of the union, we simply passed an integer to the function. The proper
+way to use this system call was to define a variable of this union type,
+and set its value appropriately, like this:
+<br>
+</p><pre><code>
+<font color="brown">/* use this variable to pass the value to the semctl() call */</font>
+union semun sem_val;
+
+<font color="brown">/* initialize the first semaphore in our set to '3'. */</font>
+sem_val.val = 0;
+rc = semctl(sem_set_id_2, 2, SETVAL, sem_val);
+if (rc == -1) {
+    perror("main: semctl");
+    exit(1);
+}
+</code></pre>
+<br>
+We used the first form just for simplicity. From now on, we will only use
+the second form.
+<p></p>
+
+<hr>
+
+<a name="semaphores_mutex">
+<font color="brown"><h4>Using Semaphores For Mutual Exclusion With <code>semop()</code></h4></font>
+</a>
+<p>
+Sometimes we have a resource that we want to allow only one process at a time
+to manipulate. For example, we have a file that we only want written into
+only by one process at a time, to avoid corrupting its contents. Of-course,
+we could use various file locking mechanisms to protect the file, but
+we will demonstrate the usage of semaphores for this purpose as an example.
+Later on we will see the real usage of semaphores, to protect access to
+shared memory segments. Anyway, here is a code snippest. It assumes the
+semaphore in our set whose id is "sem_set_id" was initialized to 1 initially:
+<br>
+</p><pre><code>
+<font color="brown">/* this function updates the contents of the file with the given path name. */</font>
+void update_file(char* file_path, int number)
+{
+    <font color="brown">/* structure for semaphore operations.   */</font>
+    struct sembuf sem_op;
+    FILE* file;
+
+    <font color="brown">/* wait on the semaphore, unless it's value is non-negative. */</font>
+    sem_op.sem_num = 0;
+    sem_op.sem_op = -1;   <font color="brown">/* &lt;-- Comment 1 */</font>
+    sem_op.sem_flg = 0;
+    semop(sem_set_id, &amp;sem_op, 1);
+
+    <font color="brown">/* Comment 2 */</font>
+    <font color="brown">/* we "locked" the semaphore, and are assured exclusive access to file.  */</font>
+    <font color="brown">/* manipulate the file in some way. for example, write a number into it. */</font>
+    file = fopen(file_path, "w");
+    if (file) {
+        fprintf(file, "%d\n", number);
+        fclose(file);
+    }
+
+    <font color="brown">/* finally, signal the semaphore - increase its value by one. */</font>
+    sem_op.sem_num = 0;
+    sem_op.sem_op = 1;   <font color="brown">/* &lt;-- Comment 3 */</font>
+    sem_op.sem_flg = 0;
+    semop(sem_set_id, &amp;sem_op, 1);
+}
+</code></pre>
+<br>
+<p></p>
+
+<p>
+This code needs some explanations, especially regarding the semantics of
+the <code>semop()</code> calls.
+</p><ol>
+<li> <u>Comment 1</u> - before we access the file, we use <code>semop()</code>
+     to wait on the semaphore. Supplying '-1' in <code>sem_op.sem_op</code>
+     means: If the value of the semaphore is greater than or equal to '1',
+     decrease this value by one, and return to the caller. Otherwise (the value
+     is 1 or less), block the calling process, until the value of the semaphore
+     becomes '1', at which point we return to the caller.
+</li><li> <u>Comment 2</u> - The semantics of <code>semop()</code> assure us that
+     when we return from this function, the value of the semaphore is 0. Why?
+     it couldn't be less, or else <code>semop()</code> won't return. It couldn't
+     be more due to the way we later on signal the semaphore. And why it cannot
+     be more than '0'? read on to find out...
+</li><li> <u>Comment 3</u> - after we are done manipulating the file, we increase
+     the value of the semaphore by 1, possibly waking up a process waiting on
+     the semaphore. If several processes are waiting on the semaphore, the first
+     that got blocked on it is wakened and continues its execution.
+</li></ol>
+<p></p>
+
+<p>
+Now, lets assume that any process that tries to access the file, does it only
+via a call to our "update_file" function. As you can see, when it goes through
+the function, it always decrements the value of the semaphore by 1, and then
+increases it by 1. Thus, the semaphore's value can never go above its initial
+value, which is '1'. Now lets check two scenarios:
+</p><ol>
+<li> No other process is executing the "update_file" concurrently. In this
+     case, when we enter the function, the semaphore's value is '1'. after
+     the first <code>semop()</code> call, the value of the semaphore is
+     decremented to '0', and thus our process is not blocked. We continue
+     to execute the file update, and with the second <code>semop()</code> call,
+     we raise the value of the semaphore back to '1'.
+</li><li> Another process is in the middle of the "update_file" function. If it
+     already managed to pass the first call to <code>semop()</code>, the value
+     of the semaphore is '0', and when we call <code>semop()</code>, our
+     process is blocked. When the other process signals the semaphore with
+     the second <code>semop()</code> call, it increases the value of the
+     semaphore back to '0', and it wakes up the process blocked on the
+     semaphore, which is our process. We now get into executing the
+     file handling code, and finally we raise the semaphore's value back to '1'
+     with our second call to <code>semop()</code>.
+</li></ol>
+<p></p>
+
+<p>
+We have the source code for a program demonstrating the mutex concept,
+in the file named <a href="http://users.actcom.co.il/%7Echoo/lupg/tutorials/multi-process/sem-mutex.c">sem-mutex.c</a>. The program launches
+several processes (5, as defined by the NUM_PROCS macro), each of which
+is executing the "update_file" function several times in a row, and then
+exits. Try running the program, and scan its output. Each process prints
+out its PID as it updates the file, so you can see what happens when.
+Try to play with the DELAY macro (specifying how long a process waits
+between two calls to "update_file") and see how it effects the order
+of the operations. Check what happens if you replace the delay loop
+in the "do_child_loop" function, with a call to <code>sleep()</code>.
+</p>
+
+<hr>
+
+<a name="semaphores_counter">
+<font color="brown"><h4>Using Semaphores For Producer-Consumer Operations With <code>semop()</code></h4></font>
+</a>
+<p>
+Using a semaphore as a mutex is not utilizing the full power of the semaphore.
+As we saw, a semaphore contains a counter, that may be used for more complex
+operations. Those operations often use a programming model called
+"producer-consumer". In this model, we have one or more processes that produce
+something, and one or more processes that consume that something. For
+example, one set of processes accept printing requests from clients and place
+them in a spool directory, and another set of processes take the files from
+the spool directory and actually print them using the printer.
+</p>
+
+<p>
+To control such a printing system, we need the producers to maintain
+a count of the number of files waiting in the spool directory and
+incrementing it for every new file placed there. The consumers check
+this counter, and whenever it gets above zero, one of them grabs a file
+from the spool, and sends it to the printer.  If there are no files in
+the spool (i.e. the counter value is zero), all consumer processes get
+blocked. The behavior of this counter sounds very familiar.... it is
+the exact same behavior of a counting semaphore.
+</p>
+
+<p>
+Lets see how we can use a semaphore as a counter. We still use the same two
+operations on the semaphore, namely "signal" and "wait".
+<br>
+</p><pre><code>
+<font color="brown">/* this variable will contain the semaphore set. */</font>
+int sem_set_id;
+
+<font color="brown">/* semaphore value, for semctl().                */</font>
+union semun sem_val;
+
+<font color="brown">/* structure for semaphore operations.           */</font>
+struct sembuf sem_op;
+
+<font color="brown">/* first we create a semaphore set with a single semaphore, */</font>
+<font color="brown">/* whose counter is initialized to '0'.                     */</font>
+sem_set_id = semget(IPC_PRIVATE, 1, 0600);
+if (sem_set_id == -1) {
+    perror("semget");
+    exit(1);
+}
+sem_val.val = 0;
+semctl(sem_set_id, 0, SETVAL, sem_val);
+
+<font color="brown">/* we now do some producing function, and then signal the   */</font>
+<font color="brown">/* semaphore, increasing its counter by one.                */</font>
+.
+.
+sem_op.sem_num = 0;
+sem_op.sem_op = 1;
+sem_op.sem_flg = 0;
+semop(sem_set_id, &amp;sem_op, 1);
+.
+.
+.
+<font color="brown">/* meanwhile, in a different process, we try to consume the      */</font>
+<font color="brown">/* resource protected (and counter) by the semaphore.            */</font>
+<font color="brown">/* we block on the semaphore, unless it's value is non-negative. */</font>
+sem_op.sem_num = 0;
+sem_op.sem_op = -1;
+sem_op.sem_flg = 0;
+semop(sem_set_id, &amp;sem_op, 1);
+
+<font color="brown">/* when we get here, it means that the semaphore's value is '0'  */</font>
+<font color="brown">/* or more, so there's something to consume.                     */</font>
+.
+.
+</code></pre>
+<br>
+Note that our "wait" and "signal" operations here are just like we did
+with when using the semaphore as a mutex. The only difference is in who
+is doing the "wait" and the "signal". With a mutex, the same process
+did both the "wait" and the "signal" (in that order). In the producer-consumer
+example, one process is doing the "signal" operation, while the other is doing
+the "wait" operation.
+<p></p>
+
+<p>
+The full source code for a simple program that implements a producer-consumer
+system with two processes, is found in the 
+file <a href="http://users.actcom.co.il/%7Echoo/lupg/tutorials/multi-process/sem-producer-consumer.c">sem-producer-consumer.c</a>.
+</p>
+
+<hr>
+
+<a name="semaphores_example">
+<font color="brown"><h4>Semaphores - A Complete Example</h4></font>
+</a>
+<p>
+As a complete example of using semaphores, we write a very simple print
+spool system. Two separate programs will be used. One runs as the printing
+command, and is found in the file
+<a href="http://users.actcom.co.il/%7Echoo/lupg/tutorials/multi-process/tiny-spool/tiny-lpr.c">tiny-lpr.c</a>. It
+gets a file path on its command line, and copies this file into the
+spool area, increasing a global (on-private) semaphore by one. Another 
+program runs as the printer daemon, and is found in the file
+<a href="http://users.actcom.co.il/%7Echoo/lupg/tutorials/multi-process/tiny-spool/tiny-lpd.c">tiny-lpd.c</a>. It waits on the same global
+semaphore, and whenever its value is larger than one, it locates a file in
+the spool directory and sends it to the printer. In order to avoid race
+conditions when copying files into the directory and removing files from
+this directory, a second semaphore will be used as a mutex, to protect the
+spool directory. The complete tiny-spooler mini-project is found in
+the <a href="http://users.actcom.co.il/%7Echoo/lupg/tutorials/multi-process/tiny-spool">tiny-spool</a> directory.
+</p>
+
+<p>
+One problem might be that copying a file takes a lot of time, and thus locking
+the spool directory for a long while. In order to avoid that, 3 directories
+will be used. One serves as a temporary place for tiny-lpr to copy files
+into. One will be used as the common spool directory, and one will be used
+as a temporary directory into which tiny-lpd will move the files before
+printing them. By putting all 3 directories on the same disk, we assure
+that files can be moved between them using the <code>rename()</code>
+system call, in one fast operation (regardless of the file size).
+</p>
+
+<hr size="4">
+
+<a name="shmem">
+<font color="brown"><h3>Shared Memory</h3></font>
+</a>
+<p>
+As we have seen, many methods were created in order to let processes
+communicate. All this communications is done in order to share data. The
+problem is that all these methods are sequential in nature. What can
+we do in order to allow processes to share data in a random-access manner?<br>
+Shared memory comes to the rescue. As you might know, on a Unix system,
+each process has its own virtual address space, and the system makes sure no
+process would access the memory area of another process. This means that if
+one process corrupts its memory's contents, this does not directly affect any
+other process in the system.
+</p>
+
+<p>
+With shared memory, we declare a given section
+in the memory as one that will be used simultaneously by several processes.
+This means that the data found in this memory section (or memory segment)
+will be seen by several processes. This also means that
+several processes might try to alter this memory area at the same time,
+and thus some method should be used to synchronize their access to this
+memory area (did anyone say "apply mutual exclusion using a semaphore" ?).
+</p>
+
+<hr>
+
+<a name="shmem_background">
+<font color="brown"><h4>Background - Virtual Memory Management Under Unix</h4></font>
+</a>
+<p>
+In order to understand the concept of shared memory, we should first check how
+virtual memory is managed on the system.
+</p>
+
+<p>
+In order to achieve virtual memory, the system divides memory into small pages
+each of the same size. For each process, a table mapping virtual memory pages
+into physical memory pages is kept. When the process is scheduled for running,
+its memory table is loaded by the operating system, and each memory access
+causes a mapping (by the CPU) to a physical memory page. If the virtual memory
+page is not found in memory, it is looked up in swap space, and loaded from
+there (this operation is also called 'page in').
+</p>
+
+<p>
+When the process is started, it is being allocated a memory segment to hold
+the runtime stack, a memory segment to hold the programs code
+(the code segment), and a memory area for data (the data segment). Each such
+segment might be composed of many memory pages. When ever the process needs to
+allocate more memory, new pages are being allocated for it, to enlarge its
+data segment.
+</p>
+
+<p>
+When a process is being forked off from another process, the memory page
+table of the parent process is being copied to the child process, but not
+the pages themselves. If the child process will try to update any of these
+pages, then this page specifically will be copied, and then only the copy
+of the child process will be modified. This behavior is very efficient
+for processes that call <code>fork()</code> and immediately use the
+<code>exec()</code> system call to replace the program it runs.
+</p>
+
+<p>
+What we see from all of this is that all we need in order to support shared
+memory, is to some memory pages as shared, and to allow a way to identify them.
+This way, one process will create a shared memory segment, other processes
+will attach to them (by placing their physical address in the process's
+memory pages table). From now all these processes will access the same physical
+memory when accessing these pages, thus sharing this memory area.
+</p>
+
+<hr>
+
+<a name="shmem_shmget">
+<font color="brown"><h4>Allocating A Shared Memory Segment</h4></font>
+</a>
+<p>
+A shared memory segment first needs to be allocated (created), using the
+<code>shmget()</code> system call. This call gets a key for the segment
+(like the keys used in <code>msgget()</code> and <code>semget()</code>),
+the desired segment size, and flags to denote access permissions and whether
+to create this page if it does not exist yet. <code>shmget()</code> returns
+an identifier that can be later used to access the memory segment. Here
+is how to use this call:
+<br>
+</p><pre><code>
+<font color="brown">/* this variable is used to hold the returned segment identifier. */</font>
+int shm_id;
+
+<font color="brown">/* allocate a shared memory segment with size of 2048 bytes,      */</font>
+<font color="brown">/* accessible only to the current user.                             */</font>
+shm_id = shmget(100, 2048, IPC_CREAT | IPC_EXCL | 0600);
+if (shm_id == -1) {
+    perror("shmget: ");
+    exit(1);
+}
+</code></pre>
+<br>
+If several processes try to allocate a segment using the same ID, they
+will all get an identifier for the same page, unless they defined
+<code>IPC_EXCL</code> in the flags to <code>shmget()</code>. In that case,
+the call will succeed only if the page did not exist before.
+<p></p>
+
+<hr>
+
+<a name="shmem_shmat_shmdt">
+<font color="brown"><h4>Attaching And Detaching A Shared Memory Segment</h4></font>
+</a>
+<p>
+After we allocated a memory page, we need to add it to the memory page table
+of the process. This is done using the <code>shmat()</code> (shared-memory
+attach) system call. Assuming 'shm_id' contains an identifier returned
+by a call to <code>shmget()</code>, here is how to do this:
+<br>
+</p><pre><code>
+<font color="brown">/* these variables are used to specify where the page is attached.  */</font>
+char* shm_addr;
+char* shm_addr_ro;
+
+<font color="brown">/* attach the given shared memory segment, at some free position */</font>
+<font color="brown">/* that will be allocated by the system.                         */</font>
+shm_addr = shmat(shm_id, NULL, 0);
+if (!shm_addr) { <font color="brown">/* operation failed. */</font>
+    perror("shmat: ");
+    exit(1);
+}
+
+<font color="brown">/* attach the same shared memory segment again, this time in     */</font>
+<font color="brown">/* read-only mode. Any write operation to this page using this   */</font>
+<font color="brown">/* address will cause a segmentation violation (SIGSEGV) signal. */</font>
+shm_addr_ro = shmat(shm_id, NULL, SHM_RDONLY);
+if (!shm_addr_ro) { <font color="brown">/* operation failed. */</font>
+    perror("shmat: ");
+    exit(1);
+}
+</code></pre>
+<br>
+As you can see, a page may be attached in read-only mode, or in read-write
+mode. The same page may be attached several times by the same process,
+and then all the given addresses will refer to the same data. In the example
+above, we can use 'shm_addr' to access the segment both for reading and for
+writing, while 'shm_addr_ro' can be used for read-only access to this page.
+Attaching a segment in read-only mode makes sense if our process is not
+supposed to alter this memory page, and is recommended in such cases. The
+reason is that if a bug in our process causes it to corrupt its memory
+image, it might corrupt the contents of the shared segment, thus causing
+all other processes using this segment to possibly crush. By using a read-only
+attachment, we protect the rest of the processes from a bug in our process.
+<p></p>
+
+<hr>
+
+<a name="shmem_data_placement">
+<font color="brown"><h4>Placing Data In Shared Memory</h4></font>
+</a>
+<p>
+Placing data in a shared memory segment is done by using the pointer returned
+by the <code>shmat()</code> system call. Any kind of data may be placed
+in a shared segment, except for pointers. The reason for this is simple:
+pointers contain virtual addresses. Since the same segment might be attached
+in a different virtual address in each process, a pointer referring to one
+memory area in one process might refer to a different memory area in another
+process. We can try to work around this problem by attaching the shared segment
+in the same virtual address in all processes (by supplying an address as the
+second parameter to <code>shmat()</code>, and adding the <code>SHM_RND</code>
+flag to its third parameter), but this might fail if the given virtual
+address is already in use by the process.
+</p>
+
+<p>
+Here is an example of placing data in a shared memory segment, and later on
+reading this data. We assume that 'shm_addr' is a character pointer, containing
+an address returned by a call to <code>shmat()</code>.
+<br>
+</p><pre><code>
+<font color="brown">/* define a structure to be used in the given shared memory segment. */</font>
+struct country {
+    char name[30];
+    char capital_city[30];
+    char currency[30];
+    int population;
+};
+
+<font color="brown">/* define a countries array variable. */</font>
+int* countries_num;
+struct country* countries;
+
+<font color="brown">/* create a countries index on the shared memory segment. */</font>
+countries_num = (int*) shm_addr;
+*countries_num = 0;
+countries = (struct country*) ((void*)shm_addr+sizeof(int));
+
+strcpy(countries[0].name, "U.S.A");
+strcpy(countries[0].capital_city, "Washington");
+strcpy(countries[0].currency, "U.S. Dollar");
+countries[0].population = 250000000;
+(*countries_num)++;
+
+strcpy(countries[1].name, "Israel");
+strcpy(countries[1].capital_city, "Jerusalem");
+strcpy(countries[1].currency, "New Israeli Shekel");
+countries[1].population = 6000000;
+(*countries_num)++;
+
+strcpy(countries[1].name, "France");
+strcpy(countries[1].capital_city, "Paris");
+strcpy(countries[1].currency, "Frank");
+countries[1].population = 60000000;
+(*countries_num)++;
+
+<font color="brown">/* now, print out the countries data. */</font>
+for (i=0; i &lt; (*countries_num); i++) {
+    printf("Country %d:\n", i+1);
+    printf("  name: %s:\n", countries[i].name);
+    printf("  capital city: %s:\n", countries[i].capital_city);
+    printf("  currency: %s:\n", countries[i].currency);
+    printf("  population: %d:\n", countries[i].population);
+}
+</code></pre>
+<br>
+A few notes and 'gotchas' about this code:
+<ol>
+<li> <u>No usage of <code>malloc()</code></u>.
+     <br><br>
+     Since the memory page was already allocated when we called
+     <code>shmget()</code>, there is no need to use <code>malloc()</code> when
+     placing data in that segment. Instead, we do all memory management
+     ourselves, by simple pointer arithmetic operations. We also need to make
+     sure the shared segment was allocated enough memory to accommodate future
+     growth of our data - there are no means for enlarging the size of the
+     segment once allocated (unlike when using normal memory management - we can
+     always move data to a new memory location using the <code>realloc()</code>
+     function).
+     <br><br>
+</li><li> <u>Memory alignment</u>.
+     <br><br>
+     In the example above, we assumed that the page's address is aligned
+     properly for an integer to be placed in it. If it was not, any attempt
+     to try to alter the contents of 'countries_num' would trigger a bus
+     error (SIGBUS) signal. further, we assumed the alignment of our structure
+     is the same as that needed for an integer (when we placed the structures
+     array right after the integer variable).
+     <br><br>
+</li><li> <u>Completeness of the data model</u>.
+     <br><br>
+     By placing all the data relating to our data model in the shared memory
+     segment, we make sure all processes attaching to this segment can use
+     the full data kept in it. A naive mistake would be to place the countries
+     counter in a local variable, while placing the countries array in the
+     shared memory segment. If we did that, other processes trying to access
+     this segment would have no means of knowing how many countries are in
+     there.
+     <br><br>
+</li></ol>
+<p></p>
+
+<hr>
+
+<a name="shmem_shmctl">
+<font color="brown"><h4>Destroying A Shared Memory Segment</h4></font>
+</a>
+<p>
+After we finished using a shared memory segment, we should destroy it.
+It is safe to destroy it even if it is still in use (i.e. attached by some
+process). In such a case, the segment will be destroyed only after all processes
+detach it. Here is how to destroy a segment:
+<br>
+</p><pre><code>
+<font color="brown">/* this structure is used by the <code>shmctl()</code> system call. */</font>
+struct shmid_ds shm_desc;
+
+<font color="brown">/* destroy the shared memory segment. */</font>
+if (shmctl(shm_id, IPC_RMID, &amp;shm_desc) == -1) {
+    perror("main: shmctl: ");
+}
+</code></pre>
+<br>
+Note that any process may destroy the shared memory segment, not only the one
+that created it, as long as it has write permission to this segment.
+<p></p>
+
+<hr>
+
+<a name="shmem_example">
+<font color="brown"><h4>A Complete Example</h4></font>
+</a>
+<p>
+As a naive example of using shared memory, we collected the source code
+from the above sections into a file named
+<a href="http://users.actcom.co.il/%7Echoo/lupg/tutorials/multi-process/shared-mem.c">shared-mem.c</a>. It shows how a single process uses
+shared memory. Naturally, when two processes (or more) use a single shared
+memory segment, there may be race conditions, if one process tries to update
+this segment, while another is reading from it. To avoid this, we need to
+use some locking mechanism - SysV semaphores (used as mutexes) come to mind
+here. An example of two processes that access the same shared memory segment
+using a semaphore to synchronize their access, is found in the file
+<a href="http://users.actcom.co.il/%7Echoo/lupg/tutorials/multi-process/shared-mem-with-semaphore.c">shared-mem-with-semaphore.c</a>.
+</p>
+
+<hr size="4">
+
+<a name="ftok">
+<font color="brown"><h3>A Generalized SysV Resource ID Creation - <code>ftok()</code></h3></font>
+</a>
+<p>
+One of the problems with SysV IPC methods is the need to choose a unique
+identifier for our processes. How can we make sure that the identifier of
+a semaphore in our project won't collide with the identifier of a semaphore
+in some other program installed on the system?
+</p>
+
+<p>
+To help with that, the <code>ftok()</code> system call was introduced.
+This system call accepts two parameters, a path to a file and a character,
+and generates a more-or-less unique identifier. It does that by finding
+the "i-node" number of the file (more or less the number of the disk sector
+containing this file's information), combines it with the second parameter,
+and thus generates an identifier, that can be later fed to <code>semget</code>,
+<code>shmget()</code> or <code>msgget()</code>. Here is how to use
+<code>ftok()</code>:
+<br>
+</p><pre><code>
+<font color="brown">/* identifier returned by <code>ftok()</code> */</font>
+key_t set_key;
+
+<font color="brown">/* generate a "unique" key for our set, using the */</font>
+<font color="brown">/* directory "/usr/local/lib/ourprojectdir".      */</font>
+set_key = ftok("/usr/local/lib/ourprojectdir", 'a');
+if (set_key == -1) {
+    perror("ftok: ");
+    exit(1);
+}
+
+<font color="brown">/* now we can use 'set_key' to generate a set id, for example. */</font>
+sem_set_id = semget(set_key, 1, IPC_CREAT | 0600);
+.
+.
+</code></pre>
+<br>
+One note should be taken: if we remove the file and then re-create it, the
+system is very likely to allocate a new disk sector for this file, and thus
+activating the same <code>ftok</code> call with this file will generate
+a different key. Thus, the file used should be a steady file, and not one
+that is likely to be moved to a different disk or erased and re-created.
+<p></p>
+
+<hr size="4">
+
+<p align="center"><img src="multi-process_files/lupg_toolbar.gif" alt="" usemap="#lupg_map" height="40" width="360"><map name="lupg_map"><area shape="rect" coords="3,0 37,39" href="http://www.actcom.co.il/%7Echoo/lupg" alt="LUPG home"><area shape="rect" coords="67,0 102,39" href="http://www.actcom.co.il/%7Echoo/lupg/tutorials/index.html" alt="Tutorials"><area shape="rect" coords="138,0 170,39" href="http://www.actcom.co.il/%7Echoo/lupg/related-material.html" alt="Related material"><area shape="rect" coords="213,0 232,39" href="http://www.actcom.co.il/%7Echoo/lupg/project-ideas/index.html" alt="Project Ideas"><area shape="rect" coords="272,0 290,39" href="http://www.actcom.co.il/%7Echoo/lupg/essays/index.html" alt="Essays"><area shape="rect" coords="324,0 355,39" href="mailto:choo@actcom.co.il" alt="Send comments"></map>
+<br>[<a href="http://www.actcom.co.il/%7Echoo/lupg/index.html">LUPG Home</a>]  [<a href="http://www.actcom.co.il/%7Echoo/lupg/tutorials/index.html">Tutorials</a>]  [<a href="http://www.actcom.co.il/%7Echoo/lupg/related-material.html">Related Material</a>] [<a href="http://www.actcom.co.il/%7Echoo/lupg/essays/index.html">Essays</a>] [<a href="http://www.actcom.co.il/%7Echoo/lupg/project-ideas/index.html">Project Ideas</a>] [<a href="mailto:choo@actcom.co.il">Send Comments</a>]<br><img src="multi-process_files/good_bar.gif" alt=""></p> 
+
+<p>This document is copyright (c) 1998-2002 by guy keren.<br><br>
+The material in this document is provided AS IS, without any
+expressed or implied warranty, or claim of fitness for a
+particular purpose. Neither the author nor any contributers shell
+be liable for any damages incured directly or indirectly by using
+the material contained in this document.<br><br>
+permission to copy this document (electronically or on paper, for
+personal or organization internal use) or publish it on-line is
+hereby granted, provided that the document is copied as-is, this
+copyright notice is preserved, and a link to the original document
+is written in the document's body, or in the page linking to the
+copy of this document.<br><br>
+Permission to make translations of this document is also granted,
+under these terms - assuming the translation preserves the meaning
+of the text, the copyright notice is preserved as-is, and a link
+to the original document is written in the document's body, or in
+the page linking to the copy of this document.<br><br>
+For any questions about the document and its license, please
+<a href="mailto:choo@actcom.co.il">contact the author</a>.</p>
+
+
+ 
+
+</body></html>

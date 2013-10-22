@@ -1,0 +1,1 @@
+cp -v build/{mfs.img,kernel} /boot/

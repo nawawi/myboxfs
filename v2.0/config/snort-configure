@@ -1,0 +1,7 @@
+./configure --prefix=/usr --enable-flexresp \
+--disable-nsl --build=i686-mybox-linux --host=i686-mybox-linux \
+--with-libnet-includes=/usr/include --with-libnet-libraries=/usr/lib
+#--enable-inline \
+#--with-libipq-includes=/usr/src/iptables/include/libipq \
+#--with-libipq-libraries=/usr/src/iptables/libipq
+

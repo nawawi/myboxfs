@@ -1,0 +1,376 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.so');
+chk_session();
+write_nocache();
+
+$_SYSID="network_shaper";
+if(mfs_license('ITS')!=1) die("Disabled. Please upgrade your license.\n");
+
+$db_id=db_connect($_DB_NAME);
+if(chk_pri($_LOGIN['auth_id'],1)==1) {
+	if($tab==1) {
+		if($do_id=='stat') {
+			if($stat==1) { $stat=0; } else { $stat=1; }
+			db_query("update shaping set stat='$stat' where id='$id'",$db_id);
+		}
+		if($do_id=='del') {
+			db_query("delete from shaping where id='$id'",$db_id);
+		}
+		if(isset($do_save)&&$do_save==2) {
+			if(count($del)!=0) {
+				foreach($del as $x) {
+					db_query("delete from shaping where id='$x'",$db_id);
+				}
+			}
+		}
+		if(isset($do_save)&&$do_save==3) {
+			if(count($del)!=0) {
+				foreach($del as $_zid) {
+					//$_zid=$del[0];
+					db_query("update shaping set id='-1' where id='$_zid'",$db_id);
+					db_query("update shaping set id='$_zid' where id='$shift_id'",$db_id);
+					db_query("update shaping set id='$shift_id' where id='-1'",$db_id);
+				}
+			}
+		}
+		if(isset($do_id)&&$do_id=='apply_chg') {
+			$msg="<script>waitcount();</script>";
+			echo_query("shaper-restart");
+		}
+	}
+	if($tab==2) {
+		if($do_id!='edit') {
+			if(isset($do_save)&&$do_save==1) {
+				if($stat!='') $stat='1';
+				if($stat=='') $stat='0';
+				$note=escape_str($note);
+				db_query("insert into shaping (ip,speed,port,note,stat) values ('$dip','$speed','$dport','$note','$stat');",$db_id);
+				$msg='Setting saved!';
+			}
+		} else {
+			if(isset($do_save)&&$do_save==1) {
+				if($stat!='') $stat='1';
+				if($stat=='') $stat='0';
+				$note=escape_str($note);
+				db_query("update shaping set ip='$dip',speed='$speed',port='$dport',note='$note',stat='$stat' where id='$id'",$db_id);
+				$msg='Setting updated!';
+			}
+		}
+	}
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied!.";
+	}
+}
+if(!isset($tab)||$tab=='') $tab=1;
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script language="javascript" src="<?echo $_URL_PATH;?>/j/strings.js"></script>
+<script language="javascript">
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+</script>
+<script language="javascript">
+	function do_submit() {
+		var ip1=document.f.ip1.value;
+		var ip2=document.f.ip2.value;
+		var port1=document.f.port1.value;
+		var port2=document.f.port2.value;
+		var speed=document.f.speed.value;
+		if(ip1=='') {
+			if(isIPgroup(ip2)) {
+				document.f.dip.value=ip2;
+			} else {
+				alert('Invalid Source Address');
+				return false;
+			}
+		} else {
+			document.f.dip.value=ip1;
+		}
+		if(port1!='any') {
+			if(port1=='') {
+				if(isPortgroup(port2)) {
+					document.f.dport.value=port2;
+				} else {
+					alert('Invalid Service Port');
+					return false;
+				}
+			} else {
+				document.f.dport.value=port1;
+			}
+		} else {
+			document.f.dport.value='any';
+		}
+		if(speed=='') return false;
+		if(!isNum(speed)) return false;
+
+		document.f.btsubmit.disabled=true;
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	}
+	function dotoggle() {
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					document.f.elements[i].checked = !(document.f.elements[i].checked);
+    				}	
+			}
+  		}
+	}
+	function chkdel() {
+		var x='0';
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					if(document.f.elements[i].checked) x++;
+    				}	
+			}
+  		}
+		if(x==0) return false;
+		return true;
+	}
+	function do_delete() {
+		if(chkdel()!=false) {
+			if(confirm('Are you sure you want to proceed?')) {
+				document.f.do_save.value='2';
+				document.f.submit();
+			}
+		}
+	}
+	function do_shift(id) {
+		if(chkdel()!=false) {
+			document.f.do_save.value='3';
+			document.f.shift_id.value=id;
+			document.f.submit();
+		}
+	}
+
+var k=0;
+function waitcount() { 
+ 	k=k+2;
+	if(k <= 100) {
+    		msg.innerHTML='Reloading.. Please wait..'+k+'%'; 
+    		setTimeout(waitcount,200);  
+	} else {
+		self.location.href='<?echo "$_URL_PATH/network_shaper.html?tab=$tab&col=$col&col2=$col2";?>';
+	}
+}
+
+</script>
+</head>
+<body scroll=auto>
+<form name=f method=post action="<?echo "$_URL_PATH/network_shaper.html";?>" onsubmit="return do_submit();">
+<table border="0" cellpadding="4" cellspacing="4" width="700" align=center>
+<tr>
+<td align=center>
+
+<!-- main -->
+<fieldset>
+<legend>&nbsp;&nbsp;&nbsp;&nbsp;
+NETWORK: TRAFFIC SHAPER
+&nbsp;&nbsp;&nbsp;&nbsp;</legend>
+
+<table valign=top border=0>
+<tr>
+<td>
+<table border=0 cellpadding="2" cellspacing="2">
+<tr>
+<td align=center valign=middle>
+
+<table width="650" border="0" cellpadding="0" cellspacing="0">
+<tr><td>
+<ul id="tabnav">
+<li class="<?if($tab==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=1) { echo "<a href=\"$_URL_PATH/network_shaper.html?tab=1\">"; }?>Traffic List<?if($tab!=1) { echo "</a>"; }?></li>
+<li class="<?if($tab==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=2) { echo "<a href=\"$_URL_PATH/network_shaper.html?tab=2\">"; }?><?if($do_id=='edit') { echo "Edit"; } else { echo "Add new"; }?><?if($tab!=2) { echo "</a>"; }?></li>
+</ul>
+</td></tr>
+<?if($tab==1) {?>
+<tr> 
+<td class="tabcont">
+<?if($msg!='') {?>
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span id=msg class=notice><?echo "$msg";?></span></td></tr>
+</table><br>
+<? }?>
+<table width="600" border=0 cellpadding="2" cellspacing="2" class=tablist>
+      <tr class=bgcolor3>
+        <td class=tdlistop>#</td> 
+        <td class=tdlistop>Source Address</td>
+	<td class=tdlistop>Port</td>
+        <td class=tdlistop>Traffic kbps</td>
+	<td class=tdlistop>Description</td>
+	<td class=tdlistop align=center>Active</td>
+	<td class=tdlistop align=center>Opt</td>
+	<td class=tdlistop align=center></td>
+      </tr>
+<?
+
+$result=db_query("select * from shaping order by id ASC",$db_id);
+if(db_num_rows($result)!=0) {
+	$_cnt=1;
+	while($row=db_fetch_array_assoc($result)) {
+		$_id=$row['id'];
+		$_ip=$row['ip'];
+		$_speed=$row['speed'];
+		$_port=$row['port'];
+		$_note=$row['note'];
+		$_note=unescape_str($_note);
+		$_stat=$row['stat'];
+		if($_port=='') $_port='any';
+		$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background:#ffffff;cursor:hand;'";
+		$lo="onclick=\"self.location.href='$_URL_PATH/network_shaper.html?tab=2&id=$_id&do_id=edit';\" ";
+	echo "
+      <tr $lt>
+        <td class=tdlistb $lo>$_cnt</td>
+        <td class=tdlistb $lo>$_ip</td>
+        <td class=tdlistb $lo>$_port</td>
+        <td class=tdlistb $lo>$_speed</td>
+        <td class=tdlistb $lo>$_note</td>
+	<td align=center class=tdlistb ><a href='$_URL_PATH/network_shaper.html?tab=1&id=$_id&stat=$_stat&do_id=stat'>{$_PNG_YESNO[$_stat]}</a></td>
+	<td width=40 class=tdlistb align=right valign=bottom><a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='$_URL_PATH/network_shaper.html?tab=1&id=$_id&stat=$_stat&do_id=del';\">{$_PNG['delete']}</a><input type=checkbox name=del[] value=$_id></td>
+	<td width=5 class=tdlistb align=right valign=middle><a href='#' onclick='do_shift($_id);'>{$_PNG['arrow_left']}</a></td>
+      </tr>
+	";
+	$_cnt++;
+	}
+echo "<tr>
+<td align=right valign=top class=tdlist colspan=7><a href='#' onclick='do_delete();'>Delete</a> / <a href='#' onclick='dotoggle();'>Toggle</a> {$_PNG['arrow_rtr']}</td>
+<td align=right valign=top class=tdlist></td>
+</tr>";
+
+} 
+?>
+</table>
+</td>
+</tr>
+<tr><td align=right valign=top><input name=btapply type="button" value="Apply changes" class="button" onclick="self.location.href='<?echo $_URL_PATH;?>/network_shaper.html?tab=1&do_id=apply_chg';document.f.btapply.disabled=true;"></td></tr>
+<? } // tab==1 
+if($tab==2) { 
+
+if($do_id=='edit') {
+	$result=db_query("select * from shaping where id='$id'",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_ip1=$row['ip'];
+			$_speed1=$row['speed'];
+			$_port1=$row['port'];
+			$_note1=$row['note'];
+			$_note1=unescape_str($_note1);
+			$_stat1=$row['stat'];
+		}
+	}
+}
+
+?>
+<tr> 
+<td class="tabcont">
+<?if($msg!='') {?>
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span id=msg class=notice><?echo "$msg";?></span></td></tr>
+</table><br>
+<? }?>
+<table width="600" border="0" cellpadding="6" cellspacing="0">
+<tr> 
+<td width="30%" valign="middle" class="tdcelltop">Source Address</td>
+<td width="70%" valign="middle" class="mtabletop">
+<select name=ip1 size=1 class=textbox onchange="if(this.value!='') {document.f.ip2.disabled=true;}else{document.f.ip2.disabled=false;}">
+<option value='' selected>User-defined</option>
+<?
+$ipf=0;
+$result=db_query("select name from ipaddr",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_name=$row['name'];
+		$_name="$_name"."-net";
+		if($_name===$_ip1) {
+			echo "<option value='$_name' selected>$_name</option>";
+			$ipf=1;
+		} else {
+			echo "<option value='$_name'>$_name</option>";
+		}
+	}
+}
+?>
+</select>&nbsp;
+<input name="ip2" type="text" class="textbox" size="30" value="<?if($ipf==0) echo "$_ip1";?>" <?if($ipf==1) echo "disabled";?>>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Service Port</td>
+<td width="70%" valign="middle" class="mtable">
+<select name=port1 size=1 class=textbox onchange="if(this.value!='') {document.f.port2.disabled=true;}else{document.f.port2.disabled=false;}">
+<option value='' selected>User-defined</option>
+<?
+$portf=0;
+foreach($_PORT_ARRAY as $pp => $nn) {
+	if("$pp"=="$_port1") {
+		echo "<option value='$pp' selected>$pp</option>";
+		$portf=1;
+	} else {
+		echo "<option value='$pp'>$pp</option>";
+	}
+}
+?>
+</select>&nbsp;
+<input name="port2" type="text" class="textbox" size="10" value="<?if($portf==0) echo "$_port1";?>" <?if($portf==1) echo "disabled";?>> eg; 80 or range 80-90
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Traffic kbps</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="speed" type="text" class="textbox" size="10" value="<?echo $_speed1;?>"> kbytes-per-sec
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Description</td>
+<td width="70%" valign="middle" class="mtable">
+<input name="note" type="text" class="textbox" size="20" value="<?echo $_note1;?>">
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Active</td>
+<td width="70%" valign="middle" class="mtable">
+<input name="stat" type="checkbox" <?if($_stat1==1) echo "checked";?>> Activate this setting
+</td>
+</tr>
+</table>
+<tr><td align=right valign=top><input name=btsubmit type="submit" value="<?if($do_id=='edit') { echo "Update"; } else { echo "Save";}?>" class="button"></td></tr>
+</td>
+</tr>
+<input type=hidden name=dport value=''>
+<input type=hidden name=dip value=''>
+<? } // tab==2 ?>
+</table>
+
+<!-- end main -->
+
+</td>
+</tr>
+</table>
+</td>
+</tr>
+</table>
+
+</fieldset>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=shift_id value=''>
+<input type=hidden name=tab value=<?echo $tab;?>>
+<?if($do_id=='edit' && $tab==2) {?>
+<input type=hidden name=do_id value=edit>
+<input type=hidden name=id value='<?echo $id;?>'>
+<? } ?>
+</form>
+</body>
+</html>
+
+<?db_close($db_id); flush();?>

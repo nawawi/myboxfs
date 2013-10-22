@@ -1,0 +1,443 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"><head><!-- $Id: top.tmpl,v 1.13 2002/03/25 14:28:16 carstenklapp Exp $ -->
+
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="robots" content="index,follow">
+<meta name="keywords" content="Active Directory Samba, WLUG-Wiki">
+<meta name="description" content="This simple guide is a mostly accurate way to set up a Samba machine as a domain member in a MicrosoftWindows 2000 or Windows 2003 ActiveDirectory domain.  For a REALLY short version, tested with Win2k3, see the Quick 'n' Dirty instructions at the bottom of the page.">
+<meta name="PHPWIKI_VERSION" content="1.3.3-jeffs-hacks">
+<!-- base href="http://www.wlug.org.nz/" -->
+<link rel="shortcut icon" href="http://www.wlug.org.nz/phpwiki/themes/WLUG/images/favicon.ico">
+<link rel="home" title="HomePage" href="http://www.wlug.org.nz/HomePage">
+<link rel="help" title="HowToUseWiki" href="http://www.wlug.org.nz/HowToUseWiki">
+<link rel="copyright" title="GNU General Public License" href="http://www.gnu.org/copyleft/gpl.html#SEC1">
+<link rel="author" title="The PhpWiki Programming Team" href="http://phpwiki.sourceforge.net/phpwiki/ThePhpWikiProgrammingTeam">
+<link rel="search" title="FindPage" href="http://www.wlug.org.nz/FindPage">
+<link rel="alternate" title="View Source: ActiveDirectorySamba" href="http://www.wlug.org.nz/ActiveDirectorySamba?action=viewsource&amp;version=37">
+
+<link rel="bookmark" title="SandBox" href="http://www.wlug.org.nz/SandBox">
+<link rel="bookmark" title="WikiWikiWeb" href="http://www.wlug.org.nz/WikiWikiWeb">
+
+
+
+<link rel="stylesheet" title="WLUG" type="text/css" charset="UTF-8" href="ActiveDirectorySamba_files/WLUG.css"><link rel="alternate stylesheet" title="Printer" type="text/css" charset="UTF-8" href="ActiveDirectorySamba_files/phpwiki-printer.css" media="print, screen"><link rel="stylesheet" type="text/css" charset="UTF-8" href="ActiveDirectorySamba_files/phpwiki-printer.css" media="print"><style type="text/css">
+<!--
+body {background-image: url(/phpwiki/themes/WLUG/images/bgpaper8.png);}
+-->
+</style>
+<title>WLUG-Wiki - Active Directory Samba</title><!-- Begin body --><!-- $Id: body.tmpl,v 1.26 2002/02/22 19:23:43 carstenklapp Exp $ --></head>
+
+
+
+
+<body>
+<div id="navbar" class="toolbar">
+<!-- The logo -->
+<div id="logo" class="unprintable"><a class="wikilink" href="http://www.wlug.org.nz/HomePage"><img src="ActiveDirectorySamba_files/logo.png" alt="WLUG-Wiki: HomePage" align="right" border="0"></a></div>
+<!-- The top navigation/search bar -->
+<!-- Begin navbar -->
+<!-- $Id: navbar.tmpl,v 1.9 2002/02/12 07:13:34 carstenklapp Exp $ -->
+<!-- The top navigation/search bar -->
+<form action="TitleSearch" method="get" accept-charset="UTF-8">
+  <div id="navbuttons" class="unprintable">
+   <a href="http://www.wlug.org.nz/RecentChanges" rel="nofollow" class="wiki"><img src="ActiveDirectorySamba_files/RecentChanges.png" alt="RecentChanges" class="wiki-button" border="0"></a>   <a href="http://www.wlug.org.nz/FindPage" rel="nofollow" class="wiki"><img src="ActiveDirectorySamba_files/FindPage.png" alt="FindPage" class="wiki-button" border="0"></a>   <input name="auto_redirect" value="1" type="hidden">
+      <input name="s" size="12" maxlength="256" title="Title Search" onmouseover="window.status='Title Search'; return true;" onmouseout="window.status=''; return true;" type="text">
+         <a href="http://www.wlug.org.nz/ActiveDirectorySamba?action=LikePages" rel="nofollow" class="wikiaction"><img src="ActiveDirectorySamba_files/LikePages.png" alt="LikePages" class="wiki-button" border="0"></a>     <a href="http://www.wlug.org.nz/ActiveDirectorySamba?action=BackLinks" rel="nofollow" class="wikiaction"><img src="ActiveDirectorySamba_files/BackLinks.png" alt="BackLinks" class="wiki-button" border="0"></a>          </div>
+</form>
+<!-- End navbar -->
+
+<!-- Page title -->
+<h1><a href="http://www.wlug.org.nz/ActiveDirectorySamba?action=BackLinks" class="backlinks" title="BackLinks for ActiveDirectorySamba" onmouseover='window.status="BackLinks for ActiveDirectorySamba"; return true;' onmouseout="window.status='';return true;">Active Directory Samba</a></h1>
+</div>
+<!-- Begin browse -->
+<!-- $Id: browse.tmpl,v 1.22 2002/02/19 23:00:26 carstenklapp Exp $ with perry-->
+
+<div class="google" style="border: thick solid blue; padding: 5pt;">
+<span style="font-size: larger; font-weight: bold;">
+<span style="color: blue;">G</span>
+<span style="color: red;">o</span>
+<span style="color: yellow;">o</span>
+<span style="color: blue;">g</span>
+<span style="color: green;">l</span>
+<span style="color: red;">e</span>
+</span>  users: 
+ 
+ We have detected that you were searching for <i>"samba"+without krb5</i>.<br>  
+<p>
+The Waikato Linux Users Group hope that this page answers your questions, but,
+if it doesn't, we politely request that if/when you find the answer to your
+question you contibute your information back into this Wiki (via the Edit
+button at the bottom of the page) so that others can also find this information
+easier.</p>
+<p>
+We also suggest that if this page doesn't answer your question, try 
+<a href="http://www.wlug.org.nz/SearchPage?auto_redirect=1&amp;s=" samba="" +without="" krb5="">Searching the wiki</a>,
+or, to find pages similar to this one, try <a href="http://www.wlug.org.nz/ActiveDirectorySamba?action=LikePages" rel="nofollow" class="wikiaction"><img src="ActiveDirectorySamba_files/LikePages.png" alt="LikePages" class="wiki-button" border="0"></a> or 
+<a href="http://www.wlug.org.nz/ActiveDirectorySamba?action=BackLinks" rel="nofollow" class="wikiaction"><img src="ActiveDirectorySamba_files/BackLinks.png" alt="BackLinks" class="wiki-button" border="0"></a>.
+</p>
+</div>
+<div class="unprintable">
+   
+  </div><table border="0" width="100%">
+ <tbody><tr>
+  <td valign="top">
+<div class="wikitext"><div><p>This simple guide is a mostly accurate way to set up a <a href="http://www.wlug.org.nz/Samba" class="wiki">Samba</a> machine as a domain member in a <a href="http://www.wlug.org.nz/MicrosoftWindows" class="wiki">MicrosoftWindows</a> 2000 or Windows 2003 <a href="http://www.wlug.org.nz/ActiveDirectory" class="wiki">ActiveDirectory</a> domain.  For a REALLY short version, tested with Win2k3, see the Quick 'n' Dirty instructions at the bottom of the page.</p>
+<h3>Samba as an Active Directory Domain Member</h3>
+<p>The following setup is used:</p>
+<table class="wiki-dl-table" border="2" cellpadding="6" cellspacing="0">
+<tbody><tr>
+<th>192.168.0.1</th>
+<th>test1.thinclient.test.org</th>
+<td><p>the AD server, hereafter known as "the server"</p>
+</td>
+</tr>
+<tr>
+<th>192.168.0.209</th>
+<th>mail.thinclient.test.org</th>
+<td><p>samba3 "client" machine</p>
+</td>
+</tr>
+</tbody></table>
+<p>The Samba system is based upon a stock standard <a href="http://www.wlug.org.nz/RedHat" class="wiki">RedHat</a> 9 system with the samba software upgraded to Samba3 (using RPM)</p>
+<p>The following steps are needed to get the system functioning:</p>
+<ol>
+<li>configure name resolution using either dns or a hosts file</li>
+<li>configure samba and winbindd</li>
+<li>configure kerberos</li>
+<li>testing Samba and winbindd</li>
+<li>good luck</li>
+</ol>
+<h3>Configure name resolution</h3>
+<p>Active Directory relies HEAVILY on DNS to resolve not only host
+names but services they provide as well. To set up DNS on the Linux
+box, see the DNSHowTo, otherwise consult necessary Windows
+documentation on setting up forward AND reverse DNS zones.</p>
+<p>The first step is to configure name resolution for our systems. The
+kerberos authentication system, which we will configure later on,
+requires us to be able to do a reverse lookup on an IP address to get a
+fully qualified domain name (FQDN).</p>
+<p>There are two ways to do this. The cheap and nasty method is to use
+a hosts file on both systems. Hosts based authentication, which is
+discussed here, is ugly and hacky, and should be avoided at all costs.
+If you want to do it anyway, you need entries similar to the following.</p>
+<h4>Samba machine</h4>
+<pre><strong>/etc/hosts</strong>
+
+  127.0.0.1       localhost localhost.localdomain
+  192.168.0.1     test1.thinclient.test.org test1
+  192.168.0.209   mail.thinclient.test.org mail</pre>
+<h4>Windows Active Directory server (see footnote 1)</h4>
+<pre><strong>%Systemroot%\System32\drivers\etc\hosts</strong>
+
+  127.0.0.1       localhost localhost.localdomain
+  192.168.0.1     test1 test1.thinclient.test.org
+  192.168.0.209   mail mail.thinclient.test.org</pre>
+<p>The correct method is to setup DNS on the server which can be done
+through the DNS console in the Administrative Tools section of Windows
+2000/2003 Server. (You shouldn't be runing an Active Directory without
+a well set up DNS; if you don't know how to do it, go away and learn
+RIGHT NOW). We won't go into the details of setting this up here, but
+we will specify the Linux side of that here.</p>
+<p>A good way to set this up is to have a Linux-based BIND server doing
+name resolution for your site 'mydomain.tld', just as you normally
+would; then configure BIND to delegate the special Active Directory
+sub-domains DomainDnsZones.mydomain.tld and so on to the Windows Server
+2003 box. Then, configure Windows Server 2003 DNS to be a caching proxy
+using the Linux BIND box as its parent, except for the AD sub-domains
+for which it should be authoritative. All machines can then use the
+Linux box for DNS. This way, name resolution of normal names stays on
+good ole reliable Linux where it belongs, the Windows Active Directory
+crud goes on Windows where it belongs, and everything's happy. If the
+Windows Server is down, the AD stuff stops working (there's no avoiding
+that if the PDC is offline); however normal (non-AD) name resolution is
+unaffected. Thanks to Matthew Sanderson for the tip.</p>
+<pre><strong>/etc/resolv.conf</strong>
+
+  search      thinclient.test.org
+  domain      thinclient.test.org
+  nameserver  192.168.0.1</pre>
+<h3>Configure Samba3 and Winbindd</h3>
+<p>This part is the easy one, we just create ourselves a default Samba
+configuration with at least the following entries (Note this is a
+completely empty and default configuration file, and you may wish to
+add more. A file share would be handy to add).</p>
+<pre>/etc/samba/smb.conf
+  [[global]
+    # general options
+    workgroup = THINCLIENT
+    netbios name = MAIL
+
+    # winbindd configuration
+    # default winbind separator is \, which is good if you
+    # use mod_ntlm since that is the character it uses.
+    # users only need to know the one syntax
+    winbind separator = +
+
+    # idmap uid and idmap gid are aliases for
+    # winbind uid and winbid gid, respectively
+    idmap uid = 10000-20000
+    idmap gid = 10000-20000
+    winbind enum users = yes
+    winbind enum groups = yes
+    template homedir = /home/%D/%U
+    template shell = /bin/bash
+
+    # Active directory joining
+    # "ads server" is only necessary if your kdc
+    # can't be located using /etc/krb5.conf -- JamesSpooner
+    # ads server = test1.thinclient.test.org
+    security = ads
+    # encrypt passwords = yes is now default in Samba3 -- EnigMa
+    encrypt passwords = yes
+    realm = thinclient.test.org
+    # this handles the "ads server = " directive as well -- EnigMa
+    password server = test1.thinclient.test.org</pre>
+<p>NB: The important things to pay attention to here are the name of our samba machine (netbios name), the workgroup, and the <a href="http://www.wlug.org.nz/ActiveDirectory" class="wiki">ActiveDirectory</a> stuff.</p>
+<h3>Configure Kerberos5</h3>
+<p>If your Kerberos setup is good, run <tt>net ads join -U Administrator%password</tt> and it will perform all the <tt>ktpass</tt> and <tt>ktutil</tt> stuff on the fly as mentioned in <a href="http://us1.samba.org/samba/docs/man/Samba-HOWTO-Collection/domain-member.html#ads-create-machine-account" class="namedurl"><img src="ActiveDirectorySamba_files/http.png" alt="[link]" class="linkicon" border="0">the SAMBA howto</a> .  Then you can skip to the winbind section below.  Thanks to <span class="wikiunknown"><u>EnigMa</u><a href="http://www.wlug.org.nz/EnigMa?action=edit" rel="nofollow"><img src="ActiveDirectorySamba_files/uww.png" alt="?" class="wiki-button" border="0"></a></span> for the tip.  If you don't specify %password, it will prompt you on the command line (for the security minded).</p>
+<p>Configuring a Kerberos setup is much easier in the long run then generating the key and importing it.</p>
+<h4>Manual approach</h4>
+<p>We need to generate a key for our samba machine on the Windows server, and securely import this into our samba machine.
+To create the keyfile we run the following on the Windows server:</p>
+<pre>  ktpass -princ host/mail.thinclient.test.org@THINCLIENT.TEST.ORG \
+             -mapuser MAIL -pass MAIL1234PASSWORD -out mail.keytab</pre>
+<p>This, and many other tools for managing Kerberos in Windows 2000,
+are located in the support tools which are directly downloadable from <a href="http://www.microsoft.com/downloads/details.aspx?familyid=f08d28f3-b835-4847-b810-bb6539362473&amp;displaylang=en" class="namedurl"><img src="ActiveDirectorySamba_files/http.png" alt="[link]" class="linkicon" border="0">Microsoft</a>. Thanks to Jan Gerle for the tip.</p>
+<p>We then transfer the mail.keytab securely to our samba machine by
+using something similar to SSH or another secure means. And then on the
+samba machine we will import the keyfile we just generated by using the
+ktutil program, which is part of the kerberos distribution. The unix
+commands for ktutil are as follows:</p>
+<pre>  % __ktutil__
+  ktutil: __rkt mail.keytab__
+  ktutil: __list__
+  ktutil: __wkt /etc/krb5.keytab__
+  ktutil: __q__</pre>
+<p>See <a href="http://www.wlug.org.nz/ActiveDirectoryKerberos" class="wiki">ActiveDirectoryKerberos</a> on setting up Kerberos to talk to <a href="http://www.wlug.org.nz/ActiveDirectory" class="wiki">ActiveDirectory</a>.</p>
+<h4>(Re)starting Samba and Winbindd</h4>
+<p>First we test our samba configuration and our winbind settings, before we modify our samba startup script.</p>
+<pre>  /etc/rc.d/init.d/samba restart
+  /usr/sbin/winbindd</pre>
+<p>For some of our paranoid friends, we can check to see if our winbindd is actually running using</p>
+<pre>  ps fax | grep winbindd</pre>
+<p>Now for a real test, and see if we can get some information off our Active Directory PDC.</p>
+<pre>  /usr/bin/wbinfo -u</pre>
+<p>And we should get a list of users in the format THINCLIENT+&lt;username&gt;</p>
+<pre>  THINCLIENT+Administrator
+  THINCLIENT+Guest
+  ..</pre>
+<p>And we can do the same for our list of groups.</p>
+<pre>  /usr/bin/wbinfo -g
+
+  THINCLIENT+Domain Admins
+  THINCLIENT+Domain Users
+  THINCLIENT+Schema Admins
+  ..</pre>
+<p>We can now use the getent utility to get a unified list of both the
+local and PDC users and groups. These utilities will generate a list of
+data similar in format to the /etc/passwd and /etc/group files
+respectively.</p>
+<p>add following entries in nssswitch.conf:</p>
+<pre>  passwd:        files winbind
+  group:         files winbind</pre>
+<p>if you are compiling samba from source then you need to copy following files manually</p>
+<pre> cp /usr/src/samba-3.0.1/source/nsswitch/pam_winbind.so  /lib/security/
+ cp /usr/src/samba-3.0.1/source/nsswitch/libnss_winbind.so /lib/
+ cp /usr/src/samba-3.0.1/source/bin/pam_smbpass.so  /lib/security/</pre>
+<p>then run following command to get unified entries</p>
+<pre>  /usr/bin/getent passwd
+  /usr/bin/getent group</pre>
+<p>It is now a good idea to test to ensure your Active Directory usernames are valid on the system.
+Try the following:</p>
+<pre>chown "THINCLIENT+username" filename</pre>
+<p>(where THINCLIENT is the active directory short name)</p>
+<p>If 'wbinfo -u' and 'getent passwd' work fine but your chown says
+this is an unknown user, you probably have NSCD running. You should
+disable NSCD and restart winbind. (See <a href="http://us4.samba.org/samba/docs/man/winbind.html#id2958310" class="rawurl"><img src="ActiveDirectorySamba_files/http.png" alt="[link]" class="linkicon" border="0">http://us4.samba.org/samba/docs/man/winbind.html#id2958310</a> for more)</p>
+<p>After this we can fix up our init.d startup scripts to automate the startup of winbindd and not start NSCD.</p>
+<h4>Configure PAM and Winbind</h4>
+<p><strong>Before we do anything at all here, we need to make a backup
+of our /etc/pam.d/* files. And have a linux bootdisk available if
+possible. If anything goes wrong here, you may not be able to login to
+your system properly. (So don't reboot or logoff to test, but use a
+text console)</strong></p>
+<p>To have our <a href="http://www.wlug.org.nz/ActiveDirectory" class="wiki">ActiveDirectory</a> users be able to login to our we have to modify our /etc/pam.d/login.
+We don't need to modify our /etc/pam.d/samba settings as it is already configured for winbind.</p>
+<pre>/etc/pam.d/login
+
+  #%PAM-1.0
+  auth        required     pam_securetty.so
+  auth        sufficient   pam_winbind.so
+  auth        sufficient   pam_unix.so use_first_pass
+  auth        required     pam_stack.so service=system-auth
+  auth        required     pam_nologin.so
+  account     sufficient   pam_winbind.so
+  account     required     pam_stack.so service=system-auth
+  password    required     pam_stack.so service=system-auth
+  session     required     pam_stack.so service=system-auth
+  session     optional     pam_console.so</pre>
+<p>After we save this file, we should now be able to login to our linux
+machine with the username THINCLIENT+Administrator, and get ourself a
+login prompt. Now the system may complain if you do not have the
+specified home directory created (in this case
+/home/THINCLIENT/Administrator)</p>
+<h4>SSH Support</h4>
+<p>Do the same additions that you made to /etc/pam.d/login to /etc/pam.d/sshd to support logins via SSH.</p>
+<h4>Have fun</h4>
+<p>And congrats it works, if you want to configure further items such
+as mail and other things you may need to modify the apropriate PAM
+modules, and isn't covered here.</p>
+<h4>References</h4>
+<ul>
+<li>Using Kerberos Clients section of the <a href="http://www.microsoft.com/windows2000/techinfo/planning/security/kerbsteps.asp" class="namedurl"><img src="ActiveDirectorySamba_files/http.png" alt="[link]" class="linkicon" border="0">Microsoft : Step-by-Step Guide to Kerberos 5 (krb5 1.0) Interoperability</a></li>
+<li><a href="http://mailman.mit.edu/pipermail/kerberos/2002-June/001189.html" class="namedurl"><img src="ActiveDirectorySamba_files/http.png" alt="[link]" class="linkicon" border="0">Authentication to ADS</a></li>
+<li>The winbindd and Active Directory Domain Member sections of the <a href="http://au1.samba.org/samba/devel/docs/html/Samba-HOWTO-Collection.html" class="namedurl"><img src="ActiveDirectorySamba_files/http.png" alt="[link]" class="linkicon" border="0">Samba v3 Documentation</a></li>
+</ul>
+<hr><h4>Quick 'n' Dirty setup for Samba 3 and Windows 2003</h4>
+<p>These are the absolute bare minimum steps to get your Samba server
+integrated as a member server in an AD controlled domain with Win2k3 as
+the DC.</p>
+<p>1. ENSURE your samba box has an A record and associated PTR in DNS.</p>
+<p>2. On your DC, disable signing: Run Domain Controller Policy tool
+and edit Account Policies -&gt; Security Options -&gt; Microsoft
+network client: Digitally sign communications (always) Set this to
+Disabled. Do the same in the Domain Policy tool. Note, you will need to
+reboot the server for this step, though it won't tell you to. Disable
+on your samba server as well with the following in smb.conf</p>
+<pre>        client signing = no
+        client use spnego = no</pre>
+<p>3. On your samba server, install kerberos5, and edit /etc/krb5.conf.  It should contain:</p>
+<pre>[libdefaults]
+        default_realm = YOUR.ADS.DOMAIN
+        dns_lookup_kdc = false
+        dns_lookup_realm = false
+
+[domain_realm]
+        .your.domain.name=YOUR.ADS.DOMAIN
+        your.domain.name=YOUR.ADS.DOMAIN
+
+[realms]
+YOUR.ADS.DOMAIN = {
+        default_domain = your.domain.name
+        kdc = IP.OF.THE.DC
+}</pre>
+<p>4. Ensure smb.conf contains</p>
+<pre>        realm = YOUR.ADS.DOMAIN
+        workgroup = YOUR
+        security = ADS</pre>
+<p>5. Get a ticket using kerberos: kinit administrator (enter the
+administrator password when prompted). The klist command should then
+list a ticket.</p>
+<p>6. Join the domain using 'net ads join'.  This should use the credentials in your kerberos ticket.</p>
+<p>7. Set up winbind - ensure the following is in smb.conf</p>
+<pre>        winbind uid = 10000-20000
+        winbind gid = 10000-20000
+        winbind enum groups = yes
+        winbind enum users = yes</pre>
+<p>8. store your winbind credentials with wbinfo --set-auth-user=DOMAIN\\administrator%password</p>
+<p>9. modify /etc/pam.d/samba (on woody) or the appropriate pam file to
+add "sufficient" for auth and account using pam_winbind.so. These need
+to go BEFORE the pam_unix.so calls for samba. My /etc/pam.d/samba is as
+follows:</p>
+<pre>auth            sufficient      pam_winbind.so
+auth            required        pam_unix.so nullok
+account         sufficient      pam_winbind.so
+account         required        pam_unix.so
+session         required        pam_unix.so
+password        required        pam_unix.so</pre>
+<p>10. Modify /etc/nsswitch.conf with the following:</p>
+<pre>passwd:         winbind compat
+group:          winbind compat
+shadow:         winbind compat</pre>
+<p>11. Restart samba and winbind.</p>
+<p>12. All should work. :)  Browse your server and see...</p>
+<hr><h4>Footnotes</h4>
+<ol>
+<li>%Systemroot% is a variable set by Windows NT and onward to mean
+"the location where Windows is installed", ie c:\winnt, c:\windows, etc.</li>
+</ol>
+<hr><p><a href="http://www.wlug.org.nz/CategoryInteroperability" class="wiki">CategoryInteroperability</a></p>
+</div>
+</div>
+  </td>
+  <td cellpadding="0" border="0" style="border-collapse: collapse; padding-top: 0.3em;" class="unprintable" valign="top" width="20%">
+  <iframe src="ActiveDirectorySamba_files/SideBarFrame.htm" type="text/html" class="sidebar unprintable" style="border-style: solid; border-color: rgb(124, 124, 124) rgb(195, 195, 195) rgb(221, 221, 221); border-width: 1px;" height="500" width="100%">
+    This &lt;a&gt;news side bar&lt;/a&gt; needs a
+    browser with "iframe" support.</iframe>
+  <div class="sidebar unprintable">
+  <p>4 pages link to <a href="http://www.wlug.org.nz/ActiveDirectorySamba" class="wiki">ActiveDirectorySamba</a>:</p>
+<ul class="pagelist">
+<li class="evenrow"><a href="http://www.wlug.org.nz/HowtoSamba3AndActiveDirectory" class="wiki">HowtoSamba3AndActiveDirectory</a></li>
+<li class="evenrow"><a href="http://www.wlug.org.nz/Samba" class="wiki">Samba</a></li>
+<li class="evenrow"><a href="http://www.wlug.org.nz/SambaAsFileServer" class="wiki">SambaAsFileServer</a></li>
+<li class="oddrow"><a href="http://www.wlug.org.nz/SambaNotes" class="wiki">SambaNotes</a></li>
+</ul>
+  </div>
+  <div class="unprintable">Please visit the <a href="http://www.wlug.org.nz/WlugSponsors" class="wiki">WlugSponsors</a>.</div>
+  </td>
+ 
+ </tr>
+</tbody></table>
+
+<div id="actionbar" class="toolbar unprintable">
+<hr class="printer" noshade="noshade">
+<p class="editdate">Last edited on Wednesday, September  1, 2004 11:13:39 am by <a href="http://www.wlug.org.nz/CraigBox" class="wiki">CraigBox</a>.</p>
+<p>
+  <small>Please note that any user can change the contents of pages
+  on this site, and therefore the Waikato Linux Users Group can offer no
+  assurances that the information is correct, and the information on this
+  site is not necessarily the opinion of the Waikato Linux Users Group, or
+  any of its members.  Copyright is retained by the individual authors of
+  a page.  If you have any complaints about the contents of this page, 
+  please do not hesitate to contact the Waikato Linux Users Group, or, click
+  the Edit button below!
+  </small>
+</p>
+<hr class="toolbar" noshade="noshade">
+<!-- Begin actionbar -->
+<!-- $Id: actionbar.tmpl,v 1.16 2002/02/22 23:23:47 carstenklapp Exp $ -->
+
+<!-- I would like not to have to use these tables, and managed to
+     get this stuff to work more or less correctly using
+     CSSs float:left; and float:right;.  However float:right; seems
+     to cause MSIE4.01/NT to hang. 
+     So, we use tables...  -->
+
+<table summary="Toolbar 1: Page actions and user login." border="0" cellpadding="0" cellspacing="0" width="100%">
+<tbody><tr valign="baseline">
+  <td>
+  <div id="actionbuttons" class="unprintable">
+    <label accesskey="E"><a href="http://www.wlug.org.nz/ActiveDirectorySamba?action=edit" rel="nofollow" class="wikiaction"><img src="ActiveDirectorySamba_files/Edit.png" alt="Edit" class="wiki-button" border="0"></a></label>
+		<a href="http://www.wlug.org.nz/ActiveDirectorySamba?action=PageHistory" rel="nofollow" class="wikiaction"><img src="ActiveDirectorySamba_files/PageHistory.png" alt="PageHistory" class="wiki-button" border="0"></a>	<a href="http://www.wlug.org.nz/ActiveDirectorySamba?action=diff" rel="nofollow" class="wikiaction"><img src="ActiveDirectorySamba_files/Diff.png" alt="Diff" class="wiki-button" border="0"></a> 
+	<a href="http://www.wlug.org.nz/ActiveDirectorySamba?action=Info" rel="nofollow" class="wikiaction"><img src="ActiveDirectorySamba_files/Info.png" alt="Info" class="wiki-button" border="0"></a>  </div>
+  </td>
+  <td align="right">
+    <div id="signin" class="unprintable"><!-- Begin signin -->
+<!-- $Id: signin.tmpl,v 1.15 2002/02/14 03:29:55 carstenklapp Exp $ -->
+
+  <form method="post" action="http://www.wlug.org.nz/" accept-charset="UTF-8" name="signin">
+  <input name="pagename" value="ActiveDirectorySamba" type="hidden"><input name="action" value="browse" type="hidden">
+
+  
+  <script language="JavaScript" type="text/javascript"><!--
+    document.write("<small>Sign In</small> ");
+  // --></script><small>Sign In</small> 
+  <input name="auth[userid]" size="12" maxlength="256" onchange="this.form.submit();" title="Enter your UserId to sign in" onmouseover='window.status="Enter your UserId to sign in"; return true;' onmouseout="window.status='';return true;" type="text">  <noscript>
+<input type="image" src="/phpwiki/themes/WLUG/buttons/en/Sign+In.png"
+value="Sign In" alt="Sign In" name="auth[login]" class="wikiaction" /> </noscript>
+
+
+  </form>
+<!-- End signin -->
+</div>
+  </td>
+</tr>
+</tbody></table>
+<!-- End actionbar -->
+<!-- RELATEDPAGES were here. -->
+</div>
+<!-- End browse -->
+
+
+<!-- End body -->
+</body></html>

@@ -1,0 +1,355 @@
+<html><head><!-- InstanceBegin template="/Templates/frame.dwt" codeOutsideHTMLIsLocked="false" --><!-- InstanceBeginEditable name="title" -->
+
+
+
+<title>Elucid8 Design - How to Configure A Fedora Core 1.0 PPTP VPN Server</title><!-- InstanceEndEditable --><meta http-equiv="imagetoolbar" content="no">
+<link href="pptp.php_files/style.css" rel="stylesheet" type="text/css">
+<link href="pptp.php_files/tutorials.css" rel="stylesheet" type="text/css">
+<script src="pptp.php_files/script.js"></script><!-- InstanceBeginEditable name="head" --><!-- InstanceEndEditable --></head>
+<body leftmargin="0" topmargin="0" onload="MM_preloadImages('../Assets/images/companyOver.gif','../Assets/images/loginOver.gif','../Assets/images/webOver.gif','../Assets/images/hostingOver.gif','../Assets/images/printOver.gif','../Assets/images/applicationsOver.gif');" bgcolor="#991200" marginheight="0" marginwidth="0">
+<table align="center" bgcolor="#ffffff" border="0" cellpadding="0" cellspacing="0" width="100%">
+  <tbody><tr>
+    <td colspan="3" align="center" bgcolor="#000000"><a href="http://www.elucid8design.com/"><img src="pptp.php_files/logo.gif" alt="{metaTitle}" border="0" height="90" width="278"></a></td>
+  </tr>
+  <tr>
+    <td colspan="3" bgcolor="#000000" height="20"><table id="menu" border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tbody><tr>
+          <td width="125"><a href="http://www.elucid8design.com/company" onmouseout="MM_swapImgRestore()" onmouseover="MM_swapImage('company','','../Assets/images/companyOver.gif',1)"><img src="pptp.php_files/company.gif" alt="Company Information" name="company" border="0" height="20" width="125"></a></td>
+          <td width="125"><a href="http://www.elucid8design.com/web" onmouseout="MM_swapImgRestore()" onmouseover="MM_swapImage('web','','../Assets/images/webOver.gif',1)"><img src="pptp.php_files/web.gif" alt="Web Design" name="web" border="0" height="20" width="125"></a></td>
+          <td width="125"><a href="http://www.elucid8design.com/hosting" onmouseout="MM_swapImgRestore()" onmouseover="MM_swapImage('hosting','','../Assets/images/hostingOver.gif',1)"><img src="pptp.php_files/hosting.gif" alt="Web Hosting" name="hosting" border="0" height="20" width="125"></a></td>
+          <td width="125"><a href="http://www.elucid8design.com/print" onmouseout="MM_swapImgRestore()" onmouseover="MM_swapImage('print','','../Assets/images/printOver.gif',1)"><img src="pptp.php_files/print.gif" alt="Print Design" name="print" border="0" height="20" width="125"></a></td>
+          <td width="125"><a href="http://www.elucid8design.com/applications" onmouseout="MM_swapImgRestore()" onmouseover="MM_swapImage('applications','','../Assets/images/applicationsOver.gif',1)"><img src="pptp.php_files/applications.gif" alt="Application Development" name="applications" border="0" height="20" width="125"></a></td>
+          <td>&nbsp;</td>
+          <td width="127"><a href="https://secure.elucid8design.com/clientcenter" onmouseout="MM_swapImgRestore()" onmouseover="MM_swapImage('login','','../Assets/images/loginOver.gif',1)"><img src="pptp.php_files/login.gif" alt="Client Center" name="login" border="0" height="20" width="125"></a></td>
+        </tr>
+      </tbody></table></td>
+  </tr>
+  <tr>
+    <td colspan="3"><img src="pptp.php_files/spacer.gif" height="20" width="760"></td>
+  </tr>
+  <tr>
+    <td><img src="pptp.php_files/spacer.gif" height="1" width="10"></td>
+    <td id="content" valign="top" width="95%"><!-- InstanceBeginEditable name="main" -->
+      <table id="tutorial" align="center" border="0" cellpadding="0" cellspacing="0" width="757">
+        <tbody><tr>
+          <td><span class="heading">How to Configure A Fedora Core 1.0 PPTP VPN Server</span> <br>
+Search the Internet and you'll find a collection of message board posts
+reporting varying degrees of confusion and frustration in configuring a
+PPTP VPN.&nbsp; Fortunately, the <a href="http://sourceforge.net/projects/poptop" target="_blank">PoPToP</a>
+project has recently produced several RPMS which now make it fast and
+easy to deploy a linux PPTP server.&nbsp; Below I have documented the
+steps that I took in configuring a working PPTP VPN on a Fedora Core
+1.0 server. <br>
+          <br>
+          <b>          </b>
+          <table border="0" cellpadding="0" cellspacing="0" width="100%">
+            <tbody><tr>
+              <td class="title">&nbsp;<img src="pptp.php_files/corner.gif" height="16" width="18"> System Prerequisites</td>
+            </tr>
+          </tbody></table>
+A Fedora Core 1.0 Installation with the base RPMs from the following package groups 
+<li>Software Development</li><li>Kernel Development</li><br>
+You will also need to install the patch-2.5.4-18.i386.rpm from the first Fedora Core 1.0 CD. <br>
+
+<br>
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+  <tbody><tr>
+    <td class="title">&nbsp;<img src="pptp.php_files/corner.gif" height="16" width="18">Configuring PoPToP</td>
+  </tr>
+</tbody></table>
+<b>          </b>PoPToP is an open source PPTP server for linux.&nbsp;
+PoPToP uses the PPP daemon to handle user authentication and the
+point-to-point encryption.&nbsp; To get a working installation, you
+need to install both PPTP and PPP and kernel modules to handle the MPPE
+encryption.<br>
+<br>
+Download the following RPMS:<b><br>
+                    </b><a href="ftp://ftp2.elucid8design.com/linux/fedora/1.0/dkms-1.12-2.noarch.rpm"><img src="pptp.php_files/download.gif" border="0" height="13" width="13">dkms-1.12-2.noarch.rpm</a> (55.6K)<br>
+                    <a href="ftp://ftp2.elucid8design.com/linux/fedora/1.0/dkms-1.12-2.noarch.rpm"><img src="pptp.php_files/download.gif" border="0" height="13" width="13"></a><a href="ftp://ftp2.elucid8design.com/linux/fedora/1.0/kernel_ppp_mppe-0.0.4-2dkms.noarch.rpm">kernel_ppp_mppe-0.0.4-2dkms.noarch.rpm</a> (58.8K)<br>
+                    <a href="ftp://ftp2.elucid8design.com/linux/fedora/1.0/dkms-1.12-2.noarch.rpm"><img src="pptp.php_files/download.gif" border="0" height="13" width="13"></a><a href="ftp://ftp2.elucid8design.com/linux/fedora/1.0/ppp-2.4.2-1.i386.rpm">ppp-2.4.2-1.i386.rpm</a> (198.2K)<br>
+                    <a href="ftp://ftp2.elucid8design.com/linux/fedora/1.0/dkms-1.12-2.noarch.rpm"><img src="pptp.php_files/download.gif" border="0" height="13" width="13"></a><a href="ftp://ftp2.elucid8design.com/linux/fedora/1.0/pptpd-1.1.4-b4.i386.rpm">pptpd-1.1.4-b4.i386.rpm</a> (87.1K)<br>
+          <br>
+Running a PPP server with MPPE encryption requires you to build and
+install new modules for your kernel.&nbsp; (Fortunately, using DKMS,
+you only need to build the modules and not an entirely new
+kernel!)&nbsp; The PoPToP project has made this easy for you by
+providing an RPM that automatically builds and installs the required
+modules for your kernel.<br>
+          <br>
+          <table class="code" border="0" cellpadding="0" cellspacing="0" width="100%">
+            <tbody><tr>
+              <td>#rpm -ivh dkms-1.12-2.noarch.rpm<br>
+#rpm -ivh kernel_ppp_mppe-0.0.4-2dkms.noarch.rpm</td>
+            </tr>
+          </tbody></table>
+          <br>
+
+Install the RPMs for the PPP  and PPTP servers.<br>
+<br>
+          <table class="code" border="0" cellpadding="0" cellspacing="0" width="100%">
+  <tbody><tr>
+    <td>#rpm -Uvh ppp-2.4.2-1.i386.rpm <br>
+#rpm -ivh pptpd-1.1.4-b4.i386.rpm </td>
+  </tr>
+</tbody></table>
+          <br>
+          Now, you may need to edit the configuration files and fine tune PoPToP to your network.<br> 
+          <br>
+<span class="file">/etc/ppp/options.pptpd<br>
+</span>This file defines the configuration options for the PPP
+daemon.&nbsp; We run a SAMBA server on our internal network, so I
+configured PPP with the ms-dns and ms-wins options to ensure the
+Windows clients can browse the network with <b>My Network Places</b>.&nbsp; The options in red below should be substituted with values from your own network or removed altogether.<br>
+
+<table class="code" border="0" cellpadding="0" cellspacing="0" width="100%">
+  <tbody><tr>
+    <td>name pptpd<br>
+      refuse-pap<br>
+      refuse-chap<br>
+      refuse-mschap<br>
+      require-mschap-v2<br>
+      require-mppe-128<br>
+      <span class="codeHighlight">ms-dns 192.168.1.1</span><br>
+      <span class="codeHighlight">ms-wins 192.168.1.2</span><br>
+      <span class="codeHighlight">proxyarp<br>
+      defaultroute<br>
+      </span>logfile /var/log/pptpd<br>
+      lock<br>
+      nobsdcomp </td>
+  </tr>
+</tbody></table>
+<br>
+<span class="file">/etc/pptpd.conf</span><br>
+This file defines the configuration options for PoPToP.&nbsp; NETBIOS
+uses broadcast packets to build the network browse list, so we enabled <b>bcrelay</b> which  relays broadcast packets from the internal interface, eth1, accross ppp0 out to the PPTP client.<br>
+
+<table class="code" border="0" cellpadding="0" cellspacing="0" width="100%">
+  <tbody><tr>
+    <td>option /etc/ppp/options.pptpd<br>
+      logwtmp<br>
+      <span class="codeHighlight">bcrelay eth1<br>
+      localip 192.168.1.200<br>
+      remoteip 192.168.1.201-250</span></td>
+  </tr>
+</tbody></table>
+<br>
+
+<span class="file">/etc/ppp/chap-secrets</span><br>
+This file is the password database for you PPTP server.&nbsp; The CHAP
+and CHAPv2 authentication methods use the chap-secrets file to
+authenticate VPN users.&nbsp; Notice the use of the WINDOWS domain
+prefix, in this case <b>BEATLES</b>.&nbsp;
+If you wish for you users to be a member of a domain, you must prefix
+their name in the chap-secrets file with the domain prefix followed by
+two backslashes.&nbsp; If you use a domain prefix in you chap-secrets
+file, clients will be required to provide the domain name as well as
+their username and password when they log in. <br>
+
+<table class="code" border="0" cellpadding="0" cellspacing="0" width="100%">
+  <tbody><tr>
+    <td># Secrets for authentication using CHAP<br>
+#
+client&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp; server &nbsp;
+secret&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; IP
+addresses<br>
+      <span class="codeHighlight">BEATLES\\john&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+*&nbsp;&nbsp; &nbsp;&nbsp; &nbsp; &nbsp;&nbsp;&nbsp; lennon&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *</span><br>
+      <span class="codeHighlight">BEATLES\\paul &nbsp;&nbsp;&nbsp;&nbsp; *&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;mccartney &nbsp;&nbsp; *<br>
+BEATLES\\george *&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; &nbsp;harrison &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; * <br>
+BEATLES\\ringo&nbsp; &nbsp; *&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; starr&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *</span></td>
+  </tr>
+</tbody></table>
+<br>
+The chap-secrets file by far the biggest security hole in the PPTP
+server as it lists the username/passwords in cleartext. This file
+should be owned by root should only grant read/write access to the the
+owner(mode 0600).&nbsp; Furthermore, you should never open chap-secrets
+in a text editor as it could potentially expose sensitive information
+every time you open it.&nbsp; Fortunately, there is a shell script for
+automatically adding and removing users from the /etc/ppp/chap-secrets
+file.<br>
+<br>
+Download the following script: <b><br>
+</b><a href="ftp://ftp2.elucid8design.com/linux/fedora/1.0/chapuser.sh"><img src="pptp.php_files/download.gif" border="0" height="13" width="13">chapuser.sh</a><br>
+<a href="ftp://ftp2.elucid8design.com/linux/fedora/1.0/dkms-1.12-2.noarch.rpm"></a> <br>
+You can add a  user to the chap-secrets file with the following command: <br>
+<br>
+<table class="code" bgcolor="#cccccc" border="0" cellpadding="0" cellspacing="0" width="100%">
+  <tbody><tr>
+    <td>#./chapuser.sh add &lt;username&gt; &lt;password&gt;</td>
+  </tr>
+</tbody></table>
+<br>
+
+
+          Start the PPTP daemon<br>
+          <br>
+          <table class="code" border="0" cellpadding="0" cellspacing="0" width="100%">
+            <tbody><tr>
+              <td bgcolor="#cccccc">#service pptpd start </td>
+            </tr>
+          </tbody></table>
+          <br>
+          <table border="0" cellpadding="0" cellspacing="0" width="100%">
+            <tbody><tr>
+              <td class="title">&nbsp;<img src="pptp.php_files/corner.gif" height="16" width="18">Configuring Shorewall </td>
+            </tr>
+          </tbody></table>
+          <b> </b>If
+you use netstat to check which ports are being used, you'll see that
+PoPToP listens for incoming TCP connections on port 1723.&nbsp; Once a
+connection has been established, the server will also exchange packets
+with the client using the GRE protocol(47).&nbsp; If you server is
+behind a firewall, you will need to configure it for both of these
+types of connections.&nbsp; I highly recommend using <a href="http://www.shorewall.net/" target="_blank">Shorewall</a>.&nbsp;
+Shorewall is a high-level configuration tool that takes the most of the
+grunt work out of configuring Netfilter for your firewall. <br>
+<br>
+Download the following file:<b><br>
+          </b><a href="ftp://ftp2.elucid8design.com/linux/fedora/1.0/shorewall-2.0.10.tgz"><img src="pptp.php_files/download.gif" border="0" height="13" width="13">shorewall-2.0.10.tgz</a> (103.1K)<br>
+          <br>
+          Untar and install shorewall.<br>
+          <br>        
+          <table class="code" border="0" cellpadding="0" cellspacing="0" width="100%">
+            <tbody><tr>
+              <td>#tar -xzvf shorewall-2.0.10.tgz<br>
+                #cd shorewall-2.0.10<br>
+                #./install.sh</td>
+            </tr>
+          </tbody></table>
+          <br>
+          Use chkconfig to configure shorewall to start by default.<br>
+          <br>
+          <table class="code" border="0" cellpadding="0" cellspacing="0" width="100%">
+            <tbody><tr>
+              <td>      #chkconfig --add shorewall <br>
+      #chkconfig --levels 345 shorewall on</td>
+            </tr>
+          </tbody></table>
+          <br>
+          <span class="file">/etc/shorewall/zones</span><br>
+This file defines your various network zones.&nbsp; Add the following zone:<br>
+<table class="code" border="0" cellpadding="0" cellspacing="0" width="100%">
+  <tbody><tr>
+    <td>pptp&nbsp;&nbsp;&nbsp;&nbsp; PoPToP&nbsp;&nbsp;&nbsp;&nbsp; Road Warrior Clients</td>
+  </tr>
+</tbody></table>
+          <br>
+          <span class="file">/etc/shorewall/interfaces</span><br>
+This file creates a mapping between a network zone and a physical
+interface.&nbsp; We expect to have several simultaneous PPTP
+connections to our VPN, so we used ppp+ to account for all of the ppp
+connections(ppp0, ppp1, ppp2, etc).<br>
+<table class="code" border="0" cellpadding="0" cellspacing="0" width="100%">
+  <tbody><tr>
+    <td>pptp&nbsp;&nbsp;&nbsp;&nbsp; ppp+&nbsp;&nbsp;&nbsp;&nbsp; -</td>
+  </tr>
+</tbody></table>
+          <br>
+          <span class="file">/etc/shorewall/policy</span><br>
+This file defines the default filtering policy for a given network
+zone.&nbsp; We want to give unrestricted access to our VPN users, so we
+set the default policy to ACCEPT.&nbsp; You may wish to be more
+restrictive with your users and set the policy to DROP.<br>
+<table class="code" border="0" cellpadding="0" cellspacing="0" width="100%">
+  <tbody><tr>
+    <td>pptp&nbsp;&nbsp;&nbsp;&nbsp; all&nbsp;&nbsp;&nbsp;&nbsp; ACCEPT</td>
+  </tr>
+</tbody></table>
+<br>
+<span class="file"></span>          <span class="file">/etc/shorewall/rules</span><br>
+This file defines the actual filtering rules for your firewall.&nbsp; Add the following rules:<br>
+<table class="code" border="0" cellpadding="0" cellspacing="0" width="100%">
+  <tbody><tr>
+    <td>ACCEPT&nbsp;&nbsp;&nbsp;&nbsp; net&nbsp;&nbsp;&nbsp;&nbsp; fw&nbsp;&nbsp;&nbsp;&nbsp; tcp&nbsp;&nbsp;&nbsp;&nbsp; 1723<br>
+      ACCEPT&nbsp;&nbsp;&nbsp;&nbsp; net&nbsp;&nbsp;&nbsp;&nbsp; fw&nbsp;&nbsp;&nbsp;&nbsp; 47&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; -</td>
+  </tr>
+</tbody></table>
+          <br>
+          <span class="file">/etc/shorewall/tunnels</span><br>
+This file defines VPN tunnels.&nbsp; Add the following tunnel: <br>
+<table class="code" border="0" cellpadding="0" cellspacing="0" width="100%">
+  <tbody><tr>
+    <td>pptpserver&nbsp;&nbsp;&nbsp;&nbsp; net</td>
+  </tr>
+</tbody></table>
+          <br>
+          Start Shorewall. <br>
+          <br>
+          <table class="code" border="0" cellpadding="0" cellspacing="0" width="100%">
+            <tbody><tr>
+              <td bgcolor="#cccccc">#service shorewall start </td>
+            </tr>
+          </tbody></table>
+            <br>
+          <table border="0" cellpadding="0" cellspacing="0" width="100%">
+            <tbody><tr>
+              <td class="title">&nbsp;<img src="pptp.php_files/corner.gif" height="16" width="18">Configuring a PPTP Client</td>
+            </tr>
+          </tbody></table>
+There are plenty of good tutorials already out there on the Internet to
+guide you through setting up a client connection to your PoPToP VPN
+server.&nbsp; Below are links to tutorials for the most popular
+operating systems.<b><br>
+                     </b><br>
+                     <b>Windows XP Client <br>
+            </b><a href="http://www.bol.ucla.edu/services/vpn/pptp/docs/winxp.html" target="_blank">http://www.bol.ucla.edu/services/vpn/pptp/docs/winxp.html</a><br>
+          <br>
+          <b>Mac OS X 10.2 Client <br>
+          </b><a href="http://www.yale.edu/fsp/doco/mac10dot3vpn.html" target="_blank">http://www.yale.edu/fsp/doco/mac10dot3vpn.html</a><br>
+
+          <br>
+          <b>Fedora Core 2.0<br>
+          </b><a href="http://jason.roysdon.net/archives/001095.html" target="_blank">http://jason.roysdon.net/archives/001095.html</a>          <br>
+          <br>
+          <table border="0" cellpadding="0" cellspacing="0" width="100%">
+            <tbody><tr>
+              <td class="title">&nbsp;<img src="pptp.php_files/corner.gif" height="16" width="18">Conclusion</td>
+            </tr>
+          </tbody></table>
+A PPTP VPN can be an exceptional tool for extending the usefullness of
+your network.&nbsp; When combined with a strong firewall, you can
+maintain rigid external security while still allowing your users secure
+access to internal network services.<br>
+          <br>
+          « <a href="http://devel.elucid8design.com/el8/devel/tutorials/index.php">back to the tutorials</a><br>
+          <br>
+          <table class="author" border="0" cellpadding="0" cellspacing="0" width="100%">
+            <tbody><tr>
+              <td>          <b>About the Author</b><br>
+Greg Kops is Elucid8 Design's technical director and is solely
+responsible for maintaining the company's production and development
+networks.&nbsp; He has been working with linux systems and building
+networks since early 2000.</td>
+            </tr>
+          </tbody></table>          
+      </td>
+        </tr>
+      </tbody></table>
+    <!-- InstanceEndEditable --></td>
+    <td><img src="pptp.php_files/spacer.gif" height="1" width="10"></td>
+  </tr>
+  <tr>
+    <td colspan="3"><img src="pptp.php_files/spacer.gif" height="20" width="574"></td>
+  </tr>
+</tbody></table>
+<table id="footer" border="0" cellpadding="0" cellspacing="0" width="100%">
+  <tbody><tr>
+    <td colspan="3" class="title"><img src="pptp.php_files/spacer.gif" height="20"></td>
+  </tr>
+  <tr>
+    <td class="quicklinks" align="center" height="20"><a href="http://www.elucid8design.com/company">company</a> | <a href="http://www.elucid8design.com/hosting">web hosting</a> | <a href="http://www.elucid8design.com/print">print design</a> | <a href="http://www.elucid8design.com/web">web design</a> | <a href="http://www.elucid8design.com/applications">applications</a> | <a href="http://devel.elucid8design.com/el8/devel/tutorials/%7BsystemHost%7D/clientcenter">login</a> | <a href="http://www.elucid8design.com/siteMap.php">site map</a>  | <a href="http://www.elucid8design.com/credits.php">credits</a> | <a href="http://www.elucid8design.com/company/contact.php">contact</a> </td>
+  </tr>
+  <tr>
+    <td class="copyright" align="center" height="20">Copyright © 2003  - 2005 Elucid8 Design, LLC. All Rights Reserved.</td>
+  </tr>
+  <tr>
+    <td class="contact" align="center" height="20">Address: 855 Five Mile Dr. Ithaca, NY 14850&nbsp; Phone: 607-277-2480</td>
+  </tr>
+</tbody></table>
+<br>
+<!-- InstanceEnd --></body></html>

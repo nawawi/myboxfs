@@ -1,0 +1,33 @@
+BODY {color:#000000; background:#FFFFCC; background-image:none;
+margin-left:.5in; margin-right:.5in; font-size:12pt;}
+Table {font-size:12pt;}
+H1 {text-align:center;}
+P.title {text-align:center;}
+TABLE.info {padding-left:.75in;}
+UL {list-style-type:disc;}
+OL {list-style-type:decimal;}
+
+.roll { font-family:"TimesNewRoman", serif; font-size:12pt;
+font-style:normal; font-weight:normal; letter-spacing:normal;
+text-decoration:underline; text-transform:none; } 
+
+.lalpha {list-style-type:lower-alpha;}
+
+.header {color:#000000; background:#FFFFCC;}
+
+.sectionheader {color:#993300; background:#FFFFCC; font-weight:bold;}
+.subheader {color:#993300; background:#FFFFCC; font-style:italic;}
+
+.pformat {text-align:justify;}
+
+.bigquote {margin-left:1.5in; margin-right: 1.5in;}
+
+A.roll:hover { font-family:"TimesNewRoman", serif; font-size:12pt;
+font-style:normal;
+font-weight:normal; letter-spacing:normal; text-decoration:underline;
+text-transform:none; color:#00DD00; background:#FFFFCC;}
+
+.guide {background:#FFFFFF; color:#000000}
+.command {background:#CCCCCC; color:#330000}
+.varcom {background:#CCCCCC; color:#FF0000}
+.ques {font-weight:bold}

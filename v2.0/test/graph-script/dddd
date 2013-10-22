@@ -1,0 +1,73 @@
+/usr/bin/rrdtool create \
+
+/var/www/html/cacti-0.8.6b/rra/352411_traffic_in_310.rrd \
+--step 300  \
+DS:traffic_in:COUNTER:600:0:100000000 \
+DS:traffic_out:COUNTER:600:0:100000000 \
+RRA:AVERAGE:0.5:1:600 \
+RRA:AVERAGE:0.5:6:700 \
+RRA:AVERAGE:0.5:24:775 \
+RRA:AVERAGE:0.5:288:797 \
+RRA:MAX:0.5:1:600 \
+RRA:MAX:0.5:6:700 \
+RRA:MAX:0.5:24:775 \
+RRA:MAX:0.5:288:797 \
+
+
+/usr/bin/rrdtool graph - \
+--imgformat=PNG \
+--start=-86400 \
+--end=-300 \
+--title="Cat6506 - 5/1 " \
+--rigid \
+--base=1000 \
+--height=120 \
+--width=500 \
+--alt-autoscale-max \
+--lower-limit=0 \
+--vertical-label="bits per second" \
+DEF:a="/var/www/html/cacti-0.8.6b/rra/cat6506_traffic_in_166.rrd":traffic_in:AVERAGE \
+DEF:b="/var/www/html/cacti-0.8.6b/rra/cat6506_traffic_in_166.rrd":traffic_out:AVERAGE \
+CDEF:cdefa=a,8,* \
+CDEF:cdeff=b,8,* \
+AREA:cdefa#00CF00:"Inbound"  \
+GPRINT:cdefa:LAST:" Current\:%8.2lf %s"  \
+GPRINT:cdefa:AVERAGE:"Average\:%8.2lf %s"  \
+GPRINT:cdefa:MAX:"Maximum\:%8.2lf %s"  \
+COMMENT:"Total In:  27.99 GB\n"  \
+LINE1:cdeff#002A97:"Outbound"  \
+GPRINT:cdeff:LAST:"Current\:%8.2lf %s"  \
+GPRINT:cdeff:AVERAGE:"Average\:%8.2lf %s"  \
+GPRINT:cdeff:MAX:"Maximum\:%8.2lf %s"  \
+COMMENT:"Total Out: 74.73 GB\n"  \
+COMMENT:"\n"  \
+COMMENT:"Last Update: Wed 08 Dec 15:45:08 MYT 2004" 
+
+/usr/bin/rrdtool graph - \
+--imgformat=PNG \
+--start=-604800 \
+--end=-1800 \
+--title="Cat6506 - 5/1 " \
+--rigid \
+--base=1000 \
+--height=120 \
+--width=500 \
+--alt-autoscale-max \
+--lower-limit=0 \
+--vertical-label="bits per second" \
+DEF:a="/var/www/html/cacti-0.8.6b/rra/cat6506_traffic_in_166.rrd":traffic_in:AVERAGE \
+DEF:b="/var/www/html/cacti-0.8.6b/rra/cat6506_traffic_in_166.rrd":traffic_out:AVERAGE \
+CDEF:cdefa=a,8,* \
+CDEF:cdeff=b,8,* \
+AREA:cdefa#00CF00:"Inbound"  \
+GPRINT:cdefa:LAST:" Current\:%8.2lf %s"  \
+GPRINT:cdefa:AVERAGE:"Average\:%8.2lf %s"  \
+GPRINT:cdefa:MAX:"Maximum\:%8.2lf %s"  \
+COMMENT:"Total In:  134.32 GB\n"  \
+LINE1:cdeff#002A97:"Outbound"  \
+GPRINT:cdeff:LAST:"Current\:%8.2lf %s"  \
+GPRINT:cdeff:AVERAGE:"Average\:%8.2lf %s"  \
+GPRINT:cdeff:MAX:"Maximum\:%8.2lf %s"  \
+COMMENT:"Total Out: 337.96 GB\n"  \
+COMMENT:"\n"  \
+COMMENT:"Last Update: Wed 08 Dec 15:45:08 MYT 2004" 

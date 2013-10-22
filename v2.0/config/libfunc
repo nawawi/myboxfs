@@ -1,0 +1,166 @@
+# /etc/libfunc
+# +-----------------------------------------------------------------------------+
+# | Copyright (c) 2002-2004 Tracenetwork Corporation Sdn. Bhd.           	|
+# +-----------------------------------------------------------------------------+
+# | This source file is belongs to nawawi, the author.                    	|
+# | Any changes/use of the source, please email to the author.           	|
+# +-----------------------------------------------------------------------------+
+# | Authors: nawawi, Mohd nawawi Mohamad Jamili <nawawi@tracenetwork.com.my 	|
+# +-----------------------------------------------------------------------------+
+#
+# Various script functions
+#
+
+WHITE="\\033[1;37m"
+
+ulimit -S -c 0 >/dev/null 2>&1
+
+do_sleep() {
+        local spin="- \\ | / \\ | /";
+        local pt="0"
+        for((i=1; i <= 20 ; i++)); do
+        let pt=pt+5
+        for f in $spin; do
+        usleep 0
+                echo -ne "$1 $pt% $f  \r"
+        done
+        done
+ 	echo -ne "$1 100% OK  \r"
+        echo ""
+}
+
+create_fifo() {
+	if [ ! -p "$1" ]; then
+		mkfifo -m 600 $1
+		[ $? != 0 ] && return 1
+	fi
+	return 0
+}
+
+strstr() {
+	[ "$1" = "$2" ] && return 0
+	slice=${1#*$2*}
+	[ "$slice" = "$1" ] && return 1
+	return 0
+}
+
+print_k() {
+	case $1 in 
+	"on")
+	echo "6" > /proc/sys/kernel/printk
+	;;
+        "off")
+        echo "0" > /proc/sys/kernel/printk
+	esac
+}
+
+read_cmdline() {
+	if [ -z "$1" ]; then
+		return 0
+	fi
+	egrep -io "(^|[[:space:]]+)$1=([^[:space:]]+)" /proc/cmdline | egrep -io "[^=]+\$"
+}
+
+read_cmd() {
+	if [ -z "$1" ]; then
+		return 0
+	fi
+	for x in $(cat /proc/cmdline); do
+		case $x in
+			$1)
+			echo $1
+			;;
+		esac
+	done
+}
+
+killpid() {
+	if [ -d "/proc/$1" ]; then
+		kill -KILL $1 >/dev/null 2>&1
+	fi
+}
+
+getpid() {
+	local proc=
+	if [ "$#" -eq 0 ]; then
+		echo "Usage: getpid [program]"
+		return 1
+       	fi
+	proc=$(ps auwx |grep -v "grep $1" | grep $1 |awk '{print $2}'|tr -s '\n' ' ')
+	echo $proc
+}
+
+killproc() {
+	local pid=
+	if [ "$#" -eq 0 ]; then
+		echo "Usage: killproc [program]"
+		return 1
+       	fi
+
+	pid=$(getpid $1)
+
+	if [ -n "$pid" ]; then
+		for p in $pid; do
+			[ "$p" != "" ] && killpid $p >/dev/null 2>&1
+		done
+	fi
+}
+
+statusprog() {
+	local base=${1##*/}
+	local pid=
+	if [ "$#" -eq 0 ]; then
+		echo "Usage: statusprog [program]"
+		return 1
+       	fi
+
+	pid=$(getpid $base)
+
+	if [ "$pid" != "" ]; then
+		echo "$base (pid $pid) is running.."
+		return 1
+	fi
+	echo "$base not running.."
+	return 0
+}
+
+stopprog() {
+	local base=${1##*/}
+	local RC=
+	if [ "$#" -eq 0 ]; then
+		echo "Usage: stopprog [program]"
+		return 1
+       	fi
+	killproc $base >/dev/null 2>&1
+	RC=$(getpid $base)
+	if [ "$RC" = "" ]; then
+		return 0
+	fi
+	return 1
+}
+
+init_msg() {
+	if [ -f "/dev/vc/5" ]; then
+		echo "INIT:" "$@" >>/dev/vc/5
+	fi
+}
+
+header() {
+	echo " "
+	echo "+============================================================================="
+	if [ -f "$1" ]; then
+		while read f; do echo "| $f"; done < $1
+	else
+		echo "| $1"
+	fi
+	echo "+============================================================================="
+	echo " "
+}
+
+db_namevalget() {
+	local what=$1
+	[ ! -x "/bin/sqlite" ] && exit 1
+	if [ -f "/strg/mybox/db/system.db" ]; then
+		sqlite /strg/mybox/db/system.db "select val from nameval where name='$what'" |tr -d '\n'
+	fi
+}

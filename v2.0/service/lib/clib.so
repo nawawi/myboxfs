@@ -1,0 +1,12 @@
+<?
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("closed. not parent");
+
+include_once('global.so');
+include_once('utils.so');
+include_once('db.so');
+include_once('net.so');
+include_once('auth.so');
+include_once('logs.so');
+include_once('rrdtool.so');
+include_once('graph.so');
+?>

@@ -1,0 +1,49 @@
+#!/bin/php -q
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once("clib.so");
+putenv("PATH=/bin:/service/tools:/service/init");
+
+if(mfs_license('OK_FILE')==-1) {
+	echo "No license file.\n";
+	exit(1);
+}
+
+if(mfs_license('OK_KEY')==-2) {
+	echo "Invalid license Key.\n";
+	exit(1);
+}
+
+
+if(mfs_license('OK_TIME')==-3) {
+	echo "License expired.\n";
+	exit(1);
+}
+
+function loop_chk() {
+	global $_LOG_PATH;
+	for(;;) {
+		sleep(1);
+		if(file_exists("/var/sys/.chkadsjoin")) {
+			if($fi=fopen("/var/sys/.chkadsjoin","r")) {
+				$time=fgets($fi,150);
+				fclose($fi);
+				$time=trim($time);
+				if(time() >= $time) {
+					killall("net join");
+					@unlink("/var/sys/.chkadsjoin");
+					$logname=date('Ymd');
+					$date=date('d/m/Y H:i:s');
+					$msg="[$date] Join AD domain timeout";
+					append_to_file("$_LOG_PATH/pptpvpn-$logname.log","$msg\n");
+					send_remotelog($msg);
+					exit(0);
+				}
+			}
+		}
+	}
+}
+
+loop_chk();
+exit(0);
+?>

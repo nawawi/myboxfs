@@ -1,0 +1,207 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.so');
+chk_session();
+write_nocache();
+
+$_SYSID="system_update";
+
+if(chk_pri($_LOGIN['auth_id'],1)==1) {
+	if(isset($do_save)&&$do_save==1 && $btype==0) {
+		if(move_uploaded_file("$filename","$_DOWNLOAD_PATH/$filename_name")) {
+			$fver=trim(file_get_contents("/etc/firmware"));
+			if(preg_match("/mfs-(\d+)\.tgz/",$filename_name,$mm)) {
+				if($fver==$mm[1]) $msg='Firmware already up to date!';
+			}
+			if(!preg_match("/mfs-(\d+)\.tgz/",$filename_name)) {
+				$msg="Invalid firmware file!";
+				@unlink("$_DOWNLOAD_PATH/$filename_name");
+			} else {
+				if(update_firmware("$_DOWNLOAD_PATH/$filename_name")!=0 && $msg=='') {
+					$msg="Firmware update failed!";
+					slog("UPDATE: ({$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}) Firmware update failed");
+				}
+			}
+
+		}
+		if($msg=='') {
+			$msg='Firmware updated. You need to reboot the system.';
+			slog("UPDATE: ({$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}) Firmware updated");
+		}
+	}
+	if(isset($do_save)&&$do_save==1 && $btype==1) {
+		if(move_uploaded_file("$filename","$_DOWNLOAD_PATH/$filename_name")) {
+			if($filename_name!="mfs-license.exc") {
+				$msg="Invalid license file!";
+				@unlink("$_DOWNLOAD_PATH/$filename_name");
+			} else {
+				rename("$_LICENSE_PATH","$_ROOT_DIR/mfs-license.exc.bak");
+				if(copy("$_DOWNLOAD_PATH/$filename_name","$_LICENSE_PATH")) {
+					$msg='License updated!';
+					slog("UPDATE: ({$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}) License updated");
+				} else {
+					$msg="License update failed!";
+					slog("UPDATE: ({$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}) License update failed");
+				}
+			}
+		}
+		if($msg=='') {
+			$msg='License updated!';
+			slog("UPDATE: ({$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}) License updated");
+		}
+	}
+	if(isset($do_save)&&$do_save==1 && $btype==2) {
+		if(move_uploaded_file("$filename","$_DOWNLOAD_PATH/$filename_name")) {
+			$msg=update_sidlist("$_DOWNLOAD_PATH/$filename_name");
+			@unlink("$_DOWNLOAD_PATH/$filename_name");
+		}
+		if($msg=='') {
+			$msg='Signature update failed!';
+			slog("UPDATE: ({$_LOGIN['auth_id']}@{$_LOGIN['auth_addr']}) signature update failed!");
+		}
+	}
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied!.";
+	}
+}
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script language="javascript" src="<?echo $_URL_PATH;?>/j/strings.js"></script>
+<script language="javascript">
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+</script>
+<script language="javascript">
+function check_imgfile() {
+	var file=document.f.filename.value;
+	uf=Trim(file);
+	var m1=/mfs/;
+	if(uf!='') {
+		if(uf.match(m1)!=null) return true;
+	}
+	return false;
+}
+function check_ipssig() {
+	var file=document.f.filename.value;
+	uf=Trim(file);
+	var m1=/ipsrules/;
+	if(uf!='') {
+		if(uf.match(m1)!=null) return true;
+	}
+	return false;
+}
+function check_licensefile() {
+	var file=document.f.filename.value;
+	uf=Trim(file);
+	if(uf.indexOf("mfs-license.exc")!=-1) return true;
+	return false;
+}
+function do_submit() {
+	var ret;
+	if(document.f.btype.value==0) {
+		ret=check_imgfile();
+	}
+	if(document.f.btype.value==1) {
+		ret=check_licensefile();
+	}
+	if(document.f.btype.value==2) {
+		ret=check_ipssig();
+	}
+	if(ret==true) {
+		document.f.btsubmit.disabled=true;
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	}
+	alert("Invalid file type!");
+	return false;
+}
+
+</script>
+</head>
+<body scroll=auto>
+<form name=f method=post action="<?echo "$_URL_PATH/system_update.html";?>" onsubmit="return do_submit();" enctype="multipart/form-data">
+<table border="0" cellpadding="4" cellspacing="4" width="700" align=center>
+<tr>
+<td align=center>
+
+<!-- main -->
+<fieldset>
+<legend>&nbsp;&nbsp;&nbsp;&nbsp;
+SYSTEM: UPDATE
+&nbsp;&nbsp;&nbsp;&nbsp;</legend>
+
+<table valign=top border=0>
+<tr>
+<td>
+<table border=0 cellpadding="2" cellspacing="2">
+<tr>
+<td align=center valign=middle>
+
+<table width="650" border="0" cellpadding="0" cellspacing="0">
+
+<tr> 
+<td class="tabcont">
+
+<?if($msg!='') {?>
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span class=notice><?echo "$msg";?></span></td></tr>
+</table><br>
+<? }?>
+<table width="600" border="0" cellpadding="6" cellspacing="0">
+<tr> 
+<td width="30%" valign="middle" class="tdcelltop">Update type</td>
+<td width="70%" valign="middle" class="mtabletop"> 
+<select name=btype size=1 class=textbox>
+<?
+$_opptype[0]="System Firmware";
+$_opptype[1]="Mybox License";
+$_opptype[2]="IPS Signature";
+$doftp=0;
+foreach($_opptype as $val => $bt) {
+	if($btype==$val) {
+		echo "<option value='$val' selected>$bt</option>";
+	} else {
+		echo "<option value='$val'>$bt</option>";
+	}
+}
+?>
+</select>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">File Upload</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="filename" type="file" class="filebox" size="35"> 
+</td>
+</tr>
+</table>
+<tr><td align=right valign=top><input name=btsubmit type="submit" value="Update" class="button"></td></tr>
+</td>
+</tr>
+
+</table>
+
+</td>
+</tr>
+</table>
+
+<!-- end main -->
+
+</td>
+</tr>
+</table>
+</fieldset>
+<input type=hidden name=do_save value=0>
+</form>
+</body>
+</html>
+
+<?flush();?>

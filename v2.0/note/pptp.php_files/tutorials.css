@@ -1,0 +1,24 @@
+.title {
+	color: #ffffff;
+	background-color: #000000;
+	background-image: url(../images/gradientBlack21.gif);
+	border: 1px solid #000000;
+}
+#tutorial .code {
+	color: #000000;
+	background-color: #CCCCCC;
+	border: 1px dotted #AAAAAA;
+	padding: 4px;
+}
+#tutorial .codeHighlight {
+	color: #cc0000;
+	background-color: #CCCCCC;
+}
+#tutorial span.file {
+	color: #CC0000;
+	font-weight: bold;
+}
+#tutorial .author {
+	color: #CC0000;
+	border-top: 1px dotted #AAAAAA;
+}

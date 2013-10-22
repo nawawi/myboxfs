@@ -1,0 +1,113 @@
+#!/bin/php -Cq
+<?
+// shaper.init - last update 11-Oct-2005
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.so');
+putenv("PATH=/bin:/service/tools:/service/init");
+if(mfs_license('ITS')!=1) die("Disabled. Please upgrade your license.\n");
+
+if(!file_exists("/bin/rshaperctl")) {
+	echo "rshaperctl not found or cannot execute\n";
+	slog("INIT: rshaperctl not found or cannot execute");
+	exit(1);
+}
+
+if(mfs_license('OK_FILE')==-1) {
+	echo "No license file.\n";
+	exit(1);
+}
+
+if(mfs_license('OK_KEY')==-2) {
+	echo "Invalid license Key.\n";
+	exit(1);
+}
+
+
+if(mfs_license('OK_TIME')==-3) {
+	echo "License expired.\n";
+	exit(1);
+}
+
+function set_shaping() {
+	global $_DB_NAME, $_PORT_ARRAY;
+	$db_id=db_connect($_DB_NAME);
+	$_n_array=array();
+	$result=db_query("select * from ipaddr",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_ip=$row['ip'];
+			$_mask=$row['mask'];
+			$_name=$row['name'];
+			$_name="$_name"."-net";
+			$_ret=ipcalc($_ip,$_mask);
+			$_net=$_ret['network'];
+			$_n_array[$_name]="$_net/$_mask";
+		}
+	}
+	$result=db_query("select * from shaping where stat='1'",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_id=$row['id'];
+			$_ip=$row['ip'];
+			$_speed=$row['speed'];
+			$_port=$row['port'];
+			$_stat=$row['stat'];
+			$_speed=$_speed * 1000;
+			if($_n_array[$_ip]!='') {
+				$_ip=$_n_array[$_ip];
+			}
+			if($_port!='any') {
+				if($_PORT_ARRAY[$_port]!='') {
+					$_port=$_PORT_ARRAY[$_port];
+				}
+				exec_quite("rshaperctl $_ip:$_port $_speed");  
+			} else {
+				exec_quite("rshaperctl $_ip $_speed"); 
+			}
+		} 
+	}
+	db_close($db_id);
+	return 0;
+}
+
+function shaper_start() {
+	global $db_id;
+	exec_quite("insmod rshaper.o mode=2");
+	set_shaping();
+	echo "Starting traffic shaping\n";
+	return 0;
+}
+
+function shaper_stop() {
+	exec_quite("rmmod rshaper");
+	return 0;
+}
+
+function shaper_status() {
+	system("rshaperctl");
+	return 0;
+}
+
+$_app=basename($_SERVER["argv"][0]);
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=shaper_start();
+		break;
+	case 'stop':
+		$ret=shaper_stop();
+		break;
+	case 'restart':
+		$ret=shaper_stop();
+		$ret=shaper_start();
+		break;
+	case 'status':
+		$ret=shaper_status();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/status]\n";
+		break;
+}
+
+flush();
+exit($ret);
+?>

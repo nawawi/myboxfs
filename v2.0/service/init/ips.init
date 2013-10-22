@@ -1,0 +1,375 @@
+#!/bin/php -Cq
+<?
+// ips.init - last update 11-Oct-2005
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.so');
+
+putenv("PATH=/bin:/service/tools:/service/init");
+if(mfs_license('IPS')!=1) die("Disabled. Please upgrade your license.\n");
+
+if(!file_exists("/bin/ipsd")) {
+	echo "ipsd binary not found or cannot execute\n";
+	slog("INIT: ips binary not found or cannot execute");
+	exit(1);
+}
+
+if(mfs_license('OK_FILE')==-1) {
+	echo "No license file.\n";
+	exit(1);
+}
+
+if(mfs_license('OK_KEY')==-2) {
+	echo "Invalid license Key.\n";
+	exit(1);
+}
+
+
+if(mfs_license('OK_TIME')==-3) {
+	echo "License expired.\n";
+	exit(1);
+}
+
+$_IDS_STAT=0;
+$_DEV=array();
+
+function get_ips_stat($db_id,$_sid) {
+	$result=db_query("select stat from idsopt where sid='$_sid'",$db_id);
+	if(db_num_rows($result)!=0) {
+		return db_fetch_single($result);
+	}
+	return 0;
+}
+
+function alter_rules($db_id) {
+   	$dir=dir("/usr/ips_rules/mfs-rules");
+	while(false !== $entry = $dir->read()) {
+        	if($entry == '.' || $entry == '..') continue;
+		$filename="/usr/ips_rules/mfs-rules/$entry";
+		$buff=file2array($filename);
+		if(count($buff)!=0) {
+			$fo=dio_open("$filename.tmp", O_RDWR | O_CREAT | O_APPEND);
+			foreach($buff as $line) {
+				$line=trim($line);
+				if($line=='') continue;
+				if(preg_match("/\s+sid:(\d+)\;/",$line,$mm)) {
+					$_sid=$mm[1];
+					if(get_ips_stat($db_id,$_sid)==0) {
+						if($line[0]!="#") $line="#$line";
+					} else {
+						if($line[0]=="#") $line[0]='';
+						$line=trim($line);
+					}
+				}
+				dio_write($fo,"$line\n",strlen($line)+1);
+			}
+			dio_close($fo);
+			rename("$filename.tmp","$filename");
+			unset($_sid);
+		}
+	}
+	$dir->close();
+	clearstatcache();
+}
+
+function ips_config() {
+	global $_DB_NAME, $_IDS_STAT, $_DEV;
+	$db_id=db_connect($_DB_NAME);
+
+	$_CONF='';
+	$_IGNP='';
+	$_IDS_NET=array();
+	$_IDS_RULES=array();
+	$_IDS_IGNORE=array();
+	$_IDS_SET=array();
+
+	$result=db_query("select * from idsopt where stat='1'",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_sid=$row['sid'];
+			$_log=$row['log'];
+			$_block=$row['block'];
+			$_IDS_RULES[$_sid]['block']=$_block;
+			$_IDS_RULES[$_sid]['log']=$_log;
+		}
+	}
+	unset($result);
+	$result=db_query("select * from gateway where stat='1'",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_ipaddrip=$row['ip'];
+			$_IDS_IGNORE[$_ipaddrip]=1;
+		}
+	}
+	unset($result);
+	$result=db_query("select * from accesslist where stat='1'",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_ipaddrip=$row['ip'];
+			$_IDS_IGNORE[$_ipaddrip]=1;
+		}
+	}
+	unset($result);
+	$result=db_query("select * from misc where name like \"ids_%\" or name like \"pscan_%\" ",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_name=$row['name'];
+			$_val=$row['val'];
+			if($_name=='ids_timeout') $_IDS_TIMEOUT=$_val;
+			if($_name=='ids_stat') $_IDS_STAT=$_val;
+			if($_name=='ids_exclude') $_IDS_EXCLUDE=trim($_val);
+			if($_name=='ids_mode') $_IDS_MODE=trim($_val);
+			if($_name=='pscan_stat') $_PSCAN_STAT=$_val;
+			if($_name=='pscan_exclude') $_PSCAN_EXCLUDE=trim($_val);
+			if($_name=='pscan_mode') $_PSCAN_MODE=trim($_val);
+		}
+	}
+	if($_IDS_TIMEOUT=='') $_IDS_TIMEOUT=0;
+	if($_IDS_STAT=='') $_IDS_STAT=0;
+	if($_IDS_MODE=='') $_IDS_MODE=3;
+	if($_PSCAN_STAT=='') $_PSCAN_STAT=0;
+	if($_PSCAN_MODE=='') $_PSCAN_MODE=3;
+	$_IDS_SET['stat']=$_IDS_STAT;
+	$_IDS_SET['timeout']=$_IDS_TIMEOUT;
+	$_IDS_SET['ips_mode']=$_IDS_MODE;
+	$_IDS_SET['pscan_mode']=$_PSCAN_MODE;
+
+	if($_IDS_EXCLUDE!='') {
+		$_list=preg_split("/\s+/",$_IDS_EXCLUDE);
+		if(count($_list)!=0) {
+			foreach($_list as $ipw) $_IDS_IGNORE[$ipw]=1;
+		} else {
+			if($_IDS_EXCLUDE!='') $_IDS_IGNORE[$_IDS_EXCLUDE]=1;
+		}
+	}
+	unset($ipw,$_list);
+	$_pscan_ignore='';
+	if($_PSCAN_EXCLUDE!='') {
+		$_list=preg_split("/\s+/",$_PSCAN_EXCLUDE);
+		if(count($_list)!=0) {
+			foreach($_list as $ipw) {
+				$_pscan_ignore .="$ipw,";
+				$_IDS_IGNORE[$ipw]=1;
+			}
+		} else {
+			if($_PSCAN_EXCLUDE!='') {
+				$_pscan_ignore .="$_PSCAN_EXCLUDE";
+				$_IDS_IGNORE[$_PSCAN_EXCLUDE]=1;
+			}
+		}
+	}
+	unset($ipw,$_list);
+	$_pscan_ignore=trim($_pscan_ignore,',');
+	$result=db_query("select * from ipaddr where onboot='1'",$db_id);
+
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_ipaddrname=$row['name'];
+			$_ipaddrdev=$row['dev'];
+			$_ipaddrip=$row['ip'];
+			$_ipaddrmask=$row['mask'];
+
+			$_IDS_IGNORE[$_ipaddrip]=1;
+
+			$_IGNP .="$_ipaddrip/32,";
+			$_ret=ipcalc($_ipaddrip,$_ipaddrmask);
+			if(count($_ret)==0) continue;
+			$_DEV[]="$_ipaddrdev";
+			$_ipaddrnetwork=$_ret['network'];
+			$_ipaddrprefix=$_ret['prefix'];
+			$_CONF[$_ipaddrdev]="$_ipaddrnetwork/$_ipaddrprefix";
+			$_IDS_NET[]="$_ipaddrip|$_ipaddrprefix|$_ipaddrnetwork|$_ipaddrmask";
+		}
+		if($_IGNP!='') {
+			$_IGNP=trim($_IGNP,',');
+			if($_pscan_ignore!='') $_IGNP="$_IGNP,$_pscan_ignore";
+			$_IGNP="preprocessor portscan-ignorehosts: [$_IGNP]";
+		}
+	}
+	alter_rules($db_id);
+	db_close($db_id);
+
+	if($_IGNP!='' && count($_CONF)!=0 && count($_DEV)!=0) {
+		foreach($_DEV as $dev) {
+			$filename='';
+			$_config='';
+			$_config .="var HOME {$_CONF[$dev]}\n";
+			$_config .="var WORLD any\n";
+			$_config .="var HTTP_PORTS 80 443 8080\n";
+			$_config .="var SHELLCODE_PORTS !\$HTTP_PORTS\n";
+			$_config .="var ORACLE_PORTS 1521\n";
+			$_config .="var AIM_SERVERS any\n";
+			$_config .="preprocessor flow: stats_interval 0 hash 2\n";
+			$_config .="preprocessor frag2\n";
+			$_config .="preprocessor stream4: disable_evasion_alerts\n";
+			// disable (27/08/2005) can't detect
+			//$_config .="preprocessor stream4_reassemble: flush_behavior large_window\n";
+			$_config .="preprocessor rpc_decode: 111 32771\n";
+			$_config .="preprocessor bo: -nobrute\n";
+			$_config .="preprocessor telnet_decode\n";
+			$_config .="preprocessor http_inspect: global iis_unicode_map unicode.map 1252\n";
+			$_config .="preprocessor http_inspect_server: server default profile all ports { 80 8080 8180 } oversize_dir_length 500\n";
+			$_config .="preprocessor conversation: allowed_ip_protocols all, timeout 60, max_conversations 3000\n";
+			// new 29/07/2005
+			$_config .="preprocessor xlink2state: ports { 25 691 }\n";
+
+			if($_PSCAN_STAT==1) {
+				$_config .="preprocessor sfportscan: proto  { all } memcap { 10000000 } sense_level { low }\n";
+				$_config .="preprocessor portscan: \$HOME 5 7\n";
+				$_config .="$_IGNP\n";
+			}
+			$_config .="output alert_syslog: LOG_AUTH LOG_ALERT\n";
+
+			$filename="ips$dev".".conf";
+			if($fi=fopen("/usr/ips_rules/$filename","w")) {
+				fwrite($fi,"$_config\n");
+				$result=db_query("select * from idsrules where stat='1'",$db_id);
+				if(db_num_rows($result)!=0) {
+					while($row=db_fetch_array_assoc($result)) {
+						$_sig=$row['sig'];
+						fwrite($fi,"include /usr/ips_rules/mfs-rules/$_sig\n");
+					}
+				}
+				fclose($fi);
+			}
+			echo "Writing IPS $dev config..\n";
+		}
+
+		file_put_contents("/var/sys/ipsset",serialize($_IDS_SET));
+		file_put_contents("/var/sys/ipsignore",serialize($_IDS_IGNORE));
+		file_put_contents("/var/sys/ipsrules",serialize($_IDS_RULES));
+		file_put_contents("/var/sys/ipsnet",serialize($_IDS_NET));
+
+		slog("INIT: Writing IPS config");
+		return 0;
+	} 
+	slog("INIT: Writing IPS config failed");
+	die("Writing IPS config failed\n");
+}
+
+function ips_status() {
+	$pid=get_progpid("ipsd");
+	if($pid!='') {
+		echo "ipsd (pid $pid) is running...\n";
+		return 0;
+	}
+	return 1;
+}
+
+function ips_start() {
+	global $_DB_NAME, $_IDS_STAT, $_DEV;
+	@ips_config();
+	if($_IDS_STAT==0) {
+		echo "IPS agent disabled\n";
+		slog("INIT: IPS agent disabled");
+		return 1;
+	}
+	exec_quite("killall -HUP syslogd");
+	if(@ips_status()==1) {
+		$ok=0;
+		if(count($_DEV)!=0) {
+			foreach($_DEV as $dev) {
+				if(!is_dir("/var/log/payload$dev")) mkdirr("/var/log/payload$dev");
+				$_EMP[]="/var/log/payload$dev";
+				$filename="ips$dev".".conf";
+				if(exec_cmd("ipsd -u mfs -g mfs -dzD -p -i $dev -l /var/log/payload$dev -c /usr/ips_rules/$filename")==0) {
+					echo "Starting IPS agent on $dev\n";
+					slog("INIT: Starting IPS agent on $dev");
+					$ok++;
+				}
+				unset($filename);
+			}
+			file_put_contents("/var/sys/payloaddir",serialize($_EMP));
+		}
+		if($ok!=0) {
+			save_to_file("/var/sys/.chk_ipsd",$ok);
+			return 0;
+		}
+	} 
+	echo "Starting IPS agent failed\n";
+	slog("INIT: Starting IPS agent failed");
+	return 1;
+}
+
+function ips_stop() {
+	if(killall("ipsd")==0) {
+		echo "Shutting down IPS agent\n";
+		slog("INIT: Shutting down IPS agent");
+		exec_quite("iptables -F IPS-DROP");
+		exec_quite("iptables -Z IPS-DROP");
+		slog("IPS: release all drop attack");
+		@unlink("/var/sys/.chk_ipsd");
+		@unlink("/var/sys/ipsblock");
+		@shell_exec("rm -rf /var/log/payload* /usr/ips_rules/ipseth*.conf >/dev/null 2>&1");
+		return 0;
+	}
+	echo "Shutting down IPS agent failed\n";
+	slog("INIT: Shutting down IPS agent failed");
+	@unlink("/var/sys/.chk_ipsd");
+	return 1;
+}
+
+function ips_active($set) {
+	global $db_id;
+	db_query("update misc set val='$set' where name='ids_stat'",$db_id);
+}
+
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+$_sig=$_SERVER["argv"][2];
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=ips_start();
+		break;
+	case 'stop':
+		$ret=ips_stop();
+		break;
+	case 'restart':
+		$ret=ips_stop();
+		sleep(2);
+		$ret=ips_start();
+		break;
+	case 'status':
+		$ret=ips_status();
+		break;
+	case 'config':
+		$ret=ips_config();
+		break;
+	case 'update':
+		if(isset($_sig) && $_sig!='') {
+			if(!file_exists("$_sig")) {
+				die("$_sig not exist\n");
+			}
+			if(!is_dir("/strg/mybox/updates/ips")) {
+				mkdirr("/strg/mybox/updates/ips");
+			}
+			$rett=update_sidlist("$_sig");
+			echo "Signature updated!\n";
+			if($rett=="Signature updated!") {
+				ips_stop();
+				ips_start();
+			}
+		} else {
+			echo "Usage: $_app update <file_full_path>\n";
+		}
+		$ret=0;
+		break;
+	case 'enable':
+		ips_active('1');
+		echo "Enabled\n";
+		slog("INIT: IPS agent enabled.");
+		$ret=0;
+		break;
+	case 'disable':
+		ips_active('0');
+		echo "Disabled\n";
+		slog("INIT: IPS agent disabled.");
+		$ret=0;
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/status/config/{enable,disable}/update <sig_file_full_path>]\n";
+		break;
+}
+flush();
+exit($ret);
+?>

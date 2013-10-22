@@ -1,0 +1,4 @@
+sh mk_fs
+sh mk_img
+#sh mktest
+

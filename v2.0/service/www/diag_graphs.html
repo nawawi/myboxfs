@@ -1,0 +1,293 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.so');
+chk_session();
+write_nocache();
+
+$_SYSID="system_services";
+
+$db_id=db_connect($_DB_NAME);
+
+if(!isset($tab)||$tab=='') $tab=1;
+
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<meta http-equiv=refresh content='300'; url='<?echo "$_URL_PATH/diag_graphs.html?id=$id&do_id=$do_id&tab=$tab";?>'>
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script language="javascript" src="<?echo $_URL_PATH;?>/j/strings.js"></script>
+<script language="javascript">
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+</script>
+</head>
+<body scroll=auto>
+<form name=f method=post action="<?echo "$_URL_PATH/diag_graphs.html";?>">
+<table border="0" cellpadding="4" cellspacing="4" width="700" align=center>
+<tr>
+<td align=center>
+
+<!-- main -->
+<fieldset>
+<legend>&nbsp;&nbsp;&nbsp;&nbsp;
+DIAGNOSTIC: GRAPHS
+&nbsp;&nbsp;&nbsp;&nbsp;</legend>
+
+<table valign=top border=0>
+<tr>
+<td>
+<table border=0 cellpadding="2" cellspacing="2">
+<tr>
+<td align=center valign=middle>
+
+<table width="600" border="0" cellpadding="0" cellspacing="0">
+<tr><td>
+<ul id="tabnav">
+<li class="<?if($tab==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=1) { echo "<a href=\"$_URL_PATH/diag_graphs.html?tab=1\">"; }?>Traffic<?if($tab!=1) { echo "</a>"; }?></li>
+<li class="<?if($tab==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=2) { echo "<a href=\"$_URL_PATH/diag_graphs.html?tab=2\">"; }?>CPU<?if($tab!=2) { echo "</a>"; }?></li>
+<li class="<?if($tab==3) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=3) { echo "<a href=\"$_URL_PATH/diag_graphs.html?tab=3\">"; }?>Memory<?if($tab!=3) { echo "</a>"; }?></li>
+<li class="<?if($tab==4) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=4) { echo "<a href=\"$_URL_PATH/diag_graphs.html?tab=4\">"; }?>Storage<?if($tab!=4) { echo "</a>"; }?></li>
+<li class="<?if($tab==5) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=5) { echo "<a href=\"$_URL_PATH/diag_graphs.html?tab=5\">"; }?>IPS<?if($tab!=5) { echo "</a>"; }?></li>
+
+</ul>
+</td></tr>
+<tr> 
+<td class="tabcont">
+<table width="600" border="0" cellpadding="6" cellspacing="0">
+
+<?if($tab==1) {?>
+
+<?
+if($do_id=='show') {
+	$name_array=array('daily','weekly','monthly','yearly');
+	$t=0;
+	foreach($name_array as $p) {
+		$graph="traffic_eth$id"."_$p.png";
+		if(file_exists("$_HTDOCS_PATH/g/$graph")) {
+			$t++;
+			echo "<tr><td width=98% valign=top>";
+			echo "<a href='$_URL_PATH/diag_graphs.html?id=&do_id=main&tab=1'><img src='$_URL_PATH/g/$graph' border=0></a></td>";
+			if($t==1) {
+				echo "<td width=2% valign=top><a href='$_URL_PATH/diag_graphs.html?id=&do_id=main&tab=1'>{$_PNG['zoomout']}</a></td></tr>";
+			} else {
+				echo "<td width=2% valign=top>&nbsp;</td></tr>";
+			}
+		}
+	}
+} else {
+	for($x=0;$x<10;$x++) {
+		$graph="traffic_eth$x"."_daily.png";
+		if(file_exists("$_HTDOCS_PATH/g/$graph")) {
+			echo "<tr><td width=98% valign=top>";
+			echo "<a href='$_URL_PATH/diag_graphs.html?id=$x&do_id=show&tab=1'><img src='$_URL_PATH/g/$graph' border=0></a></td>";
+			echo "<td width=2% valign=top><a href='$_URL_PATH/diag_graphs.html?id=$x&do_id=show&tab=1'>{$_PNG['zoomin']}</a></td></tr>";
+
+		}
+		
+	}
+}
+?>
+
+<? } // tab==1 ?>
+
+<?if($tab==2) {?>
+
+<?
+if($do_id=='show') {
+	$name_array=array('daily','weekly','monthly','yearly');
+	$t=0;
+	foreach($name_array as $p) {
+		if($id==1) {
+			$graph="loadavg_$p.png";
+		} else {
+			$graph="cpu_$p.png";
+		}
+		if(file_exists("$_HTDOCS_PATH/g/$graph")) {
+			$t++;
+			echo "<tr><td width=98% valign=top>";
+			echo "<a href='$_URL_PATH/diag_graphs.html?id=&do_id=main&tab=2'><img src='$_URL_PATH/g/$graph' border=0></a></td>";
+			if($t==1) {
+				echo "<td width=2% valign=top><a href='$_URL_PATH/diag_graphs.html?id=&do_id=main&tab=2'>{$_PNG['zoomout']}</a></td></tr>";
+			} else {
+				echo "<td width=2% valign=top>&nbsp;</td></tr>";
+			}
+		}
+	}
+} else {
+	if(file_exists("$_HTDOCS_PATH/g/loadavg_daily.png")) {
+		echo "<tr><td width=98% valign=top>";
+		echo "<a href='$_URL_PATH/diag_graphs.html?id=1&do_id=show&tab=2'><img src='$_URL_PATH/g/loadavg_daily.png' border=0></a></td>";
+		echo "<td width=2% valign=top><a href='$_URL_PATH/diag_graphs.html?id=1&do_id=show&tab=2'>{$_PNG['zoomin']}</a></td></tr>";
+	}
+	if(file_exists("$_HTDOCS_PATH/g/cpu_daily.png")) {
+		echo "<tr><td width=98% valign=top>";
+		echo "<a href='$_URL_PATH/diag_graphs.html?id=2&do_id=show&tab=2'><img src='$_URL_PATH/g/cpu_daily.png' border=0></a></td>";
+		echo "<td width=2% valign=top><a href='$_URL_PATH/diag_graphs.html?id=2&do_id=show&tab=2'>{$_PNG['zoomin']}</a></td></tr>";
+	}
+}
+?>
+
+<? } // tab==2 ?>
+
+<?if($tab==3) {?>
+
+<?
+if($do_id=='show') {
+	$name_array=array('daily','weekly','monthly','yearly');
+	$t=0;
+	foreach($name_array as $p) {
+		if($id==1) {
+			$graph="mem_$p.png";
+		} elseif($id==2) {
+			$graph="realmem_$p.png";
+		} else {
+			$graph="realswap_$p.png";
+		}
+		if(file_exists("$_HTDOCS_PATH/g/$graph")) {
+			$t++;
+			echo "<tr><td width=98% valign=top>";
+			echo "<a href='$_URL_PATH/diag_graphs.html?id=&do_id=main&tab=3'><img src='$_URL_PATH/g/$graph' border=0></a></td>";
+			if($t==1) {
+				echo "<td width=2% valign=top><a href='$_URL_PATH/diag_graphs.html?id=&do_id=main&tab=3'>{$_PNG['zoomout']}</a></td></tr>";
+			} else {
+				echo "<td width=2% valign=top>&nbsp;</td></tr>";
+			}
+		}
+	}
+} else {
+	if(file_exists("$_HTDOCS_PATH/g/mem_daily.png")) {
+		echo "<tr><td width=98% valign=top>";
+		echo "<a href='$_URL_PATH/diag_graphs.html?id=1&do_id=show&tab=3'><img src='$_URL_PATH/g/mem_daily.png' border=0></a></td>";
+		echo "<td width=2% valign=top><a href='$_URL_PATH/diag_graphs.html?id=1&do_id=show&tab=3'>{$_PNG['zoomin']}</a></td></tr>";
+	}
+	if(file_exists("$_HTDOCS_PATH/g/realmem_daily.png")) {
+		echo "<tr><td width=98% valign=top>";
+		echo "<a href='$_URL_PATH/diag_graphs.html?id=2&do_id=show&tab=3'><img src='$_URL_PATH/g/realmem_daily.png' border=0></a></td>";
+		echo "<td width=2% valign=top><a href='$_URL_PATH/diag_graphs.html?id=2&do_id=show&tab=3'>{$_PNG['zoomin']}</a></td></tr>";
+
+	}
+	if(file_exists("$_HTDOCS_PATH/g/realswap_daily.png")) {
+		echo "<tr><td width=98% valign=top>";
+		echo "<a href='$_URL_PATH/diag_graphs.html?id=3&do_id=show&tab=3'><img src='$_URL_PATH/g/realswap_daily.png' border=0></a></td>";
+		echo "<td width=2% valign=top><a href='$_URL_PATH/diag_graphs.html?id=3&do_id=show&tab=3'>{$_PNG['zoomin']}</a></td></tr>";
+	}
+}
+?>
+
+<? } // tab==3 ?>
+
+<?if($tab==4) {?>
+
+<?
+if($do_id=='show') {
+	$name_array=array('daily','weekly','monthly','yearly');
+	$t=0;
+	foreach($name_array as $p) {
+		if($id==1) {
+			$graph="strgroot_$p.png";
+		} elseif($id==2) {
+			$graph="strgfix_$p.png";
+		} elseif($id==3) {
+			$graph="strgfirmware_$p.png";
+		} else {
+			$graph="strglogs_$p.png";
+		}
+		if(file_exists("$_HTDOCS_PATH/g/$graph")) {
+			$t++;
+			echo "<tr><td width=98% valign=top>";
+			echo "<a href='$_URL_PATH/diag_graphs.html?id=&do_id=main&tab=4'><img src='$_URL_PATH/g/$graph' border=0></a></td>";
+			if($t==1) {
+				echo "<td width=2% valign=top><a href='$_URL_PATH/diag_graphs.html?id=&do_id=main&tab=4'>{$_PNG['zoomout']}</a></td></tr>";
+			} else {
+				echo "<td width=2% valign=top>&nbsp;</td></tr>";
+			}
+		}
+	}
+} else {
+	if(file_exists("$_HTDOCS_PATH/g/strgroot_daily.png")) {
+		echo "<tr><td width=98% valign=top>";
+		echo "<a href='$_URL_PATH/diag_graphs.html?id=1&do_id=show&tab=4'><img src='$_URL_PATH/g/strgroot_daily.png' border=0></a></td>";
+		echo "<td width=2% valign=top><a href='$_URL_PATH/diag_graphs.html?id=1&do_id=show&tab=4'>{$_PNG['zoomin']}</a></td></tr>";
+	}
+	if(file_exists("$_HTDOCS_PATH/g/strgfix_daily.png")) {
+		echo "<tr><td width=98% valign=top>";
+		echo "<a href='$_URL_PATH/diag_graphs.html?id=2&do_id=show&tab=4'><img src='$_URL_PATH/g/strgfix_daily.png' border=0></a></td>";
+		echo "<td width=2% valign=top><a href='$_URL_PATH/diag_graphs.html?id=2&do_id=show&tab=4'>{$_PNG['zoomin']}</a></td></tr>";
+	}
+	if(file_exists("$_HTDOCS_PATH/g/strglogs_daily.png")) {
+		echo "<tr><td width=98% valign=top>";
+		echo "<a href='$_URL_PATH/diag_graphs.html?id=4&do_id=show&tab=4'><img src='$_URL_PATH/g/strglogs_daily.png' border=0></a></td>";
+		echo "<td width=2% valign=top><a href='$_URL_PATH/diag_graphs.html?id=4&do_id=show&tab=4'>{$_PNG['zoomin']}</a></td></tr>";
+	}
+}
+?>
+
+<? } // tab==4 ?>
+
+<?if($tab==5) {?>
+
+<?
+if($do_id=='show') {
+	$name_array=array('daily','weekly','monthly','yearly');
+	$t=0;
+	foreach($name_array as $p) {
+		if($id==1) {
+			$graph="ips_$p.png";
+		} else {
+			$graph="pscan_$p.png";
+		}
+		if(file_exists("$_HTDOCS_PATH/g/$graph")) {
+			$t++;
+			echo "<tr><td width=98% valign=top>";
+			echo "<a href='$_URL_PATH/diag_graphs.html?id=&do_id=main&tab=5'><img src='$_URL_PATH/g/$graph' border=0></a></td>";
+			if($t==1) {
+				echo "<td width=2% valign=top><a href='$_URL_PATH/diag_graphs.html?id=&do_id=main&tab=5'>{$_PNG['zoomout']}</a></td></tr>";
+			} else {
+				echo "<td width=2% valign=top>&nbsp;</td></tr>";
+			}
+		}
+	}
+} else {
+	if(file_exists("$_HTDOCS_PATH/g/ips_daily.png")) {
+		echo "<tr><td width=98% valign=top>";
+		echo "<a href='$_URL_PATH/diag_graphs.html?id=1&do_id=show&tab=5'><img src='$_URL_PATH/g/ips_daily.png' border=0></a></td>";
+		echo "<td width=2% valign=top><a href='$_URL_PATH/diag_graphs.html?id=1&do_id=show&tab=5'>{$_PNG['zoomin']}</a></td></tr>";
+	}
+	if(file_exists("$_HTDOCS_PATH/g/pscan_daily.png")) {
+		echo "<tr><td width=98% valign=top>";
+		echo "<a href='$_URL_PATH/diag_graphs.html?id=2&do_id=show&tab=5'><img src='$_URL_PATH/g/pscan_daily.png' border=0></a></td>";
+		echo "<td width=2% valign=top><a href='$_URL_PATH/diag_graphs.html?id=2&do_id=show&tab=5'>{$_PNG['zoomin']}</a></td></tr>";
+	}
+}
+?>
+
+<? } // tab==5 ?>
+
+</table>
+</td>
+</tr>
+
+
+</table>
+
+</td>
+</tr>
+</table>
+
+<!-- end main -->
+
+</td>
+</tr>
+</table>
+</fieldset>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?echo $tab;?>>
+</form>
+</body>
+</html>
+
+<?db_close($db_id); flush();?>

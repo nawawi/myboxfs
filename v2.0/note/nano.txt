@@ -1,0 +1,785 @@
+Nano-Howto to use more than one independent Internet connection.
+by Christoph Simon
+v1.0, Dec  2, 2001
+----------------------------------------------------------------
+
+1. Intro
+========
+
+1.0 Thanks
+----------
+
+The solution presented here is based on the patches by Julian
+Anastasov. Like several other users on the net struggling with this, I
+believe they fill in yet another gap for using Linux as a very
+advanced router. It was hard for me not only to get this running for
+the first time, but also to understand most of the principles. Also in
+this Julian has proofed to have unlimited patience. Thanks.
+
+He also agreed to expose this file on his site:
+
+	http://www.linuxvirtualserver.org/~julian/nano.txt
+
+1.1 Initial situation
+----------------------
+
+I've been looking for a solution to use more than one connection to
+Internet at the same time for a long time. I've found out, that I'm
+not alone; there seem to be many having this very problem. The reasons
+are generally just to cheaply increase total throughput, or to provide
+for a fail-over in case of cheap lines. This is not the situation of a
+cluster of web-servers, where main traffic is input, but for networks
+which are mainly dedicated to any kind of download.
+
+1.2. Bad news
+-------------
+
+The setup of all this is not a question of 5 minutes, so I'll tell at
+the beginning where are the limits.
+
+First, this will not work for a single computer with two modem
+connections. Load balancing does work reasonably well, but only with a
+high number of simultaneous connections to different remote sites.
+
+The tests I'm performing are on a network with 17 client computers
+with an daily download (12h) of some 600MB of HTTP traffic in several
+hundreds of thousands of connections.
+
+When one connection fails while being used, this connection will be
+lost and can't be continued on another line. The user will have to
+establish this connection anew. If it was a big download and the
+server doesn't support continuation, he'll be out of luck.
+
+The lines I'm using have external modems which react as any other
+device with Ethernet. There is no PPP, PPPoE, etc. I can't tell if
+this works or would need modification for instance to use two
+telephone lines. Maybe someone else can fill in this.
+
+1.3 Good news
+-------------
+
+What does work is:
+
+- there is no restriction to 2 lines, though I didn't test more.
+- using 2.4 kernels
+- interaction with ip(8) and iptables(8)
+- usage of both lines at the same time
+- if any line fails, new connections will use any other which working.
+- if a line fails, no reconfiguration of the network is required.
+
+Right now, I can't tell how long it takes in case of a fail over, but
+there where several cases I found in the logs and no user realized
+that there was a problem.
+
+2. Setup
+========
+
+2.1. Preparing the kernel
+-------------------------
+
+Stock kernels are not able to provide this functionality. Julian
+Anastasov wrote a patch for 2.2 and 2.4 Linux kernels. I only tried
+with several 2.4 kernels, now running 2.4.15pre5. The patches have not
+been written for this version, but apply cleanly. The patches are
+available on Julian's web-page:
+
+	http://www.linuxvirtualserver.org/~julian/#routes
+
+Choose the patches for your kernel, download them, and apply all of
+them.
+
+The patches will not offer any additional configuration options.  The
+kernel needs to have "equal cost multi path" enabled. This is done in
+Network Options. After choosing "IP: advanced router" there will be an
+option for it. Only an indirect requirement is, that we will need NAT:
+Any host on the local network needs to be able to appear on the
+Internet with any of the external IPs; this is the main purpose of
+NAT. To get NAT, of course we have to enable connection tracking. But
+this would be done anyway. No further options are required, but any
+networking option may be used. Particularly, I've enabled almost all
+options for netfilter and QoS and it's working fine.
+
+Nothing special is required to run this kernel (no boot options,
+etc.).
+
+2.2 Netfilter issues
+--------------------
+
+As I stated at the beginning, to make use of the patches and the
+configuration described here, we need a relatively high number of
+connections and remote servers. I've tried bitterly, but wasn't able
+to achieve this effect alone. I started several simultaneous
+downloads, ran Mozilla on several computers at the same time, opening
+different big sites, but no avail. When the regular users came, things
+suddenly showed to work correctly. So this is certainly not a setup
+for a single box, and then, we'll need to do some address
+translation. Beside this, a firewall will almost always be
+unavoidable, but it's setup is out of scope here. A minimal setup
+would enable forwarding in the kernel, establish a default policy of
+ALLOW, and create at least two SNAT rules:
+
+	iptables -t nat -A POSTROUTING -o IFE1 -s NWI/NMI -j SNAT --to IPE1
+	iptables -t nat -A POSTROUTING -o IFE2 -s NWI/NMI -j SNAT --to IPE2
+
+If the ISP didn't give us a fixed IP, for instance using PPPoE, but it
+seems that it must be an ARP type device, we would say:
+
+	iptables -t nat -A POSTROUTING -o IFE1 -s NWI/NMI -j MASQUERADE
+	iptables -t nat -A POSTROUTING -o IFE2 -s NWI/NMI -j MASQUERADE
+
+I didn't try this, but it will work if the analog thing works with
+just one line. This is not really new, as we would have to do
+something similar anyway, even with only one line to the Internet.
+
+At least for netfilter (not sure for ipfwadm/ipchains), the firewall
+must be stateful. This can be done by:
+
+	iptables -t filter -N keep_state
+	iptables -t filter -A keep_state -m state --state RELATED,ESTABLISHED \
+		-j ACCEPT
+	iptables -t filter -A keep_state -j RETURN
+
+	iptables -t nat -N keep_state
+	iptables -t nat -A keep_state -m state --state RELATED,ESTABLISHED \
+		-j ACCEPT
+	iptables -t nat -A keep_state -j RETURN
+
+and calling this at the beginning of the script:
+
+	iptables -t nat -A PREROUTING -j keep_state
+	iptables -t nat -A POSTROUTING -j keep_state
+	iptables -t nat -A OUTPUT -j keep_state
+	iptables -t filter -A INPUT -j keep_state
+	iptables -t filter -A FORWARD -j keep_state
+	iptables -t filter -A OUTPUT -j keep_state
+
+2.3 Routing
+-----------
+
+Here I'll assume that the computer has three network cards: one to the
+local network, and two for each of the external links (DSL modems in
+my case). This needs not to be so, as there could be more DSL modems,
+and, at least in theory, it's possible to use one card for more than
+one modems, using a hub and two or more IPs on the same device. This
+is not a recommended setup because it may introduce security problems,
+but might be the only one if we had more lines than PCI slots for
+additional network cards.
+
+Abbreviations:
+IFI		internal interface
+IPI		IP address of internal interface
+NMI		netmask for the internal interface
+IFE1, IFE2	external interfaces
+IPE1, IPE2	external IP address
+NWE1, NWE2	external network address
+NME1, NME2	mask for the external network (number of bits, like in /24)
+BRD1, BRD2	broadcast address for external network
+GWE1, GWE2	gateway for external interface
+
+2.3.1 The local loopback and the internal interface
+---------------------------------------------------
+
+The local loopback must be up and running. There is nothing unusual
+about this.
+
+	ip link set lo up
+	ip addr add 127.0.0.1/8 brd + dev lo
+
+At this point, we should be able to ping localhost.
+
+We also set up the internal interface IFI with the internal address
+IPI and the netmask for the local network NMI. Assigning an address
+will cause the kernel to automatically insert an appropriate route
+into table main. This is just fine. Later, there will also be a route
+for each external interface, but none of the routes in table main will
+have a gateway.
+
+We'll want to give table main a priority of 50 to make sure it is
+looked at first.
+
+But also we want to make sure that there is no default route in table
+main. The commands so far didn't insert any, but if this is a
+reconfiguration, there might remain some from the previous setup. If
+there is none, the last command will fail, but that's OK: we just want
+to be sure.
+
+	ip link set IFI up
+	ip addr add IPI/NMI brd + dev IFI
+	ip rule add prio 50 table main
+	ip route del default table main
+
+At this point, we should be able to ping any host on the local
+network.
+
+2.3.2 Setup of external interfaces
+----------------------------------
+
+The configuration of the external interfaces isn't really different
+from that of the internal, but for now, we don't specify a gateway nor
+do we insert a default route.
+
+	ip link set IFE1 up
+	ip addr flush dev IFE1
+	ip addr add IPE1/NME1 brd BRD1 dev IFE1
+
+	ip link set IFE2 up
+	ip addr flush dev IFE2
+	ip addr add IPE2/NME2 brd BRD2 dev IFE2
+
+As ip(8) allows to assign more than one address to an interface, it's
+important that there doesn't remain any configuration from a previous
+setup; failing to do so might cause the same address to be specified
+twice. That's what the "addr flush" commands are for. When we actually
+specify the address (the last line of each block), the kernel, again,
+will insert automatically a route into table main, very much like in
+the case of the internal interface.
+
+Now, we should be able to ping the external IPs (IPE1 and IPE2), as
+well as the gateways or any other host or device which belongs to
+those external network addresses. In my case there is none beside the
+gateways. For this reason it would be correct to consider such an
+interface like a point-to-point device, but technically it is not.
+
+2.3.3 Setup of the default routes
+---------------------------------
+
+This is the complicated part of the setup. During this discussion,
+I'll mention the setup commands step by step. In the end, I'll repeat
+them all together.
+
+Before really starting, let's make a small experiment: Using any kind
+of packet tracer (logs from iptables, tcpdump, etc), we will observe
+that if we ping 127.0.0.1, the source address of that packet will be
+127.0.0.1; if we ping any address of the local network, the source
+address will be that of the internal interface. And if we ping any
+host or device outside, the source address will be that of the device
+where the packet is going out. Who is being that smart?  It might be
+the application (e.g., ping) itself, using a bind(2) call, but this is
+not normally done for a client. It's the routing system. In other
+words, until a packet actually reaches the routing system, it doesn't
+have a source address.
+
+Well, in practice, some programs try to be smarter than the routing
+system, use the bind(2) call, but actually choose a less than optimal
+route. This would easily be the case under our setup, as a program
+can't know which of the two external interfaces it should use. Also,
+there are some versions of ping which allow the user to specify the
+source address. While being an interesting tool also in our setup, the
+`being smart' is then really up to the user.
+
+As I stated in the requirements, NAT is one of them and so is
+connection tracking. This consists of a set of information for each
+known connection, including specific NAT details.
+
+We see, even if the packet originates on the same computer, in our
+case, a packet can have one of four addresses: 127.0.0.1, IPI, IPE1,
+or IPE2. This is called the local source address, which plays a major
+role when doing NAT. Here, this was one of the key concepts I had to
+understand to be able to understand the rest.
+
+I'll try to `deduce' the routing commands by following a packet from a
+host on the local network. While it might also originate from the
+computer we are configuring, this will be the most typical path. I'll
+call that host w1 (the first workstation).
+
+The setup of w1 is as usual: It has a loopback interface, a network
+card with an IP address compatible with the local network address, and
+a default route which uses as a gateway the computer we are
+configuring here (IPI). As soon as the user on w1 does anything which
+requires access to Internet, her program will set up a socket and call
+connect(2). Then, an IP packet will be formed. The routing system on
+w1 will set the source address to w1's local IP, the destination
+address to that of the remote server on the Internet.  It will use the
+default route to send this packet to us.
+
+The packet will come in by the local interface IFI, being welcome, if
+present, by the prerouting chain of the mangle table, but certainly by
+the prerouting chain of the nat table.
+
+The nat table will search the already existing connection structures
+and find out, that this is a new connection. It will create an
+uninitialized info-block, and pass the packet to the routing system.
+
+At this time, we have the following information: The packet came in by
+the local interface IFI, has the source address of w1, but we don't
+know yet the local source address.
+
+Being a new connection, there will be nothing matching in the
+cache. Also, our configuration so far doesn't have any default route
+yet. So we need one which tells what to do with such a packet:
+
+	ip rule add prio 222 table 222
+	ip route add default table 222 proto static \
+		nexthop via GWE1 dev IFE1 \
+		nexthop via GWE2 dev IFE2
+
+This is a multipath default route, causing the kernel to extract each
+time another alternative; there could be more than these two.
+
+Now, we get two additional informations: the output device (either
+IFE1 or IFE2) and the IP address of the gateway (either GWE1 or
+GWE2). Actually we also may get a third information, which is our
+local IP address, which is not contained in this route, but the system
+will deduce it by interface and gateway if it is not a dynamic
+IP. That's it, routing is doing for us right now, beside sending the
+packet to the forward chain of the filter table.
+
+Of course, forwarding must be enabled in the kernel, and there must
+not be any netfilter rule disallowing this packet. After that, the
+packet is passed along to the postrouting chain of the nat table.
+
+Using the information about the packet we gathered so far, the NAT
+system will look for a rule, and find one of the two we gave in the
+previous section. If our IP is fixed, now the local source address
+will became known, but if it is dynamic, i.e., we used the MASQUERADE
+target, we will need to go back to routing, as there is no other way
+to find out the right local source address. The answer will come from
+table 222, the multipath route, but this time, also interface and
+gateway need to match. The NAT system will insert this into the, now
+initialized, NAT information in the connection structure, replace the
+source address in the packet by this one (which was still the IP of
+w1), and get this packet on it's way to the gateway, going out by the
+proper output device.
+
+Note here, that when asking the multipath route, table 222, with a
+known output device and gateway, the kernel still has to deduce the IP
+address. It will do so, looking at the first address attached to the
+interface which, by netmask, is compatible with the gateway
+address. If there were more than one possible answers, only the first
+will be used. This might be the case if we have both lines on the same
+network card, which will work only if we use the MASQUERADE target in
+the iptables rules. If we didn't use the gateway (stock kernels don't)
+to make this match, we surely would be in troubles, because the output
+device is the same for both. This means: To be able to use more than
+one Internet connection on one and the same network card, the gateways
+must be different, the IP addresses must be public IPs and must not
+belong to the same subnet. Additionally, we should avoid SNAT in the
+iptables rules and take special measures to protect against IP
+spoofing.
+
+The gateway, and potentially lots of routers in the Internet, are
+supposed to do the right thing to make this packet reach it's
+destination. There, the answer packet will use the source address
+(which is now either IPE1 or IPE2) to come back into our computer by
+the same interface where it left. Essentially, the procedure is
+reversed; our routing table will find the way to w1 already in table
+main.
+
+Most user actions on the Internet aren't happy with just one packet of
+data; let's have a look what happens if a second packet is sent from
+w1 to the same destination:
+
+Again, the packet will arrive at the local interface of this computer
+and pass through the prerouting chain of the mangle table if that
+exists. The prerouting chain of the nat table will start looking for
+an existing, matching connection, and this time, it will find one. As
+there is no DNAT rule in the netfilter setup for this packet, NAT will
+just hand over the packet to the routing system.
+
+The routing system will look at the connection, and the patches will
+find that there is NAT information present, and that after routing
+some mangling will be done. Now, the routing question will give the
+input device (IFI), the source address (the IP of w1), the destination
+address (that of the server on the Internet), and the local source
+address (either IPE1 or IPE2). In this situation, we do not want to
+match the multipath route, because the multipath route doesn't look at
+local source address, we couldn't make sure that we get this time the
+same line as before. So we add a table for each interface:
+
+	ip rule add prio 201 from NWE1/NME1 table 201
+	ip route add default via GWE1 dev IFE1 src IPE1 proto static table 201
+	ip route append prohibit default table 201 metric 1 proto static
+
+	ip rule add prio 202 from NWE2/NME2 table 202
+	ip route add default via GWE2 dev IFE2 src IPE2 proto static table 202
+	ip route append prohibit default table 202 metric 1 proto static
+
+This can't be matched when table 222 should be matched, as we now
+require the local source address to be known. We choose a priority
+that makes sure these routes are found after the main table and before
+table 222, which is more general than these.
+
+These are still default route, because they must match any Internet
+address.
+
+The third line of each block is similar to a REJECT target in iptables
+in case the corresponding interface is not working: If the client on
+the local network sends a packet on an established connection, but in
+the meanwhile the interface stopped operating, we will send this
+client an ICMP controll message `PKT_FILTERED', hoping to cause it to
+stop sending packets, and the user might wish to open a new
+connection, which will succeed if at least one other line is still
+working.
+
+Stepping through all routing tables, either table 201 or table 202
+will match, according to the output device selected when we matched
+the multipath route for the first packet. The tricky part is, what the
+patches are doing here: They look at the local source address. If it
+is zero, the old behavior would just match the multipath route in
+table 222, but as we do know already the local source address (i.e.,
+it is not zero) from what we found in the connection structure,
+particularly what concerns NAT, we will try to match the rules against
+the local source address rather than the packet's source address,
+which is still the IP of w1. This is why either table 201 or table 202
+will provide the match, telling the gateway address and the output
+device.
+
+Having done it's job, the routing system will send the packet to the
+forward chain of the filter table, to continue in the postrouting
+chain of the nat table. That has an easy game now, because, no matter
+if the found target is MASQUERADE or SNAT, all necessary information
+is already known. The packet's source address will be replaced by our
+local source address and the packet can continue it's way going out by
+the chosen output device, and reach it's destination through the
+Internet. The same procedure is repeated for all further packets,
+because the connection information is kept alive during a certain
+time, even after closing the connection (FIN or RST).
+
+Now let's have a look at a packet which originates on this computer
+with a destination on the Internet. As we found out in our experiment,
+the source address is not known before routing, and we won't need any
+NAT. Here we will assume that the program which generates this packet
+does not use the bind() call. If it would, either table 201 or table
+202, according to the IP this program binds to, would be used and no
+(further) load balancing can take place. So, the packet will start
+crossing the output chain of the mangle table, if that is present, and
+go to the output chain of nat. As there is no rule for a destination
+nat, it will continue being evaluated in the routing system. No local
+source address is known yet, so the multipath route in table 222 will
+match. This will provide the output device, the gateway and also the
+local source IP. Now the connection information can be completed. With
+that, the packet will cross the output chain of the filter table and
+reach the postrouting chain of the nat table. From there the packet
+can be sent to the gateway. From now on, the connection is known and
+all further packets will use this path.
+
+Now the full sequence of commands, all together. For convenience, I'll
+repeat the meaning of the abbreviations:
+
+Abbreviations:
+IFI		internal interface
+IPI		IP address of internal interface
+NMI		netmask for the internal interface
+IFE1, IFE2	external interfaces
+IPE1, IPE2	external IP address
+NWE1, NWE2	external network address
+NME1, NME2	mask for the external network (number of bits, like in /24)
+BRD1, BRD2	broadcast address for external network
+GWE1, GWE2	gateway for external interface
+
+	ip link set IFI up
+	ip addr add IPI/NMI brd + dev IFI
+	ip rule add prio 50 table main
+	ip route del default table main
+
+	ip link set IFE1 up
+	ip addr flush dev IFE1
+	ip addr add IPE1/NME1 brd BRD1 dev IFE1
+
+	ip link set IFE2 up
+	ip addr flush dev IFE2
+	ip addr add IPE2/NME2 brd BRD2 dev IFE2
+
+	ip rule add prio 201 from NWE1/NME1 table 201
+	ip route add default via GWE1 dev IFE1 src IPE1 proto static table 201
+	ip route append prohibit default table 201 metric 1 proto static
+
+	ip rule add prio 202 from NWE2/NME2 table 202
+	ip route add default via GWE2 dev IFE2 src IPE2 proto static table 202
+	ip route append prohibit default table 202 metric 1 proto static
+
+	ip rule add prio 222 table 222
+	ip route add default table 222 proto static \
+		nexthop via GWE1 dev IFE1 \
+		nexthop via GWE2 dev IFE2
+
+Let's check it out:
+
+	ip address
+
+This should print on the terminal one entry for the local loopback,
+IFI, IFE1 and IFE2, and maybe some other things, if we have it
+configured (like my GRE tunnels).
+
+	ip rule
+
+This should look like this:
+
+	0:      from all lookup local
+	50:     from all lookup main
+	201:    from NWE1/NME1 lookup 201
+	202:    from NWE2/NME2 lookup 202
+	222:    from all lookup 222
+	32766:  from all lookup main
+	32767:  from all lookup default
+
+Table local is used for the local loopback, table main has the network
+routes to the internal network and for the external interfaces, which
+only give access to our gateways. Tables 201 and 202 (which also might
+have the same priority), will provide a default route if the local
+source address is known (because they have to match NWE1 or NWE2). And
+table 222 will provide the multipath route. The tables with priority
+32766 and 32767 will not be used.
+
+	  ip route list table main
+
+Giving:
+
+	NWI/NMI    dev IFI   proto kernel  scope link  src IPI
+	NWE1/NME1  dev IFE1  proto kernel  scope link  src IPE1
+	NWE2/NME2  dev IFE2  proto kernel  scope link  src IPE2
+
+These are only routes to the corresponding networks without using a
+gateway.
+
+	ip route list table 201
+
+Giving:
+
+	default via GWE1 dev IFE1  proto static  src IPE1
+	prohibit default  proto static  metric 1
+
+And:
+
+	ip route list table 202
+
+Giving:
+
+	default via GWE2 dev IFE2  proto static  src IPE2
+	prohibit default  proto static  metric 1
+
+These are the default routes requiring the local source address to be
+known. And finally:
+
+	ip route list table 222
+
+Giving:
+
+	default  proto static
+	        nexthop via GWE1  dev IFE1 weight 1
+	        nexthop via GWE2  dev IFE2 weight 1
+
+which of course is our multipath route. The weights where inserted by
+the kernel and could be changed. Actually, they need to be changed
+specially if the two lines have a very different capacity. With this
+configuration, both lines are going to be used the same amount of
+times (at least in the long run), even in case the first line has 4
+times the capacity of the second. To compensate for that, we would add
+"weight 4" after IFE1, like in:
+
+	ip route add default table 222 proto static \
+		nexthop via GWE1 dev IFE1 weight 4\
+		nexthop via GWE2 dev IFE2 weight 1
+
+The numbers should be as small as possible, because in this case, the
+kernel will create 5 alternative routes, four of them being the
+same. For this reason, it wouldn't really be an equivalent to say
+"weight 400" and "weight 100", nor would it be a good idea.
+
+Now, let's see how the kernel chooses certain routes:
+
+Asking, how to reach the gateway:
+
+	ip route get GW1
+
+We get the route from table main:
+
+	GW1 dev IFE1  src IPE1
+	    cache  mtu 1500
+
+Now, let's ask for the route to a host on the internet. Note, that the
+ip(8) command does no DNS lookups; we need to provide the IP. This one
+goes to www.kernel.org:
+
+	ip route get 204.152.189.113
+
+My system answered:
+
+	204.152.189.113 via GWE1 dev IFE1  src IPE1
+	    cache  mtu 1500
+
+i.e., having chosen the first interface. As it got this from the
+cache, it won't be easy to get the answer for the second interface
+until the cache expires, or we flush it explicitly. If not found in
+the cache, this answer must come from table 222. To test tables 201
+and 202, we can use:
+
+	ip route get from IPE1 to 204.152.189.113
+	ip route get from IPE2 to 204.152.189.113
+
+and would get respectively:
+
+	204.152.189.113 from IPE1 via GWE1 dev IFE1
+	    cache  mtu 1500
+	204.152.189.113 from IPE2 via GWE2 dev IFE2
+	    cache  mtu 1500
+
+Up to here, we know how all external lines are being used while they
+are working. It's also easy to guess what happens if all external
+lines fail. But let's see what happens if only one external line
+fails:
+
+At a first glance, nothing special happens. If one of the routes in
+the multipath statement is unavailable, it just stops being eligible
+and we get always the other one (one of the others, if more than
+two). But it is less evident, what happen during the transition.
+
+When we try to send a packet to another device, and that fails, like
+in real live, we'll blame the other side. But if we can't reach one
+neighbor, it doesn't mean necessarily that we can't reach any
+neighbor. This depends on the reason for the failure. If the problem
+is in our network card or in the cable attached to it, we won't reach
+any other, but it's also possible that only this remote device is
+down. Well, in our particular case, this is the same, because, from
+the functional point of view, this is a point to point connection, and
+beside the gateway and ourselves, there is no other device. But the
+lower level transport system can't know that and hence will mark this
+link just as suspected to fail. Neither the routing cache nor the
+connection information have yet knowledge of the problem, and the
+user's connection will block.
+
+After a certain time, Ethernet will consider the gateway dead and mark
+it as unreachable. If this is because the link was brought down, the
+routing cache will be flushed immediately, forcing the next packet to
+choose a new route, which will get only a working one. Otherwise, the
+packet could use a route in the cache which is actually unreachable,
+causing it to fail: All connections which are in the cache and which
+use this route will just go nowhere. After a certain interval of time,
+the entries in the routing cache expire, and than the route have to be
+looked for again, offering only working routes, and things will work
+again.
+
+From the user's point of view: An established connection using a line
+which stops working will be lost. She'll need to establish a new
+connection. Until the cache expires, a new connection will work only
+if the route isn't yet in the cache, or if the cached route uses a
+working line. But if the route is cached and uses the failing line,
+the connection will not work.
+
+The time until the cache expires is controlled by the kernel variable
+/proc/sys/net/ipv4/route/gc_interval and defaults to 60 seconds. The
+bigger this number, the longer it will take until failing routes are
+not being used again, but the shorter this time, the smaller the
+chances to find a connection in the cache, loosing time to look up the
+connection in the routing tables.
+
+The inverse is analog: If the line comes back up, cached routes won't
+use it. But routes found by matching the multipath route in table 222
+will consider this route as eligible again, and possibly use it. But
+more on this in the next section.
+
+2.4 Keeping them alive
+----------------------
+
+We're almost done. There is a subtle issue about the kernel detecting
+the state of an interface. We can not find out whether an interface is
+working without just trying to use it. As long as the kernel doesn't
+use the interface, it can't know if it is working or not. When we try
+to use it, the kernel will mark the interface according to the result
+of that operation. If this means, the interface is down, and we
+continue trying to access Internet, the kernel will simply use the
+other interface. How then can the kernel find out, that the failing
+interface is working again? Well, it can't, because it wouldn't even
+try. This is good, because users we wouldn't like to have to wait for
+a timeout with each packet. But then, there needs to be a way to
+notice when the interface comes back up. The only way is to use the
+interface explicitly with non critical packets. Before using these
+patches I had written a daemon which would set up explicit routes to
+each gateway and send pings in regular intervals (once per
+minute). Then the default route was set either to the preferred
+interface or to the only one working. Now, this daemon doesn't need to
+change routes anymore, but it still has to send the pings.
+
+But there isn't really a daemon needed for this. A simple script:
+
+	while : ; do
+	  ping -c 1 GWE1 > /dev/null 2>&1
+	  ping -c 1 GWE2 > /dev/null 2>&1
+	  sleep 60
+	done
+can do this.
+
+At the beginning, I was worried because I've a link where the provider
+doesn't reply pings. But this is really not necessary. The trick is,
+that ARP requests must be answered for anything to work.  One
+consequence of this is, that for now I'm only sure that this works for
+devices which are based on Ethernet, i.e., which use the ARP. Other
+devices, like dialup links, can only work if the underlying network
+protocol provides a correct status change. But I'm not aware if or
+which Linux protocols are implemented this way.
+
+What I've learned from this is, that it's not enough to just set a
+device up or down, or to add or remove a route. Somehow, the kernel
+must also be told, that this device or route is working or stopped
+doing so.
+
+Running the pings once every minute all the time isn't what seems to
+be an elegant solution, but it works. Hopefully, someday we'll get
+this done behind the scene.
+
+During development of this setup, I've considered using arping rather
+than ICMP echo replies. Both can be problematic. The gateway can drop
+echo messages, so ping wouldn't work. On the other hand, I've noticed
+in two situations that the provider apparently had installed some kind
+of load balancing making the MAC address of the gateway toggling from
+one to another. This renders arping useless. So I stayed with
+ping. This will work anyway, because my daemon doesn't need to know
+the result: Even if I don't get an ICMP echo reply, the kernel will
+fill in the right MAC address for this gateway and know that it is
+reachable or not.
+
+It seems that newer versions of arping use a broadcast mode, which
+would solve the problem with a provider that changes the MAC address
+of the gateway every few minutes. I didn't try it yet, but I will.
+
+3. Comments
+3.2 About the patches
+---------------------
+
+Some of us are curious and wish to know what the Julian's patches
+actually do. Here is a summary:
+
+- With the patches enabled, we can use "proto static" for all
+  routes. Doing so, the route for a link will survive even if that
+  device stops working. This is essential, specially if the reason for
+  using two lines is redundancy: If a line fails, all attributes of
+  the device remain, beside the fact that it can't be used until it
+  comes up again. We can continue pinging the gateway for to detect
+  the moment the link comes up again. Equal cost multipath exists also
+  without these patches, but wouldn't work in such a situation.
+
+- If the device continues existing even if it doesn't work, the kernel
+  needs a way to decide whether this is a route might be chosen,
+  specially if several are available. This is called the ``dead
+  gateway detection''; it works for any kind of unicast routes
+  (multipath/unipath, input/output) and provided by these patches.
+
+- A multipath route consists of several routes with the same source
+  and destination, but a different path, which is specified by the
+  device and the gateway. It is because of the patches that the kernel
+  knows how to distinguish the route not only by source and
+  destination, but also by device and gateway. Also, at least when
+  each line has a different device, the kernel's reverse path checking
+  (rp_filter) will work correctly.
+
+- The NAT system has no idea how to deal with alternative routes, this
+  is something the routing system has to do. And one of the additions
+  of these patches is make the routing system prepare the route of an
+  individual packet for the nat system, such that it looks as if it
+  where the only possible route.
+
+3.1 Practical experience
+-----------------------
+
+It's very little time that I use this, so obviously I can't give any
+long term results. But after the first few days of working, I can say
+that load-balancing is working reasonably well. I could imagine a more
+fine grained behavior which would benefit single users with two DSL
+lines, but in my particular situation I've seen a difference on total
+load of only 15%.
+
+Fail-over happened already several times and went by without being
+noticed by the users. In the time I'm using this, I didn't experience
+any problem. It just works :-).
+
+ciccio@kiosknet.com.br

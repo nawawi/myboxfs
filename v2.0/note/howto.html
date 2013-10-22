@@ -1,0 +1,940 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN" "http://www.w3.org/TR/REC-html40/loose.dtd">
+<html><head>
+<meta name="description" content="PPTPD howto for the 2.4 Linux Kernel">
+<meta name="keywords" content="windows, VPN, pptpd, Poptop, linux, pptp, kernel">
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<link rel="stylesheet" href="howto_files/style.css" type="text/css" media="screen">
+<title>Setting up PPTPD on Linux Kernel 2.4 HOWTO</title></head>
+
+<body>
+<h1>Setting up PPTPD on Linux Kernel 2.4 HOWTO</h1>
+
+<p>Version 0.78, Updated January 21,2002 - Still incomplete translation from text to html, but mostly usable.</p>
+
+<h2>Table of Contents</h2>
+
+<h3><a href="#preface">1.0 Introduction</a></h3>
+<h3><a href="#kernel">2.0 Kernel compile</a></h3>
+	<ul>
+		<li><a href="#upgrade">2.1 Upgrading from 2.4.2 to 2.4.4 and beyond</a></li>
+	</ul>
+<h3><a href="#pppcompile">3.0 PPP compile</a></h3>
+<h3><a href="#pptpdcompile">4.0 PPTPD compile</a></h3>
+<h3><a href="#config">5.0 Config files</a></h3>
+	<ul>
+		<li><a href="#iptables">5.1 Netfilter/Iptables rules</a></li>
+		<li><a href="#clients">5.2 Setting up the clients</a></li>
+	</ul>
+<h3><a href="#gotchas">6.0 Gotchas</a></h3>
+	<ul>
+		<li><a href="#61">6.1 Firewalls</a></li>
+		<li><a href="#62">6.2 Remote and Local IPs</a></li>
+		<li><a href="#63">6.3 Reinstall</a></li>
+		<li><a href="#64">6.4 Forwarding</a></li>
+		<li><a href="#65">6.5 Windows</a></li>
+		<li><a href="#66">6.6 PoPToP version</a></li>
+	</ul>
+<h3><a href="#trouble">7.0 Troubleshooting/FAQ</a></h3>
+
+<hr>
+<hr>
+<p class="sectionheader"><a name="preface"></a>1.0 Introduction</p>
+
+<p>I am far from an expert on this subject, but since others might
+benefit from my experience, I am writing this document in hopes of
+helping others. Anything in <font class="command">these colors are commands</font>
+the user should type in exactly except for stuff in [ ]'s, which will
+vary with each system. For the later, substitute whatever is
+appropriate for your system. Note if you want to download this for
+offline reading (which is fine with me), you will need the style sheet
+in the same directory to get the proper formating. Here is the <a href="http://home.swbell.net/berzerke/style.css">style sheet</a>.  Right click and select save as.</p>
+
+<p>I assume a reasonable level of competency with Linux. I also assume
+you have already upgraded all the programs necessary to use the 2.4
+kernel series. Consult ./Documentation/Changes in the 2.4 source tree
+(once you have installed it) for the minimum version numbers required
+and how to get updates for these packages. If your using a distribution
+that comes with a 2.4 kernel, you should be ready to go.</p>
+
+<p>This HOWTO was written and is currently maintained by Robert
+Spotswood. Much of this was based on the RedHat -PoPToP HOWTO, the
+mailing list, and personal experimentation. I'm subscribed to the
+mailing list, so any questions, comments, and corrections would best be
+addressed there. However, if you really *must* contact me personally,
+I'm at berzerke at swbell dot net. (Assemble the message manually. Damn
+Spammers.)</p>
+
+<p class="subheader">Disclaimer and Copyright</p>
+
+<p>This document is not gospel.  Nobody is responsible for what happens to your system but yourself.  <strong>THE
+AUTHOR(S) ARE NOT RESPONSIBLE FOR ANY DAMAGES INCURRED DUE TO ACTIONS
+TAKEN BASED ON THE INFORMATION INCLUDED IN THIS DOCUMENT.</strong></p>
+
+<p>This document is Copyright © 2001 by Robert Spotswood. Permission is
+granted to copy, distribute and/or modify this document under the terms
+of the GNU Free Documentation License, Version 1.1 or any later version
+published by the Free Software Foundation; with the no Invariant
+Sections , with no Front-Cover Texts, and with the no Back-Cover Texts.
+A copy of the license is included in the section entitled "GNUFree
+Documentation License" and is available at <a href="http://www.fsf.org/licenses/fdl.html">www.fsf.org/licenses/fdl.html</a>.</p>
+
+<hr>
+
+<p class="sectionheader"><a name="kernel">2.0 Kernel compile</a></p>
+
+<p>Download the new kernel source.  You can get it at <a href="http://www.kernel.org/pub/linux/kernel/v2.4/">www.kernel.org/pub/linux/kernel/v2.4/</a>
+. You can get either the bz2 or the gz version. I prefer the bz2
+because it saves bandwidth. I'm assuming with these directions that you
+have choosen the 2.4.8 version. I do not recommend using versions
+2.4.11-2.4.15. So far, 2.4.16 <strong>seems</strong> to be ok.Once you have it downloaded, type the following commands:</p>
+
+<p>If you downloaded the bz2 version: <font class="command">bunzip2 [path to source]linux-2.4.8.tar.bz2</font></p>
+
+<p>If you downloaded the gz version: <font class="command">gunzip [path to source]linux-2.4.8.tar.gz</font></p>
+
+<p><font class="command">cd /usr/src/</font></p>
+
+<p>If you have an existing directory linux here (a true directory, not
+a symbolic link), back up that directory if there is anything you want
+to keep in there before the next command.</p>
+
+<p><font class="command">tar xvf [path to source]linux-2.4.8.tar</font></p>
+
+<p>The next step may be a little controversial, but I have found it
+works best for me (Your Milage May Vary - YMMV). Because the kernels
+will install themselves in the linux subdirectory, it can easily trash
+another version you may be saving. By moving it to its own special
+directory, I avoid this problem. However, in compiling, some things are
+coded to look in the linux directory. Therefore a symlink needs to be
+created to get around that problem. Note that if you untar a different
+kernel source, it will clobber the symlink, but not the directory you
+moved the source to.</p>
+
+<p><font class="command">mv /usr/src/linux /usr/src/linux-2.4.8</font></p>
+
+<p><font class="command">ln -s /usr/src/linux-2.4.8 /usr/src/linux</font></p>
+
+<p><font class="command">cd /usr/src/linux</font></p>
+
+<p>The default options in the kernel configuration for me were
+horrible. Therefore, I saved my configuration after I went through
+every option. You can grab a copy of my configuration, and use that as
+a starting point. I designed mine as a transition between 2.2 and 2.4,
+so for anyone else upgrading, it probably will work well. The only
+thing you *REALLY* should check is the processor type. It is set for
+K6-2. Change it for your computer!</p>
+
+<p>You may also need to change other things (I don't have a TV card, so
+I didn't include support for that for example.) You can download a copy
+of the configuration file from <a href="http://home.swbell.net/berzerke/linux241">http://home.swbell.net/berzerke/linux241</a>
+(permission to mirror granted and encouraged). This configuration file
+works for any 2.4 kernel other than 2.4.0, although some "new" features
+will be left out.</p>
+
+<p> Note that the firewalling software has changed from 2.2 series
+kernels. However, I have included the needed modules so that once
+loaded (<font class="command">insmod ipchains</font>), all/most of the old ipchains firewall stuff will still work. Section <font class="varcom">4.1***</font> has some of the new netfilter/iptables rules.</p>
+
+<p>If you want to start with your current configuration, backup your
+".config" file from the /usr/src/linux[kernel number] directory, back
+it up to /usr/src directory. Then, after installing your new kernel, do
+a <font class="command">make mrproper</font>. This wipes clean all
+files to give you a fresh, clean kernel tree. Then copy your old
+.config file back to the new source tree, <font class="command">make [your choice of config programs]</font> and proceed from there.</p>
+
+<p>Unlike the 2.2 series of kernels, the crypto code is in two separate
+patches. The other howto mentions that you must do a make kernel from
+the pppd source tree. My experience shows that will fail with the 2.4
+series of kernels. In fact, according the kernel docs, ppp 2.4.0 is the
+minimum version for 2.4 kernels. One of the patches is for the kernel,
+the other is for pppd. You will also need the 2.4.0 (or 2.4.1) version
+of
+pppd (but that is later). You can download the patches (with the usual
+warnings about checking the legality of downloading crypto in your
+country) from <a href="http://mirror.binarix.com/ppp-mppe/">mirror.binarix.com/ppp-mppe/</a> or <a href="http://www.advancevpn.com/en/download_other.html">www.advancevpn.com/en/download_other.html </a>.
+The two patches you want are linux-2.4.4-openssl-0.9.6-mppe.patch.gz
+(works with kernels 2.4.1 - 2.4.8 and up too) and
+ppp-2.4.1-openssl-0.9.6-mppe.patch.gz (this is for pppd, later).</p>
+
+<p>Apply the kernel patch <font class="command">zcat [path to kernel patch]linux-2.4.4-openssl-0.9.6-mppe.patch.gz | patch -p1</font></p>
+
+<p>Now configure your kernel.  If in X, from a terminal <font class="command">cd /usr/src/linux</font>, then <font class="command">make xconfig</font> and load the configuration file you downloaded earlier.  Make changes to the configuration as needed.</p>
+
+<p>If not in X, <font class="command">cd /usr/src/linux</font>, then <font class="command">make menuconfig</font> and load the configuration file you downloaded earlier. Make changes to the configuration as needed.</p>
+
+<p><font class="command">make dep clean bzImage modules modules_install</font></p>
+
+<p>Go do something else for awhile...</p>
+
+<p><font class="command">/sbin/depmod -a</font> This command in essence instructs the kernel to load the modules in a set order.</p>
+
+<p>Copy the new kernel image (for i386 systems the full path to new
+image will be /usr/src/linux/arch/i386/boot/bzImage) to /boot. Update
+you boot loader (if using lilo, don't forget to run <font class="command">lilo -v</font>!), and reboot.</p>
+
+<p class="subheader"><a name="upgrade">2.1 Upgrading from 2.4.2 to 2.4.4 and beyond</a></p>
+
+<p>If your starting with a fresh install of pptpd, you can skip this section.</p>
+
+<p>If you have used a previous version of this howto (for the 2.4.1,
+2.4.2, or 2.4.4 kernel), you do not have to repeat all the steps to
+upgrade to the 2.4.4 kernel (or higher). There have been problems with
+kernels between 2.4.9 and 2.4.15, so I don't recommend these. So far,
+2.4.16 seems to be stable for me.</p>
+
+<p>Instead of re-downloading the entire source code, download the patch
+file instead (either patch-2.4.x.bz2 or patch-2.4.x.gz). Note that if
+you are patching, you should apply each patch in turn. For example, if
+upgrading from 2.4.1, then first apply the patch for 2.4.2, then 2.4.3,
+then 2.4.4. For 2.4.2, apply the 2.4.3 patch, then the 2.4.4 patch,
+etc. The steps to apply each patch are the same, except for the patch
+name. You do not have to recompile between patches. You also might want
+to rename the linux source directory to reflect the new kernel number.</p>
+
+<p>Apply the patch(es):</p>
+
+<p>f you downloaded the bz2 version:</p>
+
+<p><font class="command">bunzip2 [path to source]patch-2.4.[patch number].tar.bz2</font></p>
+
+<p>If you downloaded the gz version:</p>
+
+<p><font class="command">gunzip [path to source]patch-2.4.[patch number].tar.gz</font></p>
+
+<p>Repeat as needed.</p>
+
+<p><font class="command">cd /usr/src/linux</font></p>
+
+<p><font class="command">patch -p1 [path to patch]patch-2.4.[patch number]</font></p>
+
+<p>There is no need to reapply the openssl patch or do another kernel
+configuration (unless you want to change something). However, you must
+recompile.</p>
+
+<p><font class="command">make dep clean bzImage modules modules_install</font></p>
+
+<p>Go do something else for awhile...</p>
+
+<p>Note that if you jump more than one patch level between compiles,
+you will probably get an error. If you get an error, other than a
+signal 11, simply run the above command again. It should compile fine
+then. If you're making multiple jumps, it might take a few trys.</p>
+
+<p>Copy the new kernel image (for i386 systems the full path to new
+image will be /usr/src/linux/arch/i386/boot/bzImage) to /boot. Update
+you boot loader (if using lilo, don't forget to run <font class="command">lilo -v</font>!), and reboot.</p>
+
+<hr>
+
+<p class="sectionheader"><a name="pppcompile"></a>3.0 PPP Compile</p>
+
+<p>Start by grabbing yourself a clean copy of pppd.  Do not use a RPM.  One place to obtain it is: <a href="ftp://cs.anu.edu.au/pub/software/ppp/">ftp://cs.anu.edu.au/pub/software/ppp/</a> and another is <a href="http://www.advancevpn.com/en/download_other.html">http://www.advancevpn.com/en/download_other.html</a>.</p>
+
+<p><font class="command">cd /usr/src</font></p>
+
+<p><font class="command">tar zxvf [path to ppp source]ppp-2.4.1.tar.gz</font></p>
+
+<p><font class="command">cd ppp-2.4.1</font></p>
+
+<p>The following patch should have been downloaded earlier.  If not, see <a href="#kernel">2.0 Kernel compile</a>.</p>
+
+<p><font class="command">zcat [path to ppp patch]ppp-2.4.1-openssl-0.9.6-mppe.patch.gz | patch -p1</font></p>
+
+<p><font class="command">./configure</font></p>
+
+<p><font class="command">make</font></p>
+
+<p><font class="command">make install</font></p>
+
+<hr>
+
+<p class="sectionheader"><a name="pptpdcompile"></a>4.0 PPTPD Compile</p>
+
+<p>Download the pptpd source. According the website, 1.0.1 is the
+stable version and 1.1.2 is the development version. I'm using 1.1.2
+with no problems, and from the mailing list, I haven't seen any
+complaints about 1.1.2 but I have with 1.0.1. Which version you get is
+up to you, but I recommend 1.1.2.</p>
+
+<p>Two places to download the source are <a href="http://poptop.lineo.com/download_pptp.html">PoPToP.lineo.com/download_pptp.html</a> or <a href="http://www.poptop.de/poptop/">http://www.poptop.de/poptop/</a>.  In the following instructions, I'll assume you went with the 1.1.2 version.</p>
+
+<p><font class="command">cd /usr/src</font></p>
+
+<p><font class="command">tar zxvf [path to source]pptpd-1.1.2.tar.gz</font></p>
+
+<p><font class="command">cd /usr/src/pptpd-1.1.2</font></p>
+
+<p><font class="command">./configure</font></p>
+
+<p><font class="command">make</font></p>
+
+<p><font class="command">make install</font></p>
+
+<hr>
+
+<p class="sectionheader"><a name="config"></a>5.0 Config Files</p>
+
+<p>Now you need to set up the configuration files /etc/modules.conf,
+/etc/pptpd.conf, /etc/ppp/options.pptpd, and /etc/ppp/chap-secrets. Add
+the following lines to your modules.conf:</p>
+<pre>alias char-major-108 ppp_generic
+alias tty-ldisc-3 ppp_async
+alias tty-ldisc-14 ppp_synctty
+alias ppp-compress-18 ppp_mppe
+alias ppp-compress-21 bsd_comp
+alias ppp-compress-24 ppp_deflate
+alias ppp-compress-26 ppp_deflate</pre>
+
+<p>Run <font class="command">depmod -a</font> at a command prompt after
+you make the changes to modules.conf. This eliminates the error
+message, "Note: /etc/modules.conf is more recent than
+/lib/modules/2.4.x/modules.dep" error message.</p>
+
+<p>Create a file /etc/ppp/options.pptpd, and make sure /etc/ppp/options.pptpd has at least the following lines:</p>
+
+<pre>name *
+lock
+noauth
+proxyarp
++chap
++chapms-v2
+mppe-40 #comment this out if don't want to support 40 bit encryption, but see 5.23*** first
+mppe-128
+mppe-stateless
+</pre>
+
+<p>If you are using W2k clients, your options file should look like this:</p>
+
+<pre>name *
+lock
+mtu 1490
+mru 1490
+proxyarp
+auth
++chap
+#+chapms #This one is optional and my be omitted.
++chapms-v2
+ipcp-accept-local
+ipcp-accept-remote
+lcp-echo-failure 3
+lcp-echo-interval 5
+deflate 0
+mppe-128
+mppe-40
+mppe-stateless
+</pre>
+
+<p>The above option file works with Win95 clients too, so if in doubt, use the above options file.</p>
+
+<p>If the above option file still does not work with W2K clients, add the lines:</p>
+<pre>nodeflate
+nobsdcomp
+</pre>
+
+<p>If that does not work, remove the line</p>
+
+<pre>deflate 0</pre>
+
+<p><strong>Caution: This has not been tested with both Win9x and W2K clients.</strong>  You may want to add the line </p><pre>debug</pre> too, but this is optional and may reduce your pptp throughput.<p></p>
+
+<p>For /etc/pptpd.conf, unless you already have such a file, copy the sample file that came with pptpd.</p>
+
+<p><font class="command">cp /usr/src/pptpd-1.1.2/samples/pptpd.conf /etc/</font></p>
+
+<p>You must edit the localip and remoteip lines. This is highly
+individual, but instructions are included in the configuration file.
+You may also want to uncomment the debug line as well, although this
+may reduce your pptp througput. Also, uncomment the option line and
+make sure it reads:</p>
+
+<p><font class="command">option /etc/ppp/options.pptpd</font></p>
+
+<p>Make sure /etc/ppp/options is blank. If you have any options in this
+file, they are always read and may interfer with pptpd. This is good
+advice for all your ppp work. Don't populate the /etc/ppp/options file.
+Always specify everything required into it's own options file eg.</p>
+
+<ul>
+	<li>/etc/ppp/options.dialinuser</li>
+	<li>/etc/ppp/options.pptpd</li>
+	<li>/etc/ppp/options.dialout</li>
+	<li>/etc/ppp/options.anotherspecialsetup</li>
+</ul>
+
+<p>The final configuration file is /etc/ppp/chap-secrets.  The general format is:</p>
+<pre>username  *  password  *
+</pre>
+
+<p>Add the appropriate usernames and passwords. Note that the username
+and passwords are only to log into pptpd. They are not used for Linux
+or SAMBA authetication. Also, windows clients have a bad habit of
+appending the first domain name ever used to the username. Thus, even
+though a client might enter robert as the username, what actually gets
+sent could be (for example) MyDomain\\robert. The one way to fix this
+is to use the debug logs to look for the actual name sent, and add the
+actual name in chap-secrets. This also means if the client uses a
+different computer, the same username and password he (or she) has been
+using could stop working.</p>
+
+<p>There is also a patch to strip the domain names and a separate patch
+to allow the use of your samba password database rather then
+chap-secrets. See <a href="http://home.swbell.net/berzerke/pppsmb2.4.patch">home.swbell.net/berzerke/pppsmb2.4.patch</a> for the second patch.  This patch includes the blank password fix. You must add the line</p>
+
+<pre>chapms-strip-domain</pre>
+
+<p>to your pppd options file.  See also section 5.35***.</p>
+
+<p>If you wish to assign the person connecting a fixed IP address,
+rather than one from the pool you set up in pptpd.conf, replace the
+last star with the remote IP address. For example, if 192.168.1.4 is in
+the remote address pool (what gets assigned to client), and you always
+wish to assign it to the user robert, the line in chap-secrets would be:</p>
+<pre>robert  *       [robert's password]     192.168.1.4
+</pre>
+
+<p>Be careful if you use this.  The addresses assigned must <strong>NOT</strong>
+be in the pool you allocated in pptpd.conf. If someone else connects
+and gets 192.168.1.4, and robert then connects, the route to the first
+person will be replaced by the route to robert. This means the first
+person is cut off. Note that these numbers must still be set aside and
+not used except for the person they are assigned to.</p>
+
+<p>The last thing to do is to start pptpd.</p>
+
+<p><font class="command">/usr/local/sbin/pptpd -d</font></p>
+
+<p>You may want to put this command somewhere in your startup scripts.</p>
+
+<p class="subheader"><a name="iptables">5.1 Netfilter/Iptables rules</a></p>
+
+<p>The 2.4 series kernel introduced new firewalling code.  The above kernel configuration file (see <a href="#kernel">section 2.0</a>)
+includes the new code. Netfilter is the new packet filter/mangler, and
+iptables is the tool used to manipulate netfilter. The following
+assumes you have iptables already installed (current version is 1.2.3,
+use your favorite installation method). Note that these rules are for a
+pptpd server that is not being masqueraded, although I believe they
+would work for a client not being masqueraded too, but this hasn't been
+tested. Hopefully, the masquerading rules for pptp will be added soon
+(as soon as I figure out how; I've got regular masquerading working,
+but have not tried pptp masquerading).</p>
+
+<p>These rules are not a complete firewall, and while they <strong>may</strong>
+be fully functional, I believe they still have security holes. I assume
+that the default filter table policies are drop, and the nat table
+policies are accept. Let me know if you can improve them. A more
+complete <strong>SAMPLE</strong> iptables script, including pptpd support, can be found at <a href="http://home.swbell.net/berzerke">home.swbell.net/berzerke</a>. Note I use constants in my scripts to make customizations easy:</p>
+
+<pre>echo "Seting up firewall....."
+#Define some constants - change for your network!
+LOCALNETWORK="192.168.1.0/24"
+INTINT="eth1" #The internal interface
+EXTINT="eth0" #The external interface
+# Activate the forwarding!
+echo 1 &gt;/proc/sys/net/ipv4/ip_forward
+# Insert the required kernel modules
+modprobe iptable_nat
+modprobe ip_conntrack
+modprobe ip_conntrack_ftp
+
+#=============================================
+# Flush the old rules and set default policies
+#=============================================
+echo "Setting defaults"
+/sbin/iptables -F
+/sbin/iptables -t nat -F
+/sbin/iptables -P INPUT DROP
+/sbin/iptables -P OUTPUT DROP
+/sbin/iptables -P FORWARD DROP
+/sbin/iptables -t nat -P POSTROUTING ACCEPT
+/sbin/iptables -t nat -P PREROUTING ACCEPT
+/sbin/iptables -t nat -P OUTPUT ACCEPT
+
+#Loopback interface is valid
+/sbin/iptables -A INPUT  -i lo -s $LOOPBACK -j ACCEPT
+/sbin/iptables -A OUTPUT -o lo -d $LOOPBACK -j ACCEPT
+/sbin/iptables -t nat -A OUTPUT -s $LOOPBACK -j ACCEPT
+/sbin/iptables -t nat -A POSTROUTING -s $LOOPBACK -j ACCEPT
+#Yes, I know lo looks strange, but otherwise there are problems.
+#Some local network traffic does pass through lo rather than
+#the internal interface.
+/sbin/iptables -t nat -A POSTROUTING -o lo -s $LOCALNETWORK -j ACCEPT
+/sbin/iptables -A INPUT  -i lo -s $LOCALNETWORK -j ACCEPT
+/sbin/iptables -A OUTPUT -o lo -s $LOCALNETWORK -j ACCEPT
+echo "Loopback setup"
+
+#Allow unlimited LAN traffic
+/sbin/iptables -A INPUT  -i $INTINT -s $LOCALNETWORK -j ACCEPT
+/sbin/iptables -A OUTPUT -o $INTINT -s $LOCALNETWORK -j ACCEPT
+#This next allows local broadcasts from this machine.
+/sbin/iptables -t nat -A OUTPUT -s $LOCALNETWORK -j ACCEPT
+/sbin/iptables -t nat -A POSTROUTING -o $INTINT -s $LOCALNETWORK \
+        -j ACCEPT
+/sbin/iptables -t nat -A PREROUTING -s $LOCALNETWORK -j ACCEPT
+echo "LAN traffic allowed"
+
+#Allow forwarding from inside to out and vice versa
+/sbin/iptables -A FORWARD -i $INTINT -s $LOCALNETWORK -j ACCEPT
+/sbin/iptables -A FORWARD -o $INTINT -d $LOCALNETWORK -j ACCEPT
+
+#Allow pptpd connections (port 1723)
+/sbin/iptables -t nat -A PREROUTING -i $EXTINT -p TCP \
+        --sport $PUBLICPORTS --dport 1723 -j ACCEPT
+/sbin/iptables -t nat -A OUTPUT -o $EXTINT -p 47 -j ACCEPT
+/sbin/iptables -A OUTPUT -o $EXTINT -p 47 -j ACCEPT
+/sbin/iptables -A INPUT  -i $EXTINT -p 47 -j ACCEPT
+/sbin/iptables -A INPUT  -i ppp+ \
+        -s $LOCALNETWORK -d $LOCALNETWORK -j ACCEPT
+/sbin/iptables -A OUTPUT -o ppp+ \
+        -s $LOCALNETWORK -d $LOCALNETWORK -j ACCEPT
+echo "PPTPD allowed"
+</pre>
+
+<p class="subheader"><a name="clients">5.2 Setting up the clients</a></p>
+
+<p>This section was based heavily on the RedHat-PoPToP HOWTO by Mike
+Barsalou. Thanks Mike. I don't have ME, XP, or 2000 clients to test
+against, so I can't offer setup instructions for those platforms. I
+would appreciate any write-ups.</p>
+
+<p>Note that the Win95 routine is similar but requires Dial Up
+Networking (DUN) Update 1.3, with DUN 1.4 recommended and both the
+Win95 and Win98 need the vpnupdate (free from Microsoft) to be
+installed first. You're going to have to hunt around a little for these
+files as they keep moving. However, here are a couple places to try
+first:</p>
+
+<p>For Windows 95 (DUN 1.4): <a href="http://www.microsoft.com/Windows95/downloads/contents/WURecommended/S_WUNetworking/dun14win95/Default.asp">http://www.microsoft.com/Windows95/downloads/contents/WURecommended/S_WUNetworking/dun14win95/Default.asp</a></p>
+
+<p>For Windows 98 (DUN 1.4): <a href="http://www.microsoft.com/Windows98/downloads/contents/WURecommended/S_WUNetworking/dun14/Default.asp">http://www.microsoft.com/Windows98/downloads/contents/WURecommended/S_WUNetworking/dun14/Default.asp</a></p>
+
+<ol>
+	<li>For Win98 (and some 95) machines use the add-remove programs
+tool to uninstall the VPN software. Some of the OEM's don't install
+this properly. Re-Install it using the add-remove programs tool. Go to
+windows setup (tab) select communications and press the details button.
+Scroll down and check the VPN support.</li>
+	<li>Download and install the DUN 1.4 update.  take a little nap here...</li>
+	<li>Now
+that your machine is back, Go to dial-up networking (usually
+start-&gt;programs-&gt;Accessories-&gt;communications-&gt;Dial-up
+Networking) YMMV</li>
+	<li>Click make new connection</li>
+	<li>Name the Connection whatever you'd like.</li>
+	<li>Select Microsoft VPN adapter as the device.</li>
+	<li>Click next.</li>
+	<li>Type in the ip address or hostname of your pptp server.</li>
+	<li>Click next.</li>
+	<li>Click finish.</li>
+	<li>Right-click on the intranet icon.</li>
+	<li>Select properties.</li>
+	<li>Choose server types.</li>
+	<li>Check
+require encrypted password. It is also recommend that you check require
+data encryption. Without the data encryption, your Virtual Private
+Network becomes a Virtual Public Network.</li>
+	<li>Uncheck netbeui and ipx/spx compatible.</li>
+	<li>Click tcp/ip settings.</li>
+	<li>Turn off use IP header compression (May not be necessary).</li>
+	<li>Turn off use default gw on remote network.</li>
+	<li>Click ok.</li>
+	<li>Start that connection.</li>
+	<li>Type in your username and pw (yadda, yadda, yadda).</li>
+	<li>Once it finishes its connection your up.  It may take a few minutes before you can browse through network neighborhood.</li>
+</ol>
+
+<hr>
+
+<p class="sectionheader"><a name="gotchas"></a>6.0 Gotchas</p>
+
+<p>This section lists things to watch out for and check if pptpd isn't working.</p>
+
+<p class="subheader"><a name="61">6.1 Firewalls</a></p>
+
+<p>Does the client have a firewall?  If the client has a firewall, be sure it allows pptpd to pass through.</p>
+
+<p class="subheader"><a name="62">6.2 Remote and Local IPs</a></p>
+
+<p>In your pptpd.conf file, be sure the remoteip(s) and localip (you
+don't need more than one) are on the same subnet and do *NOT* overlap.
+They must be different. Also, be sure any ip's specified in
+chaps-secrets do not overlap either.</p>
+
+<p class="subheader"><a name="63">6.3 Reinstall</a></p>
+
+<p>If a particular machine can't browse over pptpd and you've checked
+everything else, try uninstalling and reinstalling Client for Microsoft
+Networks. Also try uninstalling and reinstalling the adapters. This is
+a problem even with W2k.</p>
+
+<p class="subheader"><a name="64">6.4 Forwarding</a></p>
+
+<p>You're going to have lots of trouble unless you enable ip
+forwarding. The command [echo "1" &gt;/proc/sys/net/ipv4/ip_forward]
+will do it, but will not survive a reboot, so be sure and place the
+command somewhere in your startup scripts. Also, if you have a
+firewall, be sure it allows the forwarded packets through.</p>
+
+<p class="subheader"><a name="65">6.5 Windows</a></p>
+
+<p>The three R's of MS tech support: Retry, Reboot, Reinstall.
+Especially try the reboot. Windows 9x and Me suffer from memory
+fragmentation issues that can require rebooting in order to make PPP or
+PPTP work again. This is something to try especially when you have
+connected before successfully.</p>
+
+<p class="subheader"><a name="66">6.6 PoPToP version</a></p>
+
+<p>Are you using version 1.1.2?  Don't use 1.0.1.  1.1.2 <strong>is</strong> stable.</p>
+
+<hr>
+
+<p class="sectionheader"><a name="troubleshooting"></a>7.0 Troubleshooting/FAQ</p>
+
+<p>The placement of the questions in various catergories is somewhat
+subjective. If you have any better ideas on categories or placement,
+please let me know.</p>
+
+<p class="subheader"><a name="generalq"></a>7.1 General PPTPD questions</p>
+
+<dl>
+	<dt class="ques">How do I know if my users are connecting at 40 bits or 128 bits?</dt>
+	<dd>Look
+for a line in the logs that reads either: MPPE 40 bit, stateless
+compression enabled or MPPE 128 bit, stateless compression enabled.
+What you see is what you get.</dd>
+	<dt class="ques">I've tried downloading the patches with Netscape and I get all kinds of errors.</dt>
+	<dd>Netscape
+is known to mangle patches, especially non-zipped patches. Use
+something else like wget or lynx. If you have KDE, Konqueror doesn't
+give me any problems either.</dd>
+	<dt class="ques">Can I use IPSec and PPTPD in the same kernel?</dt>
+	<dd>Yes.</dd>
+	<dt class="ques">Will pptpd work with clients on a Linksys ethernet/dsl router?</dt>
+	<dd>Yes.
+Depending on how old it is, you may have to upgrade the firmware (If
+anyone knows what the cut-off is, let me know). You also have to
+forward port 1723 to the appropriate machine. Needless to say, it only
+seems to work with one client (or server), not multiple clients (or
+servers).</dd>
+	<dt class="ques">Is there a PPTPD howto for Redhat 6.2?</dt>
+	<dd>It is by a different author I am not connected with, but yes.  See <a href="http://members.home.net/dont-bug-me/pptpd">http://members.home.net/dont-bug-me/pptpd</a></dd>
+	<dt class="ques">Can link 2 lans together using pptpd?</dt>
+	<dd>Yes.  A  document giving some pointers how is at <a href="http://earthling.2y.net/LinkingNets.html">http://earthling.2y.net/LinkingNets.html</a> .  Basically, you have to make the pptpd interface your router.</dd>
+	<dt class="ques">Can IPX be passed through pptp tunnels?</dt>
+	<dd>Yes.
+However, I've found multiple times, even on an all MS network, mixing
+TCP/IP and IPX will cause all sorts of mysterious problems. These
+problems go away once IPX is removed from the network. Don't mix these
+two without a VERY good reason.</dd>
+	<dt class="ques">Why should I use pptpd rather than ipsec?  Isn't ipsec more secure?</dt>
+	<dd>Yes,
+ipsec is more secure. However, it is also a support nightmare for road
+warriors. Pptpd is far easier to administrater. How many times will you
+pager go off at 3 AM before you decide the security advantages of ipsec
+just aren't worth it? Besides, if you're really concerend about
+security, why are you allowing Windows 9x/ME? I think the most common
+reason to use PoPToP is that it is A) cheap B) the client is built into
+MS products which eliminates the need to install client software on all
+the peers. C) Designed more specifically for Client to Network
+connections. IPSec is designed for network to network connections.</dd>
+	<dt class="ques"></dt>
+	<dd></dd>
+	<dt class="ques"></dt>
+	<dd></dd>
+
+	
+</dl>
+
+<p class="subheader"><a name="pptpdq"></a>7.2 PPTPD questions (non-error messages)</p>
+
+<dl>
+	<dt class="ques">Do I have to use multiple local IP numbers?</dt>
+	<dd>No.
+One is all you need. However, you do need multiple remote IP numbers if
+you want more than one client connecting at a time. You need one remote
+IP number for each simultaneous connection.</dd>
+	<dt class="ques">Do the local and remote IP numbers have to be on the same subnet?</dt>
+	<dd>Technically,
+no. However the setup is a real pain, especially if you are also
+running a firewall. I don't recommend trying this unless you <i>must</i>.  You're just asking for trouble if you try to do this.</dd>
+	<dt class="ques">Everytime the last PPTP session closes, pptpd exits. As long as there is an active session, it's runs fine.  How do I fix this?</dt>
+	<dd>This problem has been reported with pptpd version 1.0.1.  Upgrading to 1.1.2 fixed the problem.</dd>
+	<dt class="ques">Can I compile ppp directly into the kernel rather than making it a module?</dt>
+	<dd>This
+isn't recommended, and from the reports in the mailing list, probably
+won't work. For unknown reasons to the author, some things don't work
+if compiled directly into the kernel, but do work as modules. I have
+personally seen this with network card drivers. In any case, it seems
+ppp_mppe is tied into ppp_generic's compile. No ppp_generic module, no
+ppp_mppe. See also the next question.</dd>
+	<dt class="ques">I can get the PPTP connection to work fine, but can not get encryption to work.  What is wrong?</dt>
+	<dd>It
+has been reported that changing PPP from being built into the kernel to
+being a loadable module has fixed the problem. The configuration file
+listed in the earlier instructions does build PPP as a loadable module.
+Basically, the encryption modules depend on the pppd module. If there
+is no pppd module (emphasis module), then the encryption modules won't
+load. If the encryption modules don't load, no encryption.</dd>	
+	<dt class="ques">How come the ppp connection formed by pptp shows a netmask of 255.255.255.255?  Isn't this an error?</dt>
+	<dd>Your
+ppp* device should have that netmask (255.255.255.255). This is normal
+when you have a ppp virtual device that has another device (eth*)
+answer arp requests on behalf of the remote pptp clients ip address.
+i.e. proxyarp. You are using the proxyarp option, aren't you?</dd>
+	<dt class="ques">How can I disconnect an idle user automatically?</dt>
+	<dd>In ppp options file, add the line: idle [time in seconds after which to disconnect the user]</dd>
+	<dt class="ques">My pptpd server is answering arp requests for mac addresses and ip addresses that are not the server's.  What is going on?</dt>
+	<dd>That
+is the proxyarp command in action. Nothing is wrong. That's what should
+be happening. Its required to simulate that remote machine(s) being on
+the lan.</dd>
+	<dt class="ques">I don't seem to have packet compression when I use the Linux pptpd. Why?</dt>
+	<dd>You are correct.  There is no compression.  Nobody has bothered to write the code to support MPPC (which does the compression).</dd>
+	<dt class="ques">How do I assign a specific IP address based on their login name (and password)?</dt>
+	<dd>If
+you compile pptp with ./configure --with-pppd-ip-alloc, then ip's will
+be assigned from the chap-secrects file, based on the user log in name.
+Of course, this could bring on lots of fun with iptables if they ip
+addresses aren't all on the same subnet.</dd>
+	<dt class="ques"> Why can't I NAT more than one connection at a time to my Linux PPTPD server?  Windows NT allows that.</dt>
+	<dd>Short answer: PoPToP follows the RFC (which Microsoft helped write).  Microsoft doesn't.<br>The long is answer taken from <a href="http://www.ibiblio.org/pub/Linux/docs/HOWTO/VPN-Masquerade-HOWTO">http://www.ibiblio.org/pub/Linux/docs/HOWTO/VPN-Masquerade-HOWTO</a>  section 2.7:<br><blockquote>
+The PPTP RFC specifies in section 3.1.3 that there may only be one
+control channel connection between two systems. This should mean that
+you can only masquerade one PPTP session at a time with a given remote
+server, but in practice the MS implementation of PPTP does not enforce
+this, at least not as of NT 4.0 Service Pack 4. If the PPTP server
+you're trying to connect to only permits one connection at a time, it's
+following the protocol rules properly. Note that this does not affect a
+masqueraded server, only multiple masqueraded clients attempting to
+contact the same remote server.</blockquote><br>Even then it only affects multiple clients masqueraded behind the same box.</dd>
+	<dt class="ques">Can I configure pptpd to authenticate against a domain controller (Win2K or NT)?</dt>
+	<dd>No.
+The PPTP client authenticates using MSCHAPv2, that is, version two of a
+Microsoft specific version of CHAP. That protocol doesn't send the
+plaintext version of the password, but instead uses a cryptographic
+handshake that verifies that the server and client both have a copy of
+the NT hash of the plaintext password. pppd cannot calculate the NT
+hash without the plaintext, but it needs it both for authentication
+(although it can ask samba to do the authentication) and to initialise
+the keys used in MPPE encryption.<br>This state of events will probably
+make it impossible for a PopTop server to authenticate against an NT
+PDC - what you are asking it to do is to become a man-in-the-middle,
+and the protocols are designed to prevent that.</dd>
+	<dt class="ques">Can I autheticate users against the /etc/passwd file?</dt>
+	<dd>Not currently.  However, you can use the /etc/smbpasswd file with the correct patches.</dd>
+	<dt class="ques">Can I autheticate using PAM?</dt>
+	<dd>Yes.  However, be aware that PAM uses cleartext passwords.  Enable it at your own risk!</dd>
+	<dt class="ques">I want to use MSCHAP, the first version, not the second.  How do I enable this?</dt>
+	<dd>First, you must compile this in.  From pppd/Makefile:<br><pre># Uncomment the next 2 lines to include support for Microsoft's
+# MS-CHAP authentication protocol.
+CHAPMS=y
+USE_CRYPT=y</pre>
+Compile it.  This assumes you also applied the normal patches.  Next, in the /etc/ppp/options.pptpd file, add the line:<pre>+chapms</pre>
+You should note this is a very poor authetication protocol and it has been replaced by CHAPv2.  Enable this at your own risk!</dd>
+	<dt class="ques">Does pptpd work with Windows ME clients?</dt>
+	<dd>Yes.</dd>
+	<dt class="ques">Does pptpd work with Windows XP clients?</dt>
+	<dd>Yes.
+I have only report on that I have so far is one person who followed
+these instructions and claims it works just fine. I also have reports
+from others that XP (final, not beta) does work, although I don't know
+what configuration they used.</dd>
+	<dt class="ques">Does pptpd work under xinetd?</dt>
+	<dd>Yes, although I don't currently have an example config file. (Samples anyone?)</dd>
+	<dt class="ques">PPTPD is real slow.  How can I speed it up?  FTP speed is fine.</dt>
+	<dd>Without
+a faster connection on both ends, you probably can't. Remember that
+pptp is designed for windows clients and they use the smb protocol.
+This is not a very effient protocol. It was never designed for WAN use.
+The Samba team may very object to the term designed period with regards
+to smb. FTP uses TCP/IP which is designed for WAN use. That's why FTP
+is faster.<br>
+	If your interested in measuring speed, try <font class="command">pppstats -c 10000 -w 1 ppp[number of connection]</font> This will show you your transfer speed in Bytes/s, although the output isn't pretty.<br>
+	I have an unconfirmed report that removing the debug strings from the config files will speed things up a bit.<br>
+	I also have an unconfirmed report that lowering the MTU on the clients does help moving smb packets quicker.<br>
+Another thing that can affect speed alot is client based anti-virus
+programs. Disable the active scanning of files that are opened across
+the network.</dd>
+	<dt class="ques">Can I speed things up by playing with the speed option in /etc/pptpd.conf?</dt>
+	<dd>Not really.  In any case, values above 115200 are ignored.</dd>
+	<dt class="ques">What is the maximum number of clients that can be connected at once?</dt>
+	<dd>There are various limits, but the real world number is about 100.</dd>
+	<dt class="ques"></dt>
+	<dd></dd>
+	<dt class="ques"></dt>
+	<dd></dd>
+
+</dl>
+
+<p class="subheader"><a name="pptpdq"></a>7.3 PPTPD client issues (non-error messages)</p>
+
+<dl>
+	<dt class="ques">I'm connecting at only 40 bits.  How do I connect at 128 bits?</dt>
+	<dd>This
+is probably a client (Windows) problem. The key file for Windows is
+pppmac.vxd, located in c:\windows\system. The easiest way to upgrade
+this properly is to get the DUN 1.4 update from Microsoft. As of
+07/10/2001, the links are:<br><br>
+
+Win 95 (all versions): <a href="http://download.microsoft.com/download/win95/Update/17648/W95/EN-US/dun14-95.exe">http://download.microsoft.com/download/win95/Update/17648/W95/EN-US/dun14-95.exe</a><br>
+Win 98 First Edition: <a href="http://download.microsoft.com/download/win98/Update/17648/W98/EN-US/dun14-98.exe">http://download.microsoft.com/download/win98/Update/17648/W98/EN-US/dun14-98.exe</a><br>
+Win 98 Second Edition: <a href="http://download.microsoft.com/download/win98SE/Update/17648/W98/EN-US/dun14-SE.exe">http://download.microsoft.com/download/win98SE/Update/17648/W98/EN-US/dun14-SE.exe</a><br>
+If the above URLS don't work, try here: <a href="http://support.microsoft.com/support/kb/articles/Q285/1/89.ASP">http://support.microsoft.com/support/kb/articles/Q285/1/89.ASP</a><br>
+For W2K clients, get the high encryption pack from Microsoft.</dd>
+	<dt class="ques">The client can't connect to port 1723.</dt>
+	<dd>Is pptpd running?  <font class="command">ps ax |grep pptpd</font> should show if it is running or not.<br>
+Is another program using port 1723?  <font class="command">netstat --inet -a -n -p | grep 1723</font> should show which program, if any, is using port 1723.<br>
+Some providers, (AT&amp;T and @home have been reported so far) either
+do not pass port 1723 or filter out GRE packets (which are necessary
+for pptp). Supposedly it is to cut down on bandwidth. If possible, try
+connecting over a lan and see if that works. You also may want to
+re-read your subscriber agreement.<br>
+You could try doing a traceroute to port 1723 and see if that gets through.  The command is <font class="command">[path to traceroute]traceroute -p 1723 [IP address of pptpd server]</font>.<br>
+Is a firewall blocking it, either at the client or server end? For
+those using iptables, the commands to check ALL your firewall rules
+are:
+<pre>iptables -t filter -L -n
+iptables -t mangle -L -n
+iptables -t nat -L -n</pre></dd>
+	<dt class="ques">My
+clients get 2 DNS servers when the connect to the internet. I assign
+them 2 additional ones for the VPN. How come when I do a winipcfg, my 2
+DNS servers show last?</dt>
+	<dd>This is normal.  From tests others have done, it does <i>appear</i> as if the two servers you assigned are consulted first.</dd>
+	<dt class="ques">Browsing doesn't work.  How do I fix it?</dt>
+	<dd>This
+is one of the more difficult to diagnose problems. First, can you ping
+other computers. If not, then there is a connectivity problem (at
+least). Resolve this and try again. Second, updating network
+neighborhood to the point where a PPTPD client can see the other
+computer can take 30-60 seconds (I've seen a couple of minutes). Be
+patient and try again.<br><br>
+Are you using a wins server? Broadcasts generally don't pass routers (a
+ppp interface counts). Browsing is generally done either via Wins, or
+broadcasts. It is possible to use the hosts and lmhosts files as a
+substitute for a wins server. Most people report fewer troubles when
+the pptpd server is also a wins server. If you are using a Samba wins
+server, is the "guest account" in your smb.conf set to an actual valid
+account? The IPC$ connection that lists the shares is done as guest,
+and will fail without a valid guest account.<br><br>
+If you are using an MS wins server, it requires a re-registration at
+least every 90 days. Since linux is so stable, it is quite possible to
+run
+longer than 90 days without rebooting (or at least restarting Samba).
+Be sure and restart Samba at least every 89 days. This browsing problem
+should only affect Samba computers. Once you pass the 90 days, you may
+have to restart the MS machine too to clear things up, and even that
+may not work (conflicting reports here).<br><br>
+
+Are <i>ANY</i>
+of the clients running more than one protocol? From the Samba docs:
+"Every NetBIOS machine take part in a process of electing the LMB
+[Local Master Browser] (and DMB [Domain Master Browser]) every 15
+minutes...The election process is "fought out" so to speak over every
+NetBIOS network interface. In the case of a Windows 9x machine that has
+both TCP/IP and IPX installed and has NetBIOS enabled over both
+protocols the election will be decided over both protocols. As often
+happens, if the Windows 9x machine is the only one with both protocols
+then the LMB may be won on the NetBIOS interface over the IPX protocol.
+Samba will then lose the LMB role as Windows 9x will insist it knows
+who the LMB is. Samba will then cease to function as an LMB and thus
+browse list operation on all TCP/IP only machines will fail."<br><br>
+If running Samba, and only one machine isn't accessable (to pptpd
+clients), look in the wins.dat file. Generally it is in
+/var/lock/samba. See if
+the computer is actually listed. If not, restart the computer (or
+Samba). A computer running Samba seems only to register itself once
+(when starting). If the wins server is not available at that time, you
+will not be able to access that machine via wins until you restart
+Samba (on the missing machine).<br><br>
+Try using the "net use" and "net view" commands from the windows
+client. Just because you can't see something in network neighborhood
+doesn't mean it isn't on the network. If fact, they are much more
+reliable than browsing. I've also found mapping a drive with the net
+use command tends to make things appear faster in network neighborhood.
+YMMV.<br><br>
+Finally, Windows 9x and Me suffer from memory fragmentation issues that
+can require rebooting in order to make PPP or PPTP work again. This is
+something to try especially when you have connected before successfully.</dd>
+	<dt class="ques">I can browse the server's shares, but no other computers.  What am I missing?</dt>
+	<dd>There
+are several things to check. Do you have proxyarp in your ppp/options?
+Make sure that there is an entry in the /var/log/messages, when the
+link is brought up, that says something like: "Feb 2 20:05:59 vvvvvvv
+pppd[23097]: found interface eth? for proxy arp file?"<br>
+If not, you won't see past the pptpd server. Second, check your
+firewall rules and make sure the packets are getting forwarded from the
+ppp interface to the lan.<br><br>
+Sometimes, over a pptp connection, it takes a few minutes to update the
+browse lists. Be patient. Manually mapping a drive seems to speed this
+up considerably.<br><br>
+
+Finally, try the <font class="command">net view \\[computer name]</font>
+command. You normally can substitute the ip address of the computer. If
+when substituting the ip address, you get an error 53, then there is a
+problem with reaching the computer or with the Wins server. I've found
+from experience, if there are only a couple of servers who's ip
+addresses don't change, try using a lmhosts file. Note that if you use
+an lmhosts file, don't try the net view command with an ip address. Use
+the computer's name. This is because MS decided that an ip address is
+first treated as a name, and will try to do a lookup. That will fail,
+and you'll get an error 53 message.</dd>
+	<dt class="ques">When I
+connect to the pptpd server, the client's internet connection goes over
+the pptp connection and not over its usual connection. How do I fix
+this?</dt>
+	<dd>In the client configuration, under TCP settings, there is a check box use default gateway on remote network.  Uncheck that.</dd>
+	<dt class="ques">I
+have W2K clients, and without encryption everything works fine, but
+with encryption, they won't communicate across the pptp connection. How
+do I fix this?</dt>
+	<dd>You probably don't have the correct options in your ppp options file.  Reread section 5.0.</dd>
+	<dt class="ques">I'm having problems with Windows 98SE/ME or Windows 2K running at the proper encryption level.  What's going on?</dt>
+	<dd>For
+Windows 2K, problems have been reported if you have the line [mppe-40]
+in the options file. Commenting it out seems to fix the problem. You
+can also try the alterative options file listed above.<br><br>
+For Windows 98SE (and probably ME), it is the exact opposite. If you
+don't have the line [mppe-40], then the client will connect and
+negotiate MPPE 128 bit, but pppd spews messages like these for all
+traffic:<pre>    Apr  9 11:34:00 ra0 pppd[9521]: rcvd [Compressed data] 90 00 bb 5c a3 2d a7 0d ...
+    Apr  9 11:34:04 ra0 pppd[9521]: rcvd [Compressed data] 90 01 c3 1a 0e cb c2 29 ...</pre>
+No traffic actually goes across the link. Adding "mppe-40" to
+/etc/ppp/options.pptpd makes everything work perfectly. The clients
+still
+negotiate MPPE 128 bit.<br><br>
+
+Note that adding any of these options<pre>require-chap
+require-mppe
+require-mppe-stateless</pre>
+
+tends to kill Win9x/ME client connections.  I don't recommend using these options.</dd>
+	<dt class="ques"></dt>
+	<dd></dd>
+	
+
+</dl>
+
+server error messages and log entries
+<dl>
+	<dt class="ques">I'm getting <pre>    Apr  9 11:34:00 ra0 pppd[9521]: rcvd [Compressed data] 90 00 bb 5c a3 2d a7 0d ...
+    Apr  9 11:34:04 ra0 pppd[9521]: rcvd [Compressed data] 90 01 c3 1a 0e cb c2 29 ...</pre> in my log files and no traffic seems to go across the link.</dt>
+	<dd>Add
+"mppe-40" to /etc/ppp/options.pptpd file. The clients still negotiate
+MPPE 128 bit. This will cause problems for Win2K clients however. As a
+better alternative, try the config files in section 5.0</dd>
+	<dt class="ques"></dt>
+	<dd></dd>
+	<dt class="ques"></dt>
+	<dd></dd>
+</dl>
+
+	<dt class="ques"></dt>
+	<dd></dd>
+	<dt class="ques"></dt>
+	<dd></dd>
+	<dt class="ques"></dt>
+	<dd></dd>
+
+
+</body></html>

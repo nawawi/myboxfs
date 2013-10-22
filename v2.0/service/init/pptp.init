@@ -1,0 +1,378 @@
+#!/bin/php -Cq
+<?
+// pptp.init - last update 11-Oct-2005
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.so');
+
+putenv("PATH=/bin:/service/tools:/service/init");
+if(mfs_license('VPN')!=1) die("Disabled. Please upgrade your license.\n");
+
+if(!file_exists("/bin/pppd") || !file_exists("/bin/pptpd") || !file_exists("/bin/pptpctrl") || !file_exists("/bin/bcrelay")) {
+	echo "pppd,pptpd,pptpctrl or bcrelay binary not found or cannot execute\n";
+	slog("INIT: pppd,pptpd,pptpctrl or bcrelay binary not found or cannot execute");
+	exit(1);
+}
+
+if(mfs_license('OK_FILE')==-1) {
+	echo "No license file.\n";
+	exit(1);
+}
+
+if(mfs_license('OK_KEY')==-2) {
+	echo "Invalid license Key.\n";
+	exit(1);
+}
+
+
+if(mfs_license('OK_TIME')==-3) {
+	echo "License expired.\n";
+	exit(1);
+}
+
+$db_id=db_connect($_DB_NAME);
+$_PPTP_STAT=0;
+$_PPTP_SPEED=115200;
+$_PPTP_STIMEOUT=10;
+$_PPTP_LISTEN='';
+$_PPTP_LOCALIP='10.1.1.253';
+$_PPTP_IPSTART='10.1.1.1';
+$_PPTP_IPEND='254';
+$_PPTP_MSWINS='';
+$_PPTP_DNSWIN='';
+$_PPTP_BCRELAY='';
+$_PPTP_USEAD=0;
+$_PPTP_ADDOMAIN='';
+$_PPTP_ADADMIN='';
+$_PPTP_ADPASS='';
+$_PPTP_ADIP='';
+$_PPTP_WORKGROUP='MYBOX-FIREWALL';
+$_PPTP_NETBIOSNAME='MFS';
+$_PPTP_USEWINS='';
+$_PPTP_USER=array();
+$_HOSTNAME='mybox';
+
+$result=db_query("select * from pptp",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_PPTP_STAT=$row['stat'];
+		$_PPTP_SPEED=$row['speed'];
+		$_PPTP_STIMEOUT=$row['stimeout'];
+		$_PPTP_LISTEN=$row['listen'];
+		$_PPTP_LOCALIP=$row['localip'];
+		$_PPTP_IPSTART=$row['ipstart'];
+		$_PPTP_IPEND=$row['ipend'];
+		$_PPTP_MSWINS=$row['mswins'];
+		$_PPTP_DNSWIN=$row['dnswin'];
+		$_PPTP_BCRELAY=$row['bcrelay'];
+		$_PPTP_USEAD=$row['usead'];
+		$_PPTP_ADDOMAIN=$row['addomain'];
+		$_PPTP_ADADMIN=$row['adadmin'];
+		$_PPTP_ADPASS=$row['adpass'];
+		$_PPTP_ADIP=$row['adip'];
+		$_PPTP_WORKGROUP=$row['workgroup'];
+		$_PPTP_NETBIOSNAME=$row['netbiosname'];
+		$_PPTP_USEWINS=$row['usewins'];
+	}
+}
+
+$result=db_query("select * from pptpuser where stat='1'",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_name=$row['name'];
+		$_passwd=$row['passwd'];
+		$_ip=$row['ip'];
+		if($_ip=='' ||$_ip=='any') $_ip='*';
+		$_PPTP_USER[]="$_name|$_passwd|$_ip";
+	}
+}
+
+$result=db_query("select val from misc where name='hostname'",$db_id);
+if(db_num_rows($result)!=0) {
+	$_HOSTNAME=db_fetch_single($result);
+}
+
+$_SMB_ACL=set_smb_acl($db_id,$_PPTP_LOCALIP);
+
+db_close($db_id);
+
+function pptp_config() {
+	global $_PPTP_USER, $_PPTP_SPEED, $_PPTP_STIMEOUT, $_PPTP_LISTEN, $_PPTP_LOCALIP, $_PPTP_IPSTART;
+	global $_PPTP_IPEND, $_PPTP_DNSWIN, $_PPTP_MSWINS, $_PPTP_USEAD;
+	global $_PPTP_BCRELAY, $_PPTP_ADDOMAIN, $_PPTP_ADADMIN, $_PPTP_ADPASS, $_PPTP_ADIP;
+	global $_PPTP_WORKGROUP, $_HOSTNAME, $_SMB_ACL, $_PPTP_NETBIOSNAME, $_PPTP_USEWINS;
+
+	if($_PPTP_IPEND=='') $_PPTP_IPEND='254';
+	if($fi=fopen("/etc/pptpd.conf.tmp","w")) {
+		fwrite($fi,"speed $_PPTP_SPEED\n");
+		fwrite($fi,"ppp /bin/pppd\n");
+		fwrite($fi,"option /etc/ppp/options.pptpd\n");
+		fwrite($fi,"stimeout $_PPTP_STIMEOUT\n");
+		if($_PPTP_LISTEN!='any' && $_PPTP_LISTEN!='') fwrite($fi,"listen $_PPTP_LISTEN\n");
+		if($_PPTP_BCRELAY=='') $_PPTP_BCRELAY='eth0';
+		fwrite($fi,"bcrelay $_PPTP_BCRELAY\n");
+		fwrite($fi,"localip $_PPTP_LOCALIP\n");
+		fwrite($fi,"remoteip $_PPTP_IPSTART"."-$_PPTP_IPEND\n");
+		fwrite($fi,"debug\n");
+		fwrite($fi,"logwtmp\n");
+		fclose($fi);
+		@copy("/etc/pptpd.conf.tmp","/etc/pptpd.conf");
+		@unlink("/etc/pptpd.conf.tmp");
+	}
+
+	if(!is_dir("/etc/ppp")) mkdirr("/etc/ppp");
+	if(!is_dir("/etc/samba")) mkdirr("/etc/samba");
+
+	if($fi=fopen("/etc/ppp/options.pptpd.tmp","w")) {
+		fwrite($fi,"name mybox-vpn\n");
+		fwrite($fi,"refuse-pap\n");
+		fwrite($fi,"refuse-chap\n");
+		fwrite($fi,"refuse-mschap\n");
+		fwrite($fi,"require-mschap-v2\n");
+		fwrite($fi,"require-mppe-128\n");
+		if($_PPTP_DNSWIN!='') {
+			$lst=preg_split("/\s+/",$_PPTP_DNSWIN);
+			foreach($lst as $mm) {
+				if($mm!='') fwrite($fi,"ms-dns $mm\n");
+			}
+		}
+		unset($mm);
+		if($_PPTP_MSWINS!='' && $_PPTP_USEWINS!=1) {
+			$lst=preg_split("/\s+/",$_PPTP_MSWINS);
+			foreach($lst as $mm) {
+				if($mm!='') fwrite($fi,"ms-wins $mm\n");
+			}
+		}
+		fwrite($fi,"defaultroute\n");
+		fwrite($fi,"proxyarp\n");
+		fwrite($fi,"lock\n");
+		fwrite($fi,"nobsdcomp\n");
+		if($_PPTP_USEAD==1) {
+			@unlink("/etc/ppp/chap-secrets");
+			fwrite($fi,"plugin /lib/winbind.so\n");
+			fwrite($fi,"ntlm_auth-helper '/bin/ntlm_auth --helper-protocol=ntlm-server-1'\n");
+		}
+		fclose($fi);
+		@copy("/etc/ppp/options.pptpd.tmp","/etc/ppp/options.pptpd");
+		@unlink("/etc/ppp/options.pptpd.tmp");
+	}
+	if(count($_PPTP_USER)!=0 && $_PPTP_USEAD!=1) {
+		if($fi=fopen("/etc/ppp/chap-secrets.tmp","w")) {
+			foreach($_PPTP_USER as $list) {
+				list($user,$passwd,$ip)=preg_split("/\|/",$list);
+				if($ip=='' || $ip=='any') $ip='*';
+				fwrite($fi,"$user\tmybox-vpn\t$passwd\t$ip\n");
+			}
+			fclose($fi);
+			@copy("/etc/ppp/chap-secrets.tmp","/etc/ppp/chap-secrets");
+			@unlink("/etc/ppp/chap-secrets.tmp");
+			chmod("/etc/ppp/chap-secrets", 0600);
+		}
+	}
+	if($fi=fopen("/etc/samba/smb.conf.tmp","w")) {
+		fwrite($fi,"[global]\n");
+		if($_HOSTNAME!='') {
+			$_HOSTNAME=strtoupper($_HOSTNAME);
+		} else {
+			$_HOSTNAME='MYBOX-FIREWALL';
+		}
+		$_PPTP_WORKGROUP=strtoupper($_PPTP_WORKGROUP);
+		fwrite($fi,"workgroup = $_PPTP_WORKGROUP\n");
+		fwrite($fi,"server string = $_HOSTNAME\n");
+		if($_PPTP_USEAD==1) {
+			list($gw,$rest)=explode(".",$_PPTP_ADDOMAIN);
+			fwrite($fi,"realm = ".strtoupper($_PPTP_ADDOMAIN)."\n");
+			fwrite($fi,"security = ads\n");
+			fwrite($fi,"winbind uid = 10000-20000\n");
+			fwrite($fi,"winbind gid = 10000-20000\n");
+			fwrite($fi,"winbind use default domain = yes\n");
+			fwrite($fi,"winbind cache time = 10\n");
+			fwrite($fi,"winbind separator = \"\\\"\n");
+		}
+		if($_PPTP_USEWINS!=1) {
+			fwrite($fi,"wins support = no\n");
+			if($_PPTP_MSWINS!='') fwrite($fi,"wins server = $_PPTP_MSWINS\n");
+			fwrite($fi,"domain master = False\n");
+		} else {
+			fwrite($fi,"wins support = yes\n");
+			fwrite($fi,"domain master = yes\n");
+		}
+
+		if($_SMB_ACL!=null) {
+			fwrite($fi,"interfaces = $_SMB_ACL\n");
+		}
+		if($_PPTP_NETBIOSNAME!='') {
+			fwrite($fi,"netbios name = $_PPTP_NETBIOSNAME\n");
+		}
+
+		fwrite($fi,"name resolve order = wins lmhosts bcast host\n");
+		fwrite($fi,"local master = yes\n");
+		fwrite($fi,"preferred master = yes\n");
+		fwrite($fi,"guest account = nobody\n");
+		fwrite($fi,"load printers = no\n");
+		fwrite($fi,"browse list = yes\n");
+		fwrite($fi,"enhanced browsing = yes\n");
+		fwrite($fi,"os level = 65\n");
+		fwrite($fi,"syslog = 3\n");
+		fwrite($fi,"syslog only = yes\n");
+
+		fclose($fi);
+		@copy("/etc/samba/smb.conf.tmp","/etc/samba/smb.conf");
+		@unlink("/etc/samba/smb.conf.tmp");
+	}
+	if($_PPTP_USEAD==1) {
+		if($fi=fopen("/etc/krb5.conf.tmp","w")) {
+			fwrite($fi,"[libdefaults]\n");
+			fwrite($fi,"default_realm = ".strtoupper($_PPTP_ADDOMAIN)."\n");
+			fwrite($fi,"dns_lookup_kdc = false\n");
+			fwrite($fi,"dns_lookup_realm = false\n");
+			fwrite($fi,"[domain_realm]\n");
+			fwrite($fi,".".strtolower($_PPTP_ADDOMAIN)."=".strtoupper($_PPTP_ADDOMAIN)."\n");
+			fwrite($fi,"".strtolower($_PPTP_ADDOMAIN)."=".strtoupper($_PPTP_ADDOMAIN)."\n");
+			fwrite($fi,"[realms]\n");
+			fwrite($fi,"".strtoupper($_PPTP_ADDOMAIN)." = {\n");
+			fwrite($fi,"default_domain = ".strtolower($_PPTP_ADDOMAIN)."\n");
+			fwrite($fi,"kdc = $_PPTP_ADIP\n");
+			fwrite($fi,"}\n");
+			fclose($fi);
+			@copy("/etc/krb5.conf.tmp","/etc/krb5.conf");
+			@unlink("/etc/krb5.conf.tmp");
+		}
+	}
+	echo "Writing PPTP config..\n";
+	slog("INIT: Writing PPTP config");
+	return 0;
+}
+
+function pptp_status() {
+	$pid=get_progpid("pptpd");
+	if($pid!='') {
+		echo "pptpd (pid $pid) is running...\n";
+		return 0;
+	}
+	echo "pptpd not running..\n";
+	return 1;
+}
+
+function pptp_start() {
+	global $_PPTP_STAT, $_PPTP_USEAD;
+	global $_PPTP_ADDOMAIN, $_PPTP_ADADMIN, $_PPTP_ADPASS, $_PPTP_ADIP;
+	@pptp_config();
+	if($_PPTP_STAT==0) {
+		echo "PPTP agent disabled\n";
+		slog("INIT: PPTP agent disabled");
+		exit(1);
+	}
+	if(@pptp_status()==1) {
+		if(exec_cmd("pptpd")==0) {
+			echo "Starting PPTP agent\n";
+			slog("INIT: Starting PPTP agent");
+			@touch("/var/sys/.chk_pptp");
+			if($_PPTP_USEAD==1) {
+				if(exec_cmd("winbindd")==0) {
+					slog("INIT: Starting WINS service");
+					$ntime=time()+60*1;
+					save_to_file("/var/sys/.chkadsjoin","$ntime\n");
+					exec_bg("/service/tools/adschk.exc");
+					if(exec_cmd("net join -w $_PPTP_ADDOMAIN -S $_PPTP_ADIP -U$_PPTP_ADADMIN%$_PPTP_ADPASS >>/var/log/log.winbindd 2>&1")==0) {
+						echo "Join to AD Domain\n";
+						slog("INIT: Join to AD Domain");
+					} else {
+						echo "Join to AD Domain failed\n";
+						slog("INIT: Join to AD Domain failed");
+					}
+				}
+			}
+			@touch("usr/smb/private/smbpasswd");
+			echo "Starting Netbios service\n";
+			slog("INIT: Starting Netbios service");
+			exec_quite("nmbd -D");
+			echo "Starting SMB service\n";
+			slog("INIT: Starting SMB service");
+			exec_quite("smbd -D");
+			@touch("/var/log/wtmp");
+			return 0;
+		}
+	}
+	echo "Starting PPTP agent failed\n";
+	slog("INIT: Starting PPTP agent failed");
+	return 1;
+}
+
+function pptp_stop() {
+	global $_PPTP_USEAD;
+	@killall("bcrelay");
+	if(killall("pptpd")==0) {
+		echo "Shutting down PPTP agent\n";
+		@unlink("/var/sys/.chk_pptp");
+		if($_PPTP_USEAD==1) {
+			if(killall("winbindd")==0) {
+				echo "Shutting down WINS agent\n";
+				slog("INIT: Shutting down WINS agent");	
+			}
+			sleep(1);
+		}
+		if(killall("nmbd")==0) {
+			echo "Shutting down Netbios agent\n";
+			slog("INIT: Shutting down Netbios agent");
+		}
+		if(killall("smbd")==0) {
+			echo "Shutting down SMB agent\n";
+			slog("INIT: Shutting down SMB agent");
+		}
+		return 0;
+	}
+	@unlink("/var/sys/.chkadsjoin");
+	@unlink("/var/log/wtmp");
+	emptydir("/etc/ppp");
+	emptydir("/etc/samba");
+	@unlink("/etc/pptpd.conf");
+	@unlink("/etc/krb5.conf");
+	echo "Shutting down PPTP agent failed\n";
+	slog("INIT: Shutting down PPTP agent failed");
+	return 1;
+}
+
+function pptp_active($set) {
+	global $db_id;
+	db_query("update pptp set stat='$set'",$db_id);
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=pptp_start();
+		break;
+	case 'stop':
+		$ret=pptp_stop();
+		break;
+	case 'restart':
+		$ret=pptp_stop();
+		sleep(2);
+		$ret=pptp_start();
+		break;
+	case 'status':
+		$ret=pptp_status();
+		break;
+	case 'config':
+		$ret=pptp_config();
+		break;
+	case 'enable':
+		pptp_active('1');
+		echo "PPTP agent enabled.\n";
+		slog("INIT: PPTP agent enabled.");
+		$ret=0;
+		break;
+	case 'disable':
+		pptp_active('0');
+		echo "PPTP agent disabled.\n";
+		slog("INIT: PPTP agent disabled.");
+		$ret=0;
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/status/config/{enable,disable}]\n";
+		break;
+}
+flush();
+exit($ret);
+?>

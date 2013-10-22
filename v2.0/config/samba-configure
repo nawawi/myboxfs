@@ -1,0 +1,18 @@
+make distclean
+./configure --prefix=/usr/smb --disable-nsl --build=i686-mybox-linux --host=i686-mybox-linux \
+--with-privatedir=/usr/smb/private \
+--with-lockdir=/usr/smb/locks \
+--with-piddir=/var/run \
+--with-libdir=/usr/smb/lib \
+--with-logfilebase=/var/log \
+--with-libsmbclient=no \
+--with-utmp=no \
+--with-winbind \
+--disable-cups \
+--with-syslog \
+--with-included-popt \
+--with-ads \
+--with-ldap \
+--with-configdir=/etc/samba \
+--with-sys-quotas=no \
+--disable-xmltest

@@ -1,0 +1,38 @@
+#!/bin/bash
+ROOT_DIR=$(pwd)
+SRC_DIR=$ROOT_DIR/service
+DST_DIR=$ROOT_DIR/service_enc
+
+cd $ROOT_DIR
+rm -rfv $DST_DIR
+if [ ! -d "$DST_DIR" ]; then
+	mkdir -p $DST_DIR
+fi
+
+# --encoded-only \
+
+/usr/local/Zend/bin/zendenc \
+--quiet  \
+--recursive \
+--short-tags on \
+--ignore-errors \
+--asp-tags off \
+--optimizations 1023 \
+--no-default-extensions \
+--include-ext html \
+--include-ext so \
+--include-ext inc \
+--include-ext php \
+--include-ext exc \
+--include-ext jse \
+--include-ext lang \
+--include-ext init \
+--no-header \
+--ignore "CVS" \
+--ignore ".cvsignore"  \
+--ignore ".backup"  \
+$SRC_DIR \
+$DST_DIR
+
+cd $ROOT_DIR
+sh license_encode

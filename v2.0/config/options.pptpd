@@ -1,0 +1,16 @@
+name mybox-vpn
+noauth
+refuse-pap
+refuse-chap
+refuse-mschap
+require-mschap-v2
+require-mppe-128
+#ms-wins 10.0.0.3
+#ms-wins 10.0.0.4
+defaultroute
+proxyarp
+dump
+lock
+nobsdcomp
+#plugin /lib/winbind.so
+ntlm_auth-helper '/usr/bin/ntlm_auth --helper-protocol=ntlm-server-1'

@@ -1,0 +1,35 @@
+cp configure configure.TMP
+cat configure | sed 's/LIBS=\"-lcrypto/LIBS=\"..\/..\/uclibc\/lib\/libcrypt.a/g' >TEMP
+cat TEMP > configure
+
+./configure --prefix=/usr --disable-shared-version \
+--with-default-snmp-version=1 \
+--with-sysconfdir=/etc \
+--with-sys-contact="MFS" \
+--with-sys-location="MFS" \
+--enable-mini-agent \
+--without-kmem-usage \
+--with-logfile=/var/log \
+--disable-manuals \
+--disable-scripts \
+--disable-debugging \
+--disable-privacy \
+--disable-mibs \
+--disable-testing-code \
+--disable-ipv6 \
+--with-out-transports="TCP Unix" \
+--with-persistent-directory=/var/net-snmp \
+--without-rpm \
+--without-opaque-special-types \
+--without-openssl \
+--without-dmalloc \
+--without-openssl \
+--without-efence \
+--without-rsaref \
+--with-out-mib-modules="mibII snmpv3mibs utilities target agent_mibs agentx notification" \
+--with-mib-modules="mibII/interfaces mibII/var_route ucd-snmp/vmstat" \
+--enable-ucd-snmp-compatibility \
+--disable-nsl \
+--build=i686-mybox-linux --host=i686-mybox-linux
+
+mv configure.TMP configure

@@ -1,0 +1,4 @@
+make clean
+make distclean
+make NETEM_DIST="" \
+SUBDIRS="lib tc ip" install

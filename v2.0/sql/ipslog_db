@@ -1,0 +1,23 @@
+begin transaction;
+create table portscanlog (
+id integer primary key,
+sid int not null,
+ltime varchar not null,
+proto varchar not null,
+msg varchar not null,
+src varchar not null,
+dst varchar not null
+);
+create table idslog (
+id integer primary key,
+sid int not null,
+ltime varchar not null,
+sig varchar not null,
+msg varchar not null,
+proto varchar not null,
+src varchar not null,
+srcp int not null,
+dst varchar not null,
+dstp int not null
+);
+commit;

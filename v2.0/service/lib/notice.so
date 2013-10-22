@@ -1,0 +1,10 @@
+<?
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("closed. not parent");
+
+
+function send_notice() {
+	$date=date('d/m/Y H:i:s');
+	
+}
+
+?>

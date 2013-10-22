@@ -1,0 +1,42 @@
+#!/bin/bash -e
+
+START_POINT=$(pwd)
+cd $START_POINT
+FS=$START_POINT/core_fs
+KERNEL=$START_POINT/kernel_base/mfs-kernel
+mkdir -p mnt
+
+sh zend_encode
+cp -av service_enc/* $START_POINT/core_fs/service/
+
+TOTAL=$(du -kc $FS |grep total |tr -s '\t' ':' |cut -d ':' -f 1)
+PP=$TOTAL
+PE=$PP
+#PE=$(expr $PP / 1024)
+echo "IMAGE SIZE=$TOTAL KB"
+sleep 2
+if [ -z "$PE" ]; then
+exit
+fi
+dd if=/dev/zero of=boot count=$PE bs=1024
+mkfs.minix boot
+mount boot mnt -t minix -o loop
+# mount initrd mnt -t ext2 -o loop
+if [ $? != 0 ]; then
+	echo "not mount"
+	exit
+fi
+
+rm -rf $FS/usr/share/{nmap,snmp,zoneinfo,kbd,smb} $FS/usr/snort_rules
+cp -va $FS/* mnt/
+sync
+umount mnt
+#gzip -9 boot
+cat boot |gzip -9 >boot.img
+sync
+IMGZ=$(du -kc boot.img |grep total |tr -s '\t' ':' |cut -d ':' -f 1)
+IMGN=$(du -kc boot |grep total |tr -s '\t' ':' |cut -d ':' -f 1)
+echo "boot.img=$IMGZ boot=$IMGN"
+mv -v boot.img build/mfs.img
+cp -v $KERNEL build
+rm -rf boot mnt

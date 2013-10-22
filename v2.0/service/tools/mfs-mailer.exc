@@ -1,0 +1,146 @@
+#!/bin/php -q
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once("clib.so");
+putenv("PATH=/bin:/service/tools:/service/init");
+
+if(mfs_license('OK_FILE')==-1) {
+	echo "No license file.\n";
+	exit(1);
+}
+
+if(mfs_license('OK_KEY')==-2) {
+	echo "Invalid license Key.\n";
+	exit(1);
+}
+
+
+if(mfs_license('OK_TIME')==-3) {
+	echo "License expired.\n";
+	exit(1);
+}
+
+@shell_exec("rm -f /var/spool/mqueue/* >/dev/null 2>&1");
+
+$db_id=db_connect($_DB_NAME);
+$domain=trim(file_get_contents("/proc/sys/kernel/domainname"));
+if($domain=='') $domain='mybox.net.my';
+$_stat=0;
+$_report_names=array();
+$result=db_query("select * from alert_setting",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_stat=$row['stat'];
+		$_report_min=$row['report_min'];
+		$_report_title=$row['report_title'];
+		$_report_logs=$row['report_logs'];
+		$_report_strg=$row['report_strg'];
+		$_report_mem=$row['report_mem'];
+		$_report_sys=$row['report_sys'];
+		$_report_title=unescape_str($_report_title);
+		$_report_namess=$row['report_names'];
+	}
+	$_pp=preg_split("/,/",$_report_namess);
+	if(count($_pp)!=0) {
+		foreach($_pp as $_p) $_report_names[$_p]=1;
+	}
+}
+if($_stat==0) exit(1);
+$_to='';
+$result=db_query("select email,stat from alert_email where stat='1'",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_email=trim($row['email']);
+		$_to .="$_email,";
+	}
+}
+db_close($db_id);
+if($_to=='') exit(1);
+
+$_to=trim($_to,",");
+
+$_uname1=trim(shell_exec("uname"),"\n");
+$_uname2=trim(shell_exec("uname -v"),"\n");
+$_datel=trim(shell_exec("date"),"\n");
+$_dateu=trim(shell_exec("date -u"),"\n");
+$_uptime=trim(shell_exec("uptime"),"\n");
+$_df=trim(shell_exec("df -kh"),"\n");
+$_dflogs=trim(shell_exec("du -hc /strg/mybox/logs"),"\n");
+$_mem=trim(shell_exec("free"),"\n");
+$_update=trim(file_get_contents("/etc/firmware"));
+if($_update!='') $_update="UPDATE: $_update";
+$_ldate=date('Ymd');
+
+if($fi=popen("/bin/sendmail -t","w")) {	
+	fwrite($fi,"From: \"Mybox Notification\" <mfs@$domain>\n");
+	fwrite($fi,"To: $_to\n");
+	fwrite($fi,"Subject: $_report_title\n");
+	fwrite($fi,"MIME-Version: 1.0\n");
+	fwrite($fi,"Content-Type: text/html;charset=\"iso-8859-1\"\n");
+	fwrite($fi,"X-Priority: 1\n");
+	fwrite($fi,"X-MSMail-Priority: High\n");
+	fwrite($fi,"X-Mailer: Mybox Firewall System Mailer\n\n");
+
+	fwrite($fi,"<PRE style='font-family: courier new, courier;white-space: pre;font-size: 12px;'>\n");
+	if($_report_sys==1) {
+		fwrite($fi,"=============================================================================\n");
+		fwrite($fi," SYSTEM STATUS\n");
+		fwrite($fi,"=============================================================================\n");
+		fwrite($fi,"DATE   : $_datel\n");
+		if($_dateu!=$_datel) {
+			fwrite($fi,"       : $_dateu\n");
+		}
+		fwrite($fi,"\n");
+		fwrite($fi,"SYSTEM : $_uname1\n");
+		fwrite($fi,"       : $_uname2 $_update\n\n");
+		fwrite($fi,"UPTIME : $_uptime\n\n");
+	}
+	if($_report_strg==1) {
+		fwrite($fi,"=============================================================================\n");
+		fwrite($fi," STORAGE STATUS(1)\n");
+		fwrite($fi,"=============================================================================\n");
+		fwrite($fi,"$_df\n\n");
+		fwrite($fi,"=============================================================================\n");
+		fwrite($fi," STORAGE STATUS(2)\n");
+		fwrite($fi,"=============================================================================\n");
+		fwrite($fi,"$_dflogs\n\n");
+	}
+	if($_report_mem==1) {
+		fwrite($fi,"=============================================================================\n");
+		fwrite($fi," MEMORY STATUS\n");
+		fwrite($fi,"=============================================================================\n");
+		fwrite($fi,"$_mem\n\n");
+	}
+	if($_report_logs==1) {
+		$ok=0;
+		fwrite($fi,"=============================================================================\n");
+		fwrite($fi," LOCAL LOGS SUMMARY\n");
+		fwrite($fi,"=============================================================================\n");
+
+		foreach($_LOG_NAME as $_LIST) {
+			list($_title,$lgname)=preg_split("/\|/",$_LIST);
+			if($_report_names[$lgname]!=1) continue;
+			$logs="{$lgname}-{$_ldate}.log";
+			if(file_exists("$_LOG_PATH/$logs")) {
+				shell_exec("logtail $_LOG_PATH/$logs $_LOG_PATH/$logs.offset |sort -r > $_LOG_PATH/$logs.sum");
+				if(file_exists("$_LOG_PATH/$logs.sum")) {
+					$buff=trim(file_get_contents("$_LOG_PATH/$logs.sum"));
+					if($buff!='') {
+						fwrite($fi,"<u>$_title</u>:\n\n");
+						fwrite($fi,"$buff\n\n");
+						$ok++;
+					}
+					@unlink("$_LOG_PATH/$logs.sum");
+				}
+			}
+			unset($_title,$lgname,$buff);
+		}
+		if($ok==0) fwrite($fi,"No new logs\n\n");
+	}
+	fwrite($fi,"</PRE>\n");
+	fwrite($fi,"\n\n.\n");
+	pclose($fi);
+}
+
+exit(0);
+?>

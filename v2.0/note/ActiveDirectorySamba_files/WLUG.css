@@ -1,0 +1,303 @@
+# 1 ""
+@import url(WLUG-heavy.css);
+body { background: #fafafa url("images/bgpaper8.png"); }
+
+body.edit { background: #fafafa url("images/bggranular.png"); }
+
+.wikitext > table {
+	border-collapse: collapse;
+}
+body { }
+
+h1, h2, h3, h4, .toolbar, td { font-family: sans-serif;  }
+
+input.button { font-family: sans-serif; }
+
+input.numeric {
+  text-align: right;
+}
+
+.wikitext pre { font-family: monospace; font-size: medium; }
+.wikitext { font-size: smaller; }
+
+div.wikitext {
+  background: white;
+  border: 1px solid black;
+  font-family: sans-serif; 
+  border-top:    1px solid #7c7c7c;
+  border-left:   1px solid #c3c3c3;
+  border-bottom: 1px solid #dddddd;
+  border-right:  1px solid #c3c3c3;
+  padding-left: 0.8em; 
+  padding-right: 0.8em; 
+  padding-top: 0.5em;
+  padding-bottom: 0.5em;
+  margin: 0.5ex 0px;
+ clear: both;
+}
+
+input.wikitext { margin:0px; }
+
+
+
+div.toolbar { margin: 1ex 0ex; }
+
+.interwiki-map thead td {
+  background: #e8e8e8;
+  font-weight: bold;
+  font-size: smaller;
+}
+
+.interwiki-map thead td:first-child { text-decoration: underline; }
+
+.interwiki-moniker { background: #eee; }
+
+.interwiki-url { background: #f8f8f8; }
+
+div.errors {
+ background: #eee;
+ border: medium;
+ border-color: red;
+ border-style: solid;
+ padding-left: 0.8em; 
+ padding-right: 0.8em; 
+ padding-top: 0px;
+ padding-bottom: 0px;
+ margin: 1em;
+ clear: both;
+}
+
+.errors h4 {
+ color:red;
+ text-decoration: underline;
+ margin:0px;
+}
+
+p.error {
+ font-size: smaller;
+ font-family: monospace;;
+ margin:0px;
+}
+
+.error ul
+{
+ font-size: smaller;
+ font-family: monospace;;
+}
+
+.wikitext hr {}
+
+a.wiki { text-decoration: none; }
+
+.wiki, .named-wiki  { font-weight: bold; color:#1d42be; }  
+
+.wikiunknown a, .named-wikiunknown a, .wikiunknown U
+
+{ text-decoration: none; }
+
+.wikiunknown, .named-wikiunknown
+{color: #555; }
+
+a.interwiki { text-decoration: none; }
+
+.wikipage   { font-weight: bold; }
+
+.interwiki,
+i .interwiki .wikipage, em .interwiki .wikipage
+{ font-style: oblique; }
+.interwiki .wikipage,
+i .interwiki, em .interwiki  
+{ font-style: normal; }
+a.wikiaction, a.wikiadmin       { text-decoration: none; }
+img.linkicon, img.rssicon	{ border: 0px; }
+img.rssicon		{ vertical-align: middle; }
+img.wiki-button		{ vertical-align: middle; }
+.wikiaction { border: 0; }
+a.backlinks { color: #006; }
+textarea.wikiedit { width: 100%; margin-top: 1ex; }
+p.editdate { font-size: smaller; margin-bottom: -1ex; font-family: sans-serif; }
+a.cal-hide,
+ a.cal-arrow { text-decoration: none; }
+.cal-arrow   { font-weight: bold; }
+.cal-dayname { font-size: smaller;
+               text-decoration: none; }
+table.cal   {
+  border: 1px solid black;
+  border-top:    1px solid #7c7c7c;
+  border-left:   1px solid #c3c3c3;
+  border-bottom: 1px solid #dddddd;
+  border-right:  1px solid #c3c3c3;
+  background: #bebebe;
+} 
+
+table.cal td {
+  background: white;
+  border: 1px solid black;
+  border-top:    1px solid #7c7c7c;
+  border-left:   1px solid #c3c3c3;
+  border-bottom: 1px solid #dddddd;
+  border-right:  1px solid #c3c3c3;
+}
+
+table.cal-header td {
+  font-size:  larger;
+  background: white;
+  border: 0px; }
+
+table.cal td.cal-dayname { background: #f4f4f4; }
+
+table.cal td.cal-today {
+  background:    #f4f4f4;
+  border: 1px solid black;
+  border-top:    1px solid #7c7c7c;
+  border-left:   1px solid #c3c3c3;
+  border-bottom: 1px solid #dddddd;
+  border-right:  1px solid #c3c3c3;
+}
+
+.transclusion-title {
+  font-family: sans-serif;
+  font-size: smaller;  
+  text-decoration: underline;
+  text-align: right;
+} 
+
+div.transclusion { 
+  background: #fdfdfd;
+  border: 1px solid black;
+  border-top:    1px solid #7c7c7c;
+  border-left:   1px solid #c3c3c3;
+  border-bottom: 1px solid #dddddd;
+  border-right:  1px solid #c3c3c3;
+  padding-left:  0.8em; 
+  padding-right: 0.8em; 
+  padding-top:    0px;
+  padding-bottom: 0px;
+  margin: 0.5ex ;
+}
+
+div.wiki-edithelp .transclusion {
+  font-size: smaller;
+  background: inherit;
+  padding: 0.5ex 0.5em;
+  margin: 0.2ex 5%;
+}
+
+div.wiki-edithelp .transclusion p {
+  margin: 0;
+}
+
+div.wiki-edithelp {
+  background: white;
+  border: 1px solid black;
+  border-top:    1px solid #7c7c7c;
+  border-left:   1px solid #c3c3c3;
+  border-bottom: 1px solid #dddddd;
+  border-right:  1px solid #c3c3c3;
+  font-size: smaller;
+  padding: 6pt;
+}
+
+div.wiki-message {
+  background: #fff url("images/bggranular.png");
+  border: solid 1px #d8d8d8;
+  padding: 6pt;
+}
+
+.printer { display: none; }
+
+.diff {
+  background: white;
+  border: 1px solid black;
+  border-top:    1px solid #7c7c7c;
+  border-left:   1px solid #c3c3c3;
+  border-bottom: 1px solid #dddddd;
+  border-right:  1px solid #c3c3c3;
+}
+
+.diff .block {
+  background: #ccc;
+}
+
+.diff .context {
+  background: white;
+  border: none;
+}
+
+.diff .block tt {
+  font-weight: normal;
+  font-family: monospace;;
+  margin-left: -0.6em;
+  color: black;
+  border: none;
+}
+
+.diff del, .diff ins {
+  font-weight: bold;
+  text-decoration: none;
+}
+
+.diff .original, .diff .deleted,
+
+.diff .final, .diff .added {
+  background: white;
+}
+
+.diff .original, .diff .deleted {
+  background: white;
+  border: 2px solid #f99;  
+}
+
+.diff .final, .diff .added {
+  background: white;
+  border: 2px solid #9f9;  
+}
+
+.diff del { background: #fcc; }  
+
+.diff ins { background: #cfc; }  
+
+.pagelist tr.evenrow { background: #eee; }
+
+.pagelist tr.oddrow  { background: #f7f7f7; }
+
+div.sidebar > h2, h3 {
+	font-size: medium;
+}
+
+div.sidebar > * > UL {
+	margin-left: 2pt;
+	padding-left: 2pt;
+}
+
+div.sidebar {
+  /* background: #f8f8f8; */
+  background: #ffffff;
+  border: 1px solid black;
+  font-family: sans-serif;
+  font-size: smaller;
+  font-size-adjust: .58;
+  border-top:    1px solid #7c7c7c;
+  border-left:   1px solid #c3c3c3;
+  border-bottom: 1px solid #dddddd;
+  border-right:  1px solid #c3c3c3;
+  padding-left: 0.8em;
+  padding-right: 0.8em;
+  padding-top: 0.5em;
+  padding-bottom: 0.5em;
+  margin: 0.5ex 0px;
+  clear: both;
+  overflow: auto;
+}
+
+div.sidebartext {
+  /* background: #f8f8f8; */
+  background: #ffffff;
+  font-family: sans-serif;
+  font-size: smaller;
+  font-size-adjust: .58;
+  margin: 0.5ex 0px;
+  clear: both;
+  overflow: visible;
+}
+

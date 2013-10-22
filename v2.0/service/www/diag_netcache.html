@@ -1,0 +1,219 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.so');
+chk_session();
+write_nocache();
+
+$_SYSID="diag_netcache";
+
+$db_id=db_connect($_DB_NAME);
+
+if(chk_pri($_LOGIN['auth_id'],2)==1 && isset($do_save)&&$do_save!='') {
+	if($tab==1) {
+		if($fi=popen("dnet arp show","r")) {
+			while($buff=fgets($fi,1024)) {
+				$buff=trim($buff);
+				if($buff=='') continue;
+				list($addr,$hw)=preg_split("/at/",$buff);
+				$addr=trim($addr);
+				if($addr!='') {
+					exec_quite("dnet arp delete $addr");
+				}
+				unset($addr,$hw);
+			}
+			pclose($fi);
+			sleep(2);
+		}
+	}
+	if($tab==2) {
+		exec_quite("ip route flush cache");
+		sleep(2);
+	}
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied!.";
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script language="javascript" src="<?echo $_URL_PATH;?>/j/strings.js"></script>
+<script language="javascript">
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+</script>
+<script language="javascript">
+function do_submit() {
+	document.f.btsubmit.disabled=true;
+	document.f.do_save.value='1';
+	document.f.submit();
+	return true;
+}
+
+var k=0;
+function waitcount() { 
+ 	k=k+2;
+	if(k <= 100) {
+    		msg.innerHTML='Reloading.. Please wait..'+k+'%'; 
+    		setTimeout(waitcount,200);  
+	} else {
+		self.location.href='<?echo "$_URL_PATH/diag_netcache.html?tab=$tab";?>';
+	}
+}
+</script>
+</head>
+<body scroll=auto>
+<form name=f method=post action="<?echo "$_URL_PATH/diag_netcache.html";?>" onsubmit="return do_submit();">
+<table border="0" cellpadding="4" cellspacing="4" width="700" align=center>
+<tr>
+<td align=center>
+
+<!-- main -->
+<fieldset>
+<legend>&nbsp;&nbsp;&nbsp;&nbsp;
+DIAGNOSTIC: NETWORK CACHE
+&nbsp;&nbsp;&nbsp;&nbsp;</legend>
+
+<table valign=top border=0>
+<tr>
+<td>
+<table border=0 cellpadding="2" cellspacing="2">
+<tr>
+<td align=center valign=middle>
+
+<table width="650" border="0" cellpadding="0" cellspacing="0">
+<tr><td>
+<ul id="tabnav">
+<li class="<?if($tab==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=1) { echo "<a href=\"$_URL_PATH/diag_netcache.html?tab=1\">"; }?>ARP<?if($tab!=1) { echo "</a>"; }?></li>
+<li class="<?if($tab==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=2) { echo "<a href=\"$_URL_PATH/diag_netcache.html?tab=2\">"; }?>Routes<?if($tab!=2) { echo "</a>"; }?></li>
+</ul>
+</td></tr>
+<tr> 
+<td class="tabcont">
+
+<?if($tab==1) { ?>
+
+<?if($msg!='') {?>
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span id=msg class=notice><?echo "$msg";?></span></td></tr>
+</table><br>
+<? }?>
+
+<table border="0" cellpadding="2" cellspacing="2" width="98%" align=center class=tablist>
+<tr class=bgcolor3>
+<td class=tdlistop width=1>#</td>
+<td class=tdlistop>IP Address</td>
+<td class=tdlistop>MAC Address</td>
+</tr>
+<?
+$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background:#ffffff;cursor:hand;'";
+			
+exec("dnet arp show",$out,$ret);
+if(count($out)!=0) {
+	$i=1;
+	foreach($out as $line) {
+		list($ip,$mac)=preg_split("/at/",$line);
+		$ip=trim($ip);
+		$mac=trim($mac);
+		echo "<tr $lt>";
+		echo "<td width=1>$i</td>";
+		echo "<td>$ip</td>";
+		echo "<td>$mac</td></tr>";
+		$i++;
+	}
+}
+?>
+<tr><td colspan=3 align=right>
+<input name=btsubmit type="submit" value="Flush Cache" class="button-small">
+</td></tr>
+</table>
+
+<? } // tab==1 ?>
+
+
+
+<?if($tab==2) { ?>
+
+<?if($msg!='') {?>
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span id=msg class=notice><?echo "$msg";?></span></td></tr>
+</table><br>
+<? }?>
+
+<table border="0" cellpadding="2" cellspacing="2" width="98%" align=center class=tablist>
+<tr class=bgcolor3>
+<td class=tdlistop width=1>#</td>
+<td class=tdlistop>Type</td>
+<td class=tdlistop>Source</td>
+<td class=tdlistop>Destination</td>
+</tr>
+
+<?
+exec("ip route show cache",$out,$ret);
+$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background:#ffffff;cursor:hand;'";
+
+if(count($out)!=0) {
+	$i=1;
+	foreach($out as $line) {
+		if(preg_match("/cache/",$line)) continue;
+		if(preg_match("/(\S+)\s+(\d+\.\d+\.\d+\.\d+)\s+from\s+(\d+\.\d+\.\d+\.\d+)/",$line,$mm)) {
+			$type=$mm[1];
+			$src=$mm[2];
+			$dst=$mm[3];
+			echo "<tr $lt>";
+			echo "<td width=1>$i</td>";
+			echo "<td>$type</td>";
+			echo "<td>$src</td>";
+			echo "<td>$dst</td></tr>";
+			$i++;
+		} elseif(preg_match("/(\d+\.\d+\.\d+\.\d+)\s+from\s+(\d+\.\d+\.\d+\.\d+)/",$line,$mm)) {
+			$type="ip";
+			$src=$mm[1];
+			$dst=$mm[2];
+			echo "<tr $lt>";
+			echo "<td width=1>$i</td>";
+			echo "<td>$type</td>";
+			echo "<td>$src</td>";
+			echo "<td>$dst</td></tr>";
+			$i++;
+		}
+	}
+}
+?>
+<tr><td colspan=4 align=right>
+<input name=btsubmit type="submit" value="Flush Cache" class="button-small">
+</td></tr>
+</table>
+
+<? } // tab==2 ?>
+
+</td>
+</tr>
+
+</table>
+
+</td>
+</tr>
+</table>
+
+<!-- end main -->
+
+</td>
+</tr>
+</table>
+</fieldset>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?echo $tab;?>>
+</form>
+</body>
+</html>
+
+<?db_close($db_id); flush();?>

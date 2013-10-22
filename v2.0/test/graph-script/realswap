@@ -1,0 +1,38 @@
+update /var/www/html/cacti-0.8.6c/rra/localhostsnmp_hdd_total_457.rrd --template hdd_total:hdd_used 1112178002:1073733632:147456
+
+/usr/bin/rrdtool create \
+/var/www/html/cacti-0.8.6c/rra/localhostsnmp_hdd_total_457.rrd \
+--step 300  \
+DS:hdd_used:GAUGE:600:0:U \
+DS:hdd_total:GAUGE:600:0:U \
+RRA:AVERAGE:0.5:1:600 \
+RRA:AVERAGE:0.5:6:700 \
+RRA:AVERAGE:0.5:24:775 \
+RRA:AVERAGE:0.5:288:797 \
+RRA:MAX:0.5:1:600 \
+RRA:MAX:0.5:6:700 \
+RRA:MAX:0.5:24:775 \
+RRA:MAX:0.5:288:797 \
+
+/usr/bin/rrdtool graph - \
+--imgformat=PNG \
+--start=-86400 \
+--end=-300 \
+--title="localhost-snmp - Used Space - Swap Space" \
+--rigid \
+--base=1024 \
+--height=120 \
+--width=500 \
+--alt-autoscale-max \
+--lower-limit=0 \
+--vertical-label="bytes" \
+DEF:a="/var/www/html/cacti-0.8.6c/rra/localhostsnmp_hdd_total_457.rrd":hdd_total:AVERAGE \
+DEF:b="/var/www/html/cacti-0.8.6c/rra/localhostsnmp_hdd_total_457.rrd":hdd_used:AVERAGE \
+AREA:a#002A97:"Total"  \
+GPRINT:a:LAST:"Current\:%8.2lf %s"  \
+GPRINT:a:AVERAGE:"Average\:%8.2lf %s"  \
+GPRINT:a:MAX:"Maximum\:%8.2lf %s\n"  \
+AREA:b#F51D30:"Used"  \
+GPRINT:b:LAST:" Current\:%8.2lf %s"  \
+GPRINT:b:AVERAGE:"Average\:%8.2lf %s"  \
+GPRINT:b:MAX:"Maximum\:%8.2lf %s\n" 

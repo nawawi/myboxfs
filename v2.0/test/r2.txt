@@ -1,0 +1,40 @@
+-A INTERNIC -i eth0 -o eth1 -j INBOUND
+-A INTERNIC -i eth0 -o eth2 -j INBOUND
+-A INTERNIC -i eth0 -o eth3 -j INBOUND
+-A INTERNIC -i eth1 -o eth2 -j INBOUND
+-A INTERNIC -i eth1 -o eth3 -j INBOUND
+-A INTERNIC -i eth2 -o eth3 -j INBOUND
+-A INTERNIC -i eth3 -o eth2 -j OUTBOUND
+-A INTERNIC -i eth3 -o eth1 -j OUTBOUND
+-A INTERNIC -i eth3 -o eth0 -j OUTBOUND
+-A INTERNIC -i eth2 -o eth1 -j OUTBOUND
+-A INTERNIC -i eth2 -o eth0 -j OUTBOUND
+-A INTERNIC -i eth1 -o eth0 -j OUTBOUND
+
+<?
+$IN=array();
+$OUT=array();
+
+foreach(array("eth0","eth1","eth2","eth3") as $a) {
+        $i=$a{3};
+        foreach(array("eth0","eth1","eth2","eth3") as $b) {
+                $x=$b{3};
+
+                if($i < $x) {
+                        $IN[]="-A INTERNIC -i $a -o $b -j INBOUND";
+                }
+                if($i > $x) {
+                        $OUT[]="-A INTERNIC -i $a -o $b -j OUTBOUND";
+                }
+        }
+}
+
+foreach($IN as $l) {
+        echo "$l\n";
+}
+
+foreach($OUT as $g) {
+        echo "$g\n";
+}
+
+?>

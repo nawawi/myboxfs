@@ -1,0 +1,74 @@
+update /var/www/html/cacti-0.8.6c/rra/localhostsnmp_mem_cache_452.rrd --template mem_cache 1112167202:140748
+update /var/www/html/cacti-0.8.6c/rra/localhostsnmp_mem_buffers_451.rrd --template mem_buffers 1112167202:98192
+update /var/www/html/cacti-0.8.6c/rra/localhostsnmp_mem_free_453.rrd --template mem_free 1112167202:7324
+
+/usr/bin/rrdtool create \
+/var/www/html/cacti-0.8.6c/rra/localhostsnmp_mem_buffers_451.rrd \
+--step 300  \
+DS:mem_buffers:GAUGE:600:0:10000000 \
+RRA:AVERAGE:0.5:1:600 \
+RRA:AVERAGE:0.5:6:700 \
+RRA:AVERAGE:0.5:24:775 \
+RRA:AVERAGE:0.5:288:797 \
+RRA:MAX:0.5:1:600 \
+RRA:MAX:0.5:6:700 \
+RRA:MAX:0.5:24:775 \
+RRA:MAX:0.5:288:797 \
+
+/usr/bin/rrdtool create \
+/var/www/html/cacti-0.8.6c/rra/localhostsnmp_mem_cache_452.rrd \
+--step 300  \
+DS:mem_cache:GAUGE:600:0:10000000 \
+RRA:AVERAGE:0.5:1:600 \
+RRA:AVERAGE:0.5:6:700 \
+RRA:AVERAGE:0.5:24:775 \
+RRA:AVERAGE:0.5:288:797 \
+RRA:MAX:0.5:1:600 \
+RRA:MAX:0.5:6:700 \
+RRA:MAX:0.5:24:775 \
+RRA:MAX:0.5:288:797 \
+
+/usr/bin/rrdtool create \
+/var/www/html/cacti-0.8.6c/rra/localhostsnmp_mem_free_453.rrd \
+--step 300  \
+DS:mem_free:GAUGE:600:0:10000000 \
+RRA:AVERAGE:0.5:1:600 \
+RRA:AVERAGE:0.5:6:700 \
+RRA:AVERAGE:0.5:24:775 \
+RRA:AVERAGE:0.5:288:797 \
+RRA:MAX:0.5:1:600 \
+RRA:MAX:0.5:6:700 \
+RRA:MAX:0.5:24:775 \
+RRA:MAX:0.5:288:797 \
+
+
+/usr/bin/rrdtool graph - \
+--imgformat=PNG \
+--start=-86400 \
+--end=-300 \
+--title="localhost-snmp - Memory Usage" \
+--rigid \
+--base=1000 \
+--height=120 \
+--width=500 \
+--alt-autoscale-max \
+--lower-limit=0 \
+--vertical-label="bytes" \
+DEF:a="/var/www/html/cacti-0.8.6c/rra/localhostsnmp_mem_free_453.rrd":mem_free:AVERAGE \
+DEF:b="/var/www/html/cacti-0.8.6c/rra/localhostsnmp_mem_buffers_451.rrd":mem_buffers:AVERAGE \
+DEF:c="/var/www/html/cacti-0.8.6c/rra/localhostsnmp_mem_cache_452.rrd":mem_cache:AVERAGE \
+CDEF:cdefa=a,1024,* \
+CDEF:cdefe=b,1024,* \
+CDEF:cdefi=c,1024,* \
+AREA:cdefa#8F005C:"Memory Free"  \
+GPRINT:cdefa:LAST:"   Current\:%8.2lf %s"  \
+GPRINT:cdefa:AVERAGE:"Average\:%8.2lf %s"  \
+GPRINT:cdefa:MAX:"Maximum\:%8.2lf %s\n"  \
+STACK:cdefe#FF5700:"Memory Buffers"  \
+GPRINT:cdefe:LAST:"Current\:%8.2lf %s"  \
+GPRINT:cdefe:AVERAGE:"Average\:%8.2lf %s"  \
+GPRINT:cdefe:MAX:"Maximum\:%8.2lf %s\n"  \
+STACK:cdefi#FFC73B:"Cache Memory"  \
+GPRINT:cdefi:LAST:"  Current\:%8.2lf %s"  \
+GPRINT:cdefi:AVERAGE:"Average\:%8.2lf %s"  \
+GPRINT:cdefi:MAX:"Maximum\:%8.2lf %s\n" 

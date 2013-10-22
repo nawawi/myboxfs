@@ -1,0 +1,3 @@
+#CC=icc ./configure --prefix=/usr --bindir=/bin --sbindir=/bin --with-bcrelay \
+./configure --prefix=/usr --bindir=/bin --sbindir=/bin --with-bcrelay \
+--disable-nsl --build=i686-mybox-linux --host=i686-mybox-linux

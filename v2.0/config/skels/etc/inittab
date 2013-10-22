@@ -1,0 +1,7 @@
+::sysinit:/etc/rc.init
+tts/0::respawn:/bin/getty -h -n -L tts/0 9600 vt100
+::restart:/bin/init
+::ctrlaltdel:/etc/rc.shutdown
+::ctrlaltdel:/bin/reset
+::ctrlaltdel:/bin/reboot
+::shutdown:/etc/rc.shutdown

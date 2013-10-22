@@ -1,0 +1,16 @@
+#CC=icc ./configure \
+./configure \
+--exec-prefix=/gcc \
+--bindir=/usr/bin \
+--sbindir=/usr/sbin \
+--libexecdir=/usr/lib \
+--sysconfdir=/etc \
+--datadir=/usr/share \
+--localstatedir=/var \
+--mandir=/usr/man \
+--infodir=/usr/info \
+--disable-dependency-tracking \
+--prefix=/usr \
+--disable-nsl \
+--build=i686-mybox-linux \
+--host=i686-mybox-linux

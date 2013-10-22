@@ -1,0 +1,1 @@
+./config --prefix=/usr no-krb5 shared 686

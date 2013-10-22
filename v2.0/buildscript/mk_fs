@@ -1,0 +1,300 @@
+#!/bin/bash -e
+
+START_POINT=$(pwd)
+cd $START_POINT
+ROOT_DIR=$START_POINT/core_fs
+BUSYBOX_SRC=$START_POINT/src/busybox
+MINISERV=$START_POINT/src/mini_httpd-1.19-awie/miniserv
+KERNEL_BASE=$START_POINT/kernel_base
+BINARY_LIST=$(cat $START_POINT/config/binlist)
+DROPBEAR_SRC=$START_POINT/src/dropbear-0.45
+SSHD_SRC=$START_POINT/src/openssh-3.8p1
+SKELS_PATH=$START_POINT/config/skels
+BASH_BIN=$START_POINT/src/bash-3.0/bash
+ZENDLIB=/usr/local/Zend/lib/Optimizer-2.5.7/php-5.0.x/ZendOptimizer.so
+KBD_LIB=/lib/kbd/keymaps/i386
+ZONE_INFO=/usr/share/zoneinfo
+LOGIN_UTIL=$START_POINT/src/login-awie
+PPP_LIB=/usr/lib/pppd/*/winbind.so
+PPTP_LIB=/usr/lib/pptpd/pptpd-logwtmp.so
+SENDMAIL_BIN=$START_POINT/src/sendmail-8.11.6/obj.Linux.*/sendmail/sendmail
+SYSLOG_SRC=$START_POINT/src/sysklogd-1.4.1
+DHCPD_SRC=$START_POINT/src/dhcp-3.0.1/work.linux-2.2/server/dhcpd
+SMB_DIR=/usr/smb
+
+rm -rfv $ROOT_DIR
+for x in $SKELS_PATH/*; do
+	if [ -d "$x" ]; then
+		cp -av $x $ROOT_DIR
+	fi
+done
+
+for t in /lib/libnss*_files*; do
+        cp -av $t $ROOT_DIR/lib
+        [ ! -L "$t" ] && strip $ROOT_DIR/lib/$(basename $t)
+done
+for t in /lib/libnss*_dns*; do
+        cp -av $t $ROOT_DIR/lib
+        [ ! -L "$t" ] && strip $ROOT_DIR/lib/$(basename $t)
+done
+
+
+for x in $BINARY_LIST; do
+	if [ -x "$x" ]; then
+        	sh $START_POINT/cp_bin "$x" "$ROOT_DIR"
+	else
+		echo "WARNING ==> $x not found"
+        fi
+done
+
+if [ ! -f "$ZENDLIB" ]; then
+	echo "$ZENDLIB not found"
+	exit
+else
+	cp -v $ZENDLIB $ROOT_DIR/lib
+	strip $ROOT_DIR/lib/$(basename $ZENDLIB)
+fi
+
+if [ ! -x "$MINISERV" ]; then
+	echo "miniserv not compile yet"
+	exit
+else
+	sh $START_POINT/cp_bin "$MINISERV" "$ROOT_DIR" 
+fi
+
+
+if [ ! -x "$BUSYBOX_SRC/busybox" ]; then
+	echo "busybox not compile yet"
+	exit
+else
+        BUSYBOXLINK="$(cat $BUSYBOX_SRC/busybox.links |sed -e 's/\/sbin\///g' -e 's/\/bin\///g' |grep -v '^\/')"
+        sh $START_POINT/cp_bin "$BUSYBOX_SRC/busybox" "$ROOT_DIR"
+        cd $ROOT_DIR/bin
+	for b in $BUSYBOXLINK; do
+                ln -sfv busybox $b
+        done
+fi
+
+if [ ! -d "$DROPBEAR_SRC" ]; then
+	echo "dropbear no compile yet"
+	exit
+else
+	sh $START_POINT/cp_bin "$DROPBEAR_SRC/sshd" "$ROOT_DIR"
+	sh $START_POINT/cp_bin "$DROPBEAR_SRC/sshdkey" "$ROOT_DIR"
+	sh $START_POINT/cp_bin "$DROPBEAR_SRC/sshdconvert" "$ROOT_DIR"
+fi
+
+if [ ! -d "$SSHD_SRC" ]; then
+	echo "OpenSSH no compile yet"
+	exit
+else
+	sh $START_POINT/cp_bin "$SSHD_SRC/scp" "$ROOT_DIR"
+	sh $START_POINT/cp_bin "$SSHD_SRC/ssh" "$ROOT_DIR"
+	#sh $START_POINT/cp_bin "$SSHD_SRC/sftp-server" "$ROOT_DIR"
+fi
+
+if [ ! -x "$BASH_BIN" ]; then
+	echo "bash not compile yet"
+	exit
+else
+	sh $START_POINT/cp_bin "$BASH_BIN" "$ROOT_DIR"
+fi
+
+if [ ! -d "$LOGIN_UTIL" ]; then
+	echo "awie login not compile yet"
+	exit	
+else
+        sh $START_POINT/cp_bin "$LOGIN_UTIL/login" "$ROOT_DIR"
+        sh $START_POINT/cp_bin "$LOGIN_UTIL/chkprog" "$ROOT_DIR"
+        sh $START_POINT/cp_bin "$LOGIN_UTIL/getkey" "$ROOT_DIR"
+        sh $START_POINT/cp_bin "$LOGIN_UTIL/logtail" "$ROOT_DIR"
+fi
+
+if [ ! -d "$SYSLOG_SRC" ]; then
+	echo "syslog not compile yet"
+	exit	
+else
+        sh $START_POINT/cp_bin "$SYSLOG_SRC/syslogd" "$ROOT_DIR"
+        sh $START_POINT/cp_bin "$SYSLOG_SRC/klogd" "$ROOT_DIR"
+fi
+
+if [ ! -x "$DHCPD_SRC" ]; then
+	echo "dhcpd not compile yet"
+	exit	
+else
+        sh $START_POINT/cp_bin "$DHCPD_SRC" "$ROOT_DIR"
+        sh $START_POINT/cp_bin "$DHCPD_SRC" "$ROOT_DIR"
+fi
+
+if [ ! -d "$SMB_DIR" ]; then
+	echo "samba not compile yet"
+	exit	
+else
+	cp -av $SMB_DIR $ROOT_DIR/usr
+	SMB_DIR2="$ROOT_DIR/usr/smb"
+	if [ "$SMB_DIR2" = "" ]; then
+		echo "SMB_DIR2 empty"
+		exit
+	fi
+	sh $START_POINT/cp_bin $SMB_DIR2/bin/net "$ROOT_DIR"
+	sh $START_POINT/cp_bin $SMB_DIR2/bin/ntlm_auth "$ROOT_DIR"
+	sh $START_POINT/cp_bin $SMB_DIR2/bin/wbinfo "$ROOT_DIR"
+	sh $START_POINT/cp_bin $SMB_DIR2/sbin/nmbd "$ROOT_DIR"
+	sh $START_POINT/cp_bin $SMB_DIR2/sbin/winbindd "$ROOT_DIR"
+	sh $START_POINT/cp_bin $SMB_DIR2/sbin/smbd "$ROOT_DIR"
+	mkdir -p $ROOT_DIR/var/log
+	strip -v $SMB_DIR2/lib/charset/*
+	rm -rfv $SMB_DIR2/sbin
+	rm -rfv $SMB_DIR2/bin
+	rm -rfv $SMB_DIR2/man
+	rm -rfv $SMB_DIR2/swat
+	rm -rfv $SMB_DIR2/var
+	rm -rfv $SMB_DIR2/lib/vfs
+	rm -rfv $SMB_DIR2/lib/rpc
+	rm -fv $SMB_DIR2/lib/*.msg
+fi
+
+cp -v $SENDMAIL_BIN /tmp
+sh $START_POINT/cp_bin "/tmp/sendmail" "$ROOT_DIR"
+rm -f /tmp/sendmail
+
+cd $ROOT_DIR/bin
+ln -sfv bash sh
+ln -sfv insmod modprobe
+ln -sfv insmod rmmod
+ln -sfv insmod lsmod
+ln -sfv gzip zcat
+#ln -sfv nano vi
+#ln -sfv nano pico
+#ln -sfv nano ed
+
+cd $START_POINT
+
+cp -v $START_POINT/bootscript/rc.bootup $ROOT_DIR
+cp -v $START_POINT/bootscript/rc.init $ROOT_DIR/etc
+cp -v $START_POINT/bootscript/rc.start $ROOT_DIR/etc
+cp -v $START_POINT/bootscript/rc.shutdown $ROOT_DIR/etc
+cp -v $START_POINT/bootscript/rc.sysctl $ROOT_DIR/etc
+cp -v $START_POINT/bootscript/dbconf $ROOT_DIR/bin
+
+chmod 700 $ROOT_DIR/etc/rc.*
+chmod 700 $ROOT_DIR/rc.bootup
+chmod 700 $ROOT_DIR/bin/dbconf
+
+CC=icc
+export CC
+
+shc -r -f $ROOT_DIR/rc.bootup
+mv -v $ROOT_DIR/rc.bootup.x $ROOT_DIR/rc.bootup
+rm -f $ROOT_DIR/rc.bootup.x.c
+upx-kernel -9 $ROOT_DIR/rc.bootup
+chmod 700 $ROOT_DIR/rc.bootup
+
+shc -r -f $ROOT_DIR/etc/rc.init
+mv -v $ROOT_DIR/etc/rc.init.x $ROOT_DIR/etc/rc.init
+rm -f $ROOT_DIR/etc/rc.init.x.c
+
+shc -r -f $ROOT_DIR/etc/rc.start
+mv -v $ROOT_DIR/etc/rc.start.x $ROOT_DIR/etc/rc.start
+rm -f $ROOT_DIR/etc/rc.start.x.c
+
+shc -r -f $ROOT_DIR/etc/rc.shutdown
+mv -v $ROOT_DIR/etc/rc.shutdown.x $ROOT_DIR/etc/rc.shutdown
+rm -f $ROOT_DIR/etc/rc.shutdown.x.c
+
+shc -r -f $ROOT_DIR/etc/rc.sysctl
+mv -v $ROOT_DIR/etc/rc.sysctl.x $ROOT_DIR/etc/rc.sysctl
+rm -f $ROOT_DIR/etc/rc.sysctl.x.c
+
+shc -r -f $ROOT_DIR/bin/dbconf
+mv -v $ROOT_DIR/bin/dbconf.x $ROOT_DIR/bin/dbconf
+rm -f $ROOT_DIR/bin/dbconf.x.c
+
+upx-kernel -9 $ROOT_DIR/etc/rc.*
+chmod 700 $ROOT_DIR/etc/rc.*
+chmod 700 $ROOT_DIR/bin/dbconf
+
+cd $START_POINT
+cp -v $KERNEL_BASE/bin/* $ROOT_DIR/bin
+cp -v $KERNEL_BASE/*.bz2 $ROOT_DIR/tmp
+cp -av $PPP_LIB $ROOT_DIR/lib
+strip -v --strip-debug $ROOT_DIR/lib/winbind.so
+
+mkdir -p $ROOT_DIR/usr/lib/pptpd
+cp -av $PPTP_LIB $ROOT_DIR/usr/lib/pptpd
+strip -v --strip-debug $ROOT_DIR/usr/lib/pptpd/pptpd-logwtmp.so
+
+# remove
+#if [ -d "$KBD_LIB" ]; then
+#	rm -rfv /tmp/lib
+#	mkdir -p /tmp/$KBD_LIB
+#	cp -a $KBD_LIB/* /tmp/$KBD_LIB
+#	for f in $(find /tmp/lib/* -name '*.*map*');do
+#       	_dir=$(dirname $f)
+#        	case $f in *.gz)
+###                	#echo "GZIP $f"
+#                	gunzip -v $f
+#                ;;
+#                	*)
+#                #echo $f
+#        	esac
+#	done
+#	for f in $(find /tmp/lib/* -name '*.*map*' |sort );do
+#        	_f=$(echo $f |sed -e 's/\.kmap//g' -e 's/\.map//g')
+#        	./bin-script/loadkeys-b -b $f > $_f.bmap
+#	done
+#	mkdir -p $ROOT_DIR/usr/share
+#	cp -av /tmp/lib/* $ROOT_DIR/usr/share
+#	sync
+#	rm -rfv /tmp/lib
+#	find $ROOT_DIR/usr/share/kbd/* -name '*.kmap' |xargs rm -fv
+#	echo "creating kbd map list"
+#	rm -f $ROOT_DIR/usr/share/kbd/KBDLIST.TXT /tmp/KBDLIST.TXT
+#	for f in $(find $ROOT_DIR/usr/share/kbd/* -name '*.bmap' |sort); do
+#		echo $(basename $f) >> /tmp/KBDLIST.TXT
+#		gzip -9 $f
+#	done
+#	mv -v /tmp/KBDLIST.TXT $ROOT_DIR/usr/share/kbd/KBDLIST.TXT
+#	chmod 600 $ROOT_DIR/usr/share/kbd/KBDLIST.TXT
+#	
+#fi
+
+
+if [ -d "$ZONE_INFO" ]; then
+	mkdir -p $ROOT_DIR/usr/share/zoneinfo
+        cd /usr/share/zoneinfo
+        LS=$(find . -type f -or -type l | grep '^./[A-Z]' | sort)
+        for x in $LS; do
+                _dir=$(dirname $x)
+                if [ "$_dir" != "." ]; then
+			mkdir -p $ROOT_DIR/usr/share/zoneinfo/$_dir
+			cp -av $x $ROOT_DIR/usr/share/zoneinfo/$_dir
+                else
+			cp -av $x $ROOT_DIR/usr/share/zoneinfo
+		fi 
+                _dir=
+        done
+	cd $ROOT_DIR/usr/share
+	chmod -R 600 zoneinfo
+	echo "creating zoneinfo list"
+	cd $ROOT_DIR/usr/share/zoneinfo
+	rm -f $ROOT_DIR/usr/share/zoneinfo/ZONELIST.TXT /tmp/ZONELIST.TXT
+	for f in $(find . -type f -or -type l | grep '^./[A-Z]' | sort);do
+		#echo $(basename $f) >> /tmp/ZONELIST.TXT
+		echo $f |sed -e 's/\.\///g' >> /tmp/ZONELIST.TXT
+		gzip -9 $f
+	done
+	mv -v /tmp/ZONELIST.TXT $ROOT_DIR/usr/share/zoneinfo/ZONELIST.TXT
+	chmod 600 $ROOT_DIR/usr/share/zoneinfo/ZONELIST.TXT
+fi
+
+cp -av /usr/share/{nmap,smb} $ROOT_DIR/usr/share
+cp -av $START_POINT/config/snort_rules $ROOT_DIR/usr/ips_rules
+cd $ROOT_DIR
+#tar -jcvf tmp/share.bz2 usr/share/{nmap,zoneinfo,kbd} usr/ips_rules
+tar -jcvf tmp/share.bz2 usr/share/{nmap,zoneinfo} usr/ips_rules
+cd $START_POINT
+mv -v $ROOT_DIR/bin/miniserv $ROOT_DIR/bin/httpd
+mv -v $ROOT_DIR/bin/snort $ROOT_DIR/bin/ipsd
+mv -v $ROOT_DIR/bin/e2fsck.shared $ROOT_DIR/bin/fsck
+

@@ -1,0 +1,580 @@
+<?
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("closed. not parent");
+
+function exec_cmd($cmd) {
+	$ret=1;
+	if($cmd!='') exec("$cmd",$output, $ret);
+	return $ret;
+}
+
+function get_progpid($match) {
+	if($match=='') return 1;
+	$ppid='';
+   	exec("ps x|grep \"$match\" |grep -v grep|awk '{print $1}'", $output, $ret);
+   	if($ret==1) return 1;
+   	while(list(,$t) = each($output)) {
+       		if(preg_match('/^([0-9]+)/', $t, $r)) {
+			$ppid .="{$r[1]} ";
+       		}
+   	}
+	return trim($ppid);
+}
+
+function killall($match) {
+	if($match=='') return 1;
+	$match=escapeshellarg($match);
+	exec("killall -9 $match >/dev/null 2>&1", $output, $ret);
+	if($ret==0) return 0;
+	unset($ret,$output);
+   	exec("ps x|grep $match |grep -v grep|awk '{print $1}'", $output, $ret);
+   	if($ret==1) return 1;
+   	while(list(,$t) = each($output)) {
+       		if(preg_match('/^([0-9]+)/', $t, $r)) {
+           		system('kill -9 '. $r[1], $k);
+           		if($k==0) $killed = 1;
+       		}
+   	}
+   	if($killed) return 0;
+	return 1;
+}
+
+function exec_bg($cmd) {
+	$ret=1;
+	if($cmd!='') exec("$cmd >/dev/null 2>&1 &",$output, $ret);
+	return $ret;
+}
+
+function exec_quite($cmd) {
+	@shell_exec("$cmd >/dev/null 2>&1");
+}
+
+function echo_query($cmd) {
+	append_to_file("/var/sys/mfsque","$cmd\n");
+}
+
+function escape_str($str) {
+	if($str!='') {
+		return htmlentities($str,ENT_QUOTES);
+	}
+	return $str;
+}
+
+function unescape_str($str) {
+	if($str!='') {
+		return str_replace(array('\&#039','\&quot'),array('&#039','&quot'),$str);
+	}
+	return $str;
+}
+
+function mybox_uptime() {
+	if(!$times=posix_times()) {
+		return("unknown");
+	} else {
+		$now = $times['ticks'];
+		$days = intval($now / (60*60*24*100));
+		$remainder = $now % (60*60*24*100);
+		$hours = intval($remainder / (60*60*100));
+		$remainder = $remainder % (60*60*100);
+		$minutes = intval($remainder / (60*100));
+		if($days == 1) {$writeDays = "day";} else {$writeDays = "days";}
+		if($hours == 1) {$writeHours = "hour"; } else {$writeHours = "hours";}
+		if($minutes == 1) {$writeMins = "minute";} else {$writeMins = "minutes";}
+		if($days!=0) {
+			$since=date('D M d Y',strtotime("-$days days"));
+			$since="Since $since";
+		}
+		return	"$days $writeDays, $hours $writeHours, $minutes $writeMins. $since";
+	}
+}
+
+function spaceUsed($dir) {
+	$_strglogstotal=0;
+	if(is_dir($dir)) {
+ 		if($dh=opendir($dir)) {
+  			while(($file = readdir($dh)) !== false) {
+   				if(is_dir($dir.$file) && $file != '.' && $file != '..') {
+    					spaceUsed($dir.$file.'/');
+   				} else {
+    					$_strglogstotal += sprintf("%u", filesize($dir.$file));
+					clearstatcache();
+   				}
+  			}
+ 			closedir($dh);
+		 }
+	}
+	return $_strglogstotal;
+}
+
+function countlogfile($name) {
+	global $_LOG_PATH;
+	$cnt=0;
+	$size=0;
+	if(is_dir($_LOG_PATH)) {
+ 		if($dh=opendir($_LOG_PATH)) {
+  			while(($file = readdir($dh)) !== false) {
+   				if($file != '.' && $file != '..') {
+					if(preg_match("/$name/",$file)) {
+						$size += sprintf("%u",filesize("$_LOG_PATH/$file"));
+						$cnt++;
+						clearstatcache();
+					}
+   				}
+  			}
+ 			closedir($dh);
+		 }
+	}
+	return "$cnt|$size";
+}
+
+function getlogfile($name) {
+	global $_LOG_PATH;
+	$size=0;
+	$_file_array=array();
+	if(is_dir($_LOG_PATH)) {
+ 		if($dh=opendir($_LOG_PATH)) {
+  			while(($file = readdir($dh)) !== false) {
+   				if($file != '.' && $file != '..') {
+					if(preg_match("/(\.offset|\.sum)/",$file)) continue;
+					if(preg_match("/$name/",$file)) {
+						$stat=stat("$_LOG_PATH/$file");
+						$mtime=$stat[9];
+						$size += sprintf("%u",$stat[7]);
+						$_file_array[]="$file|$size|$mtime";
+						clearstatcache();
+					}
+   				}
+  			}
+ 			closedir($dh);
+		 }
+	}
+	return $_file_array;
+}
+
+function cntlogfile($name,$year,$month) {
+	global $_LOG_PATH;
+	$cnt=0;
+	if(is_dir($_LOG_PATH)) {
+ 		if($dh=opendir($_LOG_PATH)) {
+  			while(($file = readdir($dh)) !== false) {
+   				if($file != '.' && $file != '..') {
+					if(preg_match("/$name"."-(\d+)\.log/",$file,$mm)) {
+						$date=date('l d/m/Y',strtotime($mm[1]));
+						$year1=date('Y',strtotime($mm[1]));
+						$month1=date('m',strtotime($mm[1]));
+						if(($year1==$year) && ($month1==$month)) $cnt++;
+					}
+					clearstatcache();
+   				}
+  			}
+ 			closedir($dh);
+		 }
+	}
+	return $cnt;
+}
+
+if(!function_exists("mkdirr")) {
+	function mkdirr($pathname, $mode = 0700) {
+		if(is_dir($pathname) || empty($pathname)) return true;
+    		if(is_file($pathname)) return false;
+    		$next_pathname = substr($pathname, 0, strrpos($pathname, DIRECTORY_SEPARATOR));
+    		if(mkdirr($next_pathname, $mode)) {
+        		if(!file_exists($pathname)) {
+				return mkdir($pathname, $mode);
+        		}
+    		}
+    		return false;
+	}
+}
+function size_readable($size, $unit = null, $retstring = null) {
+	$sizes = array('B', 'KB', 'MB', 'GB', 'TB');
+	$ii = count($sizes) - 1;
+	$unit = array_search((string) $unit, $sizes);
+	if($unit === null || $unit === false) {
+		$unit = $ii;
+	}
+    	if($retstring === null) {
+		$retstring = '%01.2f %s';
+	}
+	$i = 0;
+	while ($unit != $i && $size >= 1024 && $i < $ii) {
+		$size /= 1024;
+		$i++;
+	}
+	return sprintf($retstring, $size, $sizes[$i]);
+}
+
+function save_content($buffer) {
+	global $_DOWNLOAD_PATH, $filesave;
+	$tag_array=array('/<!-- TAG NOSAVE START -->/','/<!-- TAG NOSAVE END -->/');
+	$tag_empty=array('<!-- SKIP ',' SKIP -->');
+	$buffer_save=preg_replace($tag_array,$tag_empty,$buffer);
+	$fname=session_id();
+	save_to_file("$_DOWNLOAD_PATH/$filesave",$buffer_save);
+	return $buffer;
+}
+
+function save_to_file($filename,$text) {
+	if($fp=dio_open($filename, O_RDWR | O_CREAT | O_TRUNC)) {
+ 		dio_write($fp,$text,strlen($text));
+		dio_close($fp);
+	}
+}
+
+function append_to_file($filename,$text) {
+	if($fp=dio_open($filename, O_RDWR | O_CREAT | O_APPEND)) {
+ 		dio_write($fp,$text,strlen($text));
+		dio_close($fp);
+	}
+}
+
+function movefiles($src,$new) {
+	if($src==$new) return 0;
+	if(!is_dir($new)) mkdirr($new);
+	$d=dir($src);
+        while(($entry=$d->read())) {
+                if(is_file("$src/$entry")) {
+			copy("$src/$entry", "$new/$entry");
+                }
+        }
+        $d->close();
+	return 1;
+}
+
+function emptydir($dirname) {
+	if(!file_exists($dirname)) {
+		return false;
+	}
+    	if(is_file($dirname)) {
+        	return unlink($dirname);
+    	}
+   	$dir = dir($dirname);
+	while(false !== $entry = $dir->read()) {
+        	if($entry == '.' || $entry == '..') {
+			continue;
+		}
+		emptydir("$dirname/$entry");
+	}
+	$dir->close();
+	return rmdir($dirname);
+}
+
+function emptypayloddir($dirname,$dirr) {
+	if(!file_exists($dirname)) {
+		return 1;
+	}
+    	if(is_file($dirname)) {
+        	return unlink($dirname);
+    	}
+	if(!is_dir($dirname)) return 1;
+   	$dir = dir($dirname);
+	while(false !== $entry = $dir->read()) {
+        	if($entry == '.' || $entry == '..') {
+			continue;
+		}
+		emptydir("$dirname/$entry",$dirr);
+	}
+	$dir->close();
+	if($dirname!=$dirr) return rmdir($dirname);
+}
+
+function str_add_break($str,$length) {
+	$s_len=strlen($str);
+	if($s_len < $length) return $str;
+	$p='';
+	$x=0;
+	for($si=0;$si<$s_len;$si++) {
+		$c=$str[$si];
+		if($c=='\n' || $c=='\r') continue;
+		if($x >= $length) {
+			$c="$c<br>";
+			$x=0;
+		}
+		$p .= "$c";
+		$x++;
+	}
+	return trim($p);
+}
+
+function file2array($file) {
+	$lines=array();
+	if(strstr($file,".gz")) {
+		if($fd=popen("zcat $file","r")) {
+			while(!feof($fd)) {
+  				$buffer=fgets($fd, 4096);
+				$buffer=trim($buffer);
+				if($buffer!='') $lines[]=$buffer;
+			}
+			fclose($fd);
+			return $lines;
+		}
+	} else {
+		if($fd=fopen($file, "r")) {
+			while(!feof($fd)) {
+  				$buffer=fgets($fd, 4096);
+				$buffer=trim($buffer);
+				if($buffer!='') $lines[]=$buffer;
+			}
+			fclose($fd);
+			return $lines;
+		}
+	}
+	return array();
+}
+
+function chk_pptpuser() {
+	global $_LOG_PATH;
+	$logname=date('Ymd');
+	$date=date('d/m/Y H:i:s');
+	$_user_array=array();
+	if(!file_exists("/var/log/wtmp")) return 1;
+	if(file_exists("/var/sys/pptpvpnusers")) {
+		$_user_array=unserialize(file_get_contents("/var/sys/pptpvpnusers"));
+		if(count($_user_array)!=0) {
+			for($x=0;$x<=count($_user_array);$x++) {
+				$list=$_user_array[$x];
+				list($user,$tty,$ip,$pid,$time)=preg_split("/\|/",$list);
+				$pid='';
+				/*$pid=trim(shell_exec("ps ax |grep \"pptpd-original-ip $ip\" |grep -v grep |awk '{print $1}'"));
+				if($pid=='') {
+					$pid=trim(shell_exec("ps ax |grep \"ipparam $ip\" |grep -v grep |awk '{print $1}'"));
+				}*/
+				$pid=trim(shell_exec("ps |grep $ip |grep pptpd |grep -v 'sh -c' |grep -v grep |awk '{print $1}'"));
+				if($pid=='') unset($_user_array[$x]);
+				unset($list);
+			}
+		}
+	}
+	$pid='';
+	$txt1='';
+
+	if($fi=popen("last","r")) {
+		while($buff=fgets($fi,1024)) {
+			$buff=trim($buff);
+			if(preg_match("/^USER/",$buff)) continue;
+			if(preg_match("/(\S+)\s+(\S+)\s+(\S+)\s+(.*)/",$buff,$match)) {
+				$user=$match[1];
+				$tty=$match[2];
+				$ip=$match[3];
+				$time=$match[4];
+			}
+			/*$pid=trim(shell_exec("ps ax |grep \"pptpd-original-ip $ip\" |grep -v grep |awk '{print $1}'"));
+			if($pid=='') {
+				$pid=trim(shell_exec("ps ax |grep \"ipparam $ip\" |grep -v grep |awk '{print $1}'"));
+			}*/
+			$pid=trim(shell_exec("ps |grep $ip |grep pptpd |grep -v 'sh -c' |grep -v grep |awk '{print $1}'"));
+			if($pid!='') {
+				$txt="$user|$tty|$ip|$pid";
+				if($txt!=$txt1) {
+					$_user_array[]="$user|$tty|$ip|$pid|$time";
+					$msg="[$date] TYPE=pptp-vpn USER=$user IP=$ip MSG=connection accepted on $tty ($time)";
+					append_to_file("$_LOG_PATH/auth-$logname.log","$msg\n");
+					send_remotelog($msg);
+					$txt1=$txt;
+				}
+			}
+		}
+		unset($user,$tty,$ip,$time);
+		pclose($fi);
+	}
+	file_put_contents("/var/sys/pptpvpnusers",serialize($_user_array));
+	@unlink("/var/log/wtmp");
+	@touch("/var/log/wtmp");
+	return 0;
+}
+
+function reorder_policy($db_id,$_table) {
+	$_res=db_query("select * from $_table order by id ASC",$db_id);
+	if(db_num_rows($_res)!=0) {
+		$x=1;
+		while($row=db_fetch_array_assoc($_res)) {
+			$_id=$row['id'];
+			db_query("update $_table set id='$x' where id='$_id'",$db_id);
+			$x++;
+		}
+	}
+}
+
+// created: 08/08/2005
+function update_sidlist($file) {
+	global $_UPDATE_PATH, $_DB_NAME;
+	$db_id=db_connect($_DB_NAME);
+	
+	if(!preg_match("/ipsrules(\d\d\d\d\d\d\d\d)\.tgz/",$file)) {
+		@unlink("$file");
+		die("Invalid signature file!\n");
+	}
+
+	$_IPS_UPDATE="$_UPDATE_PATH/ips";
+	$old_ver=0;
+	$msg=0;
+	exec("tar -C /tmp -zxf $file",$out1,$ret1);
+	$filex=basename(trim($file,'.tgz'));
+	if($ret1==0) {
+		@unlink("$file");
+		if(is_dir("/tmp/$filex")) {
+			if(!file_exists("/tmp/$filex/sig.bz2")) {
+				emptydir("/tmp/$filex");
+				return("Invalid signature file!");
+			}
+			if(!copy("/tmp/$filex/sig.bz2","$_IPS_UPDATE/sig.bz2")) {
+				emptydir("/tmp/$filex");
+				return("Signature update failed!");
+			}
+			if(movefiles("/usr/ips_rules/mfs-rules","/usr/ips_rules/mfs-rules.bak")==0) {
+				emptydir("/tmp/$filex");
+				return("Signature update failed!");
+			}
+			$old_ver=trim(file_get_contents("/usr/ips_rules/mfs-rules.bak/version"));
+			exec("tar -jxf $_IPS_UPDATE/sig.bz2 -C /usr/ips_rules",$out2,$ret2);
+			if($ret2==0) {
+				$new_ver=trim(file_get_contents("/usr/ips_rules/mfs-rules/version"));
+				$new_ver=strtotime("$new_ver");
+				if($new_ver < $old_ver) {
+					emptydir("/tmp/$filex");
+					return("Signature already up to date!");
+				}
+				if(file_exists("/tmp/$filex/slist.txt")) {
+					$_SLIST=array();
+					$list=file("/tmp/$filex/slist.txt");
+					if(count($list)!=0) {
+						$_cnt=0;
+						foreach($list as $sid) {
+							$sid=trim($sid);
+							if($sid=='') continue;
+							$_SLIST[$sid]=1;
+							$result=db_query("select sid from idsopt where sid='$sid'",$db_id);
+							if(db_num_rows($result)==0) {
+								db_query("insert into idsopt values($sid,0,0,0)",$db_id);
+								$_cnt++;
+							}
+						}
+						slog("IPS: updated $_cnt rule(s) into database");
+						unset($result,$sid);
+						if(count($_SLIST)!=0) {
+							$_cnt=0;
+							$result=db_query("select sid from idsopt",$db_id);
+							if(db_num_rows($result)!=0) {
+								while($row=db_fetch_array_assoc($result)) {
+									$_sid=$row['sid'];
+									if($_SLIST[$_sid]!=1) {
+										db_query("delete from idsopt where sid='$_sid'",$db_id);
+										$_cnt++;
+									}
+								}
+								slog("IPS: removed $_cnt rule(s) from database");
+							}
+						}
+					}
+				}
+				unset($list,$sid);
+				if(file_exists("/tmp/$filex/slist.txt")) {
+					$list=file("/tmp/$filex/flist.txt");
+					if(count($list)!=0) {
+						$_cnt=0;
+						foreach($list as $sig) {
+							$sig=trim($sig);
+							if($sig=='') continue;
+							$result=db_query("select sig from idsrules where sig='$sig'",$db_id);
+							if(db_num_rows($result)==0) {
+								db_query("insert into idsrules values(0,'$sig',0)",$db_id);
+								$_cnt++;
+							}
+						}
+						slog("IPS: updated $_cnt signature(s) into database");
+						unset($result,$sig);
+						$result=db_query("select sig from idsrules",$db_id);
+						if(db_num_rows($result)!=0) {
+							$_cnt=0;
+							while($row=db_fetch_array_assoc($result)) {
+								$_sig=$row['sig'];
+								if(!file_exists("/usr/ips_rules/mfs-rules/$_sig")) {
+									@unlink("/usr/ips_rules/mfs-rules/$_sig");
+									db_query("delete from idsrules where sig='$_sig'",$db_id);
+									$_cnt++;
+								}
+							}
+							slog("IPS: removed $_cnt signature(s) from database");
+						}
+						$result=db_query("select sig from idsrules",$db_id);
+						if(db_num_rows($result)!=0) {
+							$_cnt=0;
+							while($row=db_fetch_array_assoc($result)) {
+								$_sig=$row['sig'];
+								db_query("update idsrules set id='$_cnt' where sig='$_sig'",$db_id);
+								$_cnt++;
+							}
+						}
+					}
+				}
+				$msg="Signature updated!";
+				slog("IPS: $msg");
+			} else {
+				$msg="Signature update failed!";
+				slog("IPS: $msg");
+			}
+		}
+	}
+	emptydir("/tmp/$filex");
+	db_close($db_id);
+	return $msg;
+}
+
+function update_firmware($file) {
+	if(!is_dir("/firmware")) @mkdir("/firmware",0700);
+	$dev="/dev/hda1";
+	$fs="ext3";
+	if(file_exists("/var/sys/.mount_boot")) {
+		$strg=file_get_contents("/var/sys/.mount_boot");
+		list($dev,$fs)=preg_split("/:/",$strg);
+		$dev=trim($dev);$fs=trim($fs);
+	}
+	exec("mount -o noatime -t $fs $dev /firmware",$out,$ret);
+	if($ret==0) {
+		if(file_exists("/firmware/mfs.img")) {
+			if((copy("/firmware/mfs.img","/firmware/mfs.img.old")==1) &&
+			(copy("/firmware/kernel","/firmware/kernel.old")==1)) {
+				exec("tar -C /firmware -zxf $file",$out1,$ret1);
+				if($ret1==1) {
+					rename("/firmware/mfs.img.old","/firmware/mfs.img");
+					rename("/firmware/kernel.old","/firmware/kernel");
+					shell_exec("umount /firmware");
+					@unlink("$file");
+					return 1;
+				}
+			} else {
+				return 1;
+			}
+		}
+		exec("umount /firmware",$out2,$ret);
+		if($ret==0) {
+			@rmdir("/firmware");
+		}
+		@unlink("$file");
+		return 0;
+	}
+	return 1;
+}
+
+function web_updates() {
+	global $_MYBOX_UPDATE;
+	if($_MYBOX_UPDATE[0]!='Y') return 1;
+	$_URL=$_MYBOX_UPDATE[1];
+	$_USER=$_MYBOX_UPDATE[2];
+	$_PASS=$_MYBOX_UPDATE[3];
+
+}
+
+function utc2local($time) {
+	$o=date('O');
+	$z=date('Z');
+	$o1=$o{0};
+	switch($o1) {
+		case "-": $zone=$time - $z;
+		break;
+		case "+": $zone=$time + $z;
+		break;
+	} 
+	return $zone;
+}
+
+?>

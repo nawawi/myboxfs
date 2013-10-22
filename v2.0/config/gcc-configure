@@ -1,0 +1,11 @@
+../configure --prefix=/gcc \
+--enable-threads=posix \
+--disable-checking \
+--with-system-zlib \
+--enable-__cxa_atexit \
+--disable-libunwind-exceptions \
+--disable-nls --enable-shared \
+--enable-languages=c,c++ \
+--host=i686-mybox-linux
+make BOOT_LDFLAGS="-static" bootstrap
+

@@ -1,0 +1,29 @@
+# /etc/profile
+# Mybox wide environment and startup programs
+# for login setup
+
+ulimit -S -c 0 > /dev/null 2>&1
+
+for LIST in $(cat /proc/cmdline);do
+	CMD=$(echo $LIST |cut -d '=' -f 1)
+	unset $CMD > /dev/null 2>&1
+done
+unset CMD
+unset LIST
+unset OLDPWD
+unset LOGNAME
+unset MAIL
+unset MAILCHECK
+export HOME=/
+export USER=mfs
+export SHELL=/bin/bash
+export PATH=/bin:/service/tools:/service/init
+export INPUTRC=/etc/inputrc
+export BASH_ENV=
+export HISTFILE=/etc/.bash_history
+export HISTFILESIZE=100
+export HISTSIZE=100
+export PS1="\\h> "
+chmod a-w /etc/profile >/dev/null 2>&1
+
+cd /

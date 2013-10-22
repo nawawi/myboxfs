@@ -1,0 +1,436 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.so');
+chk_session();
+
+$_SYSID="diag_logread";
+
+if(!isset($grep)||$grep=='') $grep=0;
+
+$logfile=$fo;
+$sess=session_id();
+$filesave="tmp.logread.$sess";
+
+if(isset($print)&&$print==1) {
+	if(file_exists("$_DOWNLOAD_PATH/$filesave")) {
+		include_once("$_DOWNLOAD_PATH/$filesave");
+		@unlink("$_DOWNLOAD_PATH/$filesave");
+		echo "<script language='javascript'>window.print();</script>";
+		exit;
+	}
+} else {
+	ob_start('save_content');
+}
+
+if(!isset($sort)||$sort=='') {
+	$sort2=1;
+} else {
+	if($sort==1) {
+		$sort2=2;
+	} else {
+		$sort2=1;
+	}
+}
+
+$_sortimg[1]=$_PNG['desc'];
+$_sortimg[2]=$_PNG['asc'];
+
+// counting
+$currentPage = $HTTP_SERVER_VARS["PHP_SELF"];
+$maxRows_Recordset=50;
+if(isset($_GET['pageNum_Recordset'])) {
+  $pageNum_Recordset = $_GET['pageNum_Recordset'];
+} else {
+	$pageNum_Recordset=0;
+}
+$startRow_Recordset=@($pageNum_Recordset * $maxRows_Recordset);
+
+$row_Recordset=array();
+
+if($grep==1 && $str!='') {
+	$fo=trim($fo,',');
+	$flist=preg_split("/,/",$fo);
+	unset($fo);
+	if(count($flist)!=0) {
+		if(strstr($str,':')) $str=str_replace(":","\\:",$str);
+		foreach($flist as $fo) {
+			if(file_exists("$_LOG_PATH/$fo")) {
+				$line2=file2array("$_LOG_PATH/$fo");
+				foreach($line2 as $tt) {
+					$tt=trim($tt);
+					if($tt!='') $line[]="$tt";
+				}
+			}
+		}
+		$i=1;
+		for($x=$startRow_Recordset;$x < count($line);$x++) {
+			$buff=$line[$x];
+			$buff=trim($buff);
+			if($buff!='' && $i!=$maxRows_Recordset) {
+				if(preg_match("/$str/i",$buff)) {
+					array_push($row_Recordset,$buff);
+					$i++;
+				}
+			}
+		}
+		if($sort2!=1) {
+			sort($row_Recordset);
+			reset($row_Recordset);
+		}
+	}
+} else {
+	if(file_exists("$_LOG_PATH/$fo")) {
+		$line=file2array("$_LOG_PATH/$fo");
+		$i=1;
+		for($x=count($line);$x >= $startRow_Recordset;$x--) {
+			$buff=$line[$x];
+			$buff=trim($buff);
+			if($buff!='' && $i!=$maxRows_Recordset) {
+				array_push($row_Recordset,$buff);
+				$i++;
+			}
+		}
+		if($sort2!=1) {
+			sort($row_Recordset);
+			reset($row_Recordset);
+		}
+	}
+}
+
+if(isset($_GET['totalRows_Recordset'])) {
+	$totalRows_Recordset = $_GET['totalRows_Recordset'];
+} else {
+	$totalRows_Recordset=count($line);
+}
+
+$totalPages_Recordset=@ceil($totalRows_Recordset/$maxRows_Recordset)-1;
+$queryString_Recordset=null;
+if(!empty($_SERVER['QUERY_STRING'])) {
+	$params=explode("&", $_SERVER['QUERY_STRING']);
+  	$newParams=array();
+  	foreach ($params as $param) {
+		if(stristr($param, "pageNum_Recordset")==true) continue;
+		if(stristr($param, "totalRows_Recordset")==true) continue;
+		if(stristr($param, "maxRows_Recordset")==true) continue;
+		if(stristr($param, "fo")==true) continue;
+		if(stristr($param, "grep")==true) continue;
+		if(stristr($param, "str")==true) continue;
+		if(stristr($param, "sort")==true) continue;
+		array_push($newParams, $param);
+  	}
+  	if(count($newParams) != 0) {
+    		$queryString_Recordset="&" . implode("&", $newParams);
+  	}
+}
+
+$queryString_Recordset=sprintf("&totalRows_Recordset=%d%s&fo=%s&grep=%s&str=%s&sort=%d", 
+	$totalRows_Recordset, 
+	$queryString_Recordset,
+	$logfile,$grep,$str,$sort2);
+
+if($pageNum_Recordset > 0) { 
+	$pagefirst=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, 0, $queryString_Recordset);
+	$pageprev=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, max(0, $pageNum_Recordset - 1), $queryString_Recordset);
+	$button1="<a href='$pagefirst'>{$_PNG['first']}</a>\n";
+	$button2="<a href='$pageprev'>{$_PNG['prev']}</a>\n";
+} else {
+	$button1="{$_PNG['first']}\n";
+	$button2="{$_PNG['prev']}\n";
+}
+if($pageNum_Recordset < $totalPages_Recordset) {
+	$pagenext=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, min($totalPages_Recordset, $pageNum_Recordset + 1), $queryString_Recordset);
+	$pagelast=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, $totalPages_Recordset, $queryString_Recordset);
+	$button3="<a href='$pagenext'>{$_PNG['next']}</a>\n";
+	$button4="<a href='$pagelast'>{$_PNG['last']}</a>\n";
+} else {
+	$button3="{$_PNG['next']}\n";
+	$button4="{$_PNG['last']}\n";
+}
+unset($pagefirst,$pageprev,$pagenext,$pagelast);
+
+?>
+
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<meta http-equiv=refresh content='300'; url='<?echo "$_URL_PATH/diag_logread.html?fo=$logfile&sort=$sort2&grep=$grep&str=$str";?>'>
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script language="javascript">
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+</script>
+</head>
+<body scroll=auto>
+<!-- TAG NOSAVE START -->
+<table border="0" cellpadding="2" cellspacing="2" width="98%" align=center>
+<tr><td align=right>
+<a href="#" onclick="self.location.href='<?echo "$_URL_PATH/diag_logread.html?fo=$logfile&sort=$sort2&grep=$grep&str=$str&print=1";?>';"><?echo $_PNG['print'];?></a>
+</td></tr>
+</table>
+<!-- TAG NOSAVE END -->
+<table border="0" cellpadding="2" cellspacing="2" width="98%" align=center class=tablist>
+<?if(strstr($fo,"firewall-")) {?>
+<tr class=bgcolor3>
+<td class=tdlistop widht=2% onclick="self.location.href='<?echo "$_URL_PATH/diag_logread.html?fo=$logfile&sort=$sort2&grep=$grep&str=$str";?>';">&nbsp;<?echo $_sortimg[$sort2];?>Date</td>
+<td class=tdlistop>Protocol</td>
+<td class=tdlistop>Source</td>
+<td class=tdlistop>Port</td>
+<td class=tdlistop>Destination</td>
+<td class=tdlistop>Port</td>
+<td class=tdlistop>Direction</td>
+<td class=tdlistop>Action</td>
+<td class=tdlistop>Description</td>
+<?
+$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background:#ffffff;cursor:hand;'";
+if(count($row_Recordset)>0) {
+	foreach($row_Recordset as $line) {
+		$line=trim($line);
+		if(preg_match("/\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]/",$line,$mm)) {
+			$time="{$mm[2]}/{$mm[1]}/{$mm[3]} {$mm[4]}:{$mm[5]}:{$mm[6]}";
+			$date=date('l d/m/Y h:i:s A',strtotime($time));
+			$mac='';$src='';$dst='';$src_po='';$dst_po='';$proto='';
+			$desc='';$action='';
+			unset($mm);
+			if(preg_match("/MAC=(\S+)/",$line,$mm)) {
+				$mac=$mm[1];
+				unset($mm);
+			}
+			if(preg_match("/SRC=(\S+)/",$line,$mm)) {
+				$src=$mm[1];
+				unset($mm);
+			}
+			if(preg_match("/DST=(\S+)/",$line,$mm)) {
+				$dst=$mm[1];
+				unset($mm);
+			}
+			if(preg_match("/SRC_PORT=(\S+)/",$line,$mm)) {
+				$srcp=$mm[1];
+				unset($mm);
+			}
+			if(preg_match("/DST_PORT=(\S+)/",$line,$mm)) {
+				$dstp=$mm[1];
+				unset($mm);
+			}
+			if(preg_match("/PROTO=(\S+)/",$line,$mm)) {
+				$proto=$mm[1];
+				unset($mm);
+			}
+			if(preg_match("/DESCRIPTION=([A-z0-9_\-\!\@\. ]+)\s+/",$line,$mm)) {
+				$desc=$mm[1];
+				unset($mm);
+			}
+
+			if(preg_match("/ACTION=([A-z ]+)\s+/",$line,$mm)) {
+				$action=$mm[1];
+				unset($mm);
+			}
+
+			if(preg_match("/TYPE=([A-z ]+)\s+/",$line,$mm)) {
+				$type=$mm[1];
+				unset($mm);
+			}
+
+			if($src=='') $src='any';
+			if($srcp=='') $srcp='any';
+			if($dst=='') $dst='any';
+			if($dstp=='') $dstp='any';
+			if($action=='PASS') $action='<font color=green>PASS</font>';
+			if($action=='DROP') $action='<font color=red>DROP</font>';
+			echo "<tr $lt>";
+			echo "<td>$date</td>";
+			echo "<td>$proto</td>";
+			echo "<td>$src</td>";
+			echo "<td>$srcp</td>";
+			echo "<td>$dst</td>";
+			echo "<td>$dstp</td>";
+			echo "<td>$type</td>";
+			echo "<td>$action</td>";
+			echo "<td>$desc</td></tr>";
+		}
+		unset($time,$date,$line,$date,$proto,$src,$srcp,$dst,$dstp,$type,$action,$desc);
+	}
+	
+}
+
+} elseif(strstr($fo,"ips-")) {?>
+<tr class=bgcolor3>
+<td class=tdlistop widht=2% onclick="self.location.href='<?echo "$_URL_PATH/diag_logread.html?fo=$logfile&sort=$sort2&grep=$grep&str=$str";?>';">&nbsp;<?echo $_sortimg[$sort2];?>Date</td>
+<td class=tdlistop>Source</td>
+<td class=tdlistop>Destination</td>
+<td class=tdlistop>Signature</td>
+<td class=tdlistop>Description</td>
+<td class=tdlistop>Action</td>
+<?
+$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background:#ffffff;cursor:hand;'";
+if(count($row_Recordset)>0) {
+	foreach($row_Recordset as $line) {
+		$line=trim($line);
+		if(preg_match("/\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]\s+SRC=(\S+)\s+DST=(\S+)\s+SIG=(\S+)\s+MSG=([A-z ]+)\s+ACTION=(\S+)/",$line,$mm)) {
+			$time="{$mm[2]}/{$mm[1]}/{$mm[3]} {$mm[4]}:{$mm[5]}:{$mm[6]}";
+			$date=date('l d/m/Y h:i:s A',strtotime($time));
+			$src=$mm[7];
+			$dst=$mm[8];
+			$sig=$mm[9];
+			$msg=$mm[10];
+			$action=$mm[11];
+			if($action=='PASS') $action='<font color=green>PASS</font>';
+			if($action=='DROP') $action='<font color=red>DROP</font>';
+			echo "<tr $lt>";
+			echo "<td>$date</td>";
+			echo "<td>$src</td>";
+			echo "<td>$dst</td>";
+			echo "<td>$sig</td>";
+			echo "<td>$msg</td>";
+			echo "<td>$action</td></tr>";
+			unset($date,$src,$dst,$sig,$action,$msg);
+		}
+		unset($time,$date);
+	}
+}
+
+} elseif(strstr($fo,"portscan-")) {?>
+<tr class=bgcolor3>
+<td class=tdlistop widht=2% onclick="self.location.href='<?echo "$_URL_PATH/diag_logread.html?fo=$logfile&sort=$sort2&grep=$grep&str=$str";?>';">&nbsp;<?echo $_sortimg[$sort2];?>Date</td>
+<td class=tdlistop>Source</td>
+<td class=tdlistop>Destination</td>
+<td class=tdlistop>Message</td>
+<?
+$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background:#ffffff;cursor:hand;'";
+if(count($row_Recordset)>0) {
+	foreach($row_Recordset as $line) {
+		$line=trim($line);
+		if(preg_match("/\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]\s+SRC=(\S+)\s+DST=(\S+)\s+MSG=(.*)/",$line,$mm)) {
+			$time="{$mm[2]}/{$mm[1]}/{$mm[3]} {$mm[4]}:{$mm[5]}:{$mm[6]}";
+			$date=date('l d/m/Y h:i:s A',strtotime($time));
+			$src=$mm[7];
+			$dst=$mm[8];
+			$msg=$mm[9];
+			echo "<tr $lt>";
+			echo "<td>$date</td>";
+			echo "<td>$src</td>";
+			echo "<td>$dst</td>";
+			echo "<td>$msg</td></tr>";
+		}
+		unset($time,$date);
+	}
+}
+
+} elseif(strstr($fo,"auth-")) {?>
+<tr class=bgcolor3>
+<td class=tdlistop widht=2% onclick="self.location.href='<?echo "$_URL_PATH/diag_logread.html?fo=$logfile&sort=$sort2&grep=$grep&str=$str";?>';">&nbsp;<?echo $_sortimg[$sort2];?>Date</td>
+<td class=tdlistop>Type</td>
+<td class=tdlistop>User</td>
+<td class=tdlistop>From</td>
+<td class=tdlistop>Message</td>
+<?
+$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background:#ffffff;cursor:hand;'";
+if(count($row_Recordset)>0) {
+	foreach($row_Recordset as $line) {
+		$line=trim($line);
+		if(preg_match("/\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]\s+TYPE=(\S+)\s+USER=(\S+)\s+IP=(\S+)\s+MSG=(.*)/",$line,$mm)) {
+			$time="{$mm[2]}/{$mm[1]}/{$mm[3]} {$mm[4]}:{$mm[5]}:{$mm[6]}";
+			$date=date('l d/m/Y h:i:s A',strtotime($time));
+			$type=$mm[7];
+			$user=$mm[8];
+			$ip=$mm[9];
+			$msg=trim($mm[10]);
+			echo "<tr $lt>";
+			echo "<td>$date</td>";
+			echo "<td>$type</td>";
+			echo "<td>$user</td>";
+			echo "<td>$ip</td>";
+			echo "<td>$msg</td></tr>";
+		}
+		unset($time,$date);
+	}
+}
+
+} else {?>
+
+<tr class=bgcolor3>
+<td class=tdlistop widht=2% onclick="self.location.href='<?echo "$_URL_PATH/diag_logread.html?fo=$logfile&sort=$sort2&grep=$grep&str=$str";?>';">&nbsp;<?echo $_sortimg[$sort2];?>Date</td>
+<td class=tdlistop widht=96%>Messages</td>
+<?
+$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background:#ffffff;cursor:hand;'";
+if(count($row_Recordset)>0) {
+	foreach($row_Recordset as $line) {
+		$line=trim($line);
+		if(preg_match("/\[(\d+)\/(\d+)\/(\d+)\s+(\d+)\:(\d+)\:(\d+)\]\s+(.*)/",$line,$mm)) {
+			$time="{$mm[2]}/{$mm[1]}/{$mm[3]} {$mm[4]}:{$mm[5]}:{$mm[6]}";
+			$date=date('l d/m/Y h:i:s A',strtotime($time));
+			$text=str_add_break($mm[7],100);
+			echo "<tr $lt><td widht=2% class=tdlistb>$date</td>";
+			echo "<td class=tdlistb widht=96%>$text</td></tr>";
+		}
+	}
+}
+} ?>
+</table>
+<? if($totalRows_Recordset > $maxRows_Recordset) { ?>
+<!-- TAG NOSAVE START -->
+<script language="javascript">
+	function do_next() {
+		val=document.e.donum.value;
+		location.href='<?echo $currentPage;?>?pageNum_Recordset='+ val +'<?echo $queryString_Recordset;?>';
+	}
+</script>
+<form name=e method=get action='<?echo $currentPage;?>'>
+<table border="0" width="98%" align=center>
+<tr>
+<td valign=midlle>
+<?echo "$button1$button2";?>
+</td>
+<?
+	$cur_page=$pageNum_Recordset + 1;
+	$last_page=abs($totalPages_Recordset + 1);
+	$cur_page=abs($cur_page);
+	if($last_page==0) $last_page=1;
+	if(strlen($last_page)==1) $last_page="0$last_page";
+	echo "<td valign=midlle align=center>Page ";
+	echo "<select name=donum size=1 class=textbox onchange='do_next();'>";
+	for($x=0;$x<$totalPages_Recordset+1;$x++){
+		$y=$x + 1;
+		$p=str_repeat('0',strlen($last_page)-strlen($y)).$y;
+		if($x==$pageNum_Recordset) {
+			echo "<option value='$x' selected>$p</option>";
+		} else {
+			echo "<option value='$x'>$p</option>";
+		}
+	}
+	echo "</select> of $last_page Pages</td>";
+?>
+<td valign=midlle align=right>
+<?echo "$button3$button4";?>
+</td>
+</tr>
+</table>
+</form>
+<!-- TAG NOSAVE END -->
+<? } ?>
+</body>
+</html>
+
+<?
+if(!isset($print)||$print=='') {
+	ob_end_flush();
+}
+?>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

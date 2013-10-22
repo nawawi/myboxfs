@@ -1,0 +1,147 @@
+<?
+	// leave this here.
+	if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("closed. not parent");
+
+	// variables setting
+	// please check rc.bootup rc.init rc.start before change this setting
+	$_HTDOCS_PATH="/service/www";
+	$_ROOT_DIR="/strg/mybox";
+	$_DB_PATH="$_ROOT_DIR/db";
+	$_GRAPH_PATH="$_HTDOCS_PATH/g";
+	$_LOG_PATH="$_ROOT_DIR/logs";
+	$_LOCAL_SAVE_PATH="$_ROOT_DIR/localsave";
+	$_DOWNLOAD_PATH="$_ROOT_DIR/download";
+	$_UPDATE_PATH="$_ROOT_DIR/updates";
+	$_UPDATE_TMP_PATH="$_UPDATE_PATH/tmp";
+	$_LICENSE_PATH="$_ROOT_DIR/mfs-license.exc";
+	$_SQLITE_BINARY="/bin/sqlite";
+	$_INIT_DIR="/service/init";
+	$_URL_PATH="";
+	$_ZONELIST="/usr/share/zoneinfo/ZONELIST.TXT";
+	$_DB_DEBUG=0; // 0 = disable 1 = enable
+	$_DB_NAME="system.db";
+
+	$_LOG_NAME[]="Authentication|auth";
+	$_LOG_NAME[]="System activites|system";
+	$_LOG_NAME[]="Firewall rules|firewall";
+	$_LOG_NAME[]="HTTPS agent|httpd";
+	$_LOG_NAME[]="SSH agent|sshd";
+	$_LOG_NAME[]="PPTP VPN|pptpvpn";
+	$_LOG_NAME[]="IPS agent|ips";
+	$_LOG_NAME[]="Portscan detector|portscan";
+	$_LOG_NAME[]="DHCP agent|dhcpd";
+
+	$_PORT_ARRAY['any']='any';
+	$_PORT_ARRAY['HTTP']='80';
+	$_PORT_ARRAY['HTTPS']='443';
+	$_PORT_ARRAY['FTP']='21';
+	$_PORT_ARRAY['FTP-DATA']='20';
+	$_PORT_ARRAY['SSH']='22';
+	$_PORT_ARRAY['TELNET']='23';
+	$_PORT_ARRAY['SMTP']='25';
+	$_PORT_ARRAY['POP3']='110';
+	$_PORT_ARRAY['IMAP']='143';
+	$_PORT_ARRAY['SNMP']='161';
+	$_PORT_ARRAY['PPTP']='1723';
+	$_PORT_ARRAY['NETBIOS']='137:139';
+	$_PORT_ARRAY['AD-LDAP']='389';
+	$_PORT_ARRAY['AD-Authentication']='10260';
+	$_PORT_ARRAY['DNS']='53';
+	$_PORT_ARRAY['NTP']='123';
+	$_PORT_ARRAY['KERBEROS']='88';
+	$_PORT_ARRAY['DCOM']='135';
+	$_PORT_ARRAY['SNMP']='161';
+	$_PORT_ARRAY['MICROSOFT DS']='445';
+	$_PORT_ARRAY['KPassword']='464';
+	$_PORT_ARRAY['Printer']='515';
+	$_PORT_ARRAY['LDAP-SSL']='636';
+	$_PORT_ARRAY['Lotus-Notes']='1352';
+	$_PORT_ARRAY['Microsoft-SQL']='1433';
+	$_PORT_ARRAY['Microsoft-SQL-Monitor']='1434';
+	$_PORT_ARRAY['DCOM']='5000:5500';
+	$_PORT_ARRAY['Printing-Port']='9100';
+
+	// image
+	if(isset($_ENV['GATEWAY_INTERFACE'])) {
+		$_PNG_YESNO['0']="<img src='$_URL_PATH/i/no.png' border=0 alt='disabled' title='disabled'>";
+		$_PNG_YESNO['1']="<img src='$_URL_PATH/i/yes.png' border=0 alt='enabled' title='enabled'>";
+		$_PNG['edit']="<img src='$_URL_PATH/i/edit.png' border='0' alt='edit' title='edit'>";
+		$_PNG['delete']="<img src='$_URL_PATH/i/delete.png' border='0' alt='delete' title='delete'>";
+		$_PNG['arrow_up']="<img src='$_URL_PATH/i/arrow_up.png' border='0' alt='up' title='up'>";
+		$_PNG['arrow_down']="<img src='$_URL_PATH/i/arrow_down.png' border='0' alt='down' title='down'>";
+		$_PNG['arrow_right']="<img src='$_URL_PATH/i/arrow_right.png' border='0'>";
+		$_PNG['arrow_left']="<img src='$_URL_PATH/i/arrow_left.png' border='0'>";
+		$_PNG['arrow_rtr']="<img src='$_URL_PATH/i/arrow_rtr.png' border='0'>";
+		$_PNG['arrow_ltr']="<img src='$_URL_PATH/i/arrow_ltr.png' border='0'>";
+		$_PNG['folder']="<img src='$_URL_PATH/i/folder.png' border='0' alt='folder' title='folder'>";
+		$_PNG['file']="<img src='$_URL_PATH/i/file.png' border='0' alt='file' title='file'>";
+		$_PNG['zip']="<img src='$_URL_PATH/i/zip.png' border='0' alt='zip' title='zip'>";
+		$_PNG['desc']="<img src='$_URL_PATH/i/darrow.png' border='0' alt='descending' title='descending'>";
+		$_PNG['asc']="<img src='$_URL_PATH/i/uarrow.png' border='0' alt='ascending' title='ascending'>";
+		$_PNG['print']="<img src='$_URL_PATH/i/print.png' border='0' alt='print' title='print'>";
+		$_PNG['exit']="<img src='$_URL_PATH/i/exit.png' border='0' alt='exit' title='exit'>";
+		$_PNG['df_open']="<img src='$_URL_PATH/i/dfolder_open.png' border='0'>";
+		$_PNG['df_close']="<img src='$_URL_PATH/i/dfolder_close.png' border='0'>";
+		$_PNG['df_up']="<img src='$_URL_PATH/i/dfolder_up.png' border='0'>";
+		$_PNG['zoomin']="<img src='$_URL_PATH/i/zoomIn.png' border='0'>";
+		$_PNG['zoomout']="<img src='$_URL_PATH/i/zoomOut.png' border='0'>";
+		$_PNG['first']="<img src='$_URL_PATH/i/first.png' border='0'>";
+		$_PNG['last']="<img src='$_URL_PATH/i/last.png' border='0'>";
+		$_PNG['prev']="<img src='$_URL_PATH/i/prev.png' border='0'>";
+		$_PNG['next']="<img src='$_URL_PATH/i/next.png' border='0'>";
+		$_PNG_NIC['0']="<img src='$_URL_PATH/i/nicko.png' border=0 alt='Not Active' title='Not Active'>";
+		$_PNG_NIC['1']="<img src='$_URL_PATH/i/nicok.png' border=0 alt='Active' title='Active'>";
+		$_PNG_DOT['0']="<img src='$_URL_PATH/i/red.png' border=0>";
+		$_PNG_DOT['1']="<img src='$_URL_PATH/i/green.png' border=0>";
+		$_PNG['about']="<img src='$_URL_PATH/i/about.png' border='0'>";
+	}
+
+	// misc dir
+	if(!function_exists("mkdirr")) {
+		function mkdirr($pathname, $mode = 0700) {
+			if(is_dir($pathname) || empty($pathname)) return true;
+    			if(is_file($pathname)) return false;
+    			$next_pathname = substr($pathname, 0, strrpos($pathname, DIRECTORY_SEPARATOR));
+    			if(mkdirr($next_pathname, $mode)) {
+        			if(!file_exists($pathname)) {
+					return mkdir($pathname, $mode);
+        			}
+    			}
+    			return false;
+		}
+	}
+	// mfs_license
+	function mfs_license($id) {
+		global $_LICENSE_PATH, $_AWIE_CODE, $_MFS_KEY;
+		global $_MYBOX_LICENSE, $_MYBOX_SERIAL;
+
+		if(!file_exists($_LICENSE_PATH)) return -1;
+
+		include_once("$_LICENSE_PATH");
+		if($_MFS_KEY != '5047a88a7963275e43790ee796dcb7ec') return -2;
+
+		if(isset($_MYBOX_LICENSE['expired']) && $_MYBOX_LICENSE['expired']!='none') {
+			$_expired=strtotime($_MYBOX_LICENSE['expired']);
+			if(strlen($_expired) > 8) {
+				if(time() > $_expired) {
+					$_time=date('d/m/Y',$_expired);
+					return -3;
+				}
+			}
+			unset($_time,$_expired);
+		}
+		if($_MYBOX_LICENSE[$id]!='') {
+			return $_MYBOX_LICENSE[$id];
+		}
+	}
+
+	if(!is_dir("/tmp/sessions")) @mkdirr("/tmp/sessions");
+	if(!is_dir($_DOWNLOAD_PATH)) @mkdirr("$_DOWNLOAD_PATH");
+	if(!is_dir($_UPDATE_PATH)) @mkdirr("$_UPDATE_PATH");
+	if(!is_dir($_UPDATE_TMP_PATH)) @mkdirr("$_UPDATE_TMP_PATH");
+	if(!is_dir($_LOCAL_SAVE_PATH)) @mkdirr("$_LOCAL_SAVE_PATH");
+	if(!is_dir($_LOG_PATH)) @mkdirr("$_LOG_PATH");
+	if(!is_dir($_GRAPH_PATH)) @mkdirr("$_GRAPH_PATH");
+	if(!is_link("$_HTDOCS_PATH/d")) @symlink("$_DOWNLOAD_PATH","$_HTDOCS_PATH/d");
+	if(!is_link("$_HTDOCS_PATH/l")) @symlink("$_LOG_PATH","$_HTDOCS_PATH/l");
+?>

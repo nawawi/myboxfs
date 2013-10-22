@@ -1,0 +1,5 @@
+<?
+
+$mm=md5(rand().time());
+echo $mm;
+?>

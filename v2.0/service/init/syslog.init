@@ -1,0 +1,179 @@
+#!/bin/php -Cq
+<?
+// syslog.init - last update 11-Oct-2005
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.so');
+
+putenv("PATH=/bin:/service/tools:/service/init");
+
+if(!file_exists("/bin/syslogd") || !file_exists("/bin/klogd") || !file_exists("/service/tools/mfs-system.exc")
+	|| !file_exists("/service/tools/mfs-kernel.exc")) {
+	echo "syslogd,klogd or logger agent binary not found or cannot execute\n";
+	exit(1);
+}
+
+if(!is_dir("/var/log")) {
+	mkdirr("/var/log");
+}
+
+if(!is_dir("/var/run")) {
+	mkdirr("/var/run");
+}
+
+function syslog_config() {
+	global $_DB_NAME;
+
+	if($fi=fopen("/etc/syslog.conf","w")) {
+		fwrite($fi,"# pipe kernel msg\n");
+		fwrite($fi,"kern.*\t|/var/log/kernel\n");
+		fwrite($fi,"# pipe all msg\n");
+		fwrite($fi,"*.*;kern.none\t|/var/log/system\n");
+		fclose($fi);
+	}
+	$logger_stat=0;
+	$db_id=db_connect($_DB_NAME);
+	$result=db_query("select val from misc where name='logger_stat'",$db_id);
+	if(db_num_rows($result)!=0) {
+		$logger_stat=db_fetch_single($result);
+	}
+	if($logger_stat==1) {
+		$server=array();
+		$result=db_query("select * from logger",$db_id);
+		if(db_num_rows($result)!=0) {
+			while($row=db_fetch_array_assoc($result)) {
+				$server[]=$row['ip'];
+			}
+		}
+		if(count($server)!=0) {
+			if($fi=fopen("/var/sys/.logger","w")) {
+				foreach($server as $ip) {
+					if($ip!='') fwrite($fi,"$ip\n");
+				}
+				fclose($fi);
+			}
+		}
+	}
+	$_nolog=0;
+	$result=db_query("select val from misc where name='local_logs'",$db_id);
+	if(db_num_rows($result)!=0) {
+		$_nolog=db_fetch_single($result);
+	}
+	if($_nolog==1) @touch("/var/sys/nolog");
+	db_close($db_id);
+
+	echo "Writing syslog config..\n";
+	slog("INIT: Writing syslog config");
+	return 0;
+}
+
+function syslog_status() {
+	$pid1=get_progpid("syslogd");
+	$pid2=get_progpid("klogd");
+	if($pid1!='' || $pid2!='') {
+		if($pid1!='') echo "syslogd (pid $pid1) is running...\n";
+		if($pid2!='') echo "klogd (pid $pid2) is running...\n";
+		return 0;
+	}
+	echo "syslogd/klogd not running..\n";
+	return 1;
+}
+
+function syslog_start() {
+	@syslog_config();
+	if(syslog_status()==1) {
+		if(!file_exists("/var/log/kernel")) {
+			posix_mkfifo("/var/log/kernel",0600);
+			slog("INIT: Creating kernel log fifo file");
+		}
+		if(!file_exists("/var/log/system")) {
+			posix_mkfifo("/var/log/system",0600);
+			slog("INIT: Creating system log fifo file");
+		}
+		if(exec_cmd("syslogd -m 0")==0) {
+			echo "Starting System Logger agent\n";
+			slog("INIT: Starting System Logger agent");
+		}
+		if(exec_cmd("klogd -2")==0) {
+			echo "Starting Kerner Logger agent\n";
+			slog("INIT: Starting Kernel Logger agent");
+		}
+		if(exec_bg("/service/tools/mfs-system.exc")==0) {
+			echo "Starting mfs-system.exc agent\n";
+			slog("INIT: Starting mfs-system.exc agent");
+			@touch("/var/sys/.chk_syslog");
+		}
+		if(exec_bg("/service/tools/mfs-kernel.exc")==0) {
+			echo "Starting mfs-kernel.exc agent\n";
+			slog("INIT: Starting mfs-kernel.exc agent");
+			@touch("/var/sys/.chk_syslog");
+		}
+		return 0;
+	} 
+	echo "Starting syslog agent failed\n";
+	slog("INIT: Starting syslog agent failed");
+	return 1;
+}
+
+function syslog_stop() {
+	@unlink("/var/sys/.chk_syslog");
+	@unlink("/var/sys/.logger");
+	@unlink("/etc/syslog.conf");
+	@unlink("/var/sys/nolog");
+	if(killall("syslogd")==0) {
+		echo "Shutting down System Logger agent\n";
+		slog("INIT: Shutting down System Logger agent");
+	} else {
+		echo "Shutting down System Logger agent failed\n";
+		slog("INIT: Shutting down System Logger agent failed");
+	}
+	if(killall("klogd")==0) {
+		echo "Shutting down Kerner Logger agent\n";
+		slog("INIT: Shutting down Kerner Logger agent");
+	} else {
+		echo "Shutting down Kerner Logger agent failed\n";
+		slog("INIT: Shutting down Kerner Logger agent failed");
+	}
+	if(killall("mfs-system.exc")==0) {
+		echo "Shutting down mfs-system.exc agent\n";
+		slog("INIT: Shutting down mfs-system.exc agent");
+	} else {
+		echo "Shutting down mfs-system.exc agent failed\n";
+		slog("INIT: Shutting down mfs-system.exc agent failed");
+	}
+	if(killall("mfs-kernel.exc")==0) {
+		echo "Shutting down mfs-kernel.exc agent\n";
+		slog("INIT: Shutting down mfs-kernel.exc agent");
+	} else {
+		echo "Shutting down mfs-kernel.exc agent failed\n";
+		slog("INIT: Shutting down mfs-kernel.exc agent failed");
+	}
+	return 0;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=syslog_start();
+		break;
+	case 'stop':
+		$ret=syslog_stop();
+		break;
+	case 'restart':
+		$ret=syslog_stop();
+		sleep(2);
+		$ret=syslog_start();
+		break;
+	case 'status':
+		$ret=syslog_status();
+		break;
+	case 'config':
+		$ret=syslog_config();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/status/config]\n";
+		break;
+}
+flush();
+exit($ret);
+?>

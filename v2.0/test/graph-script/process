@@ -1,0 +1,31 @@
+update /var/www/html/cacti-0.8.6c/rra/localhost_proc_7.rrd --template proc 1112167202:84
+
+/usr/bin/rrdtool create \
+/var/www/html/cacti-0.8.6c/rra/localhost_proc_7.rrd \
+--step 300  \
+DS:proc:GAUGE:600:0:1000 \
+RRA:AVERAGE:0.5:1:600 \
+RRA:AVERAGE:0.5:6:700 \
+RRA:AVERAGE:0.5:24:775 \
+RRA:AVERAGE:0.5:288:797 \
+RRA:MAX:0.5:1:600 \
+RRA:MAX:0.5:6:700 \
+RRA:MAX:0.5:24:775 \
+RRA:MAX:0.5:288:797 \
+
+/usr/bin/rrdtool graph - \
+--imgformat=PNG \
+--start=-86400 \
+--end=-300 \
+--title="Localhost - Processes" \
+--base=1000 \
+--height=120 \
+--width=500 \
+--alt-autoscale-max \
+--lower-limit=0 \
+--vertical-label="processes" \
+DEF:a="/var/www/html/cacti-0.8.6c/rra/localhost_proc_7.rrd":proc:AVERAGE \
+AREA:a#F51D30:"Running Processes"  \
+GPRINT:a:LAST:"Current\:%8.0lf"  \
+GPRINT:a:AVERAGE:"Average\:%8.0lf"  \
+GPRINT:a:MAX:"Maximum\:%8.0lf"

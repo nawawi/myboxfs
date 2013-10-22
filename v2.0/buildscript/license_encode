@@ -1,0 +1,31 @@
+#!/bin/bash
+ROOT_DIR=/root/devel
+SRC_DIR=/root/devel/license
+DST_DIR=/root/devel/license_enc
+
+cd $ROOT_DIR
+rm -rfv $DST_DIR
+if [ ! -d "$DST_DIR" ]; then
+	mkdir -p $DST_DIR
+fi
+
+/usr/local/Zend/bin/zendenc \
+--quiet  \
+--recursive \
+--ignore-errors \
+--short-tags on \
+--asp-tags off \
+--optimizations 1023 \
+--no-default-extensions \
+--include-ext html \
+--include-ext so \
+--include-ext inc \
+--include-ext php \
+--include-ext exc \
+--include-ext lang \
+--no-header \
+--ignore "CVS" \
+--ignore ".cvsignore"  \
+--ignore ".backup"  \
+$SRC_DIR \
+$DST_DIR

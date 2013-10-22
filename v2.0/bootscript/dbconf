@@ -1,0 +1,116 @@
+#!/bin/bash
+
+DB_NAME="/strg/mybox/db/system.db"
+MY_TTY=$(tty)
+
+if [ ! -f "$DB_NAME" ]; then
+	echo "Database not exist"
+	exit
+fi
+
+function edit_db() {
+	tmpfile="/tmp/sql.$$"
+	trap "rm -f $tmpfile" 1 2 3 15
+
+	sqlite $DB_NAME .dump > $tmpfile
+	vi $tmpfile
+	echo -n "Write to disk? [y/n] "
+	read ans
+	if [ "$ans" = "y" ]; then
+        	mv $DB_NAME $DB_NAME.old
+        	cat $tmpfile |sqlite $DB_NAME
+		if [ $? != 0 ]; then
+			mv $DB_NAME.old $DB_NAME
+			echo "Writing Failed!"
+		else
+			echo "Writing OK!"
+		fi
+	fi
+	rm -f $tmpfile
+}
+
+function ifset_db() {
+	sqlite $DB_NAME "update ipaddr set ip='$2',mask='$3',onboot='1' where dev='$1'"
+	ifconfig $1 $2 netmask $3
+	ifconfig $1
+}
+
+function gwset_db() {
+	sqlite $DB_NAME "update gateway set ip='$1',stat='1' where id='0'"
+	route del default
+	route add default gw $1
+	route -n
+}
+
+function db_dump() {
+	if [ -f "$1" ]; then
+		echo "$1 already exist. Overwrite? (y/n) "
+		read ans
+		if [ "$ans" = "y" ]; then
+			rm -f $1
+		else
+			exit
+		fi
+	fi
+	sqlite $DB_NAME ".dump" > $1
+}
+
+case $1 in 
+	'--edit')
+		edit_db
+	;;
+	'--ifset')
+		if [ "$2" = "" -o "$3" = "" ]; then
+			echo "Invalid options"
+		else 
+			if [ "$4" = "" ]; then
+				ifset_db "$2" "$3" "255.255.255.0"
+			else
+				ifset_db "$2" "$3" "$4"
+			fi
+		fi
+	;;
+	'--gwset')
+		if [ "$2" = "" ]; then
+			echo "Invalid options"
+		else 
+			gwset_db "$2"
+		fi
+	;;
+	'--reset')
+		if [ "$MY_TTY" = "/dev/tts/0" -o "$MY_TTY" = "/dev/tts/1" ]; then
+			if [ "$2" = "" ]; then
+				echo "Invalid options"
+			else 
+				echo -n "Enter Password: "
+				read pass
+				[ "$pass" = "" ] && exit
+				if [ "$2" = "admin" ]; then
+					misc.init reset_passwd "1:$pass:$pass"
+				elif [ "$2" = "look" ]; then
+					misc.init reset_passwd "2:$pass:$pass"
+				elif [ "$2" = "console" ]; then
+					misc.init reset_passwd "3:$pass:$pass"
+				elif [ "$2" = "ssh" ]; then
+					misc.init reset_passwd "4:$pass:$pass"
+				fi
+			fi
+		fi
+	;;
+	'--dbdump')
+		if [ "$2" = "" ]; then
+			echo "Invalid options"
+		else 
+			db_dump "$2"
+		fi
+	;;
+	*)
+		echo "Mybox Firewall System"
+		echo "Usage: $0 --edit";
+		if [ "$MY_TTY" = "/dev/tts/0" -o "$MY_TTY" = "/dev/tts/1" ]; then
+			echo "          --reset [admin,look,ssh,console]"
+		fi
+		echo "          --ifset eth[0-8] ip netmask"
+		echo "          --gwset ip"
+		echo "          --dbdump <file>"
+esac

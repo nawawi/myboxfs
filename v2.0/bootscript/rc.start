@@ -1,0 +1,130 @@
+#!/bin/sh
+#
+#
+
+trap : 1 2 3 15
+PATH="/bin"
+TERM=linux
+export PATH TERM
+umask 022
+
+mkdir -p /tmp/sessions
+chmod 700 /tmp/sessions
+
+:> /etc/resolv.conf
+
+ps |grep getkey |awk '{print $1}' |xargs kill -9 >/dev/null 2>&1
+
+
+if [ -f "/etc/rc.sysctl" ]; then
+	/etc/rc.sysctl >/dev/null 2>&1
+	echo "Setting kernel parameters"
+fi
+
+if [ -f "/service/init/misc.init" ]; then
+	/service/init/misc.init keymap >/dev/null 2>&1
+	[ $? = 0 ] && echo "Loading keymap.."
+fi
+
+if [ -f "/service/init/misc.init" ]; then
+	/service/init/misc.init clock >/dev/null 2>&1
+	[ $? = 0 ] && echo "Setting clock $(date)"
+fi
+
+if [ -f "/service/init/network.init" ]; then
+	/service/init/network.init start >/dev/null 2>&1
+	[ $? = 0 ] && echo "Bringing up network interfaces"
+fi
+
+if [ -f "/service/init/arp.init" ]; then
+	/service/init/arp.init start >/dev/null 2>&1
+	[ $? = 0 ] && echo "Starting ARP Agent"
+fi
+
+iptables -P INPUT DROP >/dev/null 2>&1
+iptables -P FORWARD DROP >/dev/null 2>&1
+iptables -P OUTPUT DROP >/dev/null 2>&1
+
+iptables -A INPUT -i lo -s 127.0.0.1 -j ACCEPT >/dev/null 2>&1
+iptables -A INPUT -o lo -s 127.0.0.1 -j ACCEPT >/dev/null 2>&1
+
+if [ -f "/service/init/syslog.init" ]; then
+	/service/init/syslog.init start >/dev/null 2>&1
+	[ $? = 0 ] && echo "Starting Syslog"
+fi
+
+if [ -f "/service/init/ssh.init" ]; then
+	/service/init/ssh.init key >/dev/null 2>&1
+	[ $? = 0 ] && echo "Generating SSH key"
+	/service/init/ssh.init passwd >/dev/null 2>&1
+	[ $? = 0 ] && echo "Generating SSH access password"
+fi
+
+if [ -f "/service/init/ssh.init" ]; then
+	/service/init/ssh.init start >/dev/null 2>&1
+	[ $? = 0 ] && echo "Starting SSH Agent"
+fi
+
+if [ -f "/service/tools/mfs-query.exc" ]; then
+	/service/tools/mfs-query.exc q >/dev/null 2>&1
+	/service/tools/mfs-query.exc i >/dev/null 2>&1
+	/service/tools/mfs-query.exc o >/dev/null 2>&1
+	echo "Starting Mybox Agents"
+fi
+
+if [ -f "/service/init/cron.init" ]; then
+	/service/init/cron.init start >/dev/null 2>&1
+	[ $? = 0 ] && echo "Starting scheduler Agent"
+fi
+
+if [ -f "/service/init/snmp.init" ]; then
+	/service/init/snmp.init start >/dev/null 2>&1
+	[ $? = 0 ] && echo "Starting SNMP Agent"
+fi
+
+if [ -f "/service/init/ips.init" ]; then
+	/service/init/ips.init restart >/dev/null 2>&1
+	[ $? = 0 ] && echo "Starting IPS Agent"
+fi
+
+if [ -f "/service/init/policy.init" ]; then
+	/service/init/policy.init start >/dev/null 2>&1
+	[ $? = 0 ] && echo "Applying policy rules"
+fi
+
+if [ -f "/service/init/pptp.init" ]; then
+	echo "Checking if possible to start PPTP VPN"
+	echo "pptp-start" > /var/sys/mfsque
+fi
+
+if [ -f "/service/tools/mfs-graph.exc" ]; then
+	echo "Creating diagnostic graphs"
+	/service/tools/mfs-graph.exc >/dev/null 2>&1
+fi
+
+if [ -f "/service/tools/mfs-query.exc" ]; then
+	echo "Compressing logs.."
+	/service/tools/mfs-query.exc l >/dev/null 2>&1
+fi
+
+if [ -f "/service/init/misc.init" ]; then
+	/service/init/misc.init dnshost >/dev/null 2>&1
+	echo "Setting misc configuration"
+fi
+
+if [ -f "/service/init/https.init" ]; then
+        /service/init/https.init cert >/dev/null 2>&1
+        [ $? = 0 ] && echo "Generating site certificate"
+fi
+if [ -f "/service/init/https.init" ]; then
+	/service/init/https.init start >/dev/null 2>&1
+	[ $? = 0 ] && echo "Starting Web-based Console Agent"
+fi
+
+if [ -f "/service/init/dhcp.init" ]; then
+	/service/init/dhcp.init start >/dev/null 2>&1
+	[ $? = 0 ] && echo "Starting DHCP Agent"
+fi
+
+exit 0
+

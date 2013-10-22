@@ -1,0 +1,33 @@
+#!/bin/sh -e
+
+START_POINT=$(pwd)
+ZONE_DIR=$START_POINT/zoneinfo
+
+mkdir -p $ZONE_DIR/usr/share/zoneinfo
+cd /usr/share/zoneinfo
+LS=$(find . -type f -or -type l | grep '^./[A-Z]' | sort)
+for x in $LS; do
+	_dir=$(dirname $x)
+	if [ "$_dir" != "." ]; then
+		mkdir -p $ZONE_DIR/usr/share/zoneinfo/$_dir
+		cp -av $x $ZONE_DIR/usr/share/zoneinfo/$_dir
+	else
+		cp -av $x $ZONE_DIR/usr/share/zoneinfo
+	fi 
+	_dir=
+done
+cd $ZONE_DIR/usr/share
+chmod -R 600 zoneinfo
+echo "creating zoneinfo list"
+cd $ZONE_DIR/usr/share/zoneinfo
+rm -f $ZONE_DIR/usr/share/zoneinfo/ZONELIST.TXT /tmp/ZONELIST.TXT
+for f in $(find . -type f -or -type l | grep '^./[A-Z]' | sort);do
+	echo $f |sed -e 's/\.\///g' >> /tmp/ZONELIST.TXT
+	gzip -9 $f
+done
+mv -v /tmp/ZONELIST.TXT $ZONE_DIR/usr/share/zoneinfo/ZONELIST.TXT
+chmod 600 $ZONE_DIR/usr/share/zoneinfo/ZONELIST.TXT
+cd $ZONE_DIR
+tar -jcvf zoneinfo.bz2 * |sort
+mv -v zoneinfo.bz2 $START_POINT
+rm -rvf $ZONE_DIR

@@ -1,0 +1,157 @@
+#!/bin/bash
+# +-----------------------------------------------------------------------------+
+# | Copyright (c) 2002-2005 Tracenetwork Corporation Sdn. Bhd.           	|
+# +-----------------------------------------------------------------------------+
+# | This source file is belongs to nawawi, the author.                    	|
+# | Any changes/use of the source, please email to the author.           	|
+# +-----------------------------------------------------------------------------+
+# | Authors: nawawi, Mohd nawawi Mohamad Jamili <nawawi@tracenetwork.com.my 	|
+# +-----------------------------------------------------------------------------+
+#
+
+PATH="/bin"
+export PATH
+
+
+# allow local lan to ftp out side
+if ! lsmod 2>/dev/null |grep -q ip_conntrack_ftp; then
+	modprobe ip_conntrack_ftp /ports=21,22,115 > /dev/null 2>&1
+	[ $? = 0 ] && echo "Loading ip_conntrack_ftp"
+fi
+
+# irc stuff
+if ! lsmod 2>/dev/null |grep -q ip_conntrack_irc; then
+	modprobe ip_conntrack_irc /ports=6660,6667,6668,6669,7000,7001,7002  > /dev/null 2>&1
+	[ $? = 0 ] && echo "Loading ip_conntrack_irc"
+fi
+
+# ftp stuff
+if ! lsmod 2>/dev/null |grep -q ip_nat_ftp; then
+	modprobe ip_nat_ftp > /dev/null 2>&1
+	[ $? = 0 ] && echo "Loading ip_nat_ftp"
+fi
+
+if ! lsmod 2>/dev/null | grep -q ip_vs; then
+	modprobe ip_vs > /dev/null 2>&1
+	[ $? = 0 ] && echo "Loading ip_vs"
+fi
+
+if ! lsmod 2>/dev/null | grep -q rshaper; then
+	insmod rshaper.o mode=2 > /dev/null 2>&1
+	[ $? = 0 ] && echo "Loading rshaper"
+fi
+
+# value to tell kernel maximum ip conntrack can handle
+if [ -r "/proc/sys/net/ipv4/ip_conntrack_max" ]; then
+	echo "70000" > /proc/sys/net/ipv4/ip_conntrack_max
+	echo "Setting ip_conntrack_max=70000"
+fi
+
+if [ -r "/proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_established" ]; then
+	echo "108000" > /proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_established
+	echo "Setting ip_conntrack_tcp_timeout_established=108000"
+fi
+# value to tells kernel how long to keep sockets in the state FIN-WAIT-2
+if [ -r "/proc/sys/net/ipv4/tcp_fin_timeout" ]; then
+	echo "10" > /proc/sys/net/ipv4/tcp_fin_timeout
+	echo "Setting tcp_fin_timeout=10"
+fi
+
+# value to tells the TCP/IP stack how often to send TCP keepalive packets to 
+# keep an connection alive if it is currently unused
+if [ -r "/proc/sys/net/ipv4/tcp_keepalive_time" ]; then
+	echo "1800" > /proc/sys/net/ipv4/tcp_keepalive_time
+	echo "Setting tcp_keepalive_time=1800"
+fi
+
+# 0/1 = disable/enable window scaling
+if [ -r "/proc/sys/net/ipv4/tcp_window_scaling" ]; then
+	echo "0" > /proc/sys/net/ipv4/tcp_window_scaling
+	echo "Disable tcp_window_scaling"
+fi
+
+# 0/1 = disable/enable Selective Acknowledgements (SACK)
+if [ -r "/proc/sys/net/ipv4/tcp_sack" ]; then
+	echo "0" > /proc/sys/net/ipv4/tcp_sack
+	echo "Disable tcp_sack"
+fi
+
+# 1/0 = disable/enable PING request
+if [ -r "/proc/sys/net/ipv4/icmp_echo_ignore_all" ]; then
+	echo "0" > /proc/sys/net/ipv4/icmp_echo_ignore_all
+	echo "Enable PING request"
+fi
+
+# 0/[1-7] = disable/enable dynamic IP address following
+if [ -r "/proc/sys/net/ipv4/ip_dynaddr" ]; then
+	echo "7" > /proc/sys/net/ipv4/ip_dynaddr
+	echo "Enable dynamic IP address following"
+fi
+
+# 0/1 = disable/enable smurf attacks protect
+if [ -r "icmp_echo_ignore_broadcasts" ]; then
+	echo "1" > /proc/sys/net/ipv4/icmp_echo_ignore_broadcasts
+	echo "Enable smurf attacks protect"
+fi
+
+# 0 = yes 1 = no : Don't accept source routed packets
+if [ -r "/proc/sys/net/ipv4/conf/all/accept_source_route" ]; then
+	echo "0" > /proc/sys/net/ipv4/conf/all/accept_source_route
+	echo "Enable not accept source routed packets"
+fi
+
+# 0/1 = disable/enable Syncookies
+if [ -r "/proc/sys/net/ipv4/tcp_syncookies" ]; then
+	echo "1" > /proc/sys/net/ipv4/tcp_syncookies
+	echo "Enable Syncookies protect"
+fi
+
+# 0/1 = disable/enable IP spoofing
+echo "Enable IP spoofing protect"
+for f in /proc/sys/net/ipv4/conf/*/rp_filter; do 
+	[ -r "$f" ] && echo "1" > $f
+done
+
+# 0 = yes 1 = no : Protect ICMP redirect
+echo "Enable ICMP redirect protect"
+for f in /proc/sys/net/ipv4/conf/*/accept_redirects; do 
+	[ -r "$f" ] && echo "0" > $f
+done
+
+# 0/1 = disable/enable bad error message protection
+if [ -r "/proc/sys/net/ipv4/icmp_ignore_bogus_error_responses" ]; then
+	echo "0" > /proc/sys/net/ipv4/icmp_ignore_bogus_error_responses
+	echo "Disable icmp ignore bogus error responses"
+fi
+
+# 0/1 = disable/enable Log packets with impossible addresses
+if [ -r "/proc/sys/net/ipv4/conf/all/log_martians" ]; then
+	echo "0" > /proc/sys/net/ipv4/conf/all/log_martians
+	echo "Disable log martians"
+fi
+
+# 0/1 = disable/enable IP forwarding
+if [ -r "/proc/sys/net/ipv4/ip_forward" ]; then
+	echo "0" > /proc/sys/net/ipv4/ip_forward
+	echo "Disabled IP forwarding"
+fi
+
+# shm ipc max size
+if [ -r "> /proc/sys/kernel/shmmax" ]; then
+	echo "2147483648" > /proc/sys/kernel/shmmax
+fi
+
+# pptp stuff
+if ! lsmod 2>/dev/null |grep -q ip_gre; then
+	modprobe ip_gre  > /dev/null 2>&1
+	[ $? = 0 ] && echo "Loading ip_gre"
+fi
+if ! lsmod 2>/dev/null |grep -q ip_conntrack_proto_gre; then
+	modprobe ip_conntrack_proto_gre  > /dev/null 2>&1
+	[ $? = 0 ] && echo "Loading ip_conntrack_proto_gre"
+fi
+if ! lsmod 2>/dev/null |grep -q ip_conntrack_pptp; then
+	modprobe ip_conntrack_pptp  > /dev/null 2>&1
+	[ $? = 0 ] && echo "Loading ip_conntrack_pptp"
+fi
+exit 0

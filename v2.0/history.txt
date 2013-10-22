@@ -1,0 +1,108 @@
+10/05/2003
+- first public release as Ominix Firewall
+
+Boot banner
+
+    ============================================================== 
+      ___        _      _       ___ _                     _ _ 
+     / _ \ _ __ (_)_ _ (_)_ __ | __(_)_ _ _____ __ ____ _| | |
+    | (_) | '  \| | ' \| \ \ / | _|| | '_/ -_) V  V / _\` | | |
+     \___/|_|_|_|_|_||_|_/_\_\ |_| |_|_| \___|\_/\_/\__,_|_|_|
+    
+    ==============================================================
+
+
+motd:
+        _
+     __/ /_ _____ ___  _____ ____
+    /_  __/ ___ / __ `/  ___/ _
+     / /_ / /  / /_/ /  /__/   __/
+     \__/ _/   ___,/____/____/ Network.
+
+                           moving towards future technologies
+      ___________________________________________________________________
+
+      Ominix Security System    	TraceNetwork Corporation Sdn. Bhd
+                                	6A, Jalan MJ/7
+                                	Taman Maju Jaya
+                                	Jalan Klang Lama
+                                	46000 Petaling Jaya
+                                	Selangor Darul Ehsan
+                                	MALAYSIA
+
+      www.tracenetwork.com.my      	info@tracenetwork.net
+      ___________________________________________________________________
+
+
+-----------------------------------------------------------------------
+Mybox version 1
+1.1d (28/07/2003)
+-----------------
+* fix some error msg in kernel
+* additional web interface for webmin
+* console gui using newt
+* fix network code
+* fix ids_parse, take a lot of space for portsacn log
+* fix ARP cache
+* add new package (wget,iputils)
+* add new initscript (arping.sh), send ARP update request after reboot
+* recompile new snort 2.0.1
+* fix rules.inc, update ICMP rule and default policy
+* fix javacripts code, (network.js)
+* recompile all packages
+
+1.1a (??/06/2003)
+-----------------
+* change to Mybox Series
+* fix ids_parse
+* revamp ids rules, wipe some rules.
+* fix kernel_parse, log not properly work
+* fix dmz code
+* fix policy code
+* additional web interface for webmin (system update)
+* ids config and rules define as package
+* miniserv web gui define as package - for save space in boot ramdisk
+* encrypted packages
+
+
+1.00 (15/05/2003)
+-----------------
+* revamp from ominix perl code
+* using uclibc
+* fix user session
+* fix log utilities
+* fix ids utilities
+* load filesystem on memory
+* used freedos as main OS
+* program define as package
+* fix mailer library
+* fix kernel
+* add login utilities
+* recode most of system code
+------------------------------------------------------------------------
+Mybox version 2
+
+01/5/2004
+----------
+- revamp from 1x series
+- start new architecture, switch back using glibc, we need integrade with zend encoder
+- system in one image, no more packaging files.
+- using sqlite as database, no more *ini* style database.
+- 100% code encrypted
+
+10/06/2005:
+----------
+
+- fix storage graph
+- fix ssh password generating.
+- add syslocation,syscontact to snmp (snmp.init,system_snmp.html)
+- add new fields to service_snmp tables
+create table service_snmp (
+port int not null,
+stat int not null,
+comm varchar not null,
+location varchar not null,
+contact varchar not null
+);
+- add update page
+=================================================================

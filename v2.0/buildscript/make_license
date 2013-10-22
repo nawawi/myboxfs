@@ -1,0 +1,234 @@
+#!/bin/bash
+
+ROOT_DIR=$(pwd)
+SRC_DIR=/tmp/license$$
+DST_DIR=$ROOT_DIR/license
+REL=$(date)
+_EXPIRED="none"
+mkdir -p $SRC_DIR
+
+trap "rm -rf $SRC_DIR" EXIT TERM
+
+echo "Mybox Packages"
+echo "0 - MFS-1000"
+echo "1 - MFS-2000"
+echo "2 - MFS-3000"
+echo "3 - MFS-4000"
+
+echo -n "Enter package: [0-3] (default: 0) : "
+read _NUM
+
+if [ "$_NUM" = "0" -o  "$_NUM" = "1" -o  "$_NUM" = "2" -o  "$_NUM" = "3" ]; then
+	_NUM=$_NUM
+else
+	_NUM="0"
+fi
+
+echo
+echo "Package set to -> $_NUM"
+echo
+
+echo -n "Enter Organisation Name [default: TraceNetwork Corporation (Malaysia) Sdn. Bhd.]: "
+read _ORG
+if [ "$_ORG" = "" ]; then
+	 _ORG="TraceNetwork Corporation (Malaysia) Sdn. Bhd."
+fi
+
+
+echo
+echo "Organisation set to -> $_ORG"
+echo
+
+
+echo -n "Enable Web Updates [default: N]: (Y/N) "
+read _UPDATE_YESNO
+if [ "$_UPDATE_YESNO" = "" ]; then
+	 _UPDATE_YESNO="N"
+fi
+
+
+echo
+echo "Web Updates set to -> $_UPDATE_YESNO"
+echo
+
+if [ "$_UPDATE_YESNO" = "Y" ]; then
+	echo -n "Updates URL [default: https://www.mybox.net.my]:  "
+	read _UPDATE_URL
+	if [ "$_UPDATE_URL" = "" ]; then
+        	 _UPDATE_URL="https://www.mybox.net.my"
+	fi
+
+	echo -n "Updates Username [default: mybox]:  "
+	read _UPDATE_USER
+	if [ "$_UPDATE_USER" = "" ]; then
+        	 _UPDATE_USER="mybox"
+	fi
+
+
+	echo -n "Updates Password [default: mybox123]:  "
+	read _UPDATE_PASS
+	if [ "$_UPDATE_PASS" = "" ]; then
+        	 _UPDATE_PASS="mybox123"
+	fi
+
+fi
+
+echo -n "Set license expire date [e.g; YYYYMMDD 20051002. Default: none]: "
+read _EXPIRED
+if [ "$_EXPIRED" = "" ]; then
+	 _EXPIRED="none"
+fi
+
+
+echo
+echo "Organisation set to -> $_ORG"
+echo
+
+
+NICK_NAME=$(echo "$_ORG" |cut -d ' ' -f -1)
+if [ -d "$DST_DIR/$NICK_NAME" ]; then
+	echo -n "License for $_ORG already generated. overwrite? (y/n) "
+	read ans
+	[ "$ans" = "n" ] && exit
+
+	rm -rf $DST_DIR/$NICK_NAME
+fi
+mkdir -p $DST_DIR/$NICK_NAME
+FILE_NAME="$NICK_NAME.exc"
+
+OUTPUT="
+<?
+/* Mybox Firewall System - Modules License.
+   Created: $(date)
+*/
+
+// leave this here.
+if(\$_AWIE_CODE!=\"ef3802a1fce98f3985e6a9a1f7c1a024\") exit(\"closed. not parent\");
+\$_MFS_KEY=\"5047a88a7963275e43790ee796dcb7ec\";
+
+\$_MYBOX_UPDATE[0]='$_UPDATE_YESNO';
+\$_MYBOX_UPDATE[1]='$_UPDATE_URL';
+\$_MYBOX_UPDATE[2]='$_UPDATE_USER';
+\$_MYBOX_UPDATE[3]='$_UPDATE_PASS';
+
+// pkg variable.
+\$_MYBOX_SERIAL[0]='MFS-1000';
+\$_MYBOX_SERIAL[1]='MFS-2000';
+\$_MYBOX_SERIAL[2]='MFS-3000';
+\$_MYBOX_SERIAL[3]='MFS-4000';
+
+
+\$_MYBOX_LICENSE=array();
+
+// define package here. 0-3
+\$_MYBOX_LICENSE['pkg']=\"{\$_MYBOX_SERIAL[$_NUM]}\";
+// Organisation info
+\$_MYBOX_LICENSE['org']=\"$_ORG\";
+\$_MYBOX_LICENSE['expired']=\"$_EXPIRED\";
+
+/* 
+BLT = Blacklist
+CSF = Content Security Filtering
+IPS = Intrusion Prevention System
+NAT = Network Address Translation
+ADR = Advance Routing Management
+ITS = Internet Traffic Shaper
+ILB = Internet Load Balancing
+IFS = Internet Failover System
+VPN = Virtual Private Network
+*/
+"
+if [ "$_NUM" = "0" ]; then
+OUTPUT1="
+\$_MYBOX_LICENSE['BLT']=1;
+\$_MYBOX_LICENSE['CSF']=0;
+\$_MYBOX_LICENSE['IPS']=0;
+\$_MYBOX_LICENSE['NAT']=1;
+\$_MYBOX_LICENSE['ADR']=0;
+\$_MYBOX_LICENSE['ITS']=0;
+\$_MYBOX_LICENSE['ILB']=0;
+\$_MYBOX_LICENSE['IFS']=0;
+\$_MYBOX_LICENSE['VPN']=0;
+"
+fi
+
+if [ "$_NUM" = "1" ]; then
+OUTPUT1="
+\$_MYBOX_LICENSE['BLT']=1;
+\$_MYBOX_LICENSE['CSF']=0;
+\$_MYBOX_LICENSE['IPS']=1;
+\$_MYBOX_LICENSE['NAT']=1;
+\$_MYBOX_LICENSE['ADR']=1;
+\$_MYBOX_LICENSE['ITS']=1;
+\$_MYBOX_LICENSE['ILB']=0;
+\$_MYBOX_LICENSE['IFS']=0;
+\$_MYBOX_LICENSE['VPN']=0;
+"
+fi
+
+if [ "$_NUM" = "2" ]; then
+OUTPUT1="
+\$_MYBOX_LICENSE['BLT']=1;
+\$_MYBOX_LICENSE['CSF']=0;
+\$_MYBOX_LICENSE['IPS']=1;
+\$_MYBOX_LICENSE['NAT']=1;
+\$_MYBOX_LICENSE['ADR']=1;
+\$_MYBOX_LICENSE['ITS']=1;
+\$_MYBOX_LICENSE['ILB']=0;
+\$_MYBOX_LICENSE['IFS']=1;
+\$_MYBOX_LICENSE['VPN']=1;
+"
+fi
+
+if [ "$_NUM" = "3" ]; then
+OUTPUT1="
+\$_MYBOX_LICENSE['BLT']=1;
+\$_MYBOX_LICENSE['CSF']=1;
+\$_MYBOX_LICENSE['IPS']=1;
+\$_MYBOX_LICENSE['NAT']=1;
+\$_MYBOX_LICENSE['ADR']=1;
+\$_MYBOX_LICENSE['ITS']=1;
+\$_MYBOX_LICENSE['ILB']=1;
+\$_MYBOX_LICENSE['IFS']=1;
+\$_MYBOX_LICENSE['VPN']=1;
+"
+fi
+
+OUTPUT2="
+?>
+"
+
+echo "$OUTPUT" >$SRC_DIR/$FILE_NAME
+echo "$OUTPUT1" >>$SRC_DIR/$FILE_NAME
+echo "$OUTPUT2" >>$SRC_DIR/$FILE_NAME
+
+/usr/local/Zend/bin/zendenc \
+--quiet  \
+--recursive \
+--ignore-errors \
+--short-tags on \
+--asp-tags off \
+--optimizations 1023 \
+--no-default-extensions \
+--include-ext html \
+--include-ext so \
+--include-ext inc \
+--include-ext php \
+--include-ext exc \
+--include-ext lang \
+--no-header \
+--ignore "CVS" \
+--ignore ".cvsignore"  \
+--ignore ".backup"  \
+$SRC_DIR \
+$DST_DIR/$NICK_NAME
+
+mv $DST_DIR/$NICK_NAME/$FILE_NAME $DST_DIR/$NICK_NAME/mfs-license.exc
+
+if [ -f "$DST_DIR/$NICK_NAME/mfs-license.exc" ]; then
+	echo "Output: $DST_DIR/$NICK_NAME/mfs-license.exc"
+	echo "Created: $REL" > $DST_DIR/$NICK_NAME/create.log
+	echo "Module: $_NUM" >> $DST_DIR/$NICK_NAME/create.log
+	echo "Org: $_ORG" >> $DST_DIR/$NICK_NAME/create.log
+
+fi

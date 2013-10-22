@@ -1,0 +1,548 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.so');
+chk_session();
+write_nocache();
+
+$_SYSID="network_shaper";
+if(mfs_license('IPS')!=1) die("Disabled. Please upgrade your license.\n");
+
+$db_id=db_connect($_DB_NAME);
+if(chk_pri($_LOGIN['auth_id'],1)==1) {
+	if(isset($do_id)&&$do_id=='apply_chg') {
+		echo_query("ips-restart");
+		$msg="<script>waitcount();</script>";
+	}
+	if($tab==1) {
+		if(isset($do_save)&&$do_save==1) {
+			if($ids_timeout=='') $ids_timeout=5;
+			if($ids_stat!='') $ids_stat=1;
+			if($ids_stat=='') $ids_stat=0;
+			if($pscan_stat!='') $pscan_stat=1;
+			if($pscan_stat=='') $pscan_stat=0;
+			$ids_exclude=trim($ids_exclude);
+			$pscan_exclude=trim($pscan_exclude);
+			db_query("update misc set val='$ids_stat' where name='ids_stat'",$db_id);
+			if($ids_timeout!='') db_query("update misc set val='$ids_timeout' where name='ids_timeout'",$db_id);
+			if($ids_exclude!='') db_query("update misc set val='$ids_exclude' where name='ids_exclude'",$db_id);
+			if($ids_mode!='') db_query("update misc set val='$ids_mode' where name='ids_mode'",$db_id);
+			db_query("update misc set val='$pscan_stat' where name='pscan_stat'",$db_id);
+			if($pscan_exclude!='') db_query("update misc set val='$pscan_exclude' where name='pscan_exclude'",$db_id);
+			if($pscan_mode!='') db_query("update misc set val='$pscan_mode' where name='pscan_mode'",$db_id);
+			$msg="Setting updated!.";
+		}
+	}
+	if($tab==2) {
+		if(isset($do_save)&&$do_save==2) {
+			if(is_array($del) && count($del)!=0) {
+				foreach($del as $id) {
+					db_query("update idsrules set stat='1' where id='$id'",$db_id);
+				}
+			} else {
+				if($del!='') db_query("update idsrules set stat='1' where id='$del'",$db_id);
+			}
+		}
+		if(isset($do_save)&&$do_save==3) {
+			if(is_array($del) && count($del)!=0) {
+				foreach($del as $id) {
+					db_query("update idsrules set stat='0' where id='$id'",$db_id);
+				}
+			} else {
+				if($del!='') db_query("update idsrules set stat='0' where id='$del'",$db_id);
+			}
+		}
+		if(isset($do_save)&&$do_save==4) {
+			if(is_array($del) && count($del)!=0) {
+				foreach($del as $sid) {
+					db_query("update idsopt set stat='1' where sid='$sid'",$db_id);
+				}
+			} else {
+				if($del!='') db_query("update idsopt set stat='1' where sid='$del'",$db_id);
+			}
+		}
+		if(isset($do_save)&&$do_save==5) {
+			if(is_array($del) && count($del)!=0) {
+				foreach($del as $sid) {
+					db_query("update idsopt set stat='0' where sid='$sid'",$db_id);
+				}
+			} else {
+				if($del!='') db_query("update idsopt set stat='0' where sid='$del'",$db_id);
+			}
+		}
+		if(isset($do_save)&&$do_save==6) {
+			if(is_array($del) && count($del)!=0) {
+				foreach($del as $sid) {
+					db_query("update idsopt set log='1' where sid='$sid'",$db_id);
+				}
+			} else {
+				if($del!='') db_query("update idsopt set log='1' where sid='$del'",$db_id);
+			}
+		}
+		if(isset($do_save)&&$do_save==7) {
+			if(is_array($del) && count($del)!=0) {
+				foreach($del as $sid) {
+					db_query("update idsopt set log='0' where sid='$sid'",$db_id);
+				}
+			} else {
+				if($del!='') db_query("update idsopt set log='0' where sid='$del'",$db_id);
+			}
+		}
+		if(isset($do_save)&&$do_save==8) {
+			if(is_array($del) && count($del)!=0) {
+				foreach($del as $sid) {
+					db_query("update idsopt set block='1' where sid='$sid'",$db_id);
+				}
+			} else {
+				if($del!='') db_query("update idsopt set block='1' where sid='$del'",$db_id);
+			}
+		}
+		if(isset($do_save)&&$do_save==9) {
+			if(is_array($del) && count($del)!=0) {
+				foreach($del as $sid) {
+					db_query("update idsopt set block='0' where sid='$sid'",$db_id);
+				}
+			} else {
+				if($del!='') db_query("update idsopt set block='0' where sid='$del'",$db_id);
+			}
+		}
+		unset($del,$id);
+	}
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied!.";
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+if(!isset($do_tab)||$do_tab=='') $do_tab=1;
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script language="javascript" src="<?echo $_URL_PATH;?>/j/strings.js"></script>
+<script language="javascript">
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+</script>
+<script language="javascript">
+	function do_submit() {
+		<?if($tab==1) {?>
+		document.f.btsubmit.disabled=true;
+		document.f.do_save.value='1';
+		<? } ?>
+		document.f.submit();
+		return true;
+	}
+	function dotoggle() {
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					document.f.elements[i].checked = !(document.f.elements[i].checked);
+    				}	
+			}
+  		}
+	}
+	function chkdel() {
+		var x='0';
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					if(document.f.elements[i].checked) x++;
+    				}	
+			}
+  		}
+		if(x==0) return false;
+		return true;
+	}
+	function do_active(val) {
+		if(chkdel()==true) {
+			document.f.do_save.value=val;
+			document.f.submit();
+			return true;
+		}
+		return false;
+	}
+
+var k=0;
+function waitcount() { 
+ 	k=k+2;
+	if(k <= 100) {
+    		msg.innerHTML='Reloading.. Please wait..'+k+'%'; 
+    		setTimeout(waitcount,200);  
+	} else {
+		self.location.href='<?echo "$_URL_PATH/fw_ips.html?tab=$tab&do_tab=$do_tab&col=$col&col2=$col2";?>';
+	}
+}
+
+</script>
+</head>
+<body scroll=auto>
+<form name=f method=post action="<?echo "$_URL_PATH/fw_ips.html";?>" onsubmit="return do_submit();">
+<table border="0" cellpadding="4" cellspacing="4" width="700" align=center>
+<tr>
+<td align=center>
+
+<!-- main -->
+<fieldset>
+<legend>&nbsp;&nbsp;&nbsp;&nbsp;
+FIREWALL: IPS
+&nbsp;&nbsp;&nbsp;&nbsp;</legend>
+
+<table valign=top border=0>
+<tr>
+<td>
+<table border=0 cellpadding="2" cellspacing="2">
+<tr>
+<td align=center valign=middle>
+
+<table width="650" border="0" cellpadding="0" cellspacing="0">
+<tr><td>
+<ul id="tabnav">
+<li class="<?if($tab==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=1) { echo "<a href=\"$_URL_PATH/fw_ips.html?tab=1\">"; }?>Setting<?if($tab!=1) { echo "</a>"; }?></li>
+<li class="<?if($tab==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=2) { echo "<a href=\"$_URL_PATH/fw_ips.html?tab=2\">"; }?>Signatures<?if($tab!=2) { echo "</a>"; }?></li>
+</ul>
+</td></tr>
+
+<?if($tab==1) {
+$result=db_query("select * from misc where name like \"ids_%\" or name like \"pscan_%\"",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_name=$row['name'];
+		$_val=$row['val'];
+		if($_name=='ids_timeout') $_ids_timeout=$_val;
+		if($_name=='ids_stat') $_ids_stat=$_val;
+		if($_name=='ids_exclude') $_ids_exclude=trim($_val);
+		if($_name=='ids_mode') $_ids_mode=trim($_val);
+		if($_name=='pscan_stat') $_pscan_stat=$_val;
+		if($_name=='pscan_exclude') $_pscan_exclude=trim($_val);
+		if($_name=='pscan_mode') $_pscan_mode=trim($_val);
+		if($_ids_stat==1) $_ids_stat1='checked';
+		if($_pscan_stat==1) $_pscan_stat1='checked';
+	}
+}
+
+?>
+<script language="javascript">
+function do_chk() {
+	if(document.f.ids_stat.checked==true) {
+		document.f.ids_timeout.disabled=false;
+		document.f.ids_mode.disabled=false;
+		document.f.ids_exclude.disabled=false;
+		document.f.pscan_stat.disabled=false;
+		document.f.pscan_mode.disabled=false;
+		document.f.pscan_exclude.disabled=false;
+	} else {
+		document.f.ids_timeout.disabled=true;
+		document.f.ids_mode.disabled=true;
+		document.f.ids_exclude.disabled=true;
+		document.f.pscan_stat.disabled=true;
+		document.f.pscan_mode.disabled=true;
+		document.f.pscan_exclude.disabled=true;
+	}
+}
+function do_chk2() {
+	if(document.f.ids_stat.checked==true) {
+		if(document.f.pscan_stat.checked==true) {
+			document.f.pscan_mode.disabled=false;
+			document.f.pscan_exclude.disabled=false;
+		} else {
+			document.f.pscan_mode.disabled=true;
+			document.f.pscan_exclude.disabled=true;
+		}
+	}
+}
+</script>
+<tr> 
+<td class="tabcont">
+<?if($msg!='') {?>
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span id=msg class=notice><?echo "$msg";?></span></td></tr>
+</table><br>
+<? }?>
+
+<table width="600" border="0" cellpadding="6" cellspacing="0">
+<tr> 
+<td width="30%" valign="middle" class="tdcelltop">Enable IPS</td>
+<td width="70%" valign="middle" class="mtabletop"> 
+<input type=checkbox name=ids_stat <?echo $_ids_stat1;?> onclick='do_chk();'>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Blocking life time</td>
+<td width="70%" valign="middle" class="mtable">
+<input name="ids_timeout" type="text" class="textbox" size="10" value="<?echo $_ids_timeout;?>"> minute(s); 0 to never unblock.
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">IPS protection mode</td>
+<td width="70%" valign="middle" class="mtable"> 
+<select name=ids_mode size=1 class=textbox>
+<?
+foreach(array('Inbound'=>'1','Outbound'=>'2','Both'=>'3') as $m => $v) {
+	if($_ids_mode==$v) {
+		echo "<option value='$v' selected>$m</option>";
+	} else {
+		echo "<option value='$v'>$m</option>";
+	}
+}
+?>
+</select>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="top" class="tdcell">IPS whitelist</td>
+<td width="70%" valign="middle" class="mtable">
+<table border=0 cellpadding=1 cellspacing=1>
+<tr><td valign=top> 
+<textarea name="ids_exclude" class="textbox" cols=40 rows=3>
+<?
+$list=preg_split('/\s+/',$_ids_exclude);
+if(count($list)!=0) {
+	foreach($list as $ip) {
+		if($ip!='') echo "$ip ";
+	}
+} else {
+	if($_ids_exclude!='') echo "$_ids_exclude";
+}	
+?>
+</textarea></td>
+<td valign=bottom>Each IP separate by space.<br>By default Mybox will ignore Network Interface and IP Address from access list.
+</td></tr></table>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Enable Portscan Detector</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input type=checkbox name=pscan_stat <?echo $_pscan_stat1;?> onclick='do_chk2();'>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Portscan protection mode</td>
+<td width="70%" valign="middle" class="mtable"> 
+<select name=pscan_mode size=1 class=textbox>
+<?
+foreach(array('Inbound'=>'1','Outbound'=>'2','Both'=>'3') as $m => $v) {
+	if($_pscan_mode==$v) {
+		echo "<option value='$v' selected>$m</option>";
+	} else {
+		echo "<option value='$v'>$m</option>";
+	}
+}
+?>
+</select>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="top" class="tdcell">Portscan Ignore Host</td>
+<td width="70%" valign="middle" class="mtable">
+<table border=0 cellpadding=1 cellspacing=1>
+<tr><td valign=top> 
+<textarea name="pscan_exclude" class="textbox" cols=40 rows=3>
+<?
+$list=preg_split('/\s+/',$_pscan_exclude);
+if(count($list)!=0) {
+	foreach($list as $ip) {
+		if($ip!='') echo "$ip ";
+	}
+} else {
+	if($_pscan_exclude!='') echo "$_pscan_exclude";
+}	
+?>
+</textarea></td>
+<td valign=bottom>Each IP separate by space.<br>By default Mybox will ignore Network Interface and IP Address from access list.
+</td></tr></table>
+</td>
+</tr>
+</table>
+<tr><td align=right valign=top><input name=btapply type="button" value="Apply changes" class="button" onclick="self.location.href='<?echo $_URL_PATH;?>/fw_ips.html?tab=1&do_id=apply_chg'"><input name=btsubmit type="submit" value="Save" class="button"></td></tr>
+<script>do_chk();do_chk2();</script>
+<? } // tab==1 ?>
+<?if($tab==2) {
+	if($do_tab==1) {
+?>
+
+<table width="650" border="0" cellpadding="0" cellspacing="0"> 
+<tr><td class="tabcont">
+<?if($msg!='') {?>
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span id=msg class=notice><?echo "$msg";?></span></td></tr>
+</table><br>
+<? } ?>
+<table width="600" border=0 cellpadding="1" cellspacing="2" class=tablist>
+<tr class=bgcolor3>
+<td class=tdlistop width=1%></td>
+<td class=tdlistop align=center>Name</td>
+<td class=tdlistop>Rule count</td>
+<td class=tdlistop>Size</td>
+<td class=tdlistop width=2% align=center>Active</td>
+<td class=tdlistop width=2%>Opt</td>
+</tr>
+<?
+$t=0;
+$result=db_query("select * from idsrules",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_id=$row['id'];
+		$_sig=$row['sig'];
+		$_stat=$row['stat'];
+		$size='';
+		$file="/usr/ips_rules/mfs-rules/$_sig";
+		if(file_exists($file)) {
+			$t=1;
+			$size=sprintf("%u",filesize($file));
+			$size=size_readable($size,null,'%d%s');
+			$cnt=count(file($file));
+			$f='rule';
+			if($cnt > 1) $f='rules';
+			$_stat1=2;
+			if($_stat==1) $_stat1=3;
+			$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background:#ffffff;cursor:hand;'";
+			$lo="onclick=\"self.location.href='$_URL_PATH/fw_ips.html?tab=2&do_tab=2&id=$_id&sig=$_sig';\" ";
+			echo "<tr $lt>";
+			echo "<td class=tdlistb width=1%><a href='#' $lo>{$_PNG['df_close']}</a></td>";
+			echo "<td class=tdlistb align=center $lo><b>$_sig</b></td>";
+			echo "<td class=tdlistb $lo>$cnt $f</td>";
+			echo "<td class=tdlistb $lo>$size</td>";
+			echo "<td class=tdlistb width=2% align=center $lo><a href='$_URL_PATH/fw_ips.html?tab=2&do_tab=1&do_save=$_stat1&del=$_id'>{$_PNG_YESNO[$_stat]}</a></td>";
+			echo "<td width=2% class=tdlistb align=right><input type=checkbox name=del[] value=$_id></td></tr>";
+
+		}
+		unset($file,$size,$cnt);
+	}
+}
+if($t==1) {
+?>
+<tr>
+<td align=right valign=top class=tdlist colspan=6><a href="#" onclick='do_active(3);'>Disable</a> / <a href="#" onclick='do_active(2);'>Enable</a> / <a href="#" onclick='dotoggle();'>Toggle</a> <?echo $_PNG['arrow_rtr'];?></td>
+</tr>
+<? } ?>
+</tr></td>
+</table>
+<tr><td align=right valign=top><input name=btapply type="button" value="Apply changes" class="button" onclick="self.location.href='<?echo $_URL_PATH;?>/fw_ips.html?tab=2&do_id=apply_chg'"></td></tr>
+
+<? 
+	} // do_tab==1
+	if($do_tab==2) {
+?>
+<script language="javascript">
+function log_win(file) {
+	LeftPosition = (screen.width) ? (screen.width-620)/2 : 0;
+	TopPosition = (screen.height) ? (screen.height-530)/2 : 0;
+	settings='width=620,height=530,top='+TopPosition+',left='+LeftPosition+',scrollbars=1,status=1,resizable=1';
+	index="sigread.html?fo="+file;
+	win=window.open(index,"sigwin<?echo time();?>",settings);
+	if(parseInt(navigator.appVersion) >= 4){win.window.focus();}
+	return true;
+}
+</script>
+<table width="650" border="0" cellpadding="0" cellspacing="0"> 
+<tr><td class="tabcont">
+<?if($msg!='') {?>
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span id=msg class=notice><?echo "$msg";?></span></td></tr>
+</table><br>
+<? } ?>
+<table width="600" border=0 cellpadding="1" cellspacing="2" class=tablist>
+<tr class=bgcolor3>
+<td class=tdlistop width=1%><a href='#' onclick="self.location.href='<?echo "$_URL_PATH/fw_ips.html?tab=2&do_tab=1"?>';" title='Back to main'><?echo $_PNG['df_up'];?></a></td>
+<td class=tdlistop align=center>Name</td>
+<td class=tdlistop>Message</td>
+<td class=tdlistop width=2% align=center>Log</td>
+<td class=tdlistop width=2% align=center>Block</td>
+<td class=tdlistop width=2% align=center>Active</td>
+<td class=tdlistop width=2%>Opt</td>
+</tr>
+<?
+$t=0;
+$file="/usr/ips_rules/mfs-rules/$sig";
+if(file_exists($file)) {
+	$buff=file2array($file);
+	if(count($buff)!=0) {
+		foreach($buff as $line) {
+			$line=trim($line);
+			//if(preg_match("/^#/",$line)) continue;
+			if($line=='') continue;
+			if(preg_match("/\s+sid:(\d+)\;/",$line,$mm)) {
+				$_id=$mm[1];
+			}
+			if(preg_match("/msg:\"([A-z0-9_\-\!\@\/\. ]+)\"\;/",$line,$mm)) {
+				$_msg=$mm[1];
+			}
+			if($_id!='' && $_msg!='') {
+				$_R[$_id]=trim($_msg);
+			}
+			unset($_id,$_msg);
+		}
+		
+	}
+	if(count($_R)!=0) {
+		$t=1;
+		foreach($_R as $_sid => $_msg) {
+			$result=db_query("select * from idsopt where sid='$_sid'",$db_id);
+			if(db_num_rows($result)!=0) {
+				while($row=db_fetch_array_assoc($result)) {
+					$_log=$row['log'];
+					$_block=$row['block'];
+					$_stat=$row['stat'];
+					$_stat1=4;
+					if($_stat==1) $_stat1=5;
+					$_log1=6;
+					if($_log==1) $_log1=7;
+					$_block1=8;
+					if($_block==1) $_block1=9;
+					$_msg=htmlspecialchars($_msg);
+					$_msg=str_add_break($_msg,60);
+					$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background:#ffffff;cursor:hand;'";
+					echo "<tr $lt>";
+					echo "<td class=tdlistb width=1% onclick=\"log_win('$sig');\">{$_PNG['file']}</td>";
+					echo "<td class=tdlistb align=center $lo><b>$sig</b></td>";
+					echo "<td class=tdlistb $lo>$_msg</td>";
+					echo "<td class=tdlistb width=2% align=center $lo><a href='$_URL_PATH/fw_ips.html?tab=2&do_tab=2&do_save=$_log1&del=$_sid&sig=$sig'>{$_PNG_YESNO[$_log]}</a></td>";
+					echo "<td class=tdlistb width=2% align=center $lo><a href='$_URL_PATH/fw_ips.html?tab=2&do_tab=2&do_save=$_block1&del=$_sid&sig=$sig'>{$_PNG_YESNO[$_block]}</a></td>";
+					echo "<td class=tdlistb width=2% align=center $lo><a href='$_URL_PATH/fw_ips.html?tab=2&do_tab=2&do_save=$_stat1&del=$_sid&sig=$sig'>{$_PNG_YESNO[$_stat]}</a></td>";
+					echo "<td width=2% class=tdlistb align=right><input type=checkbox name=del[] value=$_sid></td></tr>";
+				}
+			}
+			unset($result,$_R);
+		}
+
+	}
+}
+if($t==1) {
+?>
+<tr>
+<td align=right valign=top class=tdlist colspan=7>[ <a href="#" onclick='do_active(9);'>Noblock</a> / <a href="#" onclick='do_active(8);'>Block</a> ]-[ <a href="#" onclick='do_active(7);'>Nolog</a> / <a href="#" onclick='do_active(6);'>Log</a> ]-[ <a href="#" onclick='do_active(5);'>Disable</a> / <a href="#" onclick='do_active(4);'>Enable</a> ] <a href="#" onclick='dotoggle();'>Toggle</a> <?echo $_PNG['arrow_rtr'];?></td>
+</tr>
+<? } ?>
+</tr>
+</td></table>
+<tr><td align=right valign=top><input name=btapply type="button" value="Apply changes" class="button" onclick="self.location.href='<?echo $_URL_PATH;?>/fw_ips.html?tab=2&do_id=apply_chg'"></td></tr>
+
+<? 
+	} // do_tab==2
+} // tab==2 ?>
+<!-- end main -->
+</table>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+</table>
+</fieldset><br><br>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?echo $tab;?>>
+<input type=hidden name=do_tab value=<?echo $do_tab;?>>
+<input type=hidden name=col value=<?echo $col;?>>
+<?if($do_tab==2) {?>
+<input type=hidden name=sig value=<?echo $sig;?>>
+<? } ?>
+</form>
+</body>
+</html>
+
+<?db_close($db_id); flush();?>

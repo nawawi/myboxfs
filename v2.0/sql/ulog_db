@@ -1,0 +1,9 @@
+BEGIN TRANSACTION;
+CREATE TABLE log (
+id integer primary key,
+ltime VARCHAR NOT NULL,
+who VARCHAR NOT NULL,
+host VARCHAR NOT NULL,
+status VARCHAR NOT NULL
+);
+COMMIT;

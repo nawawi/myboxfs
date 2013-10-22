@@ -1,0 +1,42 @@
+#!/bin/bash -e 
+
+START_POINT=$(pwd)
+
+SYS_DIR="
+ramd dev proc tmp bin lib etc service/tools strg \
+service/www var/spool/cron/crontabs \
+var/spool/mqueue var/sys var/run var/log"
+
+TERMLIST="
+/usr/share/terminfo/x/xterm
+/usr/share/terminfo/l/linux
+/usr/share/terminfo/v/vt100
+"
+
+for f in $SYS_DIR; do
+	mkdir -p $f
+done
+
+for l in $TERMLIST; do
+        lb=$(dirname $l)
+        mkdir -vp $START_POINT/$lb
+        cp -v $l $START_POINT/$lb
+done
+
+cp -av /usr/share/tabset ./usr/share
+
+#chmod 700 *
+cd $START_POINT/etc
+chmod -R 600 *
+cd ..
+touch $START_POINT/var/sys/mfsque
+chmod 600 $START_POINT/var/sys/mfsque
+mkfifo $START_POINT/var/log/kernel -m 600
+mkfifo $START_POINT/var/log/system -m 600
+mknod $START_POINT/dev/console c 5 1
+mknod $START_POINT/dev/ram0 b 1 0
+mknod $START_POINT/dev/null c 1 3
+
+cd $START_POINT
+ln -s /etc/profile $START_POINT/.bashrc
+touch $START_POINT/etc/mtab

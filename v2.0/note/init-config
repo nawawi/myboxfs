@@ -1,0 +1,36 @@
+::respawn:/sbin/getty 38400 /dev/vc/1
+#vc/1::respawn:/sbin/getty 38400 /dev/vc/1
+vc/2::respawn:/sbin/getty 38400 /dev/vc/2
+vc/4::respawn:/sbin/getty 38400 /dev/vc/4
+vc/5::respawn:/sbin/getty 38400 /dev/vc/5
+
+console=/dev/tts/0,19200
+
+serial
+------
+
+ - Command: serial [`--unit=unit'] [`--port=port'] [`--speed=speed']
+          [`--word=word'] [`--parity=parity'] [`--stop=stop']
+          [`--device=dev']
+     Initialize a serial device. UNIT is a number in the range 0-3
+     specifying which serial port to use; default is 0, that corresponds
+     the port often called COM1. PORT is the I/O port where the UART is
+     to be found; if specified it takes precedence over UNIT.  SPEED is
+     the transmission speed; default is 9600. WORD and STOP are the
+     number of data bits and stop bits. Data bits must be in the range
+     5-8 and stop bits are 1 or 2. Default is 8 data bits and one stop
+     bit. PARITY is one of `no', `odd', `even' and defaults to `no'.
+     The option `--device' can only be used in the grub shell and is
+     used to specify the tty device to be used in the host operating
+     system (*note Invoking the grub shell::).
+
+     The serial port is not used as a communication channel unless the
+     `terminal' command is used (*note terminal::).
+
+     This command is only available if GRUB is compiled with serial
+     support. See also *Note Serial terminal::.
+
+serial --unit=0 --speed=9600 --device=/dev/tts/0
+
+tts/0::respawn:/bin/getty -L tts/0 115200 vt100
+tts/1::respawn:/bin/getty -L tts/1 115200 vt100

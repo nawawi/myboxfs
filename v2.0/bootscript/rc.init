@@ -1,0 +1,136 @@
+#!/bin/sh
+# +-----------------------------------------------------------------------------+
+# | Copyright (c) 2002-2005 Tracenetwork Corporation Sdn. Bhd.           	|
+# +-----------------------------------------------------------------------------+
+# | This source file is belongs to nawawi, the author.                    	|
+# | Any changes/use of the source, please email to the author.           	|
+# +-----------------------------------------------------------------------------+
+# | Authors: nawawi, Mohd nawawi Mohamad Jamili <nawawi@tracenetwork.com.my 	|
+# +-----------------------------------------------------------------------------+
+#
+# post scripts:
+#	1. /strg/post-boot 		<-- extra for boot
+#	2. /strg/post-rules 		<-- extra for policy
+# updates:
+#	1. /strg/mybox/updates		<-- system pre-update
+#	2. /strg/mybox/updates/ips	<-- IPS signatures
+#
+
+trap : 1 2 3 15
+PATH="/bin"
+TERM=linux
+export PATH TERM
+umask 022
+
+echo "0 0 0 0" > /proc/sys/kernel/printk
+freeramdisk /dev/ram0 > /dev/null 2>&1
+echo "
+#!/bin/sh
+echo "mfs"
+" > /bin/groups
+chmod 700 /bin/groups
+
+# update files
+if [ -d "/strg/mybox/updates" ]; then
+	echo "Checking system updates.."
+	mkdir -p /tmp/mfsupdate > /dev/null 2>&1
+	for f in /strg/mybox/updates/*.bz2; do
+		if [ -f "$f" ]; then
+			tar -C /tmp/mfsupdate -jxf $f
+			wait
+			FF=$(basename $f .bz2)
+			[ -f "/tmp/mfsupdate/$FF/setup.sh" ] && /tmp/mfsupdate/$FF/setup.sh > /dev/null 2>&1
+			FF=
+		fi
+	done
+	rm -rf /tmp/mfsupdate >/dev/null 2>&1
+fi
+
+if [ -f "/strg/mybox/updates/ips/sig.bz2" ]; then
+	mv /usr/ips_rules/mfs-rules /usr/ips_rules/mfs-rules.bak
+	wait
+	tar -C /usr/ips_rules/ -jxf /strg/mybox/updates/ips/sig.bz2
+	if [ $? = 0 ]; then
+		echo "Extracting IPS signatures.."
+	else
+		rm -rf /usr/ips_rules/mfs-rules
+		wait
+		mv /usr/ips_rules/mfs-rules.bak /usr/ips_rules/mfs-rules
+	fi
+fi
+
+if [ -d "/strg/mybox/misc" ]; then
+	for f in /strg/mybox/misc/*.tgz;do
+		tar -C / -zxf $f
+		wait
+	done
+fi
+
+if [ -f "/etc/microcode.dat" ]; then 
+	/bin/microcode_ctl -Qui >/dev/null 2>&1
+	rm -f /etc/microcode.dat /bin/microcode_ctl >/dev/null 2>&1
+fi
+
+# dummy function to show if we have correct driver.
+network_touch() {
+	echo "127.0.0.1 localhost" > /etc/hosts
+	NET_DEVICE=$(awk -F: '/eth.:/{print $1}' /proc/net/dev)
+	if [ -n "$NET_DEVICE" ]; then
+		echo -n "Detecting network interfaces.."
+		for x in $NET_DEVICE; do
+			ip link set $x up >/dev/null 2>&1
+			if [ $? = 0 ]; then
+				echo -n "$x "
+				ip link set $x down >/dev/null 2>&1	
+			fi
+		done
+		ip route flush cache >/dev/null 2>&1
+		ip route flush table main >/dev/null 2>&1
+		echo ""
+	else
+		echo "No network device found"
+		touch /tmp/.nonetwork
+	fi
+}
+
+# clean rc.bootup stuff
+umount /initrd >/dev/null 2>&1
+rm -rf /initrd >/dev/null 2>&1
+rm -f /rc.bootup >/dev/null 2>&1
+
+network_touch
+grep -v 'rootfs' /proc/mounts >/etc/mtab
+
+chmod 700 /service/www/*.html >/dev/null 2>&1
+chmod 700 /service/tools/*.exc >/dev/null 2>&1
+
+if [ -f "/etc/rc.start" ]; then
+	chmod 700 /service/init/* >/dev/null 2>&1
+	/etc/rc.start
+fi
+if [ -f "/strg/post-boot" ]; then
+	chmod 700 /strg/post-boot >/dev/null 2>&1
+	/strg/post-boot >/dev/null 2>&1
+	if [ $? = 0 ]; then
+		echo "post-boot "
+	fi
+fi
+
+if [ -f "/strg/post-rules" ]; then
+	chmod 700 /strg/post-rules >/dev/null 2>&1
+	/strg/post-rules >/dev/null 2>&1
+	if [ $? = 0 ]; then
+		echo "post-rules " 
+	fi
+fi
+
+# clean. save space
+rm -f /etc/inittab >/dev/null 2>&1
+rm -f /etc/rc.init >/dev/null 2>&1
+rm -f /etc/rc.start >/dev/null 2>&1
+rm -rf /tmp/* /usr/share/fonts /etc/devfsd.conf >/dev/null 2>&1
+rm -f /strg/mybox/download/* >/dev/null 2>&1
+exec >/dev/console </dev/console 2>&1
+echo "1 4 1 7" > /proc/sys/kernel/printk
+trap 1 2 3 15
+

@@ -1,0 +1,208 @@
+#!/bin/sh
+# +-----------------------------------------------------------------------------+
+# | Copyright (c) 2002-2005 Tracenetwork Corporation Sdn. Bhd.           	|
+# +-----------------------------------------------------------------------------+
+# | This source file is belongs to nawawi, the author.                    	|
+# | Any changes/use of the source, please email to the author.           	|
+# +-----------------------------------------------------------------------------+
+# | Authors: nawawi, Mohd nawawi Mohamad Jamili <nawawi@tracenetwork.com.my 	|
+# +-----------------------------------------------------------------------------+
+
+trap : 1 2 3 15
+PATH="/bin"
+TERM=linux
+export PATH TERM
+umask 022
+
+# we use grub now
+DISK_BOOT=/dev/hda1:ext3
+DISK_STRG=/dev/hda3:ext3
+DISK_SWAP=/dev/hda2
+
+BOOT_DEV=
+BOOT_FS=
+STRG_DEV=
+STRG_FS=
+SWAP_DEV=
+
+DO_SINGLE=0
+
+cd /
+
+do_sleep() {
+        local spin="- \\ | / \\ | /";
+        local pt="0"
+        for((i=1; i <= 20 ; i++)); do
+        let pt=pt+5
+        for f in $spin; do
+        usleep 0
+                echo -ne "$1 $pt% $f  \r"
+        done
+        done
+        echo -ne "$1 100% OK  \r"
+        echo ""
+}
+
+read_cmdline() {
+        if [ -z "$1" ]; then
+                return 0
+        fi
+        egrep -io "(^|[[:space:]]+)$1=([^[:space:]]+)" /proc/cmdline | egrep -io "[^=]+\$"
+}
+
+# hd function
+disk_value() {
+	local b=
+	local c=
+	local s=
+	b=$(read_cmdline hd-boot)
+	if [ "$b" != "" ]; then
+		BOOT_DEV=$(echo $b |tr -s ':' ' ' | awk '{print $1}')
+		BOOT_FS=$(echo $b |tr -s ':' ' ' | awk '{print $2}')
+	else 
+		BOOT_DEV=$(echo $DISK_BOOT |tr -s ':' ' ' | awk '{print $1}')
+		BOOT_FS=$(echo $DISK_BOOT |tr -s ':' ' ' | awk '{print $2}')
+	fi
+	c=$(read_cmdline hd-strg)
+	if [ "$c" != "" ]; then
+		STRG_DEV=$(echo $c |tr -s ':' ' ' | awk '{print $1}')
+		STRG_FS=$(echo $c |tr -s ':' ' ' | awk '{print $2}')
+	else 
+		STRG_DEV=$(echo $DISK_STRG |tr -s ':' ' ' | awk '{print $1}')
+		STRG_FS=$(echo $DISK_STRG |tr -s ':' ' ' | awk '{print $2}')
+	fi
+	s=$(read_cmdline hd-swap)
+	if [ "$s" != "" ]; then
+		SWAP_DEV=$(echo $s |tr -s ':' ' ' | awk '{print $1}')
+	else
+		SWAP_DEV=$(echo $DISK_SWAP |tr -s ':' ' ' | awk '{print $1}')
+	fi
+	
+}
+
+echo " 
++=============================================================================
+| Mybox Firewall System Second Edition	
+| Copyright (c) Tracenetwork Corporation Sdn. Bhd.
++=============================================================================
+"
+
+#mkdir -p /ramd
+
+mount -n -t proc virtual /proc
+mount -n -t devfs virtual /dev
+
+FOUNDMEM="$(awk '/MemTotal/{print $2}' /proc/meminfo)"
+TOTALMEM="$(awk 'BEGIN{m=0};/MemFree|Cached/{m+=$2};END{print m}' /proc/meminfo)"
+if [ -z "$FOUNDMEM" -o "$FOUNDMEM" = 0 ]; then
+	echo "memory counting failed!"
+	exit 1
+fi
+echo "---- Total memory found: $FOUNDMEM kB"
+do_sleep "---- Initializing.."
+
+MINSIZE=2000
+MINLEFT=16000
+MAXSIZE="$(expr $TOTALMEM - $MINLEFT)"
+RAMSIZE="$(expr $TOTALMEM / 5)"
+
+if test -n "$TOTALMEM" -a "$TOTALMEM" -gt "$MINLEFT"; then
+	test -z "$RAMSIZE" && RAMSIZE=65536
+	RAMSIZE=$(expr $RAMSIZE \* 4)
+fi
+
+echo "---- Creating filesystem (dynamic size=${RAMSIZE} kB) on shared memory..."
+mount -n -t tmpfs -o "rw,size=${RAMSIZE}k" virtual /ramd
+chmod 700 /ramd > /dev/null 2>&1
+cd /ramd
+for f in /*; do case $f in /lost+found|/ramd|/proc|/dev);; *) cp -dpR $f /ramd/ ;; esac done
+mkdir -p dev initrd
+mount -n -t devfs virtual dev > /dev/null 2>&1
+
+umount /proc
+umount /dev
+
+pivot_root . initrd
+
+cd /
+mkdir proc
+chmod 700 proc tmp dev lib bin var
+mount -t proc virtual /proc
+echo "0" > /proc/sys/kernel/printk
+
+for f in /tmp/*.bz2;do
+	tar -C / -jxf $f
+done
+echo "/bin/modprobe" > /proc/sys/kernel/modprobe
+depmod -qa >> /dev/null 2>&1
+
+[ $? = 0 ] && echo -e "---- Searching modules dependency.."
+nic=$(find /lib/modules/*/kernel/drivers/net/*.o)
+for f in $nic; do
+	f=$(basename $f .o)
+	echo -ne "---- Scanning for $f..                                \r"
+	modprobe -q -k $f >> /dev/null 2>&1
+done
+
+scsi=$(find /lib/modules/*/kernel/drivers/scsi/*.o)
+for f in $scsi; do
+	f=$(basename $f .o)
+	echo -ne "---- Scanning for $f..                                  \r"
+	modprobe -q -k $f >> /dev/null 2>&1
+done
+echo -e "                                  \r---- Scanning done."
+
+# hd detection
+disk_value >/dev/null 2>&1
+
+# devfsd stuff
+devfsd /dev -np >/dev/null 2>&1
+
+
+mkdir -p /strg >/dev/null 2>&1
+mount -t $STRG_FS $STRG_DEV /strg >/dev/null 2>&1
+if [ $? = 0 ]; then
+	touch /var/sys/.mount_strg
+	mkdir -p /strg/mybox/{db,download,localsave,update,logs} >/dev/null 2>&1
+else
+	echo "**** Mounting Storage Disk Failed! ****"
+	echo "*** Dropping you to an image system ****"
+	DO_SINGLE=1
+	PS1="(post-single)# "
+	export PS1
+	/bin/sh
+fi
+
+if [ "$DO_SINGLE" = 1 ]; then
+	trap : 1 2 3 15
+	echo -e "\n---- Leaving post-single command\n"
+fi
+
+swapon $SWAP_DEV >/dev/null 2>&1
+[ $? = 0 ] && touch /var/sys/.mount_swap
+
+ln -s /etc/profile /.bashrc >/dev/null 2>&1
+chmod 700 * >/dev/null 2>&1
+
+echo "
+::sysinit:/etc/rc.init
+tts/0::respawn:/bin/getty -h -n -L tts/0 9600 vt100
+::restart:/bin/init
+::ctrlaltdel:/etc/rc.shutdown
+::ctrlaltdel:/bin/reset
+::ctrlaltdel:/bin/reboot
+::shutdown:/etc/rc.shutdown
+" > /etc/inittab
+
+DDATE=$(date +"%d/%m/%Y %T")
+LOGNAME="system-$(date +%Y%m%d).log"
+[ ! -d "/strg/mybox/logs" ] && mkdir -p /strg/mybox/logs >/dev/null 2>&1
+echo "[$DDATE] ****** SYSTEM UP ******" >> /strg/mybox/logs/$LOGNAME
+
+exec chroot . /bin/init < /dev/console > /dev/console 2>&1
+
+echo "********** ERROR! **********"
+echo "You are not supposed to be here, something went wrong!"
+echo "calling chroot failed?"
+echo "Press Ctrl+Alt+Del for reboot."
+while [ 1 = 1 ]; do sh; done

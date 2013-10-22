@@ -1,0 +1,218 @@
+#!/bin/bash
+
+START_POINT=$(pwd)
+ROOT_DIR=$START_POINT/core_fs_mnt
+mkdir -p $START_POINT/shc-src
+
+BB_SRC="/root/source/busybox-small"
+BBLINK="$(cat $BB_SRC/busybox.links |sed -e 's/\/sbin\///g' -e 's/\/bin\///g' |grep -v '^\/')"
+BINLIST="/bin/mount /bin/bash /bin/umount"
+
+function copy_binary() {
+        if [ -z "$1" ]; then
+                echo "Usage: $0 binary";
+                exit;
+        fi
+
+        file=$1
+
+        if [ -x "$file" ]; then
+                dirname=$(dirname $file)
+                basename=$(basename $file)
+                bindir="$ROOT_DIR/bin"
+        else
+                echo "file '$file' not found"
+                exit
+        fi
+
+        cp -v $file $bindir
+        chmod -v a-srwx $bindir/$basename
+        chmod -v u+rwx $bindir/$basename
+        strip $bindir/$basename
+        #upx-kernel -9 $bindir/$basename
+        echo "++ compressing.. $bindir/$basename"
+        upx-kernel -q --best $bindir/$basename >/dev/null
+
+        LO=$(ldd $file |tr -d '^\t' |sed -e 's/=>//g' |cut -d ' ' -f 3)
+        if [ "$LO" != "" ]; then
+                for f in $LO; do
+                        LS=
+                        if [ -n "$f" ]; then
+                                echo "++ $f"
+                                fd=
+                                if [ -L "$f" ]; then
+                                        fd=$(dirname $f)
+                                        #LS=$(ls -l $f |cut -d '>' -f 2 |tr -d '^ ')
+                                        LS=$(readlink $f)
+                                        LS="$fd/$LS"
+                                else
+                                        LS=$f
+                                fi
+                                if [ -e "$LS" ]; then
+                                        d=$(dirname $f)
+                                        if [ ! -d "$ROOT_DIR/$d" ]; then
+                                                mkdir -vp $ROOT_DIR/lib
+                                        fi
+                                        bd1=$(basename $LS)
+                                        bd2=$(basename $f)
+                                        if [ ! -f "$ROOT_DIR/lib/$bd1" ]; then
+                                                cp -av $LS $ROOT_DIR/lib
+                                                strip $ROOT_DIR/lib/$bd1
+                                        fi
+                                        if [ ! -f "$ROOT_DIR/lib/$bd2" ]; then
+                                                cp -av $f $ROOT_DIR/lib
+                                                strip $ROOT_DIR/lib/$bd2
+                                        fi
+                                fi
+                        fi
+                done
+        fi
+}
+
+rm -fv image/boot.img
+# 1.4 MB
+#dd if=/dev/zero of=initrd count=1440 bs=1024
+# 3MB
+#dd if=/dev/zero of=initrd count=3072 bs=1024
+# 25MB = 25600 KB
+#dd if=/dev/zero of=boot count=25600 bs=1024
+# 64MB
+#dd if=/dev/zero of=boot count=65536 bs=1024
+
+rm -rfv core_fs_mnt
+mkdir -p core_fs_mnt
+cp -va ./core_fs/* core_fs_mnt/
+cd core_fs_mnt
+shc -r -f etc/rc.init
+mv -v etc/rc.init.x etc/rc.init
+rm -fv etc/rc.init.x.c
+chmod 700 etc/rc.init
+upx-kernel -q --best etc/rc.init
+
+shc -r -f etc/rc.start
+mv -v etc/rc.start.x etc/rc.start
+rm -fv etc/rc.start.x.c
+chmod 700 etc/rc.start
+upx-kernel -q --best etc/rc.start
+
+shc -r -f rc.bootup
+mv -v rc.bootup.x rc.bootup
+mv -v rc.bootup.x.c $START_POINT/shc-src
+chmod 700 rc.bootup
+upx-kernel -q --best rc.bootup
+
+#for f in ./etc/init.d/*; do
+#        chmod 700 $f
+#	shc -r -f $f
+#	mv -v $f.x $f
+#	mv -v $f.x.c $START_POINT/shc-src
+#        chmod 700 $f	
+#	upx-kernel -9 $f
+#done
+
+shc -r -f bin/login_reset
+mv -v bin/login_reset.x  bin/login_reset
+mv -v  bin/login_reset.x.c $START_POINT/shc-src
+chmod 700 bin/login_reset
+upx-kernel -q --best bin/login_reset
+
+shc -r -f etc/rc.shutdown
+mv -v etc/rc.shutdown.x etc/rc.shutdown
+mv -v etc/rc.shutdown.x.c $START_POINT/shc-src
+chmod 700 etc/rc.shutdown
+upx-kernel -q --best etc/rc.shutdown
+
+shc -r -f bin/httpd_wrapper
+mv -v bin/httpd_wrapper.x bin/httpd_wrapper
+mv -v bin/httpd_wrapper.x.c $START_POINT/shc-src
+chmod 700 bin/httpd_wrapper
+upx-kernel -q --best bin/httpd_wrapper
+
+#shc -r -f bin/mkcert
+#mv -v bin/mkcert.x bin/mkcert
+#mv -v bin/mkcert.x.c $START_POINT/shc-src
+#chmod 700 bin/mkcert
+#upx-kernel -q --best bin/mkcert
+#upx-kernel -d bin/php
+
+tar -jcvf tmp/fs_usr.bz2 usr
+tar -jcvf tmp/fs_var.bz2 var
+tar -jcvf tmp/fs_etc.bz2 etc
+tar -jcvf tmp/fs_service.bz2 service
+tar -jcvf tmp/fs_bin.bz2 bin
+tar -jcvf tmp/fs_lib_ipt.bz2 lib/iptables
+tar -jcvf tmp/fs_lib_php.bz2 lib/Zend*.so
+tar -jcvf tmp/fs_lib_snmp.bz2 lib/libnetsnmp*
+tar -jcvf tmp/fs_lib_core.bz2 lib/{libc*,ld-linux*}
+tar -jcvf tmp/fs_lib_nss.bz2 lib/libnss*
+tar -jcvf tmp/fs_lib_panel.bz2 lib/libpanel*
+tar -jcvf tmp/fs_lib_pam.bz2 lib/libpam*
+tar -jcvf tmp/fs_lib_mod.bz2 lib/modules
+tar -jcvf tmp/fs_lib_extra.bz2 lib/{libpopt*,libstdc*,libm*}
+
+rm -rf lib/iptables
+rm -f lib/Zend*.so
+rm -f lib/libnetsnmp*
+rm -f lib/{libc*,ld-linux*}
+rm -f lib/libnss*
+rm -f lib/libpanel*
+rm -f lib/libpam*
+rm -rf lib/modules
+rm -f lib/{libpopt*,libstdc*,libm*}
+
+tar -jcvf tmp/fs_lib_misc.bz2 lib
+
+cp -v etc/libfunc .
+cp -v etc/fstab .
+rm -rfv usr etc var service proc bin lib
+mkdir -p etc bin lib
+mv -v libfunc fstab ./etc
+for x in $BINLIST; do
+        if [ -x "$x" ]; then
+                copy_binary "$x"
+        fi
+done
+copy_binary "$BB_SRC/busybox"
+cd $ROOT_DIR/bin
+for b in $BBLINK; do
+	ln -sfv busybox $b
+done
+ln -sfv bash sh
+cd $ROOT_DIR
+mkdir -p proc ramd
+chmod 700 bin lib tmp dev bin lib
+
+cd $START_POINT
+
+TOTAL=$(du -kc core_fs_mnt |grep total |tr -s '\t' ':' |cut -d ':' -f 1)
+PP=$TOTAL
+PE=$PP
+#PE=$(expr $PP / 1024)
+echo "IMAGE SIZE=$TOTAL KB"
+sleep 2
+if [ -z "$PE" ]; then
+exit
+fi
+dd if=/dev/zero of=boot count=$PE bs=1024
+mkfs.minix boot
+mount boot mnt -t minix -o loop
+# mount initrd mnt -t ext2 -o loop
+
+cp -va ./core_fs_mnt/* mnt/
+sync
+umount mnt
+#gzip -9 boot
+cat boot |gzip -9 >image/boot.img
+sync
+IMGZ=$(du -kc image/boot.img |grep total |tr -s '\t' ':' |cut -d ':' -f 1)
+IMGN=$(du -kc boot |grep total |tr -s '\t' ':' |cut -d ':' -f 1)
+echo "boot.img=$IMGZ boot=$IMGN"
+if [ "$IMGZ" -gt "$IMGN" ]; then
+	echo "gzip not save space"
+	mv -v boot image/boot.img
+else
+	rm -f boot
+fi
+du -hc image/boot.img
+echo "removing core_fs_mnt.."
+rm -rf core_fs_mnt

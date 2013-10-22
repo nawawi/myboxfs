@@ -1,0 +1,382 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.so');
+chk_session();
+write_nocache();
+
+$_SYSID="system_general";
+
+$db_id=db_connect($_DB_NAME);
+
+if(chk_pri($_LOGIN['auth_id'],1)==1) {
+	if($tab==1) {
+		if(isset($do_save)&&$do_save==1) {
+			if($val!='') {
+				if(count($val)!=0) {
+					$_local_logs=0;
+					$_local_news=0;
+					foreach($val as $p => $v) {
+						if($v!='') {
+							if($p=='local_logs') {
+								$_local_logs=1;	
+								if($v!='') $v=1;
+							}
+							if($p=='local_news') {
+								$_local_news=1;	
+								if($v!='') $v=1;
+							}
+							db_query("update misc set val='$v' where name='$p'",$db_id);
+							if($p=='www_session' && $v!=0) {
+								update_session($v);
+							}
+							if($_local_logs==0) {
+								db_query("update misc set val='0' where name='local_logs'",$db_id);
+							}
+							if($_local_news==0) {
+								db_query("update misc set val='0' where name='local_news'",$db_id);
+							}
+						}
+					}
+					if($https_port=='') $https_port='443';
+					db_query("update service_https set port='$https_port'",$db_id);
+					@unlink("/var/sys/nolog");
+					if($_local_logs==1) @touch("/var/sys/nolog");
+					$msg="General setting updated!.";
+				}
+			}
+			if(isset($dns)&&$dns!='') {
+				$list=preg_split("/\s+/",$dns);
+				if(count($list)!=0) {
+					db_query("delete from dns_name",$db_id);
+					foreach($list as $dns) {
+						if($dns!='') db_query("insert into dns_name (name) values ('$dns')",$db_id);
+					}
+				}
+			}
+		}
+		if(isset($do_id)&&$do_id=='apply_chg') {
+			$msg="<script>waitcount();</script>";
+			echo_query("update-clock");
+			echo_query("update-dnshost");
+			echo_query("cron-restart");
+			echo_query("https-restart");
+			echo_query("dhcp-restart");
+			echo_query("pptp-restart");
+			echo_query("policy-restart");
+			echo_query("ips-restart");
+		}
+	}
+	if($tab==2) {
+		if(isset($do_save)&&$do_save==1) {
+			if($val!='') {
+				if(count($val)!=0) {
+					foreach($val as $p => $v) {
+						if($v!='') {
+							db_query("update site_certificate set $p='$v'",$db_id);
+						}
+					}
+					$msg="Site Certificate updated!.";
+				}
+			}
+		}
+		if(isset($do_id)&&$do_id=='apply_chg') {
+			$msg="<script>waitcount();</script>";
+			echo_query("https-cert");
+			echo_query("https-restart");
+		}
+	}
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied!.";
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+
+?>
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script language="javascript" src="<?echo $_URL_PATH;?>/j/strings.js"></script>
+<script language="javascript">
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+</script>
+<script language="javascript">
+function do_submit() {
+	document.f.btsubmit.disabled=true;
+	document.f.do_save.value='1';
+	document.f.submit();
+	return true;
+}
+
+var k=0;
+function waitcount() { 
+ 	k=k+2;
+	if(k <= 100) {
+    		msg.innerHTML='Reloading.. Please wait..'+k+'%'; 
+    		setTimeout(waitcount,200);  
+	} else {
+		self.location.href='<?echo "$_URL_PATH/system_general.html?tab=$tab";?>';
+	}
+}
+</script>
+</head>
+<body scroll=auto>
+<form name=f method=post action="<?echo "$_URL_PATH/system_general.html";?>" onsubmit="return do_submit();">
+<table border="0" cellpadding="4" cellspacing="4" width="700" align=center>
+<tr>
+<td align=center>
+
+<!-- main -->
+<fieldset>
+<legend>&nbsp;&nbsp;&nbsp;&nbsp;
+SYSTEM: GENERAL
+&nbsp;&nbsp;&nbsp;&nbsp;</legend>
+
+<table valign=top border=0>
+<tr>
+<td>
+<table border=0 cellpadding="2" cellspacing="2">
+<tr>
+<td align=center valign=middle>
+
+<table width="650" border="0" cellpadding="0" cellspacing="0">
+<tr><td>
+<ul id="tabnav">
+<li class="<?if($tab==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=1) { echo "<a href=\"$_URL_PATH/system_general.html?tab=1\">"; }?>System<?if($tab!=1) { echo "</a>"; }?></li>
+<li class="<?if($tab==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?if($tab!=2) { echo "<a href=\"$_URL_PATH/system_general.html?tab=2\">"; }?>Site Certificate<?if($tab!=2) { echo "</a>"; }?></li>
+</ul>
+</td></tr>
+<tr> 
+<td class="tabcont">
+
+<?if($tab==1) {
+
+$val=array();
+$result=db_query("select * from misc",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_name=$row['name'];
+		$_val=$row['val'];
+		$val[$_name]=$_val;
+	}
+}
+$https_port='443';
+$result=db_query("select port from service_https",$db_id);
+if(db_num_rows($result)!=0) {
+	$https_port=db_fetch_single($result);
+}
+?>
+
+<?if($msg!='') {?>
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span id=msg class=notice><?echo "$msg";?></span></td></tr>
+</table><br>
+<? }?>
+<table width="600" border="0" cellpadding="6" cellspacing="0">
+<tr> 
+<td width="30%" valign="middle" class="tdcelltop">System Hostname</td>
+<td width="70%" valign="middle" class="mtabletop"> 
+<input name="val[hostname]" type="text" class="textbox" size="35" value="<?echo $val['hostname'];?>">
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdcell">System Domain</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="val[domainname]" type="text" class="textbox" size="35" value="<?echo $val['domainname'];?>">
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Session Port</td>
+<td width="70%" valign="middle" class="mtable"> <input name="https_port" type="text" class="textbox" size="10" value="<?echo $https_port;?>"> Web console Port
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Session lifetime</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="val[www_session]" type="text" class="textbox" size="10" value="<?echo $val['www_session'];?>"> minute(s), 0 to disable.
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Timezone</td>
+<td width="70%" valign="middle" class="mtable">
+<select class="textbox" name="val[time_zone]">
+<?
+if($fi=fopen("$_ZONELIST","r")) {
+	while($buff=fgets($fi,150)) {
+		$buff=trim($buff);
+		if($buff==$val['time_zone']) {
+			echo "<option value='$buff' selected>$buff</option>";
+		} else {
+			echo "<option value='$buff'>$buff</option>";
+		}
+	}
+	fclose($fi);
+}
+?>
+</select></td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdcell">NTP Server</td>
+<td width="70%" valign="middle" class="mtable"> <input name="val[ntp_server]" type="text" class="textbox" size="35" value="<?echo $val['ntp_server'];?>">
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdcell">NTP interval</td>
+<td width="70%" valign="middle" class="mtable"> <input name="val[ntp_time]" type="text" class="textbox" size="10" value="<?echo $val['ntp_time'];?>">  minute(s), 0 to disable.
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="top" class="tdcell">DNS Resolver</td>
+<td width="70%" valign="middle" class="mtable">
+<textarea cols=40 rows=4 class=textbox name=dns>
+<?
+$result=db_query("select * from dns_name",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_dns=trim($row['name']);
+		echo "$_dns ";
+	}
+}
+?>
+</textarea> Separate by space
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Disabled local logs</td>
+<td width="70%" valign="middle" class="mtable"> <input name="val[local_logs]" type="checkbox" value='<?echo $val['local_logs'];?>' <?if($val['local_logs']==1) echo "checked";?>>  disable.
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Disabled News Update</td>
+<td width="70%" valign="middle" class="mtable"> <input name="val[local_news]" type="checkbox" value='<?echo $val['local_logs'];?>' <?if($val['local_news']==1) echo "checked";?>>  disable.
+</td>
+</tr>
+</table>
+<tr><td align=right valign=top><input name=btapply type="button" value="Apply changes" class="button" onclick="self.location.href='<?echo $_URL_PATH;?>/system_general.html?tab=1&do_id=apply_chg';document.f.btapply.disabled=true;"><input name=btsubmit type="submit" value="Save" class="button"></td></tr>
+
+<? } // tab==1 ?>
+
+<?if($tab==2) {
+$result=db_query("select * from site_certificate",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_country=$row['country'];
+		$_state=$row['state'];
+		$_city=$row['city'];
+		$_organization=$row['organization'];
+		$_section=$row['section'];
+		$_email=$row['email'];
+		$_hostname=$row['hostname'];
+	}
+}
+?>
+
+<?if($msg!='') {?>
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span id=msg class=notice><?echo "$msg";?></span></td></tr>
+</table><br>
+<? }?>
+<table width="600" border="0" cellpadding="6" cellspacing="0">
+<tr> 
+<td width="30%" valign="middle" class="tdcelltop">Country</td>
+<td width="70%" valign="middle" class="mtabletop">
+<select class="textbox" name="val[country]" size=1>
+<?
+if(file_exists("$_HTDOCS_PATH/j/country.txt")) {
+	$fi=fopen("$_HTDOCS_PATH/j/country.txt","r");
+	while($buff=fgets($fi,150)) {
+		$buff=trim($buff);
+		list($a,$b)=preg_split("/\|/",$buff);
+		if($a=="$_country") {
+			echo "<option value='$a' selected>$b</option>";
+		} else {
+			echo "<option value='$a'>$b</option>";
+		}
+	}
+	fclose($fi);
+}
+?>
+</select></td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdcell">State</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="val[state]" type="text" class="textbox" size="35" value="<?echo $_state;?>"> 
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdcell">City</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="val[city]" type="text" class="textbox" size="35" value="<?echo $_city;?>"> 
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Organization</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="val[organization]" type="text" class="textbox" size="35" value="<?echo $_organization;?>"> 
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Section/Unit</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="val[section]" type="text" class="textbox" size="35" value="<?echo $_section;?>"> 
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Admin Email</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="val[email]" type="text" class="textbox" size="35" value="<?echo $_email;?>"> 
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdcell">Hostname or IP Address</td>
+<td width="70%" valign="middle" class="mtable"> 
+<input name="val[hostname]" type="text" class="textbox" size="35" value="<?echo $_hostname;?>"> 
+</td>
+</tr>
+</table>
+<tr><td align=right valign=top colspan=2><input name=btapply type="button" value="Apply changes" class="button" onclick="self.location.href='<?echo $_URL_PATH;?>/system_general.html?tab=2&do_id=apply_chg';document.f.btapply.disabled=true;"><input name=btsubmit type="submit" value="Save" class="button"></td></tr>
+
+<? } // tab==2 ?>
+
+</td>
+</tr>
+
+</table>
+
+</td>
+</tr>
+</table>
+
+<!-- end main -->
+
+</td>
+</tr>
+</table>
+</fieldset>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?echo $tab;?>>
+</form>
+</body>
+</html>
+
+<?db_close($db_id); flush();?>

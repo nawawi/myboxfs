@@ -1,0 +1,7 @@
+logfile=/dev/null
+pidfile=/dev/null
+cgipat=**.so|**.html|**.exc
+dir=/service/www
+port=442
+ssl
+user=console

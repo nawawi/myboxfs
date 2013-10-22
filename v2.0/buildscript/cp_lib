@@ -1,0 +1,60 @@
+#!/bin/sh -e
+
+function copy_lib() {
+        if [ -z "$1" ]; then
+                echo "Usage: $0 binary root_dir";
+                exit;
+        fi
+       if [ -z "$2" ]; then
+                echo "Usage: $0 binary root_dir";
+                exit;
+        fi
+        file=$1
+	ROOT_DIR=$2
+
+        if [ -x "$file" ]; then
+                dirname=$(dirname $file)
+                basename=$(basename $file)
+                bindir="$ROOT_DIR/bin"
+        else
+                echo "file '$file' not found"
+                exit
+        fi
+
+        LO=$(ldd $file |tr -d '^\t' |sed -e 's/=>//g' |cut -d ' ' -f 3)
+        if [ "$LO" != "" ]; then
+                for f in $LO; do
+                        LS=
+                        if [ -n "$f" ]; then
+                                echo "$f"
+                                fd=
+                                if [ -L "$f" ]; then
+                                        fd=$(dirname $f)
+                                        LS=$(readlink $f)
+                                        LS="$fd/$LS"
+                                else
+                                        LS=$f
+                                fi
+                                if [ -e "$LS" ]; then
+                                        d=$(dirname $f)
+                                        if [ ! -d "$ROOT_DIR/$d" ]; then
+                                                mkdir -vp $ROOT_DIR/lib
+                                        fi
+                                        bd1=$(basename $LS)
+                                        bd2=$(basename $f)
+                                        if [ ! -f "$ROOT_DIR/lib/$bd1" ]; then
+                                                cp -a $LS $ROOT_DIR/lib
+                                                strip $ROOT_DIR/lib/$bd1
+                                        fi
+                                        if [ ! -f "$ROOT_DIR/lib/$bd2" ]; then
+                                                cp -a $f $ROOT_DIR/lib
+                                                strip $ROOT_DIR/lib/$bd2
+                                        fi
+                                fi
+                        fi
+                done
+        fi
+}
+
+copy_lib "$1" "$2"
+exit 0;

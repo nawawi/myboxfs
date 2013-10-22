@@ -1,0 +1,710 @@
+#!/bin/php -q
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.so');
+
+putenv("PATH=/bin:/service/tools:/service/init");
+
+if(!file_exists("/bin/iptables")) {
+	echo "iptables binary not found or cannot execute\n";
+	slog("INIT: ptables binary not found or cannot execute");
+	exit(1);
+}
+
+$_DEBUG=0;
+
+function do_iptable($rules) {
+	global $_DEBUG;
+	if($_DEBUG==1) echo "iptables $rules\n";
+	if(exec_cmd("iptables $rules")==1) {
+		if($_DEBUG==1) {
+			echo "ERROR: $rules\n";
+			slog("INIT: ERROR: $rules");
+		}
+		return 1;
+	}
+	return 0;
+}
+function icmp_ping($chain='INPUT',$src='',$dst='',$action='ACCEPT') {
+	if($src!='') $src="-s $src";
+	if($dst!='') $dst="-d $dst";
+	do_iptable("-A $chain $src $dst -p icmp -m icmp --icmp-type 8 -m limit --limit 20/sec -j $action");
+	do_iptable("-A $chain $src $dst -p icmp -m icmp --icmp-type 0 -m limit --limit 10/sec -j $action");
+	do_iptable("-A $chain $src $dst -p icmp -m icmp --icmp-type 3 -m limit --limit 5/sec -j $action");
+	do_iptable("-A $chain $src $dst -p icmp -m icmp --icmp-type 30 -m limit --limit 10/sec -j $action");
+	return 0;
+}
+
+function time_policy($_timestart,$_timeend) {
+	$_cmdtime='';
+	if(preg_match("/^(\d+)-(\d+)-(\d+)\s+(\d+):(\d+)$/",$_timestart,$_md1)) {
+		$_cmdtime ="-m time --datestart {$_md1[1]}:{$_md1[2]}:{$_md1[3]}:{$_md1[4]}:{$_md1[5]}";
+	}
+	unset($_md1);
+	if(preg_match("/^(\d+)-(\d+)-(\d+)$/",$_timestart,$_md1)) {
+		$_cmdtime ="-m time --datestart {$_md1[1]}:{$_md1[2]}:{$_md1[3]}";
+	}
+	unset($_md1);
+	if(preg_match("/^(\d+):(\d+)/",$_timestart,$_md1)) {
+		$_cmdtime ="-m time --timestart {$_md1[1]}:{$_md1[2]}";
+	}
+	unset($_md1);
+	if(preg_match("/^(\d+)-(\d+)-(\d+)\s+(\d+):(\d+)$/",$_timeend,$_md1)) {
+		if($_cmdtime=='') {
+			$_cmdtime ="-m time --datestop {$_md1[1]}:{$_md1[2]}:{$_md1[3]}:{$_md1[4]}:{$_md1[5]}";
+		} else {
+			$_cmdtime .=" --datestop {$_md1[1]}:{$_md1[2]}:{$_md1[3]}:{$_md1[4]}:{$_md1[5]}";
+		}
+	}
+	unset($_md1);
+	if(preg_match("/^(\d+)-(\d+)-(\d+)$/",$_timeend,$_md1)) {
+		if($_cmdtime=='') {
+			$_cmdtime ="-m time --datestop {$_md1[1]}:{$_md1[2]}:{$_md1[3]}";
+		} else {
+			$_cmdtime .=" --datestop {$_md1[1]}:{$_md1[2]}:{$_md1[3]}";
+		}
+	}
+	unset($_md1);
+	if(preg_match("/^(\d+):(\d+)$/",$_timestart,$_md1)) {
+		if($_cmdtime=='') {
+			$_cmdtime ="-m time --timestop {$_md1[1]}:{$_md1[2]}";
+		} else {
+			$_cmdtime .=" --timestop {$_md1[1]}:{$_md1[2]}";
+		}
+	}
+	unset($_md1);
+	return $_cmdtime;
+}
+
+$_pptp_stat=0;
+
+function policy_acl($_int,$db_id) {
+	global $_pptp_stat;
+	if(count($_int)==0) return 1;
+
+	$_https_port=443;
+	$_ssh_port=22;
+	$result=db_query("select port from service_https",$db_id);
+	if(db_num_rows($result)!=0) {
+		$_https_port=db_fetch_single($result);
+	}
+	$result=db_query("select port from service_ssh",$db_id);
+	if(db_num_rows($result)!=0) {
+		$_ssh_port=db_fetch_single($result);
+	}
+
+	// enable access list to network gateway
+	$result=db_query("select * from accesslist where stat='1'",$db_id);
+	$_fodrop=array();
+	$_fodrop2=array();
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_ipaddrip=$row['ip'];
+			$_ssh=$row['ssh'];
+			$_https=$row['https'];
+			$_aport='';
+			foreach($_int as $_list) {
+				list($dev,$_ip)=preg_split("/\|/",$_list);
+				if($_https==1) $_aport="$_https_port,";
+				if($_ssh==1) $_aport .="$_ssh_port";
+				$_aport=rtrim($_aport,",");
+				do_iptable("-A INPUT -s $_ipaddrip -d $_ip -i eth+ -p tcp -m tcp -m mport --dports $_aport -j ACCEPT");
+				$_fodrop[]="-A INPUT -s ! $_ipaddrip -d $_ip -i eth+ -p tcp -m tcp -m mport --dports $_aport -j DROP";
+				if($_pptp_stat==1) $_fodrop[]="-A INPUT -s ! $_ipaddrip -d $_ip -i ppp+ -p tcp -m tcp -m mport --dports $_aport -j DROP";
+				$_fodrop2[]="-A FORWARD -s ! $_ipaddrip -d $_ip -i eth+ -p tcp -m tcp -m mport --dports $_aport -j DROP";
+				if($_pptp_stat==1) $_fodrop2[]="-A FORWARD -s ! $_ipaddrip -d $_ip -i ppp+ -p tcp -m tcp -m mport --dports $_aport -j DROP";
+				$_aport='';
+				unset($dev,$_ip);
+			}
+		}
+	}
+	unset($result);
+	if(count($_fodrop)!=0) {
+		foreach($_fodrop as $acl) do_iptable($acl);
+	}
+	if(count($_fodrop2)!=0) {
+		foreach($_fodrop2 as $acl) do_iptable($acl);
+	}
+	return 0;
+}
+
+function policy_inout_exec($type,$_proto,$src,$_srcpl,$dst,$_dstpl,$_cmdlog,$_cmdtime,$_action) {
+	$_proto=strtolower($_proto);
+	if($_proto=='tcp' || $_proto=='udp') {
+		if($_cmdlog!='') {
+			do_iptable("-A $type -p $_proto -m $_proto $src $_srcpl $dst $_dstpl $_cmdtime $_cmdlog");
+		}
+		do_iptable("-A $type -p $_proto -m $_proto $src $_srcpl $dst $_dstpl $_cmdtime -j $_action");
+	} elseif($_proto=='tcp/udp') {
+		foreach(array('tcp','udp') as $pp) {
+			if($_cmdlog!='') {
+				do_iptable("-A $type -p $pp -m $pp $src $_srcpl $dst $_dstpl $_cmdtime $_cmdlog");
+			}
+			do_iptable("-A $type -p $pp -m $pp $src $_srcpl $dst $_dstpl $_cmdtime -j $_action");
+		}
+		unset($pp);
+	} elseif($_proto=='icmp') {
+		if($_cmdlog!='') {
+			do_iptable("-A $type -p icmp -m icmp $src $dst $_cmdtime $_cmdlog");
+		}
+		if($_action=='DROP') {
+			do_iptable("-A $type -p icmp -m icmp $src $dst $_cmdtime -j DROP");
+		} else {
+			do_iptable("-A $type $src $dst -p icmp -m icmp --icmp-type 8 $_cmdtime -m limit --limit 20/sec -j ACCEPT");
+			do_iptable("-A $type $src $dst -p icmp -m icmp --icmp-type 0 $_cmdtime -m limit --limit 10/sec -j ACCEPT");
+			do_iptable("-A $type $src $dst -p icmp -m icmp --icmp-type 3 $_cmdtime -m limit --limit 5/sec -j ACCEPT");
+			do_iptable("-A $type $src $dst -p icmp -m icmp --icmp-type 30 $_cmdtime -m limit --limit 10/sec -j ACCEPT");
+		}
+	} elseif($_proto=='ipp2p') {
+		if($_cmdlog!='') {
+			do_iptable("-A $type -m ipp2p --ipp2p --debug $src $dst $_cmdtime -j $_action");
+		} else {
+			do_iptable("-A $type -m ipp2p --ipp2p $src $dst $_cmdtime -j $_action");
+		}
+	} else {
+		if($_cmdlog!='') {
+			do_iptable("-A $type -p $_proto $src $dst $_cmdtime $_cmdlog");
+		}
+		do_iptable("-A $type -p $_proto $src $dst $_cmdtime -j $_action");
+	}
+}
+
+$list_array=array();
+$list_array2=array();
+$_KMSG=array();
+$_IPP2P_INBOUND=array();
+$_IPP2P_OUTBOUND=array();
+
+function policy_inout($type,$db_id) {
+	global $list_array, $list_array2, $_PORT_ARRAY;
+	global $_KMSG, $_IPP2P_INBOUND, $_IPP2P_OUTBOUND;
+
+	$table='policy_inbound';
+	$_tt='I';
+	if($type=='MYBOX-OUT-POLICY') {
+		$table='policy_outbound';
+		$_tt='O';
+	}
+	$result=db_query("select * from $table where stat='1'",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_id=$row['id'];
+			$_proto=$row['proto'];
+			$_srcn=$row['srcn'];
+			$_src=trim($row['src']);
+			$_srcp=$row['srcp'];
+			$_dstn=$row['dstn'];
+			$_dst=trim($row['dst']);
+			$_dstp=$row['dstp'];
+			$_action=$row['action'];
+			$_usetime=$row['usetime'];
+			$_timestart=$row['timestart'];
+			$_timeend=$row['timeend'];
+			$_log=$row['log'];
+			$_stat=$row['stat'];
+			$_note=unescape_str($row['note']);
+			if($_note=='') $_note='none';
+
+			$_cmdlog='';
+			$_cmdtime='';
+			$_src_array=array();
+			$_dst_array=array();
+			$_sport='';
+			$_dport='';
+
+			if($_proto=='IPP2P') {
+				if($_tt=='I') {
+					$_IPP2P_INBOUND[$_src][$_dst]="$_note|$_action";
+				} else {
+					$_IPP2P_OUTBOUND[$_src][$_dst]="$_note|$_action";
+				}
+			}
+			if($list_array[$_src]!='') $_src=$list_array[$_src];
+			if($list_array[$_dst]!='') $_dst=$list_array[$_dst];
+			if($list_array2[$_src]!='') $_src=$list_array2[$_src];
+			if($list_array2[$_dst]!='') $_dst=$list_array2[$_dst];
+			if($_PORT_ARRAY[$_srcp]!='') $_srcp=$_PORT_ARRAY[$_srcp];
+			if($_PORT_ARRAY[$_dstp]!='') $_dstp=$_PORT_ARRAY[$_dstp];
+
+			$_srcnl='';$_dstnl='';
+			if($_srcn==1) $_srcnl='! ';
+			if($_dstn==1) $_dstnl='! ';
+
+			if($_usetime==1) {
+				$_cmdtime=time_policy($_timestart,$_timeend);
+			}
+			if($_log==1) {
+				$_cmdlog="-m state --state NEW -m limit --limit 2/sec --limit-burst 10 -j LOG --log-level info --log-prefix \"F:$_tt:$_action:$_id \"";
+				$_KMSG[$_tt][$_id]="$_note";
+			}
+
+			if($_action=='PASS') $_action='ACCEPT';
+
+			if($_proto!='any') {
+				if($_proto!='TCP' && $_proto!='UDP' && $_proto!='TCP/UDP') {
+					$_srcp='any';
+					$_dstp='any';
+				}
+			} else {
+				$_proto='ALL';
+			}
+
+			if($_src!='any') {
+				$slist=preg_split("/\s+/",$_src);
+				if(count($slist)!=0) {
+					foreach($slist as $list) $_src_array[]="-s $_srcnl$list";
+				} else {
+					$_src_array[]="-s $_srcnl$_src";
+				}
+			}
+			if($_dst!='any') {
+				$dlist=preg_split("/\s+/",$_dst);
+				if(count($dlist)!=0) {
+					foreach($dlist as $list) $_dst_array[]="-d $_dstnl$list";
+				} else {
+					$_dst_array[]="-d $_dstnl$_dst";
+				}
+			}
+			$_srcpl='';$_dstpl='';
+			if($_srcp!='any') $_srcpl="--sport $_srcp";
+			if($_dstp!='any') $_dstpl="--dport $_dstp";
+
+			// -s src --sport sport -d dst --dport dport
+			if(count($_src_array)!=0 && count($_dst_array)!=0) {
+				foreach($_src_array as $src) {
+					foreach($_dst_array as $dst) {
+						policy_inout_exec($type,$_proto,$src,$_srcpl,$dst,$_dstpl,$_cmdlog,$_cmdtime,$_action);
+						unset($src,$dst);
+					}
+				}
+			} elseif(count($_src_array)!=0 && count($_dst_array)==0) {
+				foreach($_src_array as $src) {
+					policy_inout_exec($type,$_proto,$src,$_srcpl,'',$_dstpl,$_cmdlog,$_cmdtime,$_action);
+					unset($src);
+				}
+			} elseif(count($_src_array)==0 && count($_dst_array)!=0) {
+				foreach($_dst_array as $dst) {
+					policy_inout_exec($type,$_proto,'',$_srcpl,$dst,$_dstpl,$_cmdlog,$_cmdtime,$_action);
+					unset($src,$dst);
+				}
+			} else {
+				policy_inout_exec($type,$_proto,'',$_srcpl,'',$_dstpl,$_cmdlog,$_cmdtime,$_action);
+			}
+		} // while
+	}
+}
+
+function policy_blacklist($db_id) {
+	global $_KMSG;
+
+	$result=db_query("select * from policy_blacklist where stat='1'",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_id=$row['id'];
+			$_ip=$row['ip'];
+			$_log=$row['log'];
+			$_note=unescape_str($row['note']);
+			if($_note=='') $_note='none';
+			if($_log==1) {
+				do_iptable("-A MYBOX-DROP -s $_ip -m state --state NEW -m limit --limit 10/sec --limit-burst 10 -j LOG --log-level info --log-prefix \"F:B:DROP:$_id \"");
+				do_iptable("-A MYBOX-DROP -s $_ip -j DROP");
+				do_iptable("-A MYBOX-DROP -d $_ip -m state --state NEW -m limit --limit 10/sec --limit-burst 10 -j LOG --log-level info --log-prefix \"F:B:DROP:$_id \"");
+				do_iptable("-A MYBOX-DROP -d $_ip -j DROP");
+				$_KMSG['B'][$_id]="$_note";
+			} else {
+				do_iptable("-A MYBOX-DROP -s $_ip -j DROP");
+				do_iptable("-A MYBOX-DROP -d $_ip -j DROP");
+			}
+		}
+	}
+}
+
+function policy_nat_exec($type,$_proto,$src,$dst,$_dstpl,$_fwdl,$_cmdlog,$_cmdtime) {
+	$_natj="PREROUTING";
+	if($type=='snat') $_natj="POSTROUTING";
+	$_proto=strtolower($_proto);
+	if($_proto=='tcp' || $_proto=='udp') {
+		if($_cmdlog!='') {
+			do_iptable("-t nat -A $_natj -p $_proto -m $_proto $src $dst $_dstpl $_cmdtime $_cmdlog");
+		}
+		do_iptable("-t nat -A $_natj -p $_proto -m $_proto $src $dst $_dstpl $_cmdtime $_fwdl");
+	} elseif($_proto=='tcp/udp') {
+		foreach(array('tcp','udp') as $pp) {
+			if($_cmdlog!='') {
+				do_iptable("-t nat -A $_natj -p $pp -m $pp $src $dst $_dstpl $_cmdtime $_cmdlog");
+			}
+			do_iptable("-t nat -A $_natj -p $pp -m $pp $src $dst $_dstpl $_cmdtime $_fwdl");
+		}
+		unset($pp);
+	} else {
+		if($_cmdlog!='') {
+			do_iptable("-t nat -A $_natj -p ALL $src $dst $_cmdtime $_cmdlog");
+		}
+		do_iptable("-t nat -A $_natj -p ALL $src $dst $_cmdtime $_fwdl");
+	}
+}
+
+function policy_nat($type,$db_id) {
+	global $list_array, $list_array2, $_PORT_ARRAY;
+	global $_KMSG;
+
+	$_table="policy_dnat";
+	if($type=='snat') $_table="policy_snat";
+	$result=db_query("select * from $_table where stat='1'",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_id=$row['id'];
+			$_proto=$row['proto'];
+			$_src=$row['src'];
+			$_dst=$row['dst'];
+			$_dstp=$row['dstp'];
+			$_fwd=$row['fwd'];
+			$_fwdp=$row['fwdp'];
+			$_usetime=$row['usetime'];
+			$_timestart=$row['timestart'];
+			$_timeend=$row['timeend'];
+			$_log=$row['log'];
+			$_stat=$row['stat'];
+			$_note=unescape_str($row['note']);
+			if($_note=='') $_note='none';
+
+			if($_fwd=='') continue;
+			if($_proto=='') continue;
+
+			$_cmdlog='';
+			$_cmdtime='';
+			$_src_array=array();
+			$_dst_array=array();
+			$_sport='';
+			$_dport='';
+
+			if($list_array[$_src]!='') $_src=$list_array[$_src];
+			if($list_array[$_dst]!='') $_dst=$list_array[$_dst];
+			if($list_array2[$_src]!='') $_src=$list_array2[$_src];
+			if($list_array2[$_dst]!='') $_dst=$list_array2[$_dst];
+			if($list_array2[$_fwd]!='') $_fwd=$list_array2[$_fwd];
+			if($_PORT_ARRAY[$_dstp]!='') $_dstp=$_PORT_ARRAY[$_dstp];
+			if($_PORT_ARRAY[$_fwdp]!='') $_fwdp=$_PORT_ARRAY[$_fwdp];
+
+			if($_usetime==1) {
+				$_cmdtime=time_policy($_timestart,$_timeend);
+			}
+			if($_log==1) {
+				$_cmdlog="-m state --state NEW -m limit --limit 2/sec --limit-burst 10 -j LOG --log-level info --log-prefix \"F:$type:NAT:$_id \"";
+				$_KMSG[$type][$_id]="$_note";
+			}
+
+			if($_src!='any') {
+				$slist=preg_split("/\s+/",$_src);
+				if(count($slist)!=0) {
+					foreach($slist as $list) $_src_array[]="-s $list";
+				} else {
+					$_src_array[]="-s $_src";
+				}
+			}
+			if($_dst!='any') {
+				$dlist=preg_split("/\s+/",$_dst);
+				if(count($dlist)!=0) {
+					foreach($dlist as $list) $_dst_array[]="-d $list";
+				} else {
+					$_dst_array[]="-d $_dst";
+				}
+			}
+
+			if($_dstp!='any') $_dstpl="--dport $_dstp";
+
+			$_jump="-j DNAT --to-destination";
+			if($type=='snat') {
+				$_jump="-j SNAT --to-source";
+			}
+			$_ddst='';$_ddstp='';$_ddproto='';
+			if($_fwdp!='any') {
+				$_fwdl="$_jump $_fwd:$_fwdp";
+				$_ddstp="--dport $_fwdp";
+				$_ddst="-d $_fwd";
+			} else {
+				$_fwdl="$_jump $_fwd";
+				$_ddst="-d $_fwd";
+			}
+			if($_proto=='any') {
+				$_ddproto='ALL';
+			} else {
+				$_ddproto="$_proto";
+			}
+
+			// -s src --sport sport -d dst --dport dport
+			if(count($_src_array)!=0 && count($_dst_array)!=0) {
+				foreach($_src_array as $src) {
+					foreach($_dst_array as $dst) {
+						policy_nat_exec($type,$_proto,$src,$dst,$_dstpl,$_fwdl,$_cmdlog,$_cmdtime);
+						unset($src,$dst);
+					}
+				}
+			} elseif(count($_src_array)!=0 && count($_dst_array)==0) {
+				foreach($_src_array as $src) {
+					policy_nat_exec($type,$_proto,$src,$dst,$_dstpl,$_fwdl,$_cmdlog,$_cmdtime);
+					unset($src);
+				}
+			} elseif(count($_src_array)==0 && count($_dst_array)!=0) {
+				foreach($_dst_array as $dst) {
+					policy_nat_exec($type,$_proto,'',$dst,$_dstpl,$_fwdl,$_cmdlog,$_cmdtime);
+					unset($src,$dst);
+				}
+			} else {
+				policy_nat_exec($type,$_proto,'','',$_dstpl,$_fwdl,$_cmdlog,$_cmdtime);
+			}
+		} // while
+	}
+}
+
+function policy_start() {
+	global $_DB_NAME, $_PORT_ARRAY;
+	global $list_array, $list_array2, $_pptp_stat;
+	global $_KMSG, $_IPP2P_INBOUND, $_IPP2P_OUTBOUND;
+
+	$db_id=db_connect($_DB_NAME);
+	chk_valid_policy_input($db_id);
+	$_dev=array();
+	$_acl=array();
+	$_pnl=array();
+	$_int=array();
+	$_pptp_stat=0;
+	// nic list
+	$result=db_query("select * from ipaddr where onboot='1'",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_ipaddrname=$row['name'];
+			$_ipaddrip=$row['ip'];
+			$_ipaddrmask=$row['mask'];
+			$_ipaddrdev=$row['dev'];
+			$_name="$_ipaddrname"."-net";
+			$ret=ipcalc($_ipaddrip,$_ipaddrmask);
+			$_ipnet=$ret['network'];
+			$_ippref=$ret['prefix'];
+			$list_array[$_name]="$_ipnet/$_ippref";
+			$list_array2[$_ipaddrname]="$_ipaddrip";
+			//if($_ipaddrname=='WAN' || $_ipaddrname=='FOV') $_int[]="$_ipaddrdev|$_ipaddrip";
+			if($_ipaddrname=='WAN') $_int[]="$_ipaddrdev|$_ipaddrip";
+			$_dev[]="$_ipaddrdev";
+			$_acl[]="$_ipaddrdev|$_ipaddrip";
+			$_pnl[]="$_ipaddrdev|$_ipaddrip|$_ipnet/$_ippref";
+		}
+	}
+	unset($result);
+	$result=db_query("select ip from ipalias",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_ip=$row['ip'];
+			$list_array[$_ip]="$_ip";
+			$list_array2[$_ip]="$_ip";
+		}
+	}
+	unset($result);
+	$result=db_query("select stat from pptp",$db_id);
+	if(db_num_rows($result)!=0) {
+		$_pptp_stat=db_fetch_single($result);
+	}
+	unset($result);
+
+	slog("INIT: Starting policy rules");
+	do_iptable("-P INPUT DROP");
+	do_iptable("-P FORWARD DROP");
+	do_iptable("-P OUTPUT DROP");
+	do_iptable("-t nat -P PREROUTING ACCEPT");
+	do_iptable("-t nat -P POSTROUTING ACCEPT");
+	do_iptable("-t nat -P OUTPUT ACCEPT");
+
+	do_iptable("-F");
+	do_iptable("-t nat -F");
+	do_iptable("-t mangle -F");
+	do_iptable("-X");
+	do_iptable("-t nat -X");
+	do_iptable("-t mangle -X");
+	do_iptable("-Z");
+
+	do_iptable("-N IPS-DROP");
+	do_iptable("-N MYBOX-DROP");
+	do_iptable("-N MYBOX-IN-POLICY");
+	do_iptable("-N MYBOX-INCOMING");
+	do_iptable("-N MYBOX-OUT-POLICY");
+	do_iptable("-N MYBOX-OUTGOING");
+	do_iptable("-N MYBOX-SWITCH");
+
+	do_iptable("-A INPUT -j IPS-DROP");
+	do_iptable("-A FORWARD -j IPS-DROP");
+	do_iptable("-A FORWARD -j IPS-DROP");
+	do_iptable("-A OUTPUT -j IPS-DROP");
+	do_iptable("-A INPUT -j MYBOX-DROP");
+	do_iptable("-A FORWARD -j MYBOX-DROP");
+	do_iptable("-A FORWARD -j MYBOX-DROP");
+	do_iptable("-A OUTPUT -j MYBOX-DROP");
+
+	do_iptable("-A INPUT -p all -i lo -s 127.0.0.1 -j ACCEPT");
+	foreach($_acl as $_list) {
+		list($dev,$_ip)=preg_split("/\|/",$_list);
+		do_iptable("-A INPUT -p all -i lo -s $_ip -j ACCEPT");
+	}
+	unset($dev,$_ip);
+
+	do_iptable("-A INPUT -p tcp -m tcp ! --tcp-flags SYN,RST,ACK SYN -m state --state NEW -j DROP"); 
+	do_iptable("-A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT");
+
+	// ACL
+	policy_acl($_acl,$db_id);
+
+	do_iptable("-A INPUT -j MYBOX-IN-POLICY");
+
+
+	do_iptable("-A OUTPUT -p all -s 127.0.0.1 -j ACCEPT");
+	foreach($_acl as $_list) {
+		list($dev,$_ip)=preg_split("/\|/",$_list);
+		do_iptable("-A OUTPUT -p all -s $_ip -j ACCEPT");
+	}
+	unset($dev,$_ip);
+
+	do_iptable("-A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT");
+	do_iptable("-A OUTPUT -j MYBOX-OUT-POLICY");
+
+	do_iptable("-A FORWARD -p tcp -m tcp ! --tcp-flags SYN,RST,ACK SYN -m state --state NEW -j DROP"); 
+	do_iptable("-A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT"); 
+	do_iptable("-A FORWARD -j MYBOX-SWITCH");
+
+	// old virus
+	do_iptable("-A MYBOX-DROP -p tcp -m tcp --dport 80 --tcp-flags ACK ACK -m string --string \"root.exe\" -j DROP");
+	do_iptable("-A MYBOX-DROP -p tcp -m tcp --dport 80 --tcp-flags ACK ACK -m string --string \"/_vti_bin\" -j DROP");
+	do_iptable("-A MYBOX-DROP -p tcp -m tcp --dport 80 --tcp-flags ACK ACK -m string --string \".ida?\" -j DROP");
+
+	if(mfs_license('NAT')==1) {
+		policy_nat('dnat',$db_id);
+		policy_nat('snat',$db_id);
+	}
+
+	//do_iptable("-t mangle -A PREROUTING -p tcp -m tcp --sport 22 -j TOS --set-tos 0x10");
+	//do_iptable("-t mangle -A PREROUTING -p tcp -m tcp --sport 443 -j TOS --set-tos 0x10");
+
+	if(count($_int)!=0) {
+		foreach($_int as $_list) {
+			list($dev,$_ip)=preg_split("/\|/",$_list);
+			do_iptable("-t nat -A POSTROUTING -o $dev -j SNAT --to-source $_ip");
+		}
+	}
+
+	policy_inout("MYBOX-IN-POLICY",$db_id);
+	if(count($_pnl)!=0) {
+		foreach($_pnl as $_list) {
+			list($dev,$_ip,$_net)=preg_split("/\|/",$_list);
+			icmp_ping('MYBOX-IN-POLICY',$_net,$_ip);
+		}
+	}
+	policy_inout("MYBOX-OUT-POLICY",$db_id);
+
+
+	// forward chain construct
+	$IN=array();
+	$OUT=array();
+	foreach($_dev as $a) {
+        	$i=$a{3};
+        	foreach($_dev as $b) {
+			$x=$b{3};
+                	if($i < $x) {
+				$IN[]="-A MYBOX-SWITCH -i $a -o $b -j MYBOX-IN-POLICY";
+			}
+			if($i > $x) {
+				$OUT[]="-A MYBOX-SWITCH -i $a -o $b -j MYBOX-OUT-POLICY";
+			}
+		}
+	}
+	unset($a,$b,$i,$x);
+
+	//do_iptable("-A MYBOX-SWITCH -m state --state ESTABLISHED,RELATED -j ACCEPT"); 
+	//do_iptable("-A MYBOX-SWITCH -i eth+ -o eth+ -j MYBOX-IN-POLICY");
+	//do_iptable("-A MYBOX-SWITCH -i eth+ -o eth+ -j MYBOX-OUT-POLICY");
+
+	foreach($IN as $rr) do_iptable($rr);
+	foreach($OUT as $rr) do_iptable($rr);
+
+	if($_pptp_stat==1) {
+		/*do_iptable("-A MYBOX-SWITCH -i ppp+ -o eth+ -j MYBOX-IN-POLICY");
+		do_iptable("-A MYBOX-SWITCH -i eth+ -o ppp+ -j MYBOX-OUT-POLICY");
+		do_iptable("-A MYBOX-SWITCH -i ppp+ -o ppp+ -j MYBOX-IN-POLICY");
+		do_iptable("-A MYBOX-SWITCH -i ppp+ -o ppp+ -j MYBOX-OUT-POLICY");*/
+		foreach($_dev as $a) do_iptable("-A MYBOX-SWITCH  -i ppp+ -o $a -j MYBOX-IN-POLICY");
+		foreach($_dev as $a) do_iptable("-A MYBOX-SWITCH  -i $a -o ppp+ -j MYBOX-OUT-POLICY");
+		do_iptable("-A MYBOX-SWITCH -i ppp+ -o ppp+ -j MYBOX-OUT-POLICY");
+		do_iptable("-A MYBOX-SWITCH -i ppp+ -o ppp+ -j MYBOX-IN-POLICY");
+	}
+	// long wait
+	policy_blacklist($db_id);
+	db_close($db_id);
+	file_put_contents("/var/sys/fwmsg",serialize($_KMSG));
+	file_put_contents("/var/sys/ipp2pimsg",serialize($_IPP2P_INBOUND));
+	file_put_contents("/var/sys/ipp2pomsg",serialize($_IPP2P_OUTBOUND));
+	@unlink("/var/sys/ipsblock");
+	return 0;
+}
+
+function policy_stop() {
+	do_iptable("-F");
+	do_iptable("-t nat -F");
+	do_iptable("-t mangle -F");
+	do_iptable("-X");
+	do_iptable("-t nat -X");
+	do_iptable("-t mangle -X");
+	do_iptable("-Z");
+	do_iptable("-P INPUT DROP");
+	do_iptable("-P FORWARD DROP");
+	do_iptable("-P OUTPUT DROP");
+	do_iptable("-t nat -P PREROUTING ACCEPT");
+	do_iptable("-t nat -P POSTROUTING ACCEPT");
+	do_iptable("-t nat -P OUTPUT ACCEPT");
+	slog("INIT: Stopping policy rules");
+	@unlink("/var/sys/fwmsg");
+	@unlink("/var/sys/ipp2pimsg");
+	@unlink("/var/sys/ipp2pomsg");
+	return 0;
+}
+
+function policy_clear() {
+	do_iptable("-F");
+	do_iptable("-t nat -F");
+	do_iptable("-t mangle -F");
+	do_iptable("-X");
+	do_iptable("-t nat -X");
+	do_iptable("-t mangle -X");
+	do_iptable("-Z");
+	do_iptable("-P INPUT ACCEPT");
+	do_iptable("-P FORWARD ACCEPT");
+	do_iptable("-P OUTPUT ACCEPT");
+	slog("INIT: Policy rules disabled!");
+	@unlink("/var/sys/fwmsg");
+	@unlink("/var/sys/ipp2pimsg");
+	@unlink("/var/sys/ipp2pomsg");
+	return 0;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+if($_SERVER["argv"][2]=='debug') $_DEBUG=1;
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=policy_start();
+		break;
+	case 'stop':
+		$ret=policy_stop();
+		break;
+	case 'clear':
+		$ret=policy_clear();
+		break;
+	case 'restart':
+		$ret=policy_stop();
+		sleep(2);
+		$ret=policy_start();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/clear]\n";
+		break;
+}
+flush();
+exit($ret);
+?>
+

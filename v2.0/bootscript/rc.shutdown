@@ -1,0 +1,50 @@
+#!/bin/sh
+#
+#
+
+trap : 1 2 3 15
+PATH="/bin"
+TERM=linux
+export PATH TERM
+umask 022
+
+echo "0" > /proc/sys/kernel/printk
+:>/etc/resolv.conf
+
+DDATE=$(date +"%d/%m/%Y %T")
+LOGNAME="system-$(date +%Y%m%d).log"
+
+[ -d "/strg/mybox/logs" ] && echo "[$DDATE] ****** SYSTEM SHUTDOWN ******" >> /strg/mybox/logs/$LOGNAME
+
+killall -9 crond >/dev/null 2>&1
+killall -9 sshd >/dev/null 2>&1
+killall -9 arpd >/dev/null 2>&1
+iptables -F >/dev/null 2>&1
+iptables -t nat -F >/dev/null 2>&1
+iptables -t mangle -F >/dev/null 2>&1
+iptables -X >/dev/null 2>&1
+iptables -t nat -X >/dev/null 2>&1
+iptables -t mangle -X >/dev/null 2>&1
+
+for p in php pptpd pppd sshd snmpd httpd ipsd syslog klogd; do
+	ps ax |grep $p |grep -v grep |awk '{print $1}' |xarg kill -9 >/dev/null 2>&1
+	wait
+done
+
+if [ -d "/firmware" ]; then
+	umount -r /firmware >/dev/null 2>&1
+fi
+
+rm -f /strg/.mount_strg >/dev/null 2>&1
+rm -f /strg/mybox/db/system.db-* >/dev/null 2>&1
+
+umount -r /strg >/dev/null 2>&1
+wait
+swapoff -a >/dev/null 2>&1
+
+# Remove all modules
+#for m in $(lsmod |awk '{print $1}' |grep -v '^Module'); do
+#        rmmod $m >/dev/null 2>&1
+#done
+
+exit 0

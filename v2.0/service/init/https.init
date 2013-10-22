@@ -1,0 +1,205 @@
+#!/bin/php -Cq
+<?
+// httpa.init - last update 11-Oct-2005
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.so');
+
+putenv("PATH=/bin:/service/tools:/service/init");
+
+if(!file_exists("/bin/httpd") || !file_exists("/service/tools/mfs-miniserv.exc")) {
+	echo "httpd or mfs-miniserv.exc binary not found or cannot execute\n";
+	slog("INIT: httpd or mfs-miniserv.exc binary not found or cannot execute");
+	exit(1);
+}
+
+if(mfs_license('OK_KEY')==-2) {
+	echo "Invalid license Key.\n";
+	exit(1);
+}
+
+$db_id=db_connect($_DB_NAME);
+$_HTTPS_STAT=0;
+$result=db_query("select * from service_https",$db_id);
+if(db_num_rows($result)!=0) {
+	while($row=db_fetch_array_assoc($result)) {
+		$_HTTPS_STAT=$row['stat'];
+		$_HTTPS_PORT=$row['port'];
+	}
+}
+db_close($db_id);
+
+if($_HTTPS_STAT==0) {
+	echo "HTTPS agent disabled\n";
+	exit(1);
+}
+
+function write_ssl_config() {
+	global $_DB_NAME;
+	$db_id=db_connect($_DB_NAME);
+	$result=db_query("select * from site_certificate",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_country=$row['country'];
+			$_state=$row['state'];
+			$_city=$row['city'];
+			$_organization=$row['organization'];
+			$_section=$row['section'];
+			$_email=$row['email'];
+			$_hostname=$row['hostname'];
+		}
+	}
+	db_close($db_id);
+
+$_CERT="
+RANDFILE = /tmp/.server.rnd
+
+[ req ]
+default_bits = 1024
+encrypt_key = yes
+distinguished_name = req_dn
+x509_extensions = cert_type
+
+[ req_dn ]
+countryName = Country Name (2 letter code)
+countryName_default             = $_country
+countryName_min                 = 2
+countryName_max                 = 2
+
+stateOrProvinceName             = State or Province Name (full name)
+stateOrProvinceName_default     = $_state
+
+localityName                    = Locality Name (eg, city)
+localityName_default            = $_city
+
+0.organizationName              = Organization Name (eg, company)
+0.organizationName_default      = $_organization
+
+organizationalUnitName          = Organizational Unit Name (eg, section)
+organizationalUnitName_default  = $_section
+
+0.commonName                    = Common Name (FQDN of your server)
+0.commonName_default            = $_hostname
+
+emailAddress                    = Email Address
+emailAddress_default           	= $_email
+emailAddress_max                = 40
+[ cert_type ]
+nsCertType = server
+";
+
+	if($fi=fopen("/etc/openssl.cnf","w")) {
+		fwrite($fi,"$_CERT");
+		fclose($fi);
+	}
+	unset($_CERT);
+	return 0;
+}
+
+function create_ssl_certificate() {
+	@write_ssl_config();
+	echo "Generating Site Certificate\n";
+	exec_cmd("openssl req -batch -new -x509 -days 365 -nodes -config /etc/openssl.cnf -out /etc/openssl.pem -keyout /etc/openssl.pem");
+	exec_cmd("openssl x509 -subject -dates -fingerprint -noout -in /etc/openssl.pem");
+	chmod("/etc/openssl.pem",0600);
+	slog("INIT: Generating Site Certificate");
+	return 0;
+}
+
+function https_config() {
+	global $_HTTPS_PORT;
+	if($fi=fopen("/etc/httpd.cnf.tmp","w")) {
+		fwrite($fi,"pidfile=/var/run/httpd\n");
+		fwrite($fi,"cgipat=**.html|**.so|**.exc\n");
+		fwrite($fi,"dir=/service/www\n");
+		fwrite($fi,"port=$_HTTPS_PORT\n");
+		fwrite($fi,"ssl\n");
+		fwrite($fi,"user=mfs\n");
+		fclose($fi);
+		@copy("/etc/httpd.cnf.tmp","/etc/httpd.cnf");
+		@unlink("/etc/httpd.cnf.tmp");
+		chmod("/etc/httpd.cnf",0600);
+		echo "Writing https config\n";
+		slog("INIT: Writing https config");
+		if(!file_exists("/etc/openssl.pem")) create_ssl_certificate();
+		return 0;
+	}
+	slog("INIT: Writing https config failed");
+	return 1;
+}
+function https_status() {
+	$pid=get_progpid("httpd");
+	$pid2=get_progpid("mfs-miniserv.exc");
+	if($pid!='' && $pid2!='') {
+		echo "https (pid $pid)  is running...\n";
+		return 0;
+	}
+	echo "https not running..\n";
+	return 1;
+}
+
+function https_start() {
+	@https_config();
+	if(@https_status()==1) {
+		if(exec_bg("/service/tools/mfs-miniserv.exc")==0) {
+			@touch("/var/sys/.chk_https");
+			echo "Starting HTTPS agent\n";
+			slog("INIT: Starting HTTPS agent");
+			return 0;
+		}
+	}
+	echo "Starting HTTPS agent failed\n";
+	slog("INIT: Starting HTTPS agent failed");
+	return 1;
+}
+
+function https_stop() {
+	if(killall("mfs-miniserv.exc")==0) {
+		echo "Shutting down mfs-miniserv.exc agent\n";
+		hsyslog("Shutting down mfs-miniserv.exc agent");
+	}
+	if(file_exists("/var/run/httpd")) {
+		if(shell_exec("kill -9 `cat /var/run/httpd`;echo $?")!=0)  {
+			if(killall("httpd")==0) {
+				echo "Shutting down HTTPS agent\n";
+				slog("INIT: Shutting down HTTPS agent");
+			}
+		} else {
+			echo "Shutting down HTTPS agent\n";
+			slog("INIT: Shutting down HTTPS agent");
+		}
+	}
+	@unlink("/var/run/httpd");
+	@unlink("/var/sys/.chk_https");
+	return 0;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=https_start();
+		break;
+	case 'stop':
+		$ret=https_stop();
+		break;
+	case 'restart':
+		$ret=https_stop();
+		sleep(2);
+		$ret=https_start();
+		break;
+	case 'status':
+		$ret=https_status();
+		break;
+	case 'config':
+		$ret=https_config();
+		break;
+	case 'cert':
+		$ret= create_ssl_certificate();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/status/config/cert]\n";
+		break;
+}
+flush();
+exit($ret);
+?>

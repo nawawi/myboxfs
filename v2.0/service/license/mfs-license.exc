@@ -1,0 +1,40 @@
+<?
+// 1 = enterprise 2 = mini
+
+$_SET_MYBOX_LICENSE=1;
+$_MYBOX_ORG="Tracenetwork Corporation Sdn. Bhd.";
+$_MYBOX_KEY="!mfs123*";
+$_MYBOX_LICENSE=array();
+if($_SET_MYBOX_LICENSE==1) {
+	$_MYBOX_LICENSE['type']='Enterprise';
+	$_MYBOX_LICENSE['org']=$_MYBOX_ORG;
+	$_MYBOX_LICENSE['key']=$_MYBOX_KEY;
+	$_MYBOX_LICENSE['standard_system']=1;
+	$_MYBOX_LICENSE['traffic_shaper']=1;
+	$_MYBOX_LICENSE['reporting']=1;
+	$_MYBOX_LICENSE['nat']=1;
+	$_MYBOX_LICENSE['ips']=1;
+	$_MYBOX_LICENSE['vpn']=1;
+} elseif($_SET_MYBOX_LICENSE==2) {
+	$_MYBOX_LICENSE['type']='Mini';
+	$_MYBOX_LICENSE['org']=$_MYBOX_ORG;
+	$_MYBOX_LICENSE['key']=$_MYBOX_KEY;
+	$_MYBOX_LICENSE['standard_system']=1;
+	$_MYBOX_LICENSE['traffic_shaper']=1;
+	$_MYBOX_LICENSE['reporting']=0;
+	$_MYBOX_LICENSE['nat']=0;
+	$_MYBOX_LICENSE['ips']=0;
+	$_MYBOX_LICENSE['vpn']=0;
+} else {
+	$_MYBOX_LICENSE['type']='Default';
+	$_MYBOX_LICENSE['org']=$_MYBOX_ORG;
+	$_MYBOX_LICENSE['key']=$_MYBOX_KEY;
+	$_MYBOX_LICENSE['standard_system']=1;
+	$_MYBOX_LICENSE['traffic_shaper']=0;
+	$_MYBOX_LICENSE['reporting']=0;
+	$_MYBOX_LICENSE['nat']=0;
+	$_MYBOX_LICENSE['ips']=0;
+	$_MYBOX_LICENSE['vpn']=0;
+}
+
+?>

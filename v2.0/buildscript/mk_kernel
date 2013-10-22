@@ -1,0 +1,100 @@
+#!/bin/sh -e
+
+START=$(pwd)
+CONFIG="$START/config/kernel.config-2.4.29-terminal"
+
+KERNEL_SOURCE=/usr/src/linux
+REL_DIR=$START/kernel_base
+REL_MOD=$REL_DIR/modules
+RSHAPER=/usr/src/rshaper
+RSHAPER_BIN=$REL_DIR/bin
+IPP2P_SRC=/usr/src/ipp2p
+VMXNET_SRC=$KERNEL_SOURCE/vmxnet-only
+
+TIME=$(date +%H:%M:%S)
+MYBOX_INFO="
+#define UTS_SYSNAME \"Mybox Firewall System (c) Tracenetwork Corp. (M) Sdn. Bhd.\"
+#define UTS_VERSION \"v2.0 BUILD:20041109\"
+#define LINUX_COMPILE_TIME \"$TIME\"
+#define LINUX_COMPILE_BY \"mfs\"
+#define LINUX_COMPILE_HOST \"devel.mybox.net.my\"
+#define LINUX_COMPILE_DOMAIN \"mybox.net.my\"
+#define LINUX_COMPILER \"gcc version 3.4.1 (Mybox Firewall System)\"
+#define UTS_MACHINE \"i386\"
+"
+
+if [ ! -d "$KERNEL_SOURCE" ]; then
+	echo "$KERNEL_SOURCE not found"
+	exit;
+fi
+
+if [ ! -f "$CONFIG" ]; then
+	echo "$CONFIG not found"
+	exit;
+fi
+
+rm -rf $REL_DIR
+mkdir -p $REL_MOD
+
+cd $KERNEL_SOURCE
+make distclean
+make clean
+make mrproper
+sync
+cat $CONFIG > $KERNEL_SOURCE/.config
+echo "$MYBOX_INFO" > $KERNEL_SOURCE/include/linux/mybox.h
+
+sync
+make oldconfig
+
+for act in dep bzImage modules modules_install; do
+	make INSTALL_MOD_PATH=$REL_MOD $act
+done
+
+
+cd $START
+
+K_VER=$(ls $REL_MOD/lib/modules)
+RSHAPER_DIR=$REL_MOD/lib/modules/$K_VER/misc
+mkdir -p $RSHAPER_DIR
+
+if [ -f "$KERNEL_SOURCE/arch/i386/boot/bzImage" ]; then
+	cp -v $KERNEL_SOURCE/arch/i386/boot/bzImage $REL_DIR/mfs-kernel
+	upx-kernel -9 $REL_DIR/mfs-kernel
+	du -hc $REL_DIR/$KVER
+fi
+
+cd $RSHAPER
+make clean
+make
+if [ -f "rshaper.o" ]; then
+	cp -v rshaper.o $RSHAPER_DIR
+	mkdir -p $RSHAPER_BIN
+	cp -v rshaperctl $RSHAPER_BIN
+	strip -v $RSHAPER_BIN/rshaperctl
+	upx-kernel -9 $RSHAPER_BIN/rshaperctl
+fi
+
+echo "################ IPP2P MAKE START ################"
+cd $IPP2P_SRC
+make KERNEL_SRC=/usr/src/linux IPTABLES_SRC=/usr/src/iptables clean
+make KERNEL_SRC=/usr/src/linux IPTABLES_SRC=/usr/src/iptables
+cp -v ipt_ipp2p.o $REL_MOD/lib/modules/$K_VER/kernel/net/ipv4/netfilter
+echo "################ IPP2P MAKE END ################"
+sleep 2
+
+if [ -d "$VMXNET_SRC" ]; then
+	cd $VMXNET_SRC
+	make clean
+	make
+	cp -v vmxnet.o $REL_MOD/lib/modules/$K_VER/kernel/drivers/net/
+fi
+
+cd $START
+
+rm -rf $REL_MOD/lib/modules/$K_VER/build 
+rm -rf $REL_MOD/lib/modules/$K_VER/pcmcia 
+
+cd $REL_MOD
+tar -jcvf $REL_DIR/kmods.bz2 lib |sort
+cd 

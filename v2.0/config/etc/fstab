@@ -1,0 +1,2 @@
+virtual                    /dev                	devfs  	defaults	0 0
+virtual                    /proc		proc    defaults        0 0

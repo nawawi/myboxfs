@@ -1,0 +1,135 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.so');
+
+if(isset($do_save)&&$do_save==1) {
+	$msg='';
+	if(move_uploaded_file("$filename","$_DOWNLOAD_PATH/$filename_name")) {
+		if($filename_name!="mfs-license.exc") {
+			$msg="Invalid license file!";
+			@unlink("$_DOWNLOAD_PATH/$filename_name");
+		} else {
+			@rename("$_LICENSE_PATH","$_ROOT_DIR/mfs-license.exc.bak");
+			if(!copy("$_DOWNLOAD_PATH/$filename_name","$_LICENSE_PATH")) {
+				$msg="License update failed!";
+			}
+		}
+	}
+	if($msg=='') {
+		$msg='License updated!';
+		@session_start();
+		@session_unset();
+		@session_destroy();
+		echo_query("syslog-restart");
+		echo_query("cron-restart");
+		echo_query("ips-restart");
+		echo_query("pptp-restart");
+		echo_query("snmp-restart");
+		echo_query("shaper-restart");
+		echo_query("dhcp-restart");
+		echo_query("failover-restart");
+		header("Location: $_URL_PATH/");
+		exit;
+	}
+}
+
+@session_start();
+$_mm=$_SESSION['mfs_license_id'];
+if(!isset($h)||$h==''||$h!=$_mm || !isset($msgid) || $msgid=='') exit;
+$msg_reply='';
+if($msgid==1) {
+	$msg_reply="No license file. Please upload valid license file.";
+} else if($msgid==2) {
+	$msg_reply="Invalid license Key. Please upload valid license file.";
+} else if($msgid==3) {
+	$msg_reply="License expired. Please upload new license file.";
+}
+if($msg!='') $msg_reply=$msg;
+?>
+<html>
+<head>
+<title>MyBox Firewall - License Update</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script language="javascript">
+	if(top.frames.length!=0) top.location=self.document.location;
+	defaultStatus="MyBox Firewall - License Update";
+
+function Trim(str) {
+	return(str.replace(/^\s*/,'').replace(/\s*$/,'').replace(/^\t*/,'').replace(/\t*$/,'').replace(/^\f*/,'').replace(/\f*$/,'').replace(/^\r*/,'').replace(/\r*$/,''));
+}
+
+function check_licensefile() {
+	var file=document.f.filename.value;
+	uf=Trim(file);
+	if(uf.indexOf("mfs-license.exc")!=-1) return true;
+	return false;
+}
+function do_submit() {
+	var ret=check_licensefile();
+	if(ret==true) {
+		document.f.btsubmit.disabled=true;
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	}
+	alert("Invalid file type!");
+	return false;
+}
+</script>
+</head>
+<body bgcolor='#ffffff' leftmargin="0" topmargin="0" rightmargin="0" bottommargin="0">
+<form name=f method=post action="<?echo "$_URL_PATH/license.html";?>" onsubmit='return do_submit();' enctype="multipart/form-data">
+<table border="0" cellpadding="4" cellspacing="4" width="700" align=center>
+<tr>
+<td align=center>
+<img src="<?echo $_URL_PATH;?>/i/login_logo.png" nosave border=0>
+<br><br>
+<!-- main -->
+<fieldset>
+<table valign=top border=0>
+<tr>
+<td>
+<table border=0 cellpadding="2" cellspacing="2">
+<tr>
+<td align=center valign=middle>
+<table width="650" border="0" cellpadding="0" cellspacing="0">
+
+<tr> 
+<td class="tabcont">
+
+<?if($msg_reply!='') {?>
+<table width="600" border=0 cellpadding="0" cellspacing="0">
+<tr><td align=center><span class=notice><?echo "$msg_reply";?></span></td></tr>
+</table><br>
+<? }?>
+<table width="600" border="0" cellpadding="6" cellspacing="0">
+<tr> 
+<td width="30%" valign="middle" class="tdcelltop">License File</td>
+<td width="70%" valign="middle" class="mtabletop"> 
+<input name="filename" type="file" class="filebox" size="35"> 
+</td>
+</tr>
+</table>
+<tr><td align=right valign=top><input name=btsubmit type="submit" value="Upload" class="button"></td></tr>
+</td>
+</tr>
+
+</table>
+
+</td>
+</tr>
+</table>
+
+<!-- end main -->
+</td>
+</tr>
+</table>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=h value='<?echo $_mm;?>'>
+</form>
+</body>
+</html>

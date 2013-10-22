@@ -1,0 +1,77 @@
+#!/bin/php
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.so');
+chk_session();
+
+$_SYSID="sigread";
+if(mfs_license('IPS')!=1) die("Disabled. Please upgrade your license.\n");
+
+$logfile="/usr/ips_rules/mfs-rules/$fo";
+$sess=session_id();
+$filesave="tmp.sigread.$sess";
+
+if(isset($print)&&$print==1) {
+	if(file_exists("$_DOWNLOAD_PATH/$filesave")) {
+		include_once("$_DOWNLOAD_PATH/$filesave");
+		@unlink("$_DOWNLOAD_PATH/$filesave");
+		echo "<script language='javascript'>window.print();</script>";
+		exit;
+	}
+} else {
+	ob_start('save_content');
+}
+
+?>
+
+<html>
+<head>
+<title>MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?></title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="<?echo $_URL_PATH;?>/favicon.ico" type="image/x-icon" />
+<meta http-equiv=refresh content='300'; url='<?echo "$_URL_PATH/diag_logread.html?fo=$logfile&sort=$sort2&grep=$grep&str=$str";?>'>
+<LINK REL=StyleSheet HREF="<?echo $_URL_PATH;?>/c/blue.css" TYPE="text/css">
+<script language="javascript">
+	defaultStatus="MyBox Firewall - Logged on as <?echo $_LOGIN['auth_id'];?>";
+</script>
+</head>
+<body scroll=auto>
+
+<form name=f>
+<table border="0" cellpadding="2" cellspacing="2" width="98%" align=center class=tablist>
+<!-- TAG NOSAVE START -->
+<tr><td align=right>
+<a href="#" onclick="self.location.href='<?echo "$_URL_PATH/sigread.html?fo=$logfile&print=1";?>';"><?echo $_PNG['print'];?></a>
+</td></tr>
+<!-- TAG NOSAVE END -->
+<tr>
+<td>
+<pre>
+<?
+if($fi=fopen($logfile,"r")) {
+	while($buff=fgets($fi,2048)) {
+		$line=trim($buff);
+		if($line[0]=='#') $line[0]='';
+		$line=trim($line);
+		$line=htmlspecialchars($line);
+		echo "$line\n";
+	}
+	fclose($fi);
+}
+?>
+</pre>
+</td>
+</tr>
+</table>
+<!-- TAG NOSAVE START -->
+</form>
+<!-- TAG NOSAVE END -->
+</body>
+</html>
+
+<?
+if(!isset($print)||$print=='') {
+	ob_end_flush();
+}
+?>

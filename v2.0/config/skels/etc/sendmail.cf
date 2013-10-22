@@ -1,0 +1,840 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Cwlocalhost.localdomain
+
+
+
+
+V9/Berkeley
+
+
+
+
+Cwlocalhost localhost.localdomain
+
+
+CP.
+
+DS
+
+
+CO @ % !
+
+C..
+
+C[[
+
+C{Accept}OK RELAY
+
+
+
+
+FR-o /etc/mail/relay-domains
+
+Karith arith
+C{tls}VERIFY ENCR
+
+DR
+
+DH
+
+Kdequote dequote
+
+C{E}root
+
+DM
+
+DnMAILER-DAEMON
+
+
+Kmailertable hash -o /etc/mail/mailertable.db
+
+Kvirtuser hash -o /etc/mail/virtusertable.db
+
+CPREDIRECT
+
+Kaccess hash -o /etc/mail/access.db
+
+DZ8.11.6
+
+
+
+O SevenBitInput=False
+O AliasWait=10
+O AliasFile=/etc/aliases
+O MinFreeBlocks=100
+O BlankSub=.
+O HoldExpensive=False
+O DeliveryMode=background
+O AutoRebuildAliases
+O TempFileMode=0600
+O HelpFile=/etc/mail/helpfile
+O SendMimeErrors=True
+O ForwardPath=$z/.forward.$w:$z/.forward
+O ConnectionCacheSize=2
+O ConnectionCacheTimeout=5m
+O UseErrorsTo=False
+O LogLevel=9
+O CheckAliases=False
+O OldStyleHeaders=True
+O DaemonPortOptions=Port=smtp,Addr=127.0.0.1, Name=MTA
+O PrivacyOptions=authwarnings,novrfy,noexpn,restrictqrun
+O QueueDirectory=/var/spool/mqueue
+O Timeout.connect=1m
+O Timeout.queuereturn=5d
+O Timeout.queuewarn=4h
+O SuperSafe=True
+O StatusFile=/etc/mail/statistics
+O DefaultUser=8:12
+O UserDatabaseSpec=/etc/mail/userdb.db
+O TryNullMXList=true
+O SmtpGreetingMessage=$j Sendmail $v/$Z; $b
+O UnixFromLine=From $g $d
+O OperatorChars=.:%@!^/[]+
+O DontProbeInterfaces=true
+Pfirst-class=0
+Pspecial-delivery=100
+Plist=-30
+Pbulk=-60
+Pjunk=-100
+
+
+Troot
+Tdaemon
+Tuucp
+
+
+H?P?Return-Path: <$g>
+HReceived: $?sfrom $s $.$?_($?s$|from $.$_)
+	$.$?{auth_type}(authenticated$?{auth_ssf} (${auth_ssf} bits)$.)
+	$.by $j ($v/$Z)$?r with $r$. id $i$?{tls_version}
+	(using ${tls_version} with cipher ${cipher} (${cipher_bits} bits) verified ${verify})$.$?u
+	for $u; $|;
+	$.$b
+H?D?Resent-Date: $a
+H?D?Date: $a
+H?F?Resent-From: $?x$x <$g>$|$g$.
+H?F?From: $?x$x <$g>$|$g$.
+H?x?Full-Name: $x
+H?M?Resent-Message-Id: <$t.$i@$j>
+H?M?Message-Id: <$t.$i@$j>
+
+
+Scanonify=3
+
+R$@			$@ <@>
+
+R$*			$: $1 <@>			mark addresses
+R$* < $* > $* <@>	$: $1 < $2 > $3			unmark <addr>
+R@ $* <@>		$: @ $1				unmark @host:...
+R$* :: $* <@>		$: $1 :: $2			unmark node::addr
+R:include: $* <@>	$: :include: $1			unmark :include:...
+R$* [ IPv6 : $+ ] <@>	$: $1 [ IPv6 : $2 ]		unmark IPv6 addr
+R$* : $* [ $* ]		$: $1 : $2 [ $3 ] <@>		remark if leading colon
+R$* : $* <@>		$: $2				strip colon if marked
+R$* <@>			$: $1				unmark
+R$* ;			   $1				strip trailing semi
+R$* < $+ :; > $*	$@ $2 :; <@>			catch <list:;>
+R$* < $* ; >		   $1 < $2 >			bogus bracketed semi
+
+R$@			$@ :; <@>
+
+R$*			$: < $1 >			housekeeping <>
+R$+ < $* >		   < $2 >			strip excess on left
+R< $* > $+		   < $1 >			strip excess on right
+R<>			$@ < @ >			MAIL FROM:<> case
+R< $+ >			$: $1				remove housekeeping <>
+
+R@ $+ , $+		$2
+R@ $+ : $+		$2
+
+R $+ : $* ; @ $+	$@ $>Canonify2 $1 : $2 ; < @ $3 >	list syntax
+R $+ : $* ;		$@ $1 : $2;			list syntax
+
+R$+ @ $+		$: $1 < @ $2 >			focus on domain
+R$+ < $+ @ $+ >		$1 $2 < @ $3 >			move gaze right
+R$+ < @ $+ >		$@ $>Canonify2 $1 < @ $2 >	already canonical
+
+R$* < @ $* : $* > $*	$1 < @ $2 $3 > $4		nix colons in addrs
+
+R$- ! $+		$@ $>Canonify2 $2 < @ $1 .UUCP >	resolve uucp names
+R$+ . $- ! $+		$@ $>Canonify2 $3 < @ $1 . $2 >		domain uucps
+R$+ ! $+		$@ $>Canonify2 $2 < @ $1 .UUCP >	uucp subdomains
+
+R$* % $*		$1 @ $2				First make them all @s.
+R$* @ $* @ $*		$1 % $2 @ $3			Undo all but the last.
+R$* @ $*		$@ $>Canonify2 $1 < @ $2 >	Insert < > and finish
+
+R$*			$@ $>Canonify2 $1
+
+
+
+SCanonify2=96
+
+R$* < @ localhost > $*		$: $1 < @ $j . > $2		no domain at all
+R$* < @ localhost . localdomain > $*		$: $1 < @ $j . > $2		no domain at all
+R$* < @ localhost . $m > $*	$: $1 < @ $j . > $2		local domain
+R$* < @ localhost . UUCP > $*	$: $1 < @ $j . > $2		.UUCP domain
+
+R$* < @ [ IPv6 : $+ ] > $*	$: $2 $| $1 < @@ [ $(dequote $2 $) ] > $3	mark IPv6 addr
+R$+ $| $* < @@ $=w > $*		$: $2 < @ $j . > $4		self-literal
+R$+ $| $* < @@ [ $+ ] > $*	$@ $2 < @ [ IPv6 : $1 ] > $4	canon IP addr
+
+R$* < @ [ $+ ] > $*		$: $1 < @@ [ $2 ] > $3		mark [a.b.c.d]
+R$* < @@ $=w > $*		$: $1 < @ $j . > $3		self-literal
+R$* < @@ $+ > $*		$@ $1 < @ $2 > $3		canon IP addr
+
+
+
+
+
+
+R$* < @ $+ . UUCP > $*		$: $1 < @ $[ $2 $] . UUCP . > $3
+R$* < @ $+ . . UUCP . > $*	$@ $1 < @ $2 . > $3
+
+R$* < @ $* $=P > $*		$: $1 < @ $2 $3 . > $4
+R$* < @ $* $~P > $*		$: $&{daemon_flags} $| $1 < @ $2 $3 > $4
+R$* CC $* $| $* < @ $+.$+ > $*	$: $3 < @ $4.$5 . > $6
+R$* CC $* $| $*			$: $3
+R$* $| $* < @ $* > $*		$: $2 < @ $[ $3 $] > $4
+R$* $| $*			$: $2
+
+R$* < @ $=w > $*		$: $1 < @ $2 . > $3
+R$* < @ $=M > $*		$: $1 < @ $2 . > $3
+R$* < @ $={VirtHost} > $* 	$: $1 < @ $2 . > $3
+R$* < @ $* . . > $*		$1 < @ $2 . > $3
+
+
+Sfinal=4
+
+R$+ :; <@>		$@ $1 :				handle <list:;>
+R$* <@>			$@				handle <> and list:;
+
+R$* < @ $+ . > $*	$1 < @ $2 > $3
+
+R$* < @ *LOCAL* > $*	$1 < @ $j > $2
+
+R$* < $+ > $*		$1 $2 $3			defocus
+R@ $+ : @ $+ : $+	@ $1 , @ $2 : $3		<route-addr> canonical
+R@ $*			$@ @ $1				... and exit
+
+R$+ @ $- . UUCP		$2!$1				u@h.UUCP => h!u
+
+R$+ % $=w @ $=w		$1 @ $2				u%host@host => u@host
+
+
+
+
+SRecurse=97
+R$*			$: $>canonify $1
+R$*			$@ $>parse $1
+
+
+
+Sparse=0
+
+R$*			$: $>Parse0 $1		initial parsing
+R<@>			$#local $: <@>		special case error msgs
+R$*			$: $>ParseLocal $1	handle local hacks
+R$*			$: $>Parse1 $1		final parsing
+
+
+SParse0
+R<@>			$@ <@>			special case error msgs
+R$* : $* ; <@>		$#error $@ 5.1.3 $: "553 List:; syntax illegal for recipient addresses"
+R@ <@ $* >		< @ $1 >		catch "@@host" bogosity
+R<@ $+>			$#error $@ 5.1.3 $: "553 User address required"
+R$*			$: <> $1
+R<> $* < @ [ $+ ] > $*	$1 < @ [ $2 ] > $3
+R<> $* <$* : $* > $*	$#error $@ 5.1.3 $: "553 Colon illegal in host name part"
+R<> $*			$1
+R$* < @ . $* > $*	$#error $@ 5.1.2 $: "553 Invalid host name"
+R$* < @ $* .. $* > $*	$#error $@ 5.1.2 $: "553 Invalid host name"
+R$* , $~O $*		$#error $@ 5.1.2 $: "553 Invalid route address"
+
+R$* < @ > $*		$@ $>Parse0 $>canonify $1	user@ => user
+R< @ $=w . > : $*	$@ $>Parse0 $>canonify $2	@here:... -> ...
+R$- < @ $=w . >		$: $(dequote $1 $) < @ $2 . >	dequote "foo"@here
+R< @ $+ >		$#error $@ 5.1.3 $: "553 User address required"
+R$* $=O $* < @ $=w . >	$@ $>Parse0 $>canonify $1 $2 $3	...@here -> ...
+R$- 			$: $(dequote $1 $) < @ *LOCAL* >	dequote "foo"
+R< @ *LOCAL* >		$#error $@ 5.1.3 $: "553 User address required"
+R$* $=O $* < @ *LOCAL* >
+			$@ $>Parse0 $>canonify $1 $2 $3	...@*LOCAL* -> ...
+R$* < @ *LOCAL* >	$: $1
+
+
+SParse1
+
+R$* < @ [ $+ ] > $*	$: $>ParseLocal $1 < @ [ $2 ] > $3	numeric internet spec
+R$* < @ [ $+ ] > $*	$1 < @ [ $2 ] : $S > $3		Add smart host to path
+R$* < @ [ IPv6 : $+ ] : > $*
+		$#esmtp $@ [ $(dequote $2 $) ] $: $1 < @ [IPv6 : $2 ] > $3	no smarthost: send
+R$* < @ [ $+ ] : > $*	$#esmtp $@ [$2] $: $1 < @ [$2] > $3	no smarthost: send
+R$* < @ [ $+ ] : $- : $*> $*	$#$3 $@ $4 $: $1 < @ [$2] > $5	smarthost with mailer
+R$* < @ [ $+ ] : $+ > $*	$#esmtp $@ $3 $: $1 < @ [$2] > $4	smarthost without mailer
+
+R$+			$: <!> $1		Mark for lookup
+R<!> $+ < @ $={VirtHost} . > 	$: < $(virtuser $1 @ $2 $@ $1 $: @ $) > $1 < @ $2 . >
+R<!> $+ < @ $=w . > 	$: < $(virtuser $1 @ $2 $@ $1 $: @ $) > $1 < @ $2 . >
+R<@> $+ + $* < @ $* . >
+			$: < $(virtuser $1 + * @ $3 $@ $1 $@ $2 $: @ $) > $1 + $2 < @ $3 . >
+R<@> $+ + $* < @ $* . >
+			$: < $(virtuser $1 @ $3 $@ $1 $: @ $) > $1 + $2 < @ $3 . >
+R<@> $+ + $+ < @ $+ . >	$: < $(virtuser + * @ $3 $@ $1 $@ $2 $: @ $) > $1 + $2 < @ $3 . >
+R<@> $+ + $* < @ $+ . >	$: < $(virtuser @ $3 $@ $1 $@ $2 $: @ $) > $1 + $2 < @ $3 . >
+R<@> $+ < @ $+ . >	$: < $(virtuser @ $2 $@ $1 $: @ $) > $1 < @ $2 . >
+R<@> $+			$: $1
+R<!> $+			$: $1
+R< error : $-.$-.$- : $+ > $* 	$#error $@ $1.$2.$3 $: $4
+R< error : $- $+ > $* 	$#error $@ $(dequote $1 $) $: $2
+R< $+ > $+ < @ $+ >	$: $>Recurse $1
+
+
+
+R$=L < @ $=w . >	$#local $: @ $1			special local names
+R$+ < @ $=w . >		$#local $: $1			regular local name
+
+R$* <@ $+ > $*		$: < $2 > $1 < @ $2 > $3	extract host name
+R< $+ . > $*		$: < $1 > $2			strip trailing dot
+R< $+ > $*		$: < $(mailertable $1 $) > $2	lookup
+R< $~[ : $* > $* 	$>MailerToTriple < $1 : $2 > $3		check -- resolved?
+R< $+ > $*		$: $>Mailertable <$1> $2		try domain
+
+
+
+
+
+R$* < @ $* > $*		$: $>MailerToTriple < $S > $1 < @ $2 > $3	glue on smarthost name
+
+R$* < @$* > $*		$#esmtp $@ $2 $: $1 < @ $2 > $3	user@host.domain
+
+R$=L			$#local $: @ $1		special local names
+R$+			$#local $: $1			regular local names
+
+
+SLocal_localaddr
+Slocaladdr=5
+R$+			$: $1 $| $>"Local_localaddr" $1
+R$+ $| $#$*		$#$2
+R$+ $| $*		$: $1
+
+
+
+
+R$+ + *			$#local $@ $&h $: $1
+R$+ + $*		$#local $@ + $2 $: $1 + *
+
+R$+			$: <> $1
+
+
+R< > $+			$: < $H > $1			try hub
+R< > $+			$: < $R > $1			try relay
+
+R< > $+			$: < > < $1 <> $&h >		nope, restore +detail
+R< > < $+ <> + $* >	$: < > < $1 + $2 >		check whether +detail
+R< > < $+ <> $* >	$: < > < $1 >			else discard
+R< > < $+ + $* > $*	   < > < $1 > + $2 $3		find the user part
+R< > < $+ > + $*	$#local $@ $2 $: @ $1		strip the extra +
+R< > < $+ >		$@ $1				no +detail
+R$+			$: $1 <> $&h			add +detail back in
+R$+ <> + $*		$: $1 + $2			check whether +detail
+R$+ <> $*		$: $1				else discard
+R< local : $* > $*	$: $>MailerToTriple < local : $1 > $2	no host extension
+R< error : $* > $*	$: $>MailerToTriple < error : $1 > $2	no host extension
+R< $- : $+ > $+		$: $>MailerToTriple < $1 : $2 > $3 < @ $2 >
+R< $+ > $+		$@ $>MailerToTriple < $1 > $2 < @ $1 >
+
+
+SMailertable=90
+R$* <$- . $+ > $*	$: $1$2 < $(mailertable .$3 $@ $1$2 $@ $2 $) > $4
+R$* <$~[ : $* > $*	$>MailerToTriple < $2 : $3 > $4		check -- resolved?
+R$* < . $+ > $* 	$@ $>Mailertable $1 . <$2> $3		no -- strip & try again
+R$* < $* > $*		$: < $(mailertable . $@ $1$2 $) > $3	try "."
+R< $~[ : $* > $*	$>MailerToTriple < $1 : $2 > $3		"." found?
+R< $* > $*		$@ $2				no mailertable match
+
+
+SMailerToTriple=95
+R< > $*				$@ $1			strip off null relay
+R< error : $-.$-.$- : $+ > $* 	$#error $@ $1.$2.$3 $: $4
+R< error : $- $+ > $*		$#error $@ $(dequote $1 $) $: $2
+R< local : $* > $*		$>CanonLocal < $1 > $2
+R< $- : $+ @ $+ > $*<$*>$*	$# $1 $@ $3 $: $2<@$3>	use literal user
+R< $- : $+ > $*			$# $1 $@ $2 $: $3	try qualified mailer
+R< $=w > $*			$@ $2			delete local host
+R< [ IPv6 : $+ ] > $*		$#relay $@ $(dequote $1 $) $: $2	use unqualified mailer
+R< $+ > $*			$#relay $@ $1 $: $2	use unqualified mailer
+
+
+SCanonLocal
+R< $* > < @ $+ > : $+		$@ $>Recurse $3
+R< $* > $+ $=O $+ < @ $+ >	$@ $>Recurse $2 $3 $4
+
+R< $* > $* < @ $* . >		$: < $1 > $2 < @ $3 >
+
+R< > $* < @ $* > $*		$#local $@ $1@$2 $: $1
+R< > $+				$#local $@ $1    $: $1
+
+R< $+ @ $+ > $* < @ $* >	$: < $1 > $3 < @ $4 >
+
+R< $+ > $* <@ $* > $*		$#local $@ $2@$3 $: $1
+R< $+ > $* 			$#local $@ $2    $: $1
+
+
+SMasqHdr=93
+
+
+R$* < @ $* $=N . >	$@ $1 < @ $2 $3 . >
+
+R$=E < @ *LOCAL* >	$@ $1 < @ $j . >		leave exposed
+R$=E < @ $=M . >	$@ $1 < @ $2 . >
+R$=E < @ $=w . >	$@ $1 < @ $2 . >
+
+R$* < @ $=M . > $*	$: $1 < @ $2 . @ $M > $3	convert masqueraded doms
+R$* < @ $=w . > $*	$: $1 < @ $2 . @ $M > $3
+R$* < @ *LOCAL* > $*	$: $1 < @ $j . @ $M > $2
+R$* < @ $+ @ > $*	$: $1 < @ $2 > $3		$M is null
+R$* < @ $+ @ $+ > $*	$: $1 < @ $3 . > $4		$M is not null
+
+
+SMasqEnv=94
+R$* < @ *LOCAL* > $*	$: $1 < @ $j . > $2
+
+
+SParseLocal=98
+
+R$* < @ $+ .REDIRECT. >		$: $1 < @ $2 . REDIRECT . > < ${opMode} >
+R$* < @ $+ .REDIRECT. > <i>	$: $1 < @ $2 . REDIRECT. >
+R$* < @ $+ .REDIRECT. > < $- >	$#error $@ 5.1.1 $: "551 User has moved; please try " <$1@$2>
+
+
+
+
+
+SLookUpDomain
+R<[IPv6 : $+]> <$+> <$*> <$*>	$: <[$(dequote $1 $)]> <$2> <$3> <$4>
+R<$*> <$+> <$*> <$- $->		$: < $(access $5:$1 $: ? $) > <$1> <$2> <$3> <$4 $5>
+R<?> <$+> <$+> <$*> <+ $*>	$: < $(access $1 $: ? $) > <$1> <$2> <$3> <+ $4>
+R<?> <[$+.$-]> <$+> <$*> <$*>	$@ $>LookUpDomain <[$1]> <$3> <$4> <$5>
+R<?> <[$+::$-]> <$+> <$*> <$*>	$: $>LookUpDomain <[$1]> <$3> <$4> <$5>
+R<?> <[$+:$-]> <$+> <$*> <$*>	$: $>LookUpDomain <[$1]> <$3> <$4> <$5>
+R<?> <$+.$+> <$+> <$*> <$*>	$@ $>LookUpDomain <$2> <$3> <$4> <$5>
+R<?> <$+> <$+> <$*> <$*>	$@ <$2> <$3>
+R<$*> <$+> <$+> <$*> <$*>	$@ <$1> <$4>
+
+
+SLookUpAddress
+R<$+> <$+> <$*> <$- $+>		$: < $(access $5:$1 $: ? $) > <$1> <$2> <$3> <$4 $5>
+R<?> <$+> <$+> <$*> <+ $+>	$: < $(access $1 $: ? $) > <$1> <$2> <$3> <+ $4>
+R<?> <$+::$-> <$+> <$*> <$*>	$@ $>LookUpAddress <$1> <$3> <$4> <$5>
+R<?> <$+:$-> <$+> <$*> <$*>	$@ $>LookUpAddress <$1> <$3> <$4> <$5>
+R<?> <$+.$-> <$+> <$*> <$*>	$@ $>LookUpAddress <$1> <$3> <$4> <$5>
+R<?> <$+> <$+> <$*> <$*>	$@ <$2> <$3>
+R<$*> <$+> <$+> <$*> <$*>	$@ <$1> <$4>
+
+
+SCanonAddr
+R$*			$: $>Parse0 $>canonify $1	make domain canonical
+
+
+
+SParseRecipient
+R$*				$: <?> $>CanonAddr $1
+R<?> $* < @ $* . >		<?> $1 < @ $2 >			strip trailing dots
+R<?> $- < @ $* >		$: <?> $(dequote $1 $) < @ $2 >	dequote local part
+
+R<?> $* $=O $* < @ $* >		$: <NO> $1 $2 $3 < @ $4>
+R<?> $*				$@ $1
+
+
+
+R<NO> $* < @ $* $=R >		$: <RELAY> $1 < @ $2 $3 >
+R<NO> $* < @ $+ >		$: $>LookUpDomain <$2> <NO> <$1 < @ $2 >> <+To>
+R<$+> <$+>			$: <$1> $2
+
+
+R<RELAY> $* < @ $* >		$@ $>ParseRecipient $1
+R<$-> $*			$@ $2
+
+
+
+SLocal_check_relay
+Scheck_relay
+R$*			$: $1 $| $>"Local_check_relay" $1
+R$* $| $* $| $#$*	$#$3
+R$* $| $* $| $*		$@ $>"Basic_check_relay" $1 $| $2
+
+SBasic_check_relay
+R$*			$: < ${deliveryMode} > $1
+R< d > $*		$@ deferred
+R< $* > $*		$: $2
+
+R$+ $| $+		$: $>LookUpDomain < $1 > <?> < $2 > <+Connect>
+R<?> <$+>		$: $>LookUpAddress < $1 > <?> < $1 > <+Connect>	no: another lookup
+R<?> < $+ >		$: $1					found nothing
+R<$={Accept}> < $* >	$@ $1				return value of lookup
+R<REJECT> $*		$#error $@ 5.7.1 $: "550 Access denied"
+R<DISCARD> $*		$#discard $: discard
+R<ERROR:$-.$-.$-:$+> <$*>	$#error $@ $1.$2.$3 $: $4
+R<ERROR:$+> <$*>		$#error $: $1
+R<$+> <$*>		$#error $: $1
+
+
+
+
+SLocal_check_mail
+Scheck_mail
+R$*			$: $1 $| $>"Local_check_mail" $1
+R$* $| $#$*		$#$2
+R$* $| $*		$@ $>"Basic_check_mail" $1
+
+SBasic_check_mail
+R$*			$: < ${deliveryMode} > $1
+R< d > $*		$@ deferred
+R< $* > $*		$: $2
+
+R$*			$: $1 $| $>"tls_client" $&{verify} $| MAIL
+R$* $| $#$+		$#$2
+R$* $| $*		$: $1
+
+R<>			$@ <OK>			we MUST accept <> (RFC 1123)
+R$+			$: <?> $1
+R<?><$+>		$: <@> <$1>
+R<?>$+			$: <@> <$1>
+R$*			$: $&{daemon_flags} $| $1
+R$* f $* $| <@> < $* @ $- >	$: < ? $&{client_name} > < $3 @ $4 >
+R$* u $* $| <@> < $* >	$: <?> < $3 >
+R$* $| $*		$: $2
+R<@> < $* @ localhost >	$: < ? $&{client_name} > < $1 @ localhost >
+R<@> < $* @ localhost.localdomain >	$: < ? $&{client_name} > < $1 @ localhost.localdomain >
+R<@> < $* @ [127.0.0.1] >
+			$: < ? $&{client_name} > < $1 @ [127.0.0.1] >
+R<@> < $* @ localhost.$m >
+			$: < ? $&{client_name} > < $1 @ localhost.$m >
+R<@> < $* @ localhost.UUCP >
+			$: < ? $&{client_name} > < $1 @ localhost.UUCP >
+R<@> $*			$: $1			no localhost as domain
+R<? $=w> $*		$: $2			local client: ok
+R<? $+> <$+>		$#error $@ 5.5.4 $: "553 Real domain name required for sender address"
+R<?> $*			$: $1
+R$*			$: <?> $>CanonAddr $1		canonify sender address and mark it
+R<?> $* < @ $+ . >	<?> $1 < @ $2 >			strip trailing dots
+R<?> $* < @ $* $=P >	$: <OK> $1 < @ $2 $3 >
+R<?> $* < @ $+ >	$: <OK> $1 < @ $2 >		... unresolvable OK
+
+R<$+> $+ < @ $* >	$: @<$1> <$2 < @ $3 >> $| <F:$2@$3> <U:$2@> <H:$3>
+R<$+> $+		$: @<$1> <$2> $| <U:$2@>
+R@ <$+> <$*> $| <$+>	$: <@> <$1> <$2> $| $>SearchList <+From> $| <$3> <>
+R<@> <$+> <$*> $| <$*>	$: <$3> <$1> <$2>		reverse result
+R<?> <$+> <$*>		$: <$1> $2	no match
+R<$+> <$+> <$*>		$: <$1> $3	relevant result, keep it
+
+R<?> $*			$: $&{daemon_flags} $| <?> $1
+R$* u $* $| <?> $*	$: <OK> $3
+R$* $| $*		$: $2
+R<?> $*			$: < ? $&{client_name} > $1
+R<?> $*			$@ <OK>				...local unqualed ok
+R<? $+> $*		$#error $@ 5.5.4 $: "553 Domain name required for sender address " $&f
+							...remote is not
+R<?> $*			$: @ $1		mark address: nothing known about it
+R<OK> $*		$@ <OK>
+R<TEMP> $*		$#error $@ 4.1.8 $: "451 Domain of sender address " $&f " does not resolve"
+R<PERM> $*		$#error $@ 5.1.8 $: "553 Domain of sender address " $&f " does not exist"
+R<$={Accept}> $*	$# $1
+R<DISCARD> $*		$#discard $: discard
+R<REJECT> $*		$#error $@ 5.7.1 $: "550 Access denied"
+R<ERROR:$-.$-.$-:$+> $*		$#error $@ $1.$2.$3 $: $4
+R<ERROR:$+> $*		$#error $: $1
+R<$+> $*		$#error $: $1		error from access db
+
+
+SLocal_check_rcpt
+Scheck_rcpt
+R$*			$: $1 $| $>"Local_check_rcpt" $1
+R$* $| $#$*		$#$2
+R$* $| $*		$@ $>"Basic_check_rcpt" $1
+
+SBasic_check_rcpt
+R$*			$: < ${deliveryMode} > $1
+R< d > $*		$@ deferred
+R< $* > $*		$: $2
+
+
+R$*			$: $>ParseRecipient $1		strip relayable hosts
+
+
+
+R$*			$: <?> $1
+R<?> $+ < @ $=w >	$: <> <$1 < @ $2 >> $| <F:$1@$2> <U:$1@> <H:$2>
+R<?> $+ < @ $* >	$: <> <$1 < @ $2 >> $| <F:$1@$2> <H:$2>
+R<?> $+			$: <> <$1> $| <U:$1@>
+R<> <$*> $| <$+>	$: <@> <$1> $| $>SearchList <+To> $| <$2> <>
+R<@> <$*> $| <$*>	$: <$2> <$1>		reverse result
+R<?> <$*>		$: @ $1		mark address as no match
+R<$={Accept}> <$*>	$: @ $2		mark address as no match
+
+R<REJECT> $*		$#error $@ 5.2.1 $: "550 Mailbox disabled for this recipient"
+R<DISCARD> $*		$#discard $: discard
+R<ERROR:$-.$-.$-:$+> $*		$#error $@ $1.$2.$3 $: $4
+R<ERROR:$+> $*		$#error $: $1
+R<$+> $*		$#error $: $1		error from access db
+R@ $*			$1		remove mark
+
+
+R$*		$: $1 $| $>RelayAuth $1 $| $&{verify}	client authenticated?
+R$* $| $# $+		$# $2				error/ok?
+R$* $| $*		$: $1				no
+
+R$*			$: $1 $| $&{auth_type}
+R$* $|			$: $1
+R$* $| $={TrustAuthMech}	$# RELAYAUTH
+R$* $| $*		$: $1
+R$+ < @ $=w >		$@ RELAYTO
+R$+ < @ $* $=R >	$@ RELAYTO
+R$+ < @ $+ >		$: $>LookUpDomain <$2> <?> <$1 < @ $2 >> <+To>
+R<RELAY> $*		$@ RELAYTO
+R<$*> <$*>		$: $2
+
+
+
+R$*			$: <?> $1
+R<?> $* < @ $+ >	$: <REMOTE> $1 < @ $2 >
+R<?> $+			$@ RELAYTOLOCAL
+R<$+> $*		$: $2
+
+R$*			$: $&{client_addr}
+R$@			$@ RELAYFROM		originated locally
+R0			$@ RELAYFROM		originated locally
+R$=R $*			$@ RELAYFROM		relayable IP address
+R$*			$: $>LookUpAddress <$1> <?> <$1> <+Connect>
+R<RELAY> $* 		$@ RELAYFROM		relayable IP address
+R<$*> <$*>		$: $2
+R$*			$: [ $1 ]		put brackets around it...
+R$=w			$@ RELAYFROM		... and see if it is local
+
+
+R$*			$: < $&{client_resolve} >
+R<TEMP>			$#error $@ 4.7.1 $: "450 Relaying temporarily denied. Cannot resolve PTR record for " $&{client_addr}
+R<FORGED>		$#error $@ 5.7.1 $: "550 Relaying denied. IP name possibly forged " $&{client_name}
+R<FAIL>			$#error $@ 5.7.1 $: "550 Relaying denied. IP name lookup failed " $&{client_name}
+R$*			$: <?> $&{client_name}
+R<?> $* $~P 		$:<?>  $[ $1 $2 $]
+R$* .			$1			strip trailing dots
+R<?>			$@ RELAYFROM
+R<?> $=w		$@ RELAYFROM
+R<?> $* $=R			$@ RELAYFROM
+R<?> $*			$: $>LookUpDomain <$1> <?> <$1> <+Connect>
+R<RELAY> $*		$@ RELAYFROM
+R<$*> <$*>		$: $2
+
+R$*			$#error $@ 5.7.1 $: "550 Relaying denied"
+
+
+C{src}E F H U
+SSearchList
+R<$+> $| <H:$+> <$*>		$: <$1> $| <@> $>LookUpDomain <$2> <?> <$3> <$1>
+R<$+> $| <@> <$+> <$*>		$: <$1> $| <$2> <$3>
+R<$- $-> $| <$={src}:$+> <$*>	$: <$1 $2> $| <$(access $2:$4 $: $3:$4 $)> <$5>
+R<+ $-> $| <$={src}:$+> <$*>	$: <+ $1> $| <$(access $3 $: $2:$3 $)> <$4>
+R<$- $-> $| <F:$* + $*@$+> <$*>	$: <$1 $2> $| <$(access $2:$3@$5 $: F:$3 + $4@$5$)> <$6>
+R<+ $-> $| <F:$* + $*@$+> <$*>	$: <+ $1> $| <$(access $2@$4 $: F:$2 + $3@$4$)> <$5>
+R<$- $-> $| <U:$* + $*> <$*>	$: <$1 $2> $| <$(access $2:$3@ $: U:$3 + $4$)> <$5>
+R<+ $-> $| <U:$* + $*> <$*>	$: <+ $1> $| <$(access $2@ $: U:$2 + $3$)> <$4>
+R<$+> $| <$={src}:$+> <$+>	$@ $>SearchList <$1> $| <$4>
+R<$+> $| <$={src}:$+> <>	$@ <?>
+R<$+> $| <$+> <$*>		$@ <$2>
+R<$+> $| <$+>			$@ <$2>
+
+Strust_auth
+R$*			$: $&{auth_type} $| $1
+R$@ $| $*		$#error $@ 5.7.1 $: "550 not authenticated"
+R$* $| $&{auth_authen}		$@ identical
+R$* $| <$&{auth_authen}>	$@ identical
+R$* $| $*		$: $1 $| $>"Local_trust_auth" $1
+R$* $| $#$*		$#$2
+R$*			$#error $@ 5.7.1 $: "550 " $&{auth_authen} " not allowed to act as " $&{auth_author}
+
+SLocal_trust_auth
+
+
+Stls_client
+R$* $| $*	$: $1 $| $>LookUpDomain <$&{client_name}> <?> <> <! TLS_Clt>
+R$* $| <?>$*	$: $1 $| $>LookUpAddress <$&{client_addr}> <?> <> <! TLS_Clt>
+R$* $| <?>$*	$: $1 $| <$(access TLS_Clt: $: ? $)>
+R$*		$@ $>"tls_connection" $1
+
+Stls_server
+R$*		$: $1 $| $>LookUpDomain <$&{server_name}> <?> <> <! TLS_Srv>
+R$* $| <?>$*	$: $1 $| $>LookUpAddress <$&{server_addr}> <?> <> <! TLS_Srv>
+R$* $| <?>$*	$: $1 $| <$(access TLS_Srv: $: ? $)>
+R$*		$@ $>"tls_connection" $1
+
+Stls_connection
+R$* $| <$*>$*			$: $1 $| <$2>
+R$* $| <PERM + $={tls} $*>	$: $1 $| <503:5.7.0> <$2 $3>
+R$* $| <TEMP + $={tls} $*>	$: $1 $| <403:4.7.0> <$2 $3>
+R$* $| <$={tls} $*>		$: $1 $| <403:4.7.0> <$2 $3>
+RSOFTWARE $| <$-:$+> $* 	$#error $@ $2 $: $1 " TLS handshake failed."
+RSOFTWARE $| $* 		$#error $@ 4.7.0 $: "403 TLS handshake failed."
+R$* $| <$*> <VERIFY>		$: <$2> <VERIFY> $1
+R$* $| <$*> <$={tls}:$->$*	$: <$2> <$3:$4> $1
+R$* $| $*			$@ OK
+R<$*><VERIFY> OK		$@ OK
+R<$*><VERIFY:$-> OK		$: <$1> <REQ:$2>
+R<$*><ENCR:$-> $*		$: <$1> <REQ:$2>
+R<$-:$+><VERIFY $*>		$#error $@ $2 $: $1 " authentication required"
+R<$-:$+><VERIFY $*> FAIL	$#error $@ $2 $: $1 " authentication failed"
+R<$-:$+><VERIFY $*> NO		$#error $@ $2 $: $1 " not authenticated"
+R<$-:$+><VERIFY $*> NONE	$#error $@ $2 $: $1 " other side does not support STARTTLS"
+R<$-:$+><VERIFY $*> $+		$#error $@ $2 $: $1 " authentication failure " $4
+R<$*><REQ:$->			$: <$1> <REQ:$2> $>max $&{cipher_bits} : $&{auth_ssf}
+R<$*><REQ:$-> $-		$: <$1> <$2:$3> $(arith l $@ $3 $@ $2 $)
+R<$-:$+><$-:$-> TRUE		$#error $@ $2 $: $1 " encryption too weak " $4 " less than " $3
+
+Smax
+R:		$: 0
+R:$-		$: $1
+R$-:		$: $1
+R$-:$-		$: $(arith l $@ $1 $@ $2 $) : $1 : $2
+RTRUE:$-:$-	$: $2
+R$-:$-:$-	$: $2
+
+SRelayAuth
+R$* $| OK		$: $1
+R$* $| $*		$@ NO		not authenticated
+R$*			$: $1 $| $&{cert_issuer}
+R$* $| $+		$: $1 $| $(access CERTISSUER:$2 $)
+R$* $| RELAY		$# RELAYCERTISSUER
+R$* $| SUBJECT		$: $1 $| <@> $&{cert_subject}
+R$* $| <@> $+		$: $1 $| <@> $(access CERTSUBJECT:$2 $)
+R$* $| <@> RELAY	$# RELAYCERTSUBJECT
+R$* $| $*		$: $1
+
+
+
+
+
+SMasqSMTP=61
+R$* < @ $* > $*		$@ $1 < @ $2 > $3		already fully qualified
+R$+			$@ $1 < @ *LOCAL* >		add local qualification
+
+SPseudoToReal=51
+
+R< @ $+ > $*		$@ < @ $1 > $2			resolve <route-addr>
+
+
+R$+ < @ $+ .UUCP. >	$: < $2 ! > $1			convert to UUCP form
+R$+ < @ $* > $*		$@ $1 < @ $2 > $3		not UUCP form
+
+R< $&h ! > $- ! $+	$@ $2 < @ $1 .UUCP. >
+R< $&h ! > $-.$+ ! $+	$@ $3 < @ $1.$2 >
+R< $&h ! > $+		$@ $1 < @ $&h .UUCP. >
+R< $+ ! > $+		$: $1 ! $2 < @ $Y >		use UUCP_RELAY
+R$+ < @ $+ : $+ >	$@ $1 < @ $3 >			strip mailer: part
+R$+ < @ >		$: $1 < @ *LOCAL* >		if no UUCP_RELAY
+
+
+SEnvFromSMTP=11
+R$+			$: $>PseudoToReal $1		sender/recipient common
+R$* :; <@>		$@				list:; special case
+R$*			$: $>MasqSMTP $1		qualify unqual'ed names
+R$+			$: $>MasqEnv $1			do masquerading
+
+
+SEnvToSMTP=21
+R$+			$: $>PseudoToReal $1		sender/recipient common
+R$+			$: $>MasqSMTP $1		qualify unqual'ed names
+R$* < @ *LOCAL* > $*	$: $1 < @ $j . > $2
+
+SHdrFromSMTP=31
+R$+			$: $>PseudoToReal $1		sender/recipient common
+R:; <@>			$@				list:; special case
+
+R$* <@> $*		$@ $1 <@> $2			pass null host through
+R< @ $* > $*		$@ < @ $1 > $2			pass route-addr through
+R$*			$: $>MasqSMTP $1		qualify unqual'ed names
+R$+			$: $>MasqHdr $1			do masquerading
+
+
+SMasqRelay=71
+R$+			$: $>MasqSMTP $1
+R$+			$: $>MasqHdr $1
+
+Msmtp,		P=[IPC], F=mDFMuX, S=EnvFromSMTP/HdrFromSMTP, R=EnvToSMTP, E=\r\n, L=990,
+		T=DNS/RFC822/SMTP,
+		A=TCP $h
+Mesmtp,		P=[IPC], F=mDFMuXa, S=EnvFromSMTP/HdrFromSMTP, R=EnvToSMTP, E=\r\n, L=990,
+		T=DNS/RFC822/SMTP,
+		A=TCP $h
+Msmtp8,		P=[IPC], F=mDFMuX8, S=EnvFromSMTP/HdrFromSMTP, R=EnvToSMTP, E=\r\n, L=990,
+		T=DNS/RFC822/SMTP,
+		A=TCP $h
+Mdsmtp,		P=[IPC], F=mDFMuXa%, S=EnvFromSMTP/HdrFromSMTP, R=EnvToSMTP, E=\r\n, L=990,
+		T=DNS/RFC822/SMTP,
+		A=TCP $h
+Mrelay,		P=[IPC], F=mDFMuXa8, S=EnvFromSMTP/HdrFromSMTP, R=MasqSMTP, E=\r\n, L=2040,
+		T=DNS/RFC822/SMTP,
+		A=TCP $h
+
+
+
+
+Mprocmail,	P=/usr/bin/procmail, F=DFMSPhnu9, S=EnvFromSMTP/HdrFromSMTP, R=EnvToSMTP/HdrFromSMTP,
+		T=DNS/RFC822/X-Unix,
+		A=procmail -Y -m $h $f $u
+
+
+
+
+SEnvFromL=10
+R<@>			$n			errors to mailer-daemon
+R@ <@ $*>		$n			temporarily bypass Sun bogosity
+R$+			$: $>AddDomain $1	add local domain if needed
+R$*			$: $>MasqEnv $1		do masquerading
+
+SEnvToL=20
+R$+ < @ $* >		$: $1			strip host part
+
+SHdrFromL=30
+R<@>			$n			errors to mailer-daemon
+R@ <@ $*>		$n			temporarily bypass Sun bogosity
+R$+			$: $>AddDomain $1	add local domain if needed
+R$*			$: $>MasqHdr $1		do masquerading
+
+SHdrToL=40
+R$+			$: $>AddDomain $1	add local domain if needed
+R$* < @ *LOCAL* > $*	$: $1 < @ $j . > $2
+
+SAddDomain=50
+R$* < @ $* > $* 	$@ $1 < @ $2 > $3	already fully qualified
+R$+			$@ $1 < @ *LOCAL* >	add local qualification
+
+Mlocal,		P=/usr/bin/procmail, F=lsDFMAw5:/|@qSPfhn9, S=EnvFromL/HdrFromL, R=EnvToL/HdrToL,
+		T=DNS/RFC822/X-Unix,
+		A=procmail -t -Y -a $h -d $u
+Mprog,		P=/usr/sbin/smrsh, F=lsDFMoqeu9, S=EnvFromL/HdrFromL, R=EnvToL/HdrToL, D=$z:/,
+		T=X-Unix/X-Unix/X-Unix,
+		A=smrsh -c $u
+

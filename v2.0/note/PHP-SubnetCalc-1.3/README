@@ -1,0 +1,18 @@
+PHP Subnet Calculator is pretty simple. 
+
+To install, just move SubnetCalc.php into the webroot of a 
+php capable webserver.
+
+v1.1 Released 6/28/03 
+  Should work well.  I think I fixed all the bugs.
+v1.2 Released 6/28/03
+  Works the same, but the code is cleaner and more efficient.
+v1.3
+  Minor changes.  w3c compliance.  Title link to sourceforge.
+
+Suggestions, Bug reports, Question etc.
+  Contact Ray Ferguson, foo@share-foo.com.
+
+Online Demo:
+  http://share-foo.com/SubnetCalc.php
+

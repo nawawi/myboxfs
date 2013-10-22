@@ -1,0 +1,24 @@
+#!/bin/php -q
+<?
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.so');
+putenv("PATH=/bin:/service/tools:/service/init");
+
+if(mfs_license('OK_KEY')==-2) {
+	echo "Invalid license Key.\n";
+	exit(1);
+}
+
+function loop_chk() {
+	while(1) {
+		hsyslog("Starting mfs-miniserv.exc");
+		exec_cmd("httpd -D");
+		sleep(1);
+		echo_query("ssh-passwd");
+		echo_query("https-config");
+	}
+}
+loop_chk();
+exit(0);
+
+?>
