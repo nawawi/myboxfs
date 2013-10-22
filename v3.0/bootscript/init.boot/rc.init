@@ -1,0 +1,618 @@
+#!/bin/sh
+# $Id: rc.init.sh,v 7.0 2008/01/21 03:29:00 nawawi Exp $
+
+trap : 1 2 3 15
+PATH="/bin"
+TERM=linux
+export PATH TERM
+umask 077
+cd /
+. /etc/init.boot/functions
+. /etc/init.boot/rc.conf
+
+NETWORK_OK=0;
+MOUNT_OK=0;
+LCD_PROG=-1;
+
+rc_banner() {
+	echo -e "$(/bin/banner)\n\n" > /etc/banner
+}
+rc_setting() {
+	if [ ! -r "/proc/cmdline" ]; then
+		echo "#### /proc/ is not present -- aborted"
+		exit 1;
+	fi
+	read CMDLINE < /proc/cmdline
+	for cmd in $CMDLINE; do
+		 case "$cmd" in
+			\#*) break;;
+			storage=*) export "$cmd";;
+			hwapp=*) export "$cmd";;
+			mods=*) export "$cmd";;
+			lcdtype=*) export "$cmd";;
+			forcefsck=*) export "$cmd";;
+		esac
+	done
+	[ "x$storage" != "x" ] && storage=$(echo $storage |tr -d '"');
+	[ "x$mods" != "x" ] && mods=$(echo $mods |tr -d '"');
+	[ "x$hwapp" != "x" ] && hwapp=$(echo $hwapp |tr -d '"');
+	[ "x$lcdtype" != "x" ] && lcdtype=$(echo $lcdtype |tr -d '"');
+	[ "x$forcefsck" != "x" ] && forcefsck=$(echo $forcefsck |tr -d '"');
+}
+
+rc_progress_bar() {
+	local msg="$1";
+	local ok=0;
+	while read buff; do
+		do_spin "$msg"
+		if strstr "$buff" "unlicensed" ; then
+			echo -n -e "\r* $msg Unlicensed.${__SPACE}\n";
+			ok=1;
+			break;
+		elif strstr "$buff" "Internal error" ; then
+			echo -n -e "\r* $msg Internal error.${__SPACE}\n";
+			ok=1;
+			break;
+		elif strstr "$buff" "failed" ; then
+			echo -n -e "\r* $msg Failed.${__SPACE}\n";
+			ok=1;
+			break;
+		elif strstr "$buff" "Failed" ; then
+			echo -n -e "\r* $msg Failed.${__SPACE}\n";
+			ok=1;
+			break;
+		elif strstr "$buff" "disabled" ; then
+			echo -n -e "\r* $msg Disabled.${__SPACE}\n";
+			ok=1;
+			break;
+		elif strstr "$buff" "Timeout" ; then
+			echo -n -e "\r* $msg Timeout.${__SPACE}\n";
+			ok=1;
+			break;
+		fi	
+    	done
+	[ "$ok" = "0" ] && echo -n -e "\r* $msg Done.${__SPACE}\n"
+}
+
+rc_wait_prog() {
+	local msg="$1";
+	local prog="$2";
+	php -f $prog | rc_progress_bar "$msg"
+}
+
+rc_chk_net() {
+        NET_DEVICE=$(awk -F: '/eth.:/{print $1}' /proc/net/dev)
+        if [ -n "$NET_DEVICE" ]; then
+                echo -n "* Detecting network interfaces: "
+                lcdd_msg "SYSTEM LOADING.." "-> CHECKING NIC"
+                for x in $NET_DEVICE; do
+                        ip link set $x up >/dev/null 2>&1
+                        if [ $? = 0 ]; then
+                                echo -n "$x "
+                                ip link set $x down >/dev/null 2>&1
+                        fi
+                done
+                ip route flush cache >/dev/null 2>&1
+                ip route flush table main >/dev/null 2>&1
+                echo ""
+		NETWORK_OK=1;
+        else
+                echo "* No network device found"
+                lcdd_msg "SYSTEM LOADING.." "-> NO NIC FOUND"
+        fi
+}
+
+rc_init() {
+	echo "0 0 0 0" > /proc/sys/kernel/printk
+	echo "TRACENETWORK" > /proc/sys/kernel/hostname
+	blockdev --flushbufs /dev/ram0 >/dev/null 2>&1
+	umount /initrd/sys >/dev/null 2>&1
+	umount /initrd >/dev/null 2>&1
+	rm -rf /initrd /bootup
+	echo -e '#!/bin/sh\necho "mfs"\nexit 0;' > /bin/groups
+	chmod 700 /bin/groups
+	pkill -9 -f getkey >/dev/null 2>&1
+	if [ ! -z "$hwapp" -a "$hwapp" = "6280A" ]; then
+		if [ -z "$mods" -a "x$mods" = "x" ]; then
+			export mods="$HWAPP6280A_MODS";
+		fi
+		if [ -z "$storage" -a "x$storage" = "x" ]; then
+			export storage="$HWAPP6280A_STORAGE";
+		fi
+		if [ -z "$lcdtype" -a "x$lcdtype" = "x" ]; then
+			export lcdtype="$HWAPP6280A_LCDTYPE";
+		fi
+		if [ "x$HWAPP6280A_MODSCONF" != "x" ]; then
+			echo -n -e "$HWAPP6280A_MODSCONF" >> /etc/modprobe.conf
+		fi
+	fi
+	if [ ! -z "$hwapp" -a "$hwapp" = "3140" ]; then
+		if [ -z "$mods" -a "x$mods" = "x" ]; then
+			export mods="$HWAPP3140_MODS";
+		fi
+		if [ -z "$storage" -a "x$storage" = "x" ]; then
+			export storage="$HWAPP3140_STORAGE";
+		fi
+		if [ -z "$lcdtype" -a "x$lcdtype" = "x" ]; then
+			export lcdtype="$HWAPP3140_LCDTYPE";
+		fi
+		if [ "x$HWAPP3140_MODSCONF" != "x" ]; then
+			echo -n -e "$HWAPP3140_MODSCONF" >> /etc/modprobe.conf
+		fi
+	fi
+	if [ ! -z "$hwapp" -a "$hwapp" = "NA806C" ]; then
+		if [ -z "$mods" -a "x$mods" = "x" ]; then
+			export mods="$HWAPPNA806C_MODS";
+		fi
+		if [ -z "$storage" -a "x$storage" = "x" ]; then
+			export storage="$HWAPPNA806C_STORAGE";
+		fi
+		if [ -z "$lcdtype" -a "x$lcdtype" = "x" ]; then
+			export lcdtype="$HWAPPNA806C_LCDTYPE";
+		fi
+		if [ "x$HWAPPNA806C_MODSCONF" != "x" ]; then
+			echo -n -e "$HWAPPNA806C_MODSCONF" >> /etc/modprobe.conf
+		fi
+	fi
+}
+
+rc_script() {
+	local opt="$1";
+	if [ -f "/strg/mybox/scripts/$opt-init" ]; then
+		chmod 700 /strg/mybox/scripts/$opt-init
+		echo "* Executing $opt-init: /strg/mybox/scripts/$opt-init"; 
+		/strg/mybox/scripts/$opt-init >/dev/null 2>&1
+	fi
+}
+
+rc_mount_local() {
+	mkdir -p /config/{backup,logs,update} >/dev/null 2>&1
+	mount --bind /strg/mybox/backup /config/backup >/dev/null 2>&1
+	mount --bind /strg/mybox/logs /config/logs >/dev/null 2>&1
+	mount --bind /strg/mybox/update/files /config/update >/dev/null 2>&1
+}
+
+rc_hwdetect() {
+	if [ ! -z "$mods" -a "x$mods" != "x" ]; then
+		echo -n "-> Loading hardware drivers.";
+		for f in $(echo $mods |sed -e 's/,/ /g');do
+			modprobe -q $f > /dev/null 2>&1
+			echo -n "."
+			usleep 0; wait
+		done
+		echo -e -n "\r* Loading hardware drivers. Done.${__SPACE}\n";
+	else 
+		echo -n "-> Checking hardware drivers.";
+		/etc/init.boot/rc.hwdetect
+		# earlier probe
+		if [ -f "/var/spool/modules/moduleslist" ]; then
+			for f in $(cat /var/spool/modules/moduleslist); do
+				modprobe -q $f > /dev/null 2>&1
+				echo -n "."
+				usleep 0; wait
+			done
+			echo -e -n "\r* Checking hardware drivers. Done.${__SPACE}\n";
+		fi
+		echo -n "-> Loading hardware drivers.";
+		/etc/init.boot/rc.hwdetect
+		if [ -f "/var/spool/modules/moduleslist" ]; then
+			for f in $(cat /var/spool/modules/moduleslist); do
+				modprobe -q $f > /dev/null 2>&1
+				echo -n ".";
+				usleep 0; wait
+			done
+			echo -e -n "\r* Loading hardware drivers. Done.${__SPACE}\n";
+		fi
+	fi
+	if [ -f "/lib/modules/ppp.txt" ]; then
+		for f in $(cat /lib/modules/ppp.txt); do
+			modprobe -q $(basename $f .ko) > /dev/null 2>&1
+			usleep 0; wait
+		done
+		mknod /dev/ppp c 180 0 >/dev/null 2>&1
+	fi
+	if [ -f "/lib/modules/lcd.txt" -a "$LCD_PROG" = "1" ]; then
+		for f in $(cat /lib/modules/lcd.txt); do
+			modprobe -q $(basename $f .ko) > /dev/null 2>&1
+			usleep 0; wait
+		done
+	fi
+	mkdir -p /dev/cpu >/dev/null 2>&1
+	mknod /dev/cpu/microcode c 10 184 >/dev/null 2>&1
+	[ -f "/etc/microcode.dat" ] && microcode_ctl -Qui >/dev/null 2>&1
+	# create device incase hotplug failed
+	mdev >/dev/null 2>&1
+	[ -d "/proc/bus/usb" ] && mount -t usbfs none /proc/bus/usb >/dev/null 2>&1
+	return 0;
+}
+
+rc_chk_error() {
+	lcdd_msg "SYSTEM LOADING..." "-> STORAGE ERROR"
+       	echo "#### An error occurred during the file system check."
+       	echo "#### Dropping you to a shell; the system will reboot"
+       	echo "#### when you leave the shell."
+	:> /var/sys/do_single
+       	/bin/sh
+}
+rc_chk_disk() {
+	local disk="$1";
+	local force="";
+	if [ ! -z "$forcefsck" -a "$forcefsck" = "1" ]; then
+		force="-f"
+	fi
+	echo "* Checking filesystems $disk";
+	fsck $force -T -a -C $disk
+	ret=$?
+	[ $ret -gt 1 ] && rc_chk_error;
+}
+rc_mount() {
+	local p=0 fs="" dev="" dir="" option="" priority="" bootf="" strgf="" cachef="";
+	# fs:dev:dir:option:priority
+	# priority: 1 = boot, 2 = strg, 3 = cache
+	# boot = /boot, strg = /strg, cache = /strg/mybox/cache
+	if [ ! -z "$storage" -a "x$storage" != "x" ]; then
+		for f in $(echo $storage | sed -e 's/,/ /g');do
+			p=0;fs="";dev="";dir="";option="";priority="";
+			for x in $(echo "$f" |sed -e 's/:/ /g');do
+				let p=p+1;
+				[ "$p" = "1" ] && fs="$x";
+				[ "$p" = "2" ] && dev="$x";
+				[ "$p" = "3" ] && dir="$x";
+				if [ "$p" = "4" ]; then
+					[ "x$x" != "x" ] && option=",$x";
+				fi
+				if [ "$p" = "5" ]; then
+					[ "x$x" != "x" ] && priority="$x";
+				fi
+                        done
+			[ "x$dir" != "x" -a "$f" != "swap" ] && mkdir -p $dir > /dev/null 2>&1
+			if [ "$fs" = "swap" ]; then
+				swapon /dev/$dev
+			fi
+			if [ "$fs" != "swap" -a "$fs" != "swapfile" ]; then
+				if [ -r "/dev/$dev" ]; then
+					rc_chk_disk "/dev/$dev"
+					mount -t $fs -o "rw$option" /dev/$dev $dir
+					if [ $? = 0 ]; then
+						MOUNT_OK=1;
+						echo "/dev/$dev" >> /tmp/strg
+						echo "$dir" >> /var/sys/strg_mount
+						if [ ! -z "$priority" -a "x$priority" != "x" ]; then
+							if [ "$priority" = "1" -a "$dir" != "/boot" ]; then
+								ln -sf $dir /boot >/dev/null 2>&1
+							elif [ "$priority" = "2" -a "$dir" != "/strg" ]; then
+								ln -sf $dir /strg >/dev/null 2>&1
+							elif [ "$priority" = "3" -a "$dir" != "/strg/mybox/cache" ]; then
+								ln -sf $dir /strg/mybox/cache >/dev/null 2>&1
+							fi
+						fi
+					else
+						echo "* Mounting storage $dir failed";
+						MOUNT_OK=0;
+						:> /var/sys/nolog
+						:> /var/sys/do_single
+					fi
+				fi
+			fi
+			if [ "$fs" = "swapfile" ]; then
+				swapon $dev
+			fi
+                done
+		if [ -f "/tmp/strg" ]; then
+			for i in $(cat /tmp/strg |tr -d [0-9]); do
+				echo "$i" >> /tmp/strg1
+			done
+			[ -f "/tmp/strg1" ] && cat /tmp/strg1 |sort -u > /tmp/strg2
+		fi
+		if [ -f "/tmp/strg2" ]; then
+			for i in $(cat /tmp/strg2); do
+				hdparm -d 1 -c 1 -u 1 $i >/dev/null 2>&1
+			done
+		fi
+        fi
+}
+
+rc_pkg() {
+	local _VER=$(uname -v |tr -d 'v');
+	if [ -d "/strg/mybox/pkg" ]; then
+		echo -n -e "-> Extracting packages: ";
+        	for f in /strg/mybox/pkg/*-${_VER}.mpk;do
+			tar -C / -axf $f
+			echo -n -e "#";
+			usleep 0; wait
+        	done
+		echo -n -e "\r* Extracting packages. Done${__SPACE}\n";
+	fi
+	[ -d "/service/www" ] && chmod 700 /service/www/*.exh >/dev/null 2>&1
+	[ -d "/service/tools" ] && chmod 700 /service/tools/*.exc >/dev/null 2>&1
+	return 0;
+}
+
+rc_lcd() {
+	if [ ! -z "$lcdtype" -a "x$lcdtype" != "x" ]; then
+		if [ "$lcdtype" = "1" -a -f "/tmp/lcd/lcd.mpk" ]; then
+			LCD_PROG=1;
+			tar -C / -axf /tmp/lcd/lcd.mpk
+			echo "1" > /var/sys/lcd_proc
+			mknod /dev/parport0 c 99 0 >/dev/null 2>&1
+			mknod /dev/lp0 c 6 0 >/dev/null 2>&1
+			ln -sf /dev/parport0 /dev/lcd >/dev/null 2>&1
+		fi
+		if [ "$lcdtype" = "0" ]; then
+			LCD_PROG=0;
+			echo "/dev/ttyS1" > /var/sys/lcd_dev
+			echo "0" > /var/sys/lcd_com
+			ln -sf /dev/ttyS1 /dev/lcd >/dev/null 2>&1
+		fi
+	fi
+}
+
+rc_start() {
+	:> /etc/resolv.conf
+	:> /var/sys/init_no_restart
+	:> /var/sys/init_start
+
+	local SNMP_STAT=0 AUTH_AD=0 PPTP_STAT=0 DHCP_STAT=0 SHAPER_STAT=0;
+	local DDNS_STAT=0 CAPTIVE_STAT=0 SQUID_STAT=0 FROX_STAT=0 SOPHOS_STAT=0 SPAM_STAT=0;
+	local P3SCAN_STAT=0;
+
+	for f in $(php -f /service/init/initconf.init "init_chk_services_stat"); do
+		[ "$f" = "snmp" ] && SNMP_STAT=1;
+		[ "$f" = "auth_ad" ] && AUTH_AD=1;
+		[ "$f" = "pptp" ] && PPTP_STAT=1;
+		[ "$f" = "dhcp" ] && DHCP_STAT=1;
+		[ "$f" = "dhcp_relay" ] && DHCP_RELAY_STAT=1;
+		[ "$f" = "shaper" ] && SHAPER_STAT=1;
+		[ "$f" = "ddns" ] && DDNS_STAT=1;
+		[ "$f" = "captive" ] && CAPTIVE_STAT=1;
+		[ "$f" = "squid" ] && SQUID_STAT=1;
+		[ "$f" = "sophos" ] && SOPHOS_STAT=1;
+		[ "$f" = "spam" ] && SPAM_STAT=1;
+		[ "$f" = "p3scan" ] && P3SCAN_STAT=1;
+	done
+
+	# policy order
+	iptables -P INPUT DROP >/dev/null 2>&1
+	iptables -P FORWARD DROP >/dev/null 2>&1
+	iptables -P OUTPUT DROP >/dev/null 2>&1
+
+	iptables -A INPUT -i lo -s 127.0.0.1 -j ACCEPT >/dev/null 2>&1
+	iptables -A INPUT -o lo -s 127.0.0.1 -j ACCEPT >/dev/null 2>&1
+
+	if [ "$LCD_PROG" = "1" -a -f "/etc/lcreset" ]; then
+		echo "* Starting LCD services";
+		/etc/lcreset >/dev/null 2>&1 &
+	fi
+
+	if [ -f "/service/init/initconf.init" ]; then
+		/service/init/initconf.init keymap >/dev/null 2>&1
+		if [ $? = 0 ]; then
+			echo "* Setting keymap. Done."
+			lcdd_msg "SYSTEM SETTING.." "-> KEYMAP"
+		fi
+		/service/init/initconf.init clock >/dev/null 2>&1
+		if [ $? = 0 ]; then
+			echo "* Setting clock: $(date)"
+			lcdd_msg "SYSTEM SETTING.." "-> CLOCK"
+		fi
+		if [ -f "/tmp/bootup" ]; then
+			local dt=$(date "+%Y%m%d")
+			if [ -f "/strg/mybox/logs/system-$dt.log" ]; then
+				cat /tmp/bootup >> /strg/mybox/logs/system-$dt.log
+			fi
+		fi
+		/service/init/initconf.init dnshost >/dev/null 2>&1
+		if [ $? = 0 ]; then
+			echo "* Setting system hostname: $(hostname)."
+			lcdd_msg "SYSTEM SETTING.." "-> HOSTNAME"
+		fi
+		/service/init/initconf.init init_set_passwd >/dev/null 2>&1
+	fi
+
+
+	if [ "$NETWORK_OK" = "1" ]; then
+		if [ -f "/service/init/network.init" ]; then
+			lcdd_msg "START SERVICES.." "-> NETWORKING"
+			rc_wait_prog "Bringing up network interfaces." "/service/init/network.init start"
+		fi
+
+		if [ -f "/service/init/dns.init" ]; then
+			lcdd_msg "START SERVICES.." "-> DNS RESOLVER"
+			rc_wait_prog "Starting DNS Resolver service." "/service/init/dns.init start"
+		fi
+
+		if [ -f "/bin/set_conntrack" ]; then
+			/bin/set_conntrack >/dev/null 2>&1
+		fi
+
+		if [ -f "/service/init/policy.init" ]; then
+			lcdd_msg "START SERVICES.." "-> PACKET FILTER"
+			rc_wait_prog "Applying packet filter rules." "/service/init/policy.init start"
+		fi
+	fi
+
+	if [ -f "/service/init/syslog.init" ]; then
+		lcdd_msg "START SERVICES.." "-> SYSTEM LOGGER"
+		rc_wait_prog "Starting Syslog." "/service/init/syslog.init start"
+	fi
+
+	if [ -f "/service/init/sophos.init" -a "$SOPHOS_STAT" = "1" ]; then
+		lcdd_msg "START SERVICES.." "-> SOPHOS AV"
+		rc_wait_prog "Starting SOPHOS AV service." "/service/init/sophos.init start"
+	fi
+	if [ -f "/service/init/spam.init" -a "$SPAM_STAT" = "1" ]; then
+		lcdd_msg "START SERVICES.." "-> SPAM filter"
+		rc_wait_prog "Starting SPAM filter service." "/service/init/spam.init start"
+	fi
+
+	if [ -f "/service/tools/mfs-query.exc" ]; then
+		lcdd_msg "START SERVICES.." "-> MYBOX"
+		echo -n "* Starting Mybox services. "
+		/service/tools/mfs-query.exc o >/dev/null 2>&1
+		echo -n -e " Done\n"
+	fi
+
+	if [ "$NETWORK_OK" = "1" ]; then
+		if [ -f "/service/init/snmp.init" -a "$SNMP_STAT" = "1" ]; then
+			lcdd_msg "START SERVICES.." "-> SNMP"
+			rc_wait_prog "Starting SNMP service." "/service/init/snmp.init start"
+		fi
+
+		if [ -f "/service/init/ips.init" ]; then
+			lcdd_msg "START SERVICES.." "-> IPS"
+			rc_wait_prog "Starting IPS service." "/service/init/ips.init start"
+		fi
+
+		if [ -f "/service/init/auth.init" -a "$AUTH_AD" = "1" ]; then
+			lcdd_msg "START SERVICES.." "-> AUTH AD"
+			rc_wait_prog "Starting Auth AD service." "/service/init/auth.init ad_start"
+		fi
+
+		if [ -f "/service/init/pptp.init" -a "$PPTP_STAT" = "1" ]; then
+			lcdd_msg "START SERVICES.." "-> PPTP VPN"
+			rc_wait_prog "Starting PPTP VPN service." "/service/init/pptp.init start"
+		fi
+
+		if [ -f "/service/init/dhcp.init" -a "$DHCP_STAT" = "1" ]; then
+			lcdd_msg "START SERVICES.." "-> DHCP"
+			rc_wait_prog "Starting DHCP service." "/service/init/dhcp.init start"
+		fi
+
+		if [ -f "/service/init/dhcp_relay.init" -a "$DHCP_RELAY_STAT" = "1" ]; then
+			lcdd_msg "START SERVICES.." "-> DHCP RELAY"
+			rc_wait_prog "Starting DHCP Relay service." "/service/init/dhcp_relay.init start"
+		fi
+
+		if [ -f "/service/init/captive.init" -a "$CAPTIVE_STAT" = "1" ]; then
+			lcdd_msg "START SERVICES.." "-> CAPTIVE PORTAL"
+			rc_wait_prog "Starting Captive Portal service." "/service/init/captive.init start"
+		fi
+
+		if [ -f "/service/init/ntp.init" -a "$NETWORK_OK" = "1" ]; then
+			lcdd_msg "START SERVICES.." "-> NTP"
+			rc_wait_prog "Starting NTP service." "/service/init/ntp.init start"
+		fi
+
+		if [ -f "/service/init/ddns.init" -a "$DDNS_STAT" = "1" ]; then
+			lcdd_msg "START SERVICES.." "-> DYNAMIC DNS"
+			rc_wait_prog "Starting Dynamic DNS service." "/service/init/ddns.init start"
+		fi
+
+		if [ -f "/service/init/shaper.init" -a "$SHAPER_STAT" = "1" ]; then
+			lcdd_msg "START SERVICES.." "-> QOS"
+			rc_wait_prog "Applying network QOS" "/service/init/shaper.init start"
+		fi
+
+		if [ -f "/service/init/initconf.init" ]; then
+			lcdd_msg "START SERVICES.." "-> STATIC ARP"
+			rc_wait_prog "Applying static ARP." "/service/init/initconf.init staticarp"
+		fi
+
+		if [ -f "/service/init/http_proxy.init" -a "$SQUID_STAT" = "1" ]; then
+			lcdd_msg "START SERVICES.." "-> HTTP PROXY"
+			rc_wait_prog "Starting HTTP Proxy." "/service/init/http_proxy.init start"
+		fi
+
+		if [ -f "/service/init/ftp_proxy.init" -a "$FROX_STAT" = "1" ]; then
+			lcdd_msg "START SERVICES.." "-> FTP PROXY"
+			rc_wait_prog "Starting FTP Proxy." "/service/init/ftp_proxy.init start"
+		fi
+
+		if [ -f "/service/init/mail_proxy.init" -a "$P3SCAN_STAT" = "1" ]; then
+			lcdd_msg "START SERVICES.." "-> MAIL PROXY"
+			rc_wait_prog "Starting Mail Proxy." "/service/init/mail_proxy.init start"
+		fi
+
+		if [ -f "/service/init/xinet.init" ]; then
+			lcdd_msg "START SERVICES.." "-> XINETD"
+			rc_wait_prog "Starting XINETD service." "/service/init/xinet.init start"
+		fi
+	fi
+
+	if [ -f "/service/init/cron.init" ]; then
+		lcdd_msg "START SERVICES.." "-> SCHEDULER"
+		rc_wait_prog "Starting SCHEDULER service." "/service/init/cron.init start"
+	fi
+
+	if [ -f "/service/tools/mfs-graph.exc" ]; then
+		lcdd_msg "START SERVICES.." "-> GRAPH"
+		echo "* Creating diagnostic graphs. Done";
+		/service/tools/mfs-graph.exc >/dev/null 2>&1
+	fi
+
+	if [ -f "/service/tools/mfs-query.exc" ]; then
+		lcdd_msg "SYSTEM SETTING.." "-> COMPRESS LOGS"
+		echo "* Compressing logs. Done";
+		/service/tools/mfs-query.exc bl >/dev/null 2>&1
+	fi
+
+	rm -f /var/sys/init_no_restart
+
+	if [ "$NETWORK_OK" = "1" ]; then
+        	if [ -f "/service/init/policy.init" ]; then
+                	lcdd_msg "START SERVICES.." "-> POLICY FINAL"
+			rc_wait_prog "Reloading packet filter rules" "/service/init/policy.init restart quiet"
+		fi
+	fi
+}
+
+rc_sysctl() {
+	/etc/init.boot/rc.sysctl
+}
+
+rc_banner;
+rc_init;
+rc_setting;
+rc_lcd;
+rc_hwdetect;
+rc_mount;
+if [ "$MOUNT_OK" = "1" ]; then
+	set_firmware_version;
+	rc_pkg;
+	rc_chk_net;
+	rc_script "pre";
+	rc_start;
+	rc_script "post";
+	rc_sysctl;
+	rc_mount_local;
+	dmesg -c > /strg/mybox/boot.msg
+else 
+	echo "### MOUNTING STORAGE DISK FAILED!";
+	lcdd_msg "SYSTEM LOADING..." "-> STORAGE FAILED"
+fi
+if [ "$LCD_PROG" = "0" ]; then
+	/bin/lcdd
+	:> /var/sys/chk_lcdd
+fi
+
+if [ -f "/var/spool/modules/moduleslist" ]; then
+	echo -e "mods=\"$(cat /var/spool/modules/moduleslist |tr -s '\n' ',')\"\n" > /var/sys/moduleslist
+fi
+# clean
+rm -f /var/sys/init_no_restart
+rm -f /var/sys/init_start
+rm -rf /etc/inittab
+rm -rf /etc/microcode.dat
+rm -rf /bin/microcode_ctl
+rm -rf /strg/mybox/download/*
+rm -rf /tmp/*
+rm -rf /etc/init.boot/rc.*
+rm -rf /usr/share/fonts
+rm -rf /var/sys/lcd_msg
+rm -fr /var/spool/modules
+
+if [ "$MOUNT_OK" = "0" ]; then
+	:> /var/sys/nolog
+	:> /var/sys/do_single
+fi
+
+mkdir -p /tmp/sessions /tmp/console.session
+echo "0 0 0 0" > /proc/sys/kernel/printk
+chmod 700 /* >/dev/null 2>&1
+chmod 700 /strg/mybox/* >/dev/null 2>&1
+PRF=$(procinfo);
+echo "$PRF" |grep ^Bootup |sed -e 's/Load\(.*\)//g' -e 's/Bootup\: //g' >/etc/bootup
+echo "$PRF" |grep ^Bootup |sed -e 's/Load/\nLoad/g' -e 's/Bootup:/\nBootup       :/g' -e 's/average:/average :/g' >/var/sys/system_bootup
+/service/init/initconf.init reboot_bootup_alert >/dev/null 2>&1
+[ -x "/bin/sophos_info" ] && /bin/sophos_info > /dev/null 2>&1
+exit 0;

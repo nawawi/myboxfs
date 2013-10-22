@@ -1,0 +1,32 @@
+#!/bin/php -f
+<?php 
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="mfs-graph";
+include_once("clib.exl");
+putenv("PATH=/bin:/service/tools:/service/init");
+$_INIT_START=0;
+function __create_graph($_INIT_START) {
+	global $time;
+	if(file_exists("/var/sys/create_graph")) {
+		exit;
+	}
+	if($_INIT_START==1) {
+		if(mybox_daemon()==0) exit;
+	}
+	@touch("/var/sys/create_graph");
+	$time=time();
+	mybox_get_traffic_graph($_INIT_START);
+	mybox_get_cpu_graph($_INIT_START);
+	mybox_get_mem_graph($_INIT_START);
+	mybox_get_storage_graph($_INIT_START);
+	mybox_get_ips_graph($_INIT_START);
+	@unlink("/var/sys/create_graph");
+}
+
+if($_SERVER["argv"][1]=="init") {
+	$_INIT_START=1;
+}
+__create_graph($_INIT_START);
+exit;
+?>

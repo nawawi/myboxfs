@@ -1,0 +1,19 @@
+<?php 
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+
+include_once("iptables.exl");
+include_once("policy_blacklist.exl");
+include_once("policy_conntrack.exl");
+include_once("policy_dns.exl");
+include_once("policy_dos.exl");
+include_once("policy_ips.exl");
+include_once("policy_lb.exl");
+include_once("policy_nat.exl");
+include_once("policy_ntp.exl");
+include_once("policy_pscan.exl");
+include_once("policy_snmp.exl");
+include_once("policy_captive.exl");
+include_once("policy_route.exl");
+include_once("policy_badpacket.exl");
+include_once("policy_admin.exl");
+?>

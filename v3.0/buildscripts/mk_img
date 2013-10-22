@@ -1,0 +1,25 @@
+#!/bin/bash -e
+
+START_POINT=$(pwd)
+cd $START_POINT
+FS=$START_POINT/rootfs
+VER=$(date +%y.%m00%d)
+REL="$(cat $START_POINT/MYBOX_VERSION)"
+
+KERNEL=$START_POINT/kernel_base/mfs-kernel
+rm -rfv mnt
+mkdir -p mnt
+
+cp -va $FS/* mnt/
+echo "$VER" > mnt/etc/firmware
+echo "$REL" > mnt/etc/version_core
+sync
+mksquashfs mnt boot.img -all-root -noappend -nopad
+sync
+IMGZ=$(du -kc boot.img |grep total |tr -s '\t' ':' |cut -d ':' -f 1)
+echo "boot.img SIZE=$IMGZ"
+mv -v boot.img build/myboxsys.bin
+cp -v $KERNEL build/myboxos.bin
+rm -rf mnt
+echo "$VER" > build/latest-firmware
+cd $START_POINT

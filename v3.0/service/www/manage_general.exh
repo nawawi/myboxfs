@@ -1,0 +1,471 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="manage_general";
+include_once('page.exl');
+mybox_chk_session();
+mybox_send_nocache();
+
+
+
+$db_id=mybox_db_connect($_DB_NAME);
+
+if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+	if($tab==1) {
+		if(isset($do_save)&&$do_save==1) {
+			mybox_db_query("update site_certificate set organization='$organization',city='$city',country='$country'",$db_id);
+			if($val!='') {
+				if(count($val)!=0) {
+					foreach($val as $p => $v) {
+						if($v!='') {
+							mybox_db_query("update misc set val='$v' where name='$p'",$db_id);
+							if($p=='www_session' && $v!=0) {
+								mybox_session_update($v);
+							}
+						}
+					}
+					if($val['fwadmin']!='') mybox_save_to_file("/var/sys/fw_admin","{$val['fwadmin']}");
+				}
+			}
+			if($https_port=='') $https_port='5051';
+			mybox_db_query("update service_https set port='$https_port',stat='1'",$db_id);
+			$msg="System setting updated";
+		}
+		if(isset($do_save)&&$do_save==2) {
+			if(isset($do_id)&&$do_id=='apply_chg') {
+				$msg="<script>waitcount();</script>";
+				mybox_echo_query("update-dnshost");
+				mybox_echo_query("cron-restart");
+				mybox_echo_query("pptp-restart");
+				mybox_echo_query("policy-restart");
+				mybox_echo_query("xinet-reload");
+			}
+		}
+	}
+	if($tab==2) {
+		if(isset($do_save)&&$do_save==1) {
+			if($certstat!=0 || $certstat!=1) $certstat=0;
+			if($certstat==0) {
+				mybox_db_query("update site_certificate set certstat='$certstat',hostname='$hostname'",$db_id);
+			} else {
+				mybox_db_query("update site_certificate set certstat='$certstat',cert='$cert'",$db_id);
+			}
+			$msg="HTTPS Certificate updated";
+		}
+		if(isset($do_save)&&$do_save==2) {
+			if(isset($do_id)&&$do_id=='apply_chg') {
+				$msg="<script>waitcount();</script>";
+				@touch("/etc/openssl.pem.rm");
+				@unlink("/etc/openssl.cnf");
+				mybox_echo_query("xinet-reload");
+			}
+		}
+	}
+	if($tab==3) {
+		if(isset($do_save)&&$do_save==1) {
+			if($time_zone!='') {
+				mybox_db_query("update misc set val='$time_zone' where name='time_zone'",$db_id);
+			}
+			if($dstat==1 && $timeset!='') {
+				if(preg_match("/(\d\d)\/(\d\d)\/(\d\d\d\d)\s+(\d\d)\:(\d\d)\:(\d\d)/",$timeset,$mm)) {
+					$_ndate="{$mm[2]}{$mm[1]}{$mm[4]}{$mm[5]}{$mm[3]}.{$mm[6]}";
+					mybox_exec_cmd("date $_ndate");	
+				}
+			}
+			$msg="Time and Date setting updated";
+		}
+		if(isset($do_save)&&$do_save==2) {
+			if(isset($do_id)&&$do_id=='apply_chg') {
+				$msg="<script>waitcount();</script>";
+				mybox_echo_query("update-clock");
+				mybox_echo_query("cron-restart");
+			}
+		}
+	}
+
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied";
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+
+$val=array();
+$result=mybox_db_query("select * from misc",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_name=$row['name'];
+		$_val=$row['val'];
+		$val[$_name]=$_val;
+	}
+}
+
+?>
+<html>
+<head>
+<title>MyAdmin</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<script type='text/javascript' src="/j/mybox_func.js"></script>
+<script type='text/javascript' src="/j/mybox_overlib.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?php echo $_LOGIN['auth_id'];?>";
+	page_load();
+</script>
+<?php if($tab==3) {?>
+<LINK REL=StyleSheet HREF="/c/mybox_calendar.css" TYPE="text/css">
+<script type='text/javascript'>
+calendar=null;
+function showCalendar(id) {var el = document.getElementById(id);if (calendar != null) {calendar.hide();} else {var cal = new Calendar(true, null, selected, closeHandler);cal.weekNumbers = true;cal.showsTime = true;cal.time24 = true;cal.showsOtherMonths = false;calendar = cal;cal.setRange(1900, 2070);cal.create();}calendar.setDateFormat('%d/%m/%Y %H:%M:%S');calendar.parseDate(el.value);calendar.sel = el;calendar.showAtElement(el, "Br");return false;}
+function selected(cal, date) {cal.sel.value = date;}
+function closeHandler(cal) {cal.hide();calendar = null;}
+</script>
+<script type='text/javascript' src="/j/mybox_calendar.js"></script>
+<?php }?>
+<script type='text/javascript'>
+function do_submit() {
+	<?php if($tab==1){?>
+	if(chk_input()==false) return false;
+	<?php }?>
+	<?php if($tab==2){?>
+	if(document.f.certstat.checked==true) {
+		var cert=Trim(document.f.cert.value);
+		if(cert=='') {
+			pop_msg("pre-generated certificate and key empty");
+			return false;
+		}
+	} else {
+		if(document.f.hostname) {
+			var hostname=Trim(document.f.hostname.value);
+			if(hostname=='') {
+				pop_msg("Invalid value for hostname");
+				return false;
+			}
+		}
+	}
+	<?php }?>
+	document.f.do_save.value=1;
+	document.f.submit();
+};
+function do_changes() {
+	self.location.href='<?php echo "/manage_general.exh?tab=$tab&do_save=2&do_id=apply_chg";?>';	
+};
+function waitcount() {
+	page_reload('200','<?php echo "/manage_general.exh?tab=$tab";?>');
+};
+<?php if($tab==1) {?>
+function chk_input() {
+		var m1=/(\S+)\.(\S+)\.(\S+)/;
+		var hport=Trim(document.f.https_port.value);
+		if(!isnum(hport)) {
+			pop_msg("Invalid TCP Port '"+hport+"'");
+			return false;
+		}
+		var org=Trim(document.f.organization.value);
+		var city=Trim(document.f.city.value);
+		if(org=='') {
+			pop_msg("Invalid value for organization");
+			return false;
+		}
+		if(city=='') {
+			pop_msg("Invalid value for city");
+			return false;
+		}
+		for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='text') {
+			    	if( document.f.elements[i].name=="val[hostname]") {
+					var hostname=Trim(document.f.elements[i].value);
+					if(hostname.match(m1)==null) {
+						pop_msg("Invalid hostname '"+hostname+"'");
+						return false;
+					}
+    				}
+			    	if( document.f.elements[i].name=="val[www_session]") {
+					var wwwsession=Trim(document.f.elements[i].value);
+					if(!isnum(wwwsession)) {
+						pop_msg("Invalid Session lifetime '"+wwwsession+"'");
+						return false;
+					}
+    				}
+			    	if( document.f.elements[i].name=="val[fwadmin]") {
+					var fwadmin=Trim(document.f.elements[i].value);
+					if(fwadmin=='') {
+						pop_msg("Invalid System admin value");
+						return false;
+					}
+    				}	
+			}
+  		}
+		return true;
+	}
+<?php }?>
+
+</script>
+
+</head>
+
+<body onload="load_menu('sub3','t3d1','s3i1');" scroll="auto">
+<form name="f" method="post" action="/manage_general.exh">
+
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 0px;'>
+<tr>
+<td>
+<?php mybox_page_section("Management / Preference");?>
+<br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="/manage_general.exh?tab=1" <?php if($tab==1){?>class="tabact"<?php }?>>General</a></li>
+<li><a href="/manage_general.exh?tab=2" <?php if($tab==2){?>class="tabact"<?php }?>>HTTPS Certificate</a></li>
+<li><a href="/manage_general.exh?tab=3" <?php if($tab==3){?>class="tabact"<?php }?>>Time and Date</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td> 
+<?php mybox_page_msg($msg);?>
+<br>
+
+<!-- tab container -->
+<?php if($tab==1) {
+	$https_port='5051';
+	$result=mybox_db_query("select port from service_https",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		$https_port=mybox_db_fetch_single($result);
+	}
+	$result=mybox_db_query("select * from site_certificate",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_country=$row['country'];
+			$_city=$row['city'];
+			$_organization=$row['organization'];
+		}
+	}
+?>
+<table class="data" width="100%">
+<tbody>
+<tr>
+<td valign="middle" class=tdname>System Hostname</td>
+<td valign="middle" class=tdvalue><input name="val[hostname]" type="text" class="valbox2" value="<?php echo $val['hostname'];?>"></td>
+</tr>
+<tr>
+<td valign="middle" class=tdname>System Admin</td>
+<td valign="middle" class=tdvalue><input name="val[fwadmin]" type="text" class="valbox2" value="<?php echo $val['fwadmin'];?>"></td>
+</tr>
+<tr>
+<td valign="middle" class=tdname>MyAdmin TCP Port</td>
+<td valign="middle" class=tdvalue><input name="https_port" type="text" class="valbox2" value="<?php echo $https_port;?>"></td>
+</tr>
+<tr>
+<td valign="middle" class=tdname>MyAdmin idle timeout</td>
+<td valign="middle" class=tdvalue><input name="val[www_session]" type="text" class="valbox2" value="<?php echo $val['www_session'];?>"> minutes</td>
+</tr>
+<tr>
+<td valign="middle" class=tdname>Organization Name</td>
+<td valign="middle" class=tdvalue><input name="organization" type="text" class="valbox2" value="<?php echo $_organization;?>"></td>
+</tr>
+<tr>
+<td valign="middle" class=tdname>City</td>
+<td valign="middle" class=tdvalue><input name="city" type="text" class="valbox2" value="<?php echo $_city;?>"></td>
+</tr>
+<tr>
+<td valign="middle" class="tdname">Country</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if(file_exists("$_HTDOCS_PATH/j/country.txt")) {
+	$data_a=array();
+	$ff=array();
+	$ff=mybox_file2array("$_HTDOCS_PATH/j/country.txt");
+	if(count($ff)!=0) {
+		foreach($ff as $lx) {
+			$lx=trim($lx);
+			if($lx=='') continue;
+			list($a,$b)=preg_split("/\|/",$lx);
+			$data_a[$b]=$a;
+		}
+	}
+	$set_a=array("height"=>"150px;");
+	echo mybox_select_box('mgs1',$data_a,"$_country",'country',$set_a);
+}
+?>
+</td>
+</tr>
+</tbody>
+</table>
+<?php  } //tab==1 ?>
+
+<?php if($tab==2) {
+$result=mybox_db_query("select * from site_certificate",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_hostname=$row['hostname'];
+		$_certstat=$row['certstat'];
+		$_cert=$row['cert'];
+	}
+}
+?>
+<script type='text/javascript'>
+function do_certh(val) {
+	if(val==0) {
+		do_hide('sh1');
+		do_show('sh2');
+	} else {
+		do_show('sh1');
+		do_hide('sh2');
+	}
+}
+</script>
+<table class="data" width="100%">
+<tbody>
+<tr id='sh2' style='display: none;'>
+<td valign="middle" class="tdname">Hostname or IP Address</td>
+<td valign="middle" class="tdvalue"> 
+<input name="hostname" type="text" class="valbox2" value="<?php echo $_hostname;?>"> 
+</td>
+</tr>
+<tr>
+<td valign="top" class="tdname">Use pre-generated certificate and key</td>
+<td valign="top" class="tdvalue">
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+$set_a=array("act"=>"do_certh('b');");
+echo mybox_select_box('mgs2',$data_a,$_certstat,'certstat',$set_a);
+?>
+<div id='sh1' style='margin: 0px; padding: 0px; display: none;'>
+<textarea style='height: 120px; font-size: 10px;' cols=70 rows=5 class=valbox name=cert>
+<?php 
+if($_cert=='') {
+echo mybox_fget_contents("/etc/openssl.pem");
+} else {
+echo "$_cert";
+}?>
+</textarea>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+<script type='text/javascript'>do_certh('<?php echo $_certstat;?>');</script>
+<?php  } //tab==2 ?>
+
+<?php if($tab==3) {
+	$list_array1=mybox_defnetwork_array($db_id);
+	$list_array2=array();
+	if(count($list_array1)!=0) {
+		foreach($list_array1 as $a => $b) {
+			if($a=='any') continue;
+			if(is_array($b)) {
+				if($b['type'] == 2) $list_array2[]="$a";
+				if($b['group']!='') {
+					$list_array2[]="$a";
+				}
+			} 
+		}
+	};
+?>
+<script type='text/javascript'>
+function chk_dstat(val) {
+	if(val==0) {
+		do_hide('dstt1');
+	} else {
+		do_show('dstt1');
+	}
+}
+</script>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td width="30%" valign="top" class="tdname">System Time</td>
+<td width="70%" valign="top" class="tdvalue"> 
+<?php 
+if(!isset($dstat)||$dstat=='') $dstat=0;
+$data_a=array("Set to"=>"1","Not set"=>"0");
+$set_a=array("act"=>"chk_dstat('b')");
+echo mybox_select_box('mgs3',$data_a,$dstat,'dstat',$set_a);
+?>
+<div id='dstt1' style='margin: 0px; margin-top: 5px; padding: 0px; display: none;'>
+<input type="text" name="timeset" id="timeset" size="30" value="<?php echo date('d/m/Y H:i:s');?>" class="valbox2" style='background: #ffffff url(/i/clock.gif) no-repeat right; cursor: pointer;' onclick="return showCalendar('timeset');">
+</div>
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdname">Timezone</td>
+<td width="70%" valign="middle" class="tdvalue">
+<?php 
+if($fi=fopen("$_ZONELIST","r")) {
+	$data_a=array();
+	while($buff=fgets($fi,150)) {
+		$buff=trim($buff);
+		$buff1='';
+		$buff1=str_replace("_"," ",$buff);
+		$data_a["$buff1"]="$buff";
+	}
+	fclose($fi);
+	$set_a=array("height"=>"150px");
+	echo mybox_select_box('mgs4',$data_a,$val['time_zone'],'time_zone',$set_a);
+}
+?>
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdname">NTP Server</td>
+<td width="70%" valign="middle" class="tdvalue">
+<?php 
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($list_array2,'val[ntp_server]',$val[ntp_server],'tmg1','tmg1a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+?>
+<?php echo mybox_defwin('tmg1','200px','#ffffff','#999999','#336699','#ffffff','NTP Server','#ffffff','100px','hidden','auto',$txt);?>
+</td>
+</tr>
+
+</tbody>
+</table>
+<script type='text/javascript'>
+chk_dstat('<?php echo $dstat;?>');
+</script>
+<?php  } //tab==3 ?>
+
+<table align=right>
+<tbody>
+<tr>
+<td>
+<a name="sini"><a class="btn" href="#sini" onclick="return do_changes();return false;">Reload</a>
+</td>
+<td>
+<a name="sini"><a class="btn" href="#sini" onclick="return do_submit();return false;">Save</a>
+</td>
+</tr> 
+</tbody>
+</table>
+<input type=hidden name=do_save value=''>
+<input type=hidden name=tab value='<?php echo $tab;?>'>
+
+<!-- end tab container -->
+
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+
+</form>
+<script type='text/javascript'>page_kill();</script>
+</body>
+</html>
+<?php mybox_db_close($db_id);?>

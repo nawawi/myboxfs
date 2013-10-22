@@ -1,0 +1,57 @@
+# /etc/profile
+. /etc/init.boot/functions
+
+ulimit -S -c 0 > /dev/null 2>&1
+ulimit -n 64000 > /dev/null 2>&1
+umask 077
+
+unset OLDPWD
+export HOME=/config
+export USER=mfs
+export SHELL=/bin/sh
+export PATH=/bin:/service/tools:/service/init
+export INPUTRC=/etc/inputrc
+export PS1="\\h:\\W> "
+export HISTFILE=/.consolehistory
+
+cd $HOME
+set_lcd;
+xps() { ps; }
+alias ps='xps';
+alias ls='ls -l';
+alias exit='xexit';
+
+if [ -f "/var/sys/do_single" ]; then
+	echo "** MAINTENANCE MODE **"
+	lcdd_msg "SYSTEM LOADING..-> MAINTENANCE"
+	alias exit='/bin/reboot';
+	read io
+else
+	if [ -f "/bin/iosh" ]; then
+		unset XTTY;
+		unset SYSEXEC;
+		export XTTY="SSL";
+		if [ -f "/var/sys/init_start" ]; then
+			trap : 1 2 3 15
+			echo "System loading in progress..please wait or login back in a minute"
+			while [ -f "/var/sys/init_start" ]; do sleep 1;done
+			trap 1 2 3 15
+		fi
+		if [ "$PPID" = "1" ]; then
+			export ME="/tmp/console.session/console_${PPID}_$(basename $(tty))_$(date "+%d:%m:%Y_%H:%M:%S")";
+			touch $ME
+			export XTTY="console";
+		fi
+		/bin/iosh $XTTY
+		if [ $? != 5 ]; then
+			clear;reset
+			unset SYSEXEC;
+			exit
+		fi
+		export SYSEXEC=1;
+	else
+		echo "** FAILED TO RUN IO SHELL **"
+		read io
+		exit
+	fi 
+fi

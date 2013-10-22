@@ -1,0 +1,412 @@
+#!/bin/php -Cq
+<?php 
+// xinet.init - last update 18-Jan-2008
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="xinet";
+include_once('clib.exl');
+include_once('policy.exl');
+putenv("PATH=/bin:/service/tools:/service/init");
+
+function ftp_config(&$_FTP_PORT) {
+	global $_QUIET;
+	mybox_ftp_ssh_console(&$_FTP_STAT,&$_FTP_PORT,&$_FTP_PASS,
+			&$_SSH_STAT,&$_SSH_PORT,&$_SSH_PASS);
+
+	if($_FTP_STAT==0) return 0;
+
+	if(!is_dir("/etc/vsftpd")) @mybox_mkdirr("/etc/vsftpd");
+	$_config='';
+	$_config .="anonymous_enable=NO\n";
+	$_config .="local_enable=YES\n";
+	$_config .="write_enable=YES\n";
+	$_config .="local_umask=022\n";
+	$_config .="dirmessage_enable=YES\n";
+	$_config .="xferlog_enable=YES\n";
+	$_config .="connect_from_port_20=YES\n";
+	$_config .="xferlog_enable=NO\n";
+	$_config .="xferlog_std_format=NO\n";
+	$_config .="idle_session_timeout=600\n";
+	$_config .="data_connection_timeout=120\n";
+	$_config .="ftpd_banner=MyBox Firewall System\n";
+	$_config .="userlist_enable=YES\n";
+	$_config .="listen=NO\n";
+	$_config .="chmod_enable=NO\n";
+	$_config .="chroot_local_user=YES\n";
+	$_config .="syslog_enable=YES\n";
+	$_config .="userlist_deny=NO\n";
+	$_config .="use_localtime=YES\n";
+	$_config .="ftp_data_port=20\n";
+	mybox_save_to_file("/etc/vsftpd/vsftpd.conf",$_config);
+	mybox_save_to_file("/etc/vsftpd/user_list","ftp1\n");
+	if(!is_dir("/usr/share/empty")) @mybox_mkdirr("/usr/share/empty");
+	if(file_exists("/etc/vsftpd/vsftpd.conf")) return 1;
+	return 0;
+}
+
+function https_cert($db_id) {
+	$result=mybox_db_query("select * from site_certificate",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_country=$row['country'];
+			$_city=$row['city'];
+			$_organization=$row['organization'];
+			$_hostname=$row['hostname'];
+			$_certstat=$row['certstat'];
+			$_cert=$row['cert'];
+		}
+	}
+
+	$_CERT ="RANDFILE = /tmp/.server.rnd\n";
+	$_CERT .="[ req ]\n";
+	$_CERT .="default_bits = 1024\n";
+	$_CERT .="encrypt_key = yes\n";
+	$_CERT .="distinguished_name = req_dn\n";
+	$_CERT .="x509_extensions = cert_type\n";
+	$_CERT .="[ req_dn ]\n";
+	$_CERT .="countryName = Country Name (2 letter code)\n";
+	$_CERT .="countryName_default = $_country\n";
+	$_CERT .="countryName_min = 2\n";
+	$_CERT .="countryName_max = 2\n";
+	$_CERT .="stateOrProvinceName = State or Province Name (full name)\n";
+	$_CERT .="stateOrProvinceName_default = $_city\n";
+	$_CERT .="localityName = Locality Name (eg, city)\n";
+	$_CERT .="localityName_default = $_city\n";
+	$_CERT .="0.organizationName = Organization Name (eg, company)\n";
+	$_CERT .="0.organizationName_default = $_organization\n";
+	$_CERT .="organizationalUnitName = Organizational Unit Name (eg, section)\n";
+	$_CERT .="organizationalUnitName_default = $_organization\n";
+	$_CERT .="0.commonName = Common Name (FQDN of your server)\n";
+	$_CERT .="0.commonName_default = $_hostname\n";
+	$_CERT .="emailAddress = Email Address\n";
+	$_CERT .="emailAddress_default = $_email\n";
+	$_CERT .="emailAddress_max = 40\n";
+	$_CERT .="[ cert_type ]\n";
+	$_CERT .="nsCertType = server\n";
+	if($_certstat==0) {
+		@mybox_save_to_file("/etc/openssl.cnf","$_CERT");
+		mybox_exec_cmd("openssl req -batch -new -x509 -days 365 -nodes -config /etc/openssl.cnf -out /etc/openssl.pem -keyout /etc/openssl.pem");
+		mybox_exec_cmd("openssl x509 -subject -dates -fingerprint -noout -in /etc/openssl.pem");
+	} else {
+		@unlink("/etc/openssl.cnf");
+		@mybox_save_to_file("/etc/openssl.pem","$_cert");
+	}
+}
+
+function https_chk_log() {
+	if(file_exists("/var/sys/log_setting/httpsd") || file_exists("/var/sys/rlog_setting/httpsd")) {
+		return 1;
+	}
+	return 0;
+}
+function https_config(&$_HTTPS_PORT) {
+	global $_QUIET, $_DB_NAME;
+	global $_ROOT_DIR, $_LOG_PATH, $_HTDOCS_PATH;
+
+	$db_id=mybox_db_connect($_DB_NAME);
+	$result=mybox_db_query("select * from service_https",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_HTTPS_STAT=$row['stat'];
+			$_HTTPS_PORT=$row['port'];
+		}
+	}
+	if($_HTTPS_STAT==0) {
+		@mybox_db_close($db_id);
+		return 0;
+	}
+	if(file_exists("/etc/openssl.pem.rm")) {
+		@unlink("/etc/openssl.pem");
+		@unlink("/etc/openssl.pem.rm");
+		clearstatcache();
+	}
+	if(!file_exists("/etc/openssl.pem")) https_cert($db_id);
+	@mybox_db_close($db_id);
+	$_config="";
+	$_config .="cgi_interpreter /bin/php\n";
+	$_config .="list_directories 0\n";
+	$_config .="inetd_mode 1\n";
+	$_config .="cgi_extensions .exh\n";
+	$_config .="document_root $_HTDOCS_PATH\n";
+	$_config .="ssl_certificate /etc/openssl.pem\n";
+	if(https_chk_log()==1) {
+		$_config .="access_log /var/log/https.log\n";
+	}
+	$_config .="aliases /l/=$_LOG_PATH/,/d/=$_ROOT_DIR/download/,/b/=$_ROOT_DIR/backup/\n";
+	mybox_save_to_file("/etc/httpsd.cnf",$_config);
+	if(file_exists("/etc/httpsd.cnf") && file_exists("/etc/openssl.pem")) return 1;
+	return 0;
+}
+
+function ssh_cert() {
+	global $_QUIET;
+	if(!file_exists("/etc/ssh/rsa1_key")) {
+		if(mybox_exec_cmd("ssh-keygen -q -t rsa1 -f /etc/ssh/rsa1_key -C '' -N '' >&/dev/null")) {
+			mybox_init_echo($_QUIET,"INFO","Generating SSH1 RSA key");
+		}
+	}
+	if(!file_exists("/etc/ssh/rsa_key")) {
+		if(mybox_exec_cmd("ssh-keygen -q -t rsa -f /etc/ssh/rsa_key -C '' -N '' >&/dev/null")) {
+			mybox_init_echo($_QUIET,"INFO","Generating SSH2 RSA key");
+		}
+	}
+	if(!file_exists("/etc/ssh/dsa_key")) {
+		if(mybox_exec_cmd("ssh-keygen -q -t dsa -f /etc/ssh/dsa_key -C '' -N '' >&/dev/null")) {
+			mybox_init_echo($_QUIET,"INFO","Generating SSH2 DSA key");
+		}
+	}
+}
+
+function ssh_config(&$_SSH_PORT) {
+	global $_QUIET, $_DB_NAME;
+
+	mybox_ftp_ssh_console(&$_FTP_STAT,&$_FTP_PORT,&$_FTP_PASS,
+			&$_SSH_STAT,&$_SSH_PORT,&$_SSH_PASS);
+
+	if($_SSH_STAT==0) return 0;
+	if(!is_dir("/etc/ssh")) @mybox_mkdirr("/etc/ssh");
+	ssh_cert();
+	$_config="";
+	$_config .="Protocol 2,1\n";
+	$_config .="HostKey /etc/ssh/rsa1_key\n";
+	$_config .="HostKey /etc/ssh/rsa_key\n";
+	$_config .="HostKey /etc/ssh/dsa_key\n";
+	$_config .="SyslogFacility AUTHPRIV\n";
+	$_config .="LogLevel VERBOSE\n";
+	$_config .="AcceptEnv LANG LC_CTYPE LC_NUMERIC LC_TIME LC_COLLATE LC_MONETARY LC_MESSAGES\n";
+	$_config .="AcceptEnv LC_PAPER LC_NAME LC_ADDRESS LC_TELEPHONE LC_MEASUREMENT\n";
+	$_config .="AcceptEnv LC_IDENTIFICATION LC_ALL\n";
+	$_config .="ChallengeResponseAuthentication no\n";
+	$_config .="MaxAuthTries 3\n";
+	$_config .="PrintMotd no\n";
+	$_config .="PrintLastLog no\n";
+	$_config .="UsePrivilegeSeparation no\n";
+	$_config .="AllowTcpForwarding no\n";
+	$_config .="Banner /etc/banner\n";
+	$_config .="AllowUsers mfs\n";
+	mybox_save_to_file("/etc/ssh/sshd_config","$_config");
+	return 1;
+}
+
+function cf_http_config(&$_CF_PORT) {
+	global $_QUIET, $_DB_NAME;
+	$db_id=mybox_db_connect($_DB_NAME);
+	$result=mybox_db_query("select * from cf",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			if(trim($row['name'])=="cf_http_stat") $_cf_http_stat=trim($row['val']);
+			if(trim($row['name'])=="cf_http_filter") $_cf_http_filter=trim($row['val']);
+			if(trim($row['name'])=="cf_http_filter_c") $_cf_http_filter_c=trim($row['val']);
+			if(trim($row['name'])=="cf_http_ext_block_stat") $_cf_http_ext_block_stat=trim($row['val']);
+			if(trim($row['name'])=="cf_http_av_stat") $_cf_http_av_stat=trim($row['val']);
+			if(trim($row['name'])=="cf_http_filter_port") $_cf_http_filter_port=trim($row['val']);
+		}
+	}
+	@mybox_db_close($db_id);
+	if($_cf_http_stat=='') $_cf_http_stat=0;
+	if($_cf_http_filter=='') $_cf_http_filter=0;
+	if($_cf_http_filter_c=='') $_cf_http_filter_c=0;
+	if($_cf_http_ext_block_stat=='') $_cf_http_ext_block_stat=0;
+	if($_cf_http_av_stat=='') $_cf_http_av_stat=0;
+	if($_cf_http_filter_port=='') $_cf_http_filter_port="6062";
+	$_CF_PORT=$_cf_http_filter_port;
+	if($_cf_http_stat==0 && $_cf_http_filter==0 && $_cf_http_filter_c==0 && $_cf_http_ext_block_stat==0 && $_cf_http_av_stat==0) return 0;
+	$_config="";
+	$_config .="cgi_interpreter /bin/php\n";
+	$_config .="list_directories 0\n";
+	$_config .="inetd_mode 1\n";
+	$_config .="cgi_extensions .exh\n";
+	$_config .="document_root /service/cf\n";
+	$_config .="listen_ports 6062\n";
+	mybox_save_to_file("/etc/http-filter.conf",$_config);
+	if(file_exists("/etc/http-filter.conf")) {
+		chmod("/etc/cf/http-filter.conf",0600);
+		mybox_save_to_file("/var/sys/http-filter","$_CF_PORT");
+		return 1;
+	}
+	return 0;
+	return 0;
+}
+
+function xinet_config() {
+
+	$_config="";
+	$_config .="defaults\n";
+	$_config .="{\n";
+	$_config .="\tlog_type\t= SYSLOG authpriv\n";
+	$_config .="\tlog_on_success\t= HOST PID\n";
+	$_config .="\tlog_on_failure\t= HOST\n";
+	$_config .="\tcps\t= 25 30\n";
+	$_config .="}\n";
+
+	if(ftp_config(&$_FTP_PORT)==1) {
+		$_config .="service mybox-ftpd\n";
+		$_config .="{\n";
+		$_config .="\tsocket_type\t= stream\n";
+		$_config .="\tflags\t= NOLIBWRAP\n";
+		$_config .="\ttype\t= UNLISTED\n";
+		$_config .="\tport\t= $_FTP_PORT\n";
+ 		$_config .="\twait\t= no\n";
+		$_config .="\tuser\t= mfs\n";
+		$_config .="\tgroup\t= mfs\n";
+		$_config .="\tserver\t= /bin/ftpd\n";
+		//$_config .="\tserver_args\t= /etc/vsftpd/vsftpd.conf\n";
+		$_config .="\tnice\t= -2\n";
+		$_config .="\tdisable\t= no\n";
+		$_config .="}\n";
+
+	}
+	if(https_config(&$_HTTPS_PORT)==1) {
+		$_config .="service mybox-webadmin\n";
+		$_config .="{\n";
+		$_config .="\tsocket_type\t= stream\n";
+		$_config .="\tflags\t= NOLIBWRAP\n";
+		$_config .="\ttype\t= UNLISTED\n";
+		$_config .="\tport\t= $_HTTPS_PORT\n";
+		$_config .="\tnice\t= -2\n";
+		$_config .="\twait\t= no\n";
+		$_config .="\tuser\t= mfs\n";
+		$_config .="\tgroup\t= mfs\n";
+		$_config .="\tserver\t= /bin/httpsd\n";
+		$_config .="\tdisable\t= no\n";
+		$_config .="}\n";
+	}
+	if(ssh_config(&$_SSH_PORT)==1) {
+		$_config .="service mybox-sshd\n";
+		$_config .="{\n";
+		$_config .="\tsocket_type\t= stream\n";
+		$_config .="\ttype\t= UNLISTED\n";
+		$_config .="\tprotocol\t= tcp\n";
+		$_config .="\tport\t= $_SSH_PORT\n";
+		$_config .="\tnice\t= -2\n";
+		$_config .="\twait\t= no\n";
+		$_config .="\tuser\t= mfs\n";
+		$_config .="\tserver\t= /bin/sshd\n";
+		$_config .="\tserver_args\t= -i\n";
+		$_config .="\tdisable\t= no\n";
+		$_config .="}\n";
+	}
+	if(cf_http_config(&$_CF_PORT)==1) {
+		$_config .="service mybox-httpfilter\n";
+		$_config .="{\n";
+		$_config .="\tsocket_type\t= stream\n";
+		$_config .="\tflags\t= NOLIBWRAP\n";
+		$_config .="\ttype\t= UNLISTED\n";
+		$_config .="\tport\t= $_CF_PORT\n";
+		$_config .="\tnice\t= -2\n";
+		$_config .="\twait\t= no\n";
+		$_config .="\tuser\t= mfs\n";
+		$_config .="\tgroup\t= mfs\n";
+		$_config .="\tserver\t= /bin/httpsd\n";
+		$_config .="\tserver_args\t= /etc/http-filter.conf\n";
+		$_config .="\tdisable\t= no\n";
+		$_config .="}\n";
+	}
+	@unlink("/etc/xinetd.conf");
+	mybox_save_to_file("/etc/xinetd.conf","$_config");
+	if(file_exists("/etc/xinetd.conf")) return 1;
+	return 0;
+}
+
+function xinet_status() {
+	global $_QUIET;
+	$pid=mybox_get_progpid("xinetd");
+	if($pid!='' && $_QUIET==0) {
+		echo "* xinetd (pid $pid) is running...\n";
+		return 0;
+	}
+	return 1;
+}
+function xinet_start() {
+	global $_QUIET, $_ROOT_DIR;
+
+	if(file_exists("$_ROOT_DIR/scripts/xinet/start")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/xinet/start");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/xinet/pre-start")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/xinet/pre-start");
+	}
+	if(@xinet_config()==1 && @xinet_status()==1) {
+		if(mybox_exec_cmd("/bin/xinetd -stayalive -pidfile /var/run/xinetd.pid")==0) {
+			mybox_init_echo($_QUIET,"INFO","Starting xinetd service");
+			@touch("/var/sys/chk_xinetd");
+			if(!file_exists("/var/sys/init_no_restart")) do_policy_admin();
+			return 0;
+		}
+	}
+	mybox_init_echo($_QUIET,"ERROR","Starting xinetd service failed");
+	return 1;
+}
+
+function xinet_stop() {
+	global $_QUIET, $_ROOT_DIR;
+	@unlink("/var/sys/chk_xinetd");
+	if(file_exists("$_ROOT_DIR/scripts/xinet/stop")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/xinet/stop");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/xinet/pre-stop")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/xinet/pre-stop");
+	}
+
+	if(mybox_killall("xinetd")==0) {
+		mybox_init_echo($_QUIET,"INFO","Shutting down xinetd service");
+		if(file_exists("$_ROOT_DIR/scripts/xinet/post-stop")) {
+			mybox_execq_cmd("$_ROOT_DIR/scripts/xinet/post-stop");
+		}
+		return 0;
+	}
+	mybox_init_echo($_QUIET,"ERROR","Shutting down xinetd service failed");
+	return 1;
+}
+
+function xinet_reload() {
+	global $_QUIET, $_ROOT_DIR;
+
+	if(file_exists("$_ROOT_DIR/scripts/xinet/reload")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/xinet/reload");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/xinet/pre-reload")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/xinet/pre-reload");
+	}
+	if(@xinet_config()==1) {
+		@exec("pkill -HUP -f xinetd",$out,$ret);
+		if($ret==0) {
+			mybox_init_echo($_QUIET,"INFO","Reloading xinetd service");
+			return 0;
+		}
+	}
+	mybox_init_echo($_QUIET,"ERROR","Reloading xinetd service failed");
+	@unlink("/var/sys/chk_xinetd");
+	return 1;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=xinet_start();
+		break;
+	case 'stop':
+		$ret=xinet_stop();
+		break;
+	case 'restart':
+		$ret=xinet_stop();
+		sleep(2);
+		$ret=xinet_start();
+		break;
+	case 'reload':
+		$ret=xinet_reload();
+		break;
+	case 'status':
+		$ret=xinet_status();
+		break;
+	case 'config':
+		$ret=xinet_config();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/reload/status]\n";
+		break;
+}
+exit($ret);
+?>

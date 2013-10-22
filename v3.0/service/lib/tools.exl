@@ -1,0 +1,270 @@
+<?php 
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+// updated: 19/06/2007
+
+function mybox_exec_cmd($cmd) {
+	$ret=1;
+	if($cmd!='') system("$cmd >/dev/null 2>&1",$ret);
+	return $ret;
+}
+
+function mybox_execq_cmd($cmd) {
+	$ret=1;
+	if($cmd!='') system("$cmd", $ret);
+	return $ret;
+}
+
+function procps_scan() {
+        $buff=mybox_dir2array("/proc/*/stat");
+        $ret=array();
+        if(count($buff)!=0) {
+                foreach($buff as $line) {
+			$fl=$line;
+                        list(,,$pid,)=explode("/",$fl);
+			if($pid <= 9) continue;
+                        if(preg_match("/^$pid\s+\((\S+)\)\s+/",mybox_fget_contents($line),$mm)) {
+				$prog=$mm[1];
+				if(preg_match("/^\d+$/",$prog)) $prog='';
+			}
+                        $argv=mybox_fget_contents("/proc/$pid/cmdline");
+                        $argv=preg_replace("/\\0/"," ",$argv);
+			$proc=trim("$prog $argv");
+			$ret[$pid]="$proc";
+		}
+	}
+	return $ret;
+}
+
+function mybox_get_pid($xpid) {
+	$proc=procps_scan();
+	$ret='';
+	if(count($proc)!=0) {
+		foreach($proc as $pid => $prog) {
+			if($pid=='') continue;
+			if($pid=="$xpid") return trim($pid);
+		}
+	}
+	return;
+}
+
+function mybox_get_progpid($match1,$match2='') {
+	$proc=procps_scan();
+	$ret='';
+	if(count($proc)!=0) {
+		foreach($proc as $pid => $prog) {
+			if($pid=='') continue;
+			if($match2!='') {
+				if((strpos("$prog","$match1") !== FALSE) && (strpos("$prog","$match2") !== FALSE)) $ret .="$pid ";
+			} else {
+				if(strpos("$prog","$match1") !== FALSE) $ret .="$pid ";
+			}
+		}
+	}
+	return trim($ret);
+}
+
+function mybox_kill($ppid,$signal) {
+	$ret=1;
+	$p_array=preg_split("/\s+/",$ppid);
+	if(count($p_array)!=0) {
+		foreach($p_array as $pid) {
+			if(posix_kill("$pid",$signal)==TRUE) $ret=0;
+		}
+	} else {
+		$ppid=trim($ppid);
+		if(posix_kill("$ppid",$signal)==TRUE) $ret=0;
+	}
+	return $ret;
+}
+
+function mybox_killall($match) {
+	$ppid='';$ret=1;
+	if(file_exists("/var/run/{$match}.pid")) {
+		$ppid=mybox_fget_contents("/var/run/{$match}.pid");
+		if($ppid!='' && preg_match("/^\d+/",$ppid)) {
+			if(posix_kill("$ppid",9)==TRUE) {
+				@unlink("/var/run/{$match}.pid");
+				return 0;
+			}
+		}
+		$ppid='';
+	}
+	exec("pkill -9 -f $match",$out,$ret);
+	if($ret==0) return $ret;
+
+	$ppid=mybox_get_progpid($match);
+   	if($ppid!='') {
+		$p_array=preg_split("/\s+/",$ppid);
+		if(count($p_array)!=0) {
+			foreach($p_array as $pid) {
+				if(posix_kill("$pid",9)) $ret=0;
+			}
+		} else {
+			$ppid=trim($ppid);
+			if(posix_kill("$ppid",9)) $ret=0;
+		}
+	}
+	return $ret;
+}
+
+function mybox_exec_bg($cmd) {
+	$ret=1;
+	if($cmd!='') system("$cmd >/dev/null 2>&1 &", $ret);
+	return $ret;
+}
+
+function mybox_echo_query($cmd) {
+	mybox_append_to_file("/var/sys/mfsque","$cmd\n");
+}
+
+function mybox_init_alarm_handler($signal) {
+	echo "Timeout\n";
+	mybox_daemon();
+	return 0;
+}
+function mybox_init_set_alarm($sec) {
+	if(file_exists("/var/sys/init_no_restart")) {
+		declare(ticks = 1);
+		pcntl_signal(SIGALRM, "mybox_init_alarm_handler", true);
+		pcntl_alarm($sec);
+	}
+}
+
+function mybox_init_echo($opt,$type,$txt='') {
+	if($opt==0 && $txt!='') {
+		$type=strtoupper($type);
+		echo "* $txt\n";
+		mybox_slog($type,$txt);
+	}
+	if($txt!='') mybox_alert_service($txt);
+}
+
+function mybox_ip2country($ip) {
+	if($ip=='' || $ip=='any') return;
+	if($ip=="255.255.255.255") return "NONE,UNKNOWN";
+	$ipx=sprintf("%u",ip2long($ip));
+	if($ipx <= 0) return;
+	mybox_set_cipname_file();
+	$perl_file=new Perl();
+	$perl_file->eval('
+                sub ip2country {
+                        my $ip=shift;
+                        if(open(CT,"/var/sys/cipname.cache")) {
+                                while(<CT>) {
+                                        chomp;
+                                        if(/^\"(.*?)\"\,\"(.*?)\"\,\"(.*?)\"\,\"(.*?)\"\,\"(.*?)\"/) {
+                                                if($ip >= $1 && $ip <= $2) {
+							close(CT);
+                                                        return "$3,$5";
+                                                }
+                                                next;
+                                        }
+                                }
+                                close(CT);
+                        }
+                        if(open(CN,"/usr/share/ip-to-country.csv")) {
+                                while(<CN>) {
+                                        chomp;
+                                        if(/^\"(.*?)\"\,\"(.*?)\"\,\"(.*?)\"\,\"(.*?)\"\,\"(.*?)\"/) {
+                                                if($ip >= $1 && $ip <= $2) {
+							close(CN);
+                                                        return "$3,$5";
+                                                }
+                                                next;
+                                        }
+                                }
+                                close(CN);
+                        }
+			return "NONE,UNKNOWN";
+                }
+        ');
+	return $perl_file->ip2country("$ipx");
+}
+
+function mybox_get_country($ip) {
+	$_COUNTRY_CACHE=array();
+	if(file_exists("/var/sys/country_cache.cache")) {
+		$_COUNTRY_CACHE=unserialize(mybox_fget_contents("/var/sys/country_cache.cache"));
+	}
+	if(isset($_COUNTRY_CACHE[$ip]) && $_COUNTRY_CACHE[$ip]!='') return $_COUNTRY_CACHE[$ip];
+	if(count($_COUNTRY_CACHE) > 1000) $_COUNTRY_CACHE=array();
+	$co=mybox_ip2country($ip);
+	$_COUNTRY_CACHE[$ip]="$co";
+	mybox_save_to_file("/var/sys/country_cache.cache",serialize($_COUNTRY_CACHE));
+	return "$co";
+}
+
+function mybox_getprotobynumber($num) {
+	if(preg_match("/^\d+$/",$num)) {
+		return strtoupper(getprotobynumber($num));
+	}
+	return $num;
+}
+
+function mybox_gethostbyname($domain) {
+	$_DOMAIN_CACHE=array();
+	if(file_exists("/var/sys/domain_cache.cache")) {
+		$_DOMAIN_CACHE=unserialize(mybox_fget_contents("/var/sys/domain_cache.cache"));
+	}
+	if(isset($_DOMAIN_CACHE[$domain]) && $_DOMAIN_CACHE[$domain]!='') return $_DOMAIN_CACHE[$domain];
+	if(count($_DOMAIN_CACHE) > 1000) $_DOMAIN_CACHE=array();
+	$ip=gethostbyname($domain);
+	$_DOMAIN_CACHE[$domain]=$ip;
+	mybox_save_to_file("/var/sys/domain_cache.cache",serialize($_DOMAIN_CACHE));
+	return $_DOMAIN_CACHE[$domain];
+}
+
+function mybox_url_get_country($url) {
+	if(preg_match("/(.*?)\:\/\/(.*?)\//",$url,$mm)) {
+		if(preg_match("/^\d+$/",$mm[2])) return "none,UNKNOWN";
+		if(mybox_check_ipv4($mm[2])) {
+			return mybox_get_country($mm[2]);
+		}
+		if(preg_match("/(.*?)\:\d+$/",$mm[2],$mm3)) {
+                        $mm[2]=$mm3[1];
+                }
+        	$ip=mybox_gethostbyname($mm[2]);
+		if($ip==$mm[2]) return "none,UNKNOWN";
+		return mybox_get_country($ip);
+	}
+	unset($mm,$mm3);
+	if(preg_match("/^(\d+\.\d+\.\d+\.\d+)/",$url,$mm)) {
+        	$ip=mybox_gethostbyname($mm[1]);
+		$sc=mybox_get_country($ip);
+		return $sc;
+	}
+	unset($mm);
+	if(preg_match("/^(.*?)\:(\d+)/",$url,$mm)) {
+		if(preg_match("/^\d+$/",$mm[1])) return "none,UNKNOWN";
+        	$ip=mybox_gethostbyname($mm[1]);
+		return mybox_get_country($ip);
+	}
+	return "none,UNKNOWN";
+}
+
+function mybox_valid_browser() {
+	global $_SERVER;
+	$browser=$_SERVER['HTTP_USER_AGENT'];
+	if(stripos($browser,"Mozilla")===FALSE ||
+		stripos($browser,"firefox")===FALSE) {
+		return "
+			<div style='margin-top: 10px;font-weight: bold;'>
+			We're sorry. Some function will not work well with your browser.<br> 
+			Please consider using <a style='color: black; font-weight: bold;' href='http://http://www.mozilla.com' target='_blank'>Mozilla/Firefox</a>.
+			</div>
+		";
+	}
+}
+
+
+function mybox_get_ipact($dev,$ip,$time='') {
+	if($time=='') $time=time();
+	if(file_exists("/var/spool/account/$dev/$ip")) {
+		list($timex,$ipx,$sp,$sb,$dp,$db)=preg_split("/,/",mybox_fget_contents("/var/spool/account/$dev/$ip"));
+		$timex=$timex + 60 * 5;
+		if($timex > $time) return array("$sp","$sb","$dp","$db");
+	}
+	return array("0","0","0","0");
+}
+
+?>

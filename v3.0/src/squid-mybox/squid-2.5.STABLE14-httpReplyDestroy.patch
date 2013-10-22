@@ -1,0 +1,41 @@
+---------------------
+PatchSet 10612 
+Date: 2006/06/02 22:00:34
+Author: hno
+Branch: SQUID_2_5
+Tag: (none) 
+Log:
+Bug #1606: assertion failed: HttpReply.c:105: "rep"
+
+The patch for Bug #1511 "Some 206 responses logged incorrectly" was slightly
+broken and could cause the above assert.
+
+Members: 
+	src/client_side.c:1.561.2.96->1.561.2.97 
+
+Index: squid/src/client_side.c
+===================================================================
+RCS file: /cvsroot/squid/squid/src/client_side.c,v
+retrieving revision 1.561.2.96
+retrieving revision 1.561.2.97
+diff -u -r1.561.2.96 -r1.561.2.97
+--- squid/src/client_side.c	10 Mar 2006 22:58:35 -0000	1.561.2.96
++++ squid/src/client_side.c	2 Jun 2006 22:00:34 -0000	1.561.2.97
+@@ -2031,8 +2031,6 @@
+ 		http->entry = clientCreateStoreEntry(http, http->request->method,
+ 		    null_request_flags);
+ 		errorAppendEntry(http->entry, err);
+-		httpReplyDestroy(http->reply);
+-		http->reply = NULL;
+ 		memFree(buf, MEM_CLIENT_SOCK_BUF);
+ 		return;
+ 	    }
+@@ -2067,8 +2065,6 @@
+ 		    http->entry = clientCreateStoreEntry(http, http->request->method,
+ 			null_request_flags);
+ 		    errorAppendEntry(http->entry, err);
+-		    httpReplyDestroy(http->reply);
+-		    http->reply = NULL;
+ 		    memFree(buf, MEM_CLIENT_SOCK_BUF);
+ 		    return;
+ 		}

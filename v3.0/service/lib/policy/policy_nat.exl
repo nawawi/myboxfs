@@ -1,0 +1,388 @@
+<?php 
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+
+function nat_header() {
+	/*
+	ACL1006-000 - CAPTIVE
+	ACL1006-001 - DNS PROXY
+	ACL1006-002 - IM PROXY
+	ACL1006-003 - FTP PROXY
+	ACL1006-004 - MAIL PROXY
+	ACL1006-01 - HTTP PROXY
+	ACL1006-02 - PRE
+	ACL1006-03 - BALANCING
+	ACL1006-04 - POST
+	*/
+	do_iptable("*nat");
+	do_iptable(":PREROUTING ACCEPT [0:0]");
+	do_iptable(":POSTROUTING ACCEPT [0:0]");
+	do_iptable(":OUTPUT ACCEPT [0:0]");
+	do_iptable(":ACL1006-000 - [0:0]");
+	do_iptable(":ACL1006-001 - [0:0]");
+	do_iptable(":ACL1006-002 - [0:0]");
+	do_iptable(":ACL1006-003 - [0:0]");
+	do_iptable(":ACL1006-004 - [0:0]");
+	do_iptable(":ACL1006-01 - [0:0]");
+	do_iptable(":ACL1006-02 - [0:0]");
+	do_iptable(":ACL1006-03 - [0:0]");
+	do_iptable(":ACL1006-04 - [0:0]");
+}
+
+function policy_nat($type,$db_id) {
+	$_KMSG_NAT=array();
+	$_KMSG_NAT=unserialize(mybox_fget_contents("/var/sys/fwmsg"));
+	unset($_KMSG_NAT[$type]);
+	$_KMSG_NAT[$type]=array();
+	$_table="pf_dnat";
+	$_natj="ACL1006-02";
+	if($type=='snat') {
+		$_table="pf_snat";
+		$_natj="ACL1006-04";
+	}
+	
+	$_cmdlog='-m state --state NEW -m limit --limit 2/sec --limit-burst 10 -j NFLOG --nflog-prefix';
+	$_deftime_array=mybox_deftimes_array($db_id);
+	$_defnet_array=mybox_defnetwork_array($db_id);
+	$_defservice_array=mybox_defservices_array($db_id);
+	$_defservice4nat_array=mybox_defservices_4nat_array($db_id);
+
+	$namedev_array=mybox_name2dev_array($db_id);
+
+	$result=mybox_db_query("select * from $_table where stat='1' order by id ASC",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_id=$row['id'];
+			$_src=trim($row['src']);
+			$_dst=trim($row['dst']);
+			$_service=trim($row['service']);
+			$_fwd=trim($row['fwd']);
+			$_fwdp=trim($row['fwdp']);
+			$_event=trim($row['event']);
+			$_log=$row['log'];
+			$_note=mybox_unescape_str($row['note']);
+			if($_note=='') $_note='none';
+			// variable
+			$_cmdlogx='';
+			$_cmd_time='';
+			$_service_array=array();
+			$_fwd_array=array();
+			$_fwdp_array=array();
+			$_src_array=array();
+			$_dst_array=array();
+
+			// time
+			if($_event!='') {
+				if(isset($_deftime_array[$_event])&&$_deftime_array[$_event]!='') {
+					$_timeday=$_deftime_array[$_event]['day'];
+					$_timestart=$_deftime_array[$_event]['start'];
+					$_timeend=$_deftime_array[$_event]['stop'];
+					$_cmd_time=time_policy($_timeday,$_timestart,$_timeend);
+				}
+				unset($_deftime_array,$_timeday,$_timestart,$_timeend);
+			}
+			// Log
+			if($_log==1) {
+				$_cmdlogx="$_cmdlog \"F:$type:NAT:$_id \"";
+				$_KMSG_NAT[$type][$_id]="$_note";
+			}
+			if($_service!='any') {
+				$_service_array=list_service_array($_defservice_array,$_service);
+			}
+			if($_src!='any') {
+				if(isset($namedev_array[$_src])&&$namedev_array[$_src]!='') {
+					$_src_array[]="-s {$namedev_array[$_src]}";
+				} else {
+					if(isset($_defnet_array[$_src])&&$_defnet_array[$_src]!='') {
+						$_src_array=list_srcdst_array($_defnet_array,$_src,"1","");
+					}
+				}
+			}
+			if($_dst!='any') {
+				if(isset($namedev_array[$_dst])&&$namedev_array[$_dst]!='') {
+					$_dst_array[]="-d {$namedev_array[$_dst]}";
+				} else {
+					if(isset($_defnet_array[$_dst])&&$_defnet_array[$_dst]!='') {
+						$_dst_array=list_srcdst_array($_defnet_array,$_dst,"2","");
+					}
+				}
+			}
+			if(isset($namedev_array[$_fwd])&&$namedev_array[$_fwd]!='') {
+				$_fwd_array[]="{$namedev_array[$_fwd]}";
+			} else {
+				if(isset($_defnet_array[$_fwd])&&$_defnet_array[$_fwd]!='') {
+					$_fwd_array=list_srcdst_array($_defnet_array,$_fwd,"3","");
+				}
+			}
+			if(count($_fwd_array)==0) {
+				// skip
+				continue;
+			}
+			$_fwdp_array=list_service4nat_array($_defservice4nat_array,$_fwdp,$_fwd_array,$type);
+			if(count($_fwdp_array)==0) {
+				// skip
+				continue;
+			}
+			
+			if(count($_src_array)!=0 && count($_dst_array)!=0) {
+				foreach($_src_array as $src) {
+					if($src=='') continue;
+					foreach($_dst_array as $dst) {
+						if($dst=='') continue;
+						if(count($_service_array)!=0) {
+							foreach($_service_array as $sr) {
+								if($sr=='') continue;
+								if($_log==1) {
+									do_iptable("-A $_natj $sr $src $dst $_cmd_time $_cmdlogx");
+								}
+								foreach($_fwdp_array as $fw) {
+									if($fw=='') continue;
+									do_iptable("-A $_natj $sr $src $dst $_cmd_time $fw");
+								}
+							}
+						} else {
+							if($_log==1) {
+								do_iptable("-A $_natj $src $dst $_cmd_time $_cmdlogx");
+							}
+							foreach($_fwdp_array as $fw) {
+								if($fw=='') continue;
+								do_iptable("-A $_natj $src $dst $_cmd_time $fw");
+							}
+						}
+					}
+				}
+			} elseif(count($_src_array)!=0 && count($_dst_array)==0) {
+				foreach($_src_array as $src) {
+					if($src=='') continue;
+					if(count($_service_array)!=0) {
+						foreach($_service_array as $sr) {
+							if($sr=='') continue;
+							if($_log==1) {
+								do_iptable("-A $_natj $sr $src $_cmd_time $_cmdlogx");
+							}
+							foreach($_fwdp_array as $fw) {
+								if($fw=='') continue;
+								do_iptable("-A $_natj $sr $src $_cmd_time $fw");
+							}
+						}
+					} else {
+						if($_log==1) {
+							do_iptable("-A $_natj $src $_cmd_time $_cmdlogx");
+						}
+						foreach($_fwdp_array as $fw) {
+							if($fw=='') continue;
+							do_iptable("-A $_natj $src $_cmd_time $fw");
+						}
+					}
+				}
+			} elseif(count($_src_array)==0 && count($_dst_array)!=0) {
+				foreach($_dst_array as $dst) {
+					if($dst=='') continue;
+					if(count($_service_array)!=0) {
+						foreach($_service_array as $sr) {
+							if($sr=='') continue;
+							if($_log==1) {
+								do_iptable("-A $_natj $sr $dst $_cmd_time $_cmdlogx");
+							}
+							foreach($_fwdp_array as $fw) {
+								if($fw=='') continue;
+								do_iptable("-A $_natj $sr $dst $_cmd_time $fw");
+							}
+						}
+					} else {
+						if($_log==1) {
+							do_iptable("-A $_natj $dst $_cmd_time $_cmdlogx");
+						}
+						foreach($_fwdp_array as $fw) {
+							if($fw=='') continue;
+							do_iptable("-A $_natj $dst $_cmd_time $fw");
+						}
+					}
+				}
+			} elseif(count($_src_array)==0 && count($_dst_array)==0) {
+				if(count($_service_array)!=0) {
+					foreach($_service_array as $sr) {
+						if($sr=='') continue;
+						if($_log==1) {
+							do_iptable("-A $_natj $sr $_cmd_time $_cmdlogx");
+						}
+						foreach($_fwdp_array as $fw) {
+							if($fw=='') continue;
+							do_iptable("-A $_natj $sr $_cmd_time $fw");
+						}
+					}
+				} else {
+					if($_log==1) {
+						do_iptable("-A $_natj $_cmd_time $_cmdlogx");
+					}
+					foreach($_fwdp_array as $fw) {
+						if($fw=='') continue;
+						do_iptable("-A $_natj $_cmd_time -j $_action");
+					}
+				}
+			}
+			unset($_id,$_src,$_dst,$_service,$_event,$_log,$_fwd,$_fwdp,$_note,$fw);
+		} // while
+	}
+	mybox_save_to_file("/var/sys/fwmsg",serialize($_KMSG_NAT));
+}
+
+function policy_netmap($db_id) {
+	$_deftime_array=mybox_deftimes_array($db_id);
+	$_defnet_array=mybox_defnetwork_array($db_id);
+	$namedev_array=mybox_name2dev_array($db_id);
+
+	$result=mybox_db_query("select * from pf_map where stat='1' order by id ASC",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_id=$row['id'];
+			$_type=trim($row['type']);
+			$_src=trim($row['src']);
+			$_dst=trim($row['dst']);
+			$_fwd=trim($row['fwd']);
+			$_event=trim($row['event']);
+			$_note=mybox_unescape_str($row['note']);
+			if($_note=='') $_note='none';
+			// variable
+			$_cmd_time='';
+			$_fwd_array=array();
+			$_src_array=array();
+			$_dst_array=array();
+
+			if($_type==0) {
+				$_type="ACL1006-02";
+			} else {
+				$_type="ACL1006-04";
+			}
+
+			// time
+			if($_event!='') {
+				if(isset($_deftime_array[$_event])&&$_deftime_array[$_event]!='') {
+					$_timeday=$_deftime_array[$_event]['day'];
+					$_timestart=$_deftime_array[$_event]['start'];
+					$_timeend=$_deftime_array[$_event]['stop'];
+					$_cmd_time=time_policy($_timeday,$_timestart,$_timeend);
+				}
+				unset($_deftime_array,$_timeday,$_timestart,$_timeend);
+			}
+			if($_src!='any') {
+				if(isset($namedev_array[$_src])&&$namedev_array[$_src]!='') {
+					$_src_array[]="-s {$namedev_array[$_src]}";
+				} else {
+					if(isset($_defnet_array[$_src])&&$_defnet_array[$_src]!='') {
+						$_src_array=list_srcdst_array($_defnet_array,$_src,"1","");
+					}
+				}
+			}
+			if($_dst!='any') {
+				if(isset($namedev_array[$_dst])&&$namedev_array[$_dst]!='') {
+					$_dst_array[]="-d {$namedev_array[$_dst]}";
+				} else {
+					if(isset($_defnet_array[$_dst])&&$_defnet_array[$_dst]!='') {
+						$_dst_array=list_srcdst_array($_defnet_array,$_dst,"2","");
+					}
+				}
+			}
+			if(isset($namedev_array[$_fwd])&&$namedev_array[$_fwd]!='') {
+				$_fwd_array[]="{$namedev_array[$_fwd]}";
+			} else {
+				if(isset($_defnet_array[$_fwd])&&$_defnet_array[$_fwd]!='') {
+					$_fwd_array=list_srcdst_array($_defnet_array,$_fwd,"3","");
+				}
+			}
+
+			if(count($_fwd_array)==0) {
+				// skip
+				return 1;
+			}
+
+			if(count($_src_array)!=0 && count($_dst_array)!=0) {
+				foreach($_src_array as $src) {
+					if($src=='') continue;
+					foreach($_dst_array as $dst) {
+						if($dst=='') continue;
+						foreach($_fwd_array as $fw) {
+							if($fw=='') continue;
+							do_iptable("-A $_type $src $dst $_cmd_time -j NETMAP --to $fw");
+						}
+					}
+				}
+			} elseif(count($_src_array)==0 && count($_dst_array)!=0) {
+				foreach($_dst_array as $dst) {
+					if($dst=='') continue;
+					foreach($_fwd_array as $fw) {
+						if($fw=='') continue;
+						do_iptable("-A $_type $dst $_cmd_time -j NETMAP --to $fw");
+					}
+				}
+			}
+			unset($_id,$_src,$_dst,$_event,$_fwd,$_note,$fw);
+		} // while
+	}
+}
+
+function do_policy_nat($db_id='') {
+	global $_DB_NAME, $_QUIET;
+	$close_db=0;
+	if($db_id=='') {
+		$db_id=mybox_db_connect($_DB_NAME);
+		$close_db=1;
+	}
+	$_masqip=array();
+	policy_get_data(&$_dev,&$_local,&$_masqip,&$_ping,$db_id);
+	iptables_open();
+	nat_header();
+	mybox_init_echo($_QUIET,"INFO","Loading NAT rules");
+	do_iptable("-A PREROUTING -j ACL1006-000"); // captive
+	do_iptable("-A PREROUTING -j ACL1006-001"); // dns proxy
+	do_iptable("-A PREROUTING -j ACL1006-002"); // im proxy
+	do_iptable("-A PREROUTING -j ACL1006-003"); // ftp proxy
+	do_iptable("-A PREROUTING -j ACL1006-004"); // mail proxy
+	do_iptable("-A PREROUTING -j ACL1006-01"); // http proxy
+	do_iptable("-A PREROUTING -j ACL1006-02");
+	do_iptable("-A PREROUTING -j ACL1006-03");
+	do_iptable("-A POSTROUTING -j ACL1006-04");
+
+	// dns_proxy transparent
+	if(file_exists("/var/sys/dns_proxy.set")) {
+		$dns_a=unserialize(mybox_fget_contents("/var/sys/dns_proxy.set"));
+		if(count($dns_a)!=0) {
+			foreach($dns_a as $ipx) {
+				$ipx=trim($ipx);
+				if($ipx=='') continue;
+				do_iptable("-A ACL1006-001 -s $ipx -p tcp -m tcp --sport 53:65535 --dport 53 -j REDIRECT --to-port 53");
+			}
+		}
+		unset($ipx);
+	}
+	// ftp_proxy transparent
+	ftp_proxy_policy();
+	// mail_proxy transparent
+	mail_proxy_policy();
+	// http_proxy transparent
+	http_proxy_policy();
+	// 040709 - SNAT failed?
+	/*if(count($_masqip)!=0) {
+		foreach($_masqip as $_lls) {
+			if($_lls=='') continue;
+			list($dev,$_ip)=preg_split("/\|/",$_lls);
+			if($dev!='' && $_ip!='') do_iptable("-A ACL1006-04 -o $dev -j SNAT --to-source $_ip");
+		}
+	}*/
+	policy_nat('dnat',$db_id);
+	policy_nat('snat',$db_id);
+	if(count($_masqip)!=0) {
+		foreach($_masqip as $_lls) {
+			if($_lls=='') continue;
+			list($dev,$_ip)=preg_split("/\|/",$_lls);
+			if($dev!='' && $_ip!='') do_iptable("-A ACL1006-04 -o $dev -j SNAT --to-source $_ip");
+		}
+	}
+	policy_netmap($db_id);
+	policy_close();
+	do_policy_lb($db_id);
+	if(!file_exists("/var/sys/init_no_restart")) do_policy_captive($db_id);
+	if($close_db==1) {
+		mybox_db_close($db_id);
+	}
+}
+?>

@@ -1,0 +1,643 @@
+#!/bin/sh
+
+ldconfig
+
+if [ ! -f "MYBOX_VERSION" ]; then
+	echo "MYBOX_VERSION not found"
+	exit
+fi
+
+VER=$(cat ./MYBOX_VERSION)
+START_POINT=$(pwd)
+cd $START_POINT
+MODS_DIR=$START_POINT/modules
+BASE_DIR=$START_POINT/rootfs
+
+#rm -rfv $START_POINT/build/pkg
+#mkdir -p $START_POINT/build/pkg
+
+if [ -d "$MODS_DIR" ]; then
+	rm -rfv $MODS_DIR
+fi
+
+function del_modules() {
+	local file=$1
+	[ -f "$file" ] && rm -fv $file
+}
+
+function cp_lib() {
+        if [ -z "$1" ]; then
+                echo "Usage: cp_lib library library_dir";
+                exit;
+        fi
+	if [ -z "$2" ]; then
+                echo "Usage: cp_lib library library_dir";
+                exit;
+        fi
+        local file=$1
+	local xdir=$2
+	bd0=$(basename $file)
+	mkdir -vp $xdir/lib
+	cp -a $file $xdir/lib
+        [ ! -L "$xdir/lib/$bd0" ] && strip --strip-debug $xdir/lib/$bd0
+	LO=$(ldd $file |tr -d '^\t' |sed -e 's/=>//g' |cut -d ' ' -f 3)
+        if [ "$LO" != "" ]; then
+                for f in $LO; do
+                        LS=
+                        if [ -n "$f" ]; then
+                                echo "$f"
+                                fd=
+                                if [ -L "$f" ]; then
+                                        fd=$(dirname $f)
+                                        LS=$(readlink $f)
+                                        LS="$fd/$LS"
+                                else
+                                        LS=$f
+                                fi
+                                if [ -e "$LS" ]; then
+                                        d=$(dirname $f)
+                                        if [ ! -d "$xdir/$d" ]; then
+                                                mkdir -vp $xdir/lib
+                                        fi
+                                        bd1=$(basename $LS)
+                                        bd2=$(basename $f)
+					local ret=0;
+					if [ -f "$BASE_DIR/lib/$bd1" ]; then
+						echo "library exist in $BASE_DIR/lib/$bd1"
+						ret=1
+					fi
+					if [ -f "$BASE_DIR/lib/$bd2" ]; then
+						echo "library exist in $BASE_DIR/lib/$bd2"
+						ret=1
+					fi
+					if [ "$ret" = 0 ]; then
+                                       		if [ ! -f "$xdir/lib/$bd1" ]; then
+                                               		cp -a $LS $xdir/lib
+                                               		strip --strip-debug $xdir/lib/$bd1
+							#echo "$basename $bd1" >>/tmp/DEBUG
+                                      		fi
+                                       		if [ ! -f "$xdir/lib/$bd2" ]; then
+							cp -a $f $xdir/lib
+                                               		strip --strip-debug $xdir/lib/$bd2
+							#echo "$basename $bd2" >>/tmp/DEBUG
+                                       		fi
+					fi
+                                fi
+                        fi
+                done
+        fi
+}
+
+function cp_modules() {
+        if [ -z "$1" ]; then
+                echo "Usage: cp_modules binary modules_dir";
+                exit;
+        fi
+	if [ -z "$2" ]; then
+                echo "Usage: cp_modules binary modules_dir";
+                exit;
+        fi
+	noupx=0
+	[ ! -z "$3" ] && noupx=1
+        local file=$1
+	local xdir=$2
+
+	mkdir -p $xdir
+
+        if [ -x "$file" ]; then
+                dirname=$(dirname $file)
+                basename=$(basename $file)
+                bindir="$xdir/bin"
+        else
+                echo "file '$file' not found"
+                exit
+        fi
+
+        cp -v $file $bindir
+        chmod -v a-srwx $bindir/$basename
+        chmod -v u+rwx $bindir/$basename
+        strip --strip-all $bindir/$basename
+        echo "++ compressing.. $bindir/$basename"
+        
+	if [ "$noupx" = 0 ]; then 
+        	upx-bin -q --best --force-execve $bindir/$basename >/dev/null
+	else
+		upx-kernel -q --best $bindir/$basename >/dev/null
+	fi
+	
+	LO=$(ldd $file |tr -d '^\t' |sed -e 's/=>//g' |cut -d ' ' -f 3)
+        if [ "$LO" != "" ]; then
+                for f in $LO; do
+                        LS=
+                        if [ -n "$f" ]; then
+                                echo "$f"
+                                fd=
+                                if [ -L "$f" ]; then
+                                        fd=$(dirname $f)
+                                        LS=$(readlink $f)
+                                        LS="$fd/$LS"
+                                else
+                                        LS=$f
+                                fi
+                                if [ -e "$LS" ]; then
+                                        d=$(dirname $f)
+                                        if [ ! -d "$xdir/$d" ]; then
+                                                mkdir -vp $xdir/lib
+                                        fi
+                                        bd1=$(basename $LS)
+                                        bd2=$(basename $f)
+					local ret=0;
+					if [ -f "$BASE_DIR/lib/$bd1" ]; then
+						echo "library exist in $BASE_DIR/lib/$bd1"
+						ret=1
+					fi
+					if [ -f "$BASE_DIR/lib/$bd2" ]; then
+						echo "library exist in $BASE_DIR/lib/$bd2"
+						ret=1
+					fi
+					if [ "$ret" = 0 ]; then
+                                        	if [ ! -f "$xdir/lib/$bd1" ]; then
+                                                	cp -a $LS $xdir/lib
+                                                	strip --strip-debug $xdir/lib/$bd1
+  							#echo "$basename $bd1" >>/tmp/DEBUG
+	                                      	fi
+                                        	if [ ! -f "$xdir/lib/$bd2" ]; then
+							cp -a $f $xdir/lib
+                                                	strip --strip-debug $xdir/lib/$bd2
+  							#echo "$basename $bd2" >>/tmp/DEBUG
+                                        	fi
+					fi
+                                fi
+                        fi
+                done
+        fi
+}
+
+function pptp_pkg() {
+	cd $START_POINT
+	local PPTP_LIB="src/pptpd-*/plugins/pptpd-logwtmp.so 
+			src/pptpd-*/plugins/pptpd-mybox.so"
+
+	local BIN_LIST="src/pptpd-*/pptpd
+			src/pptpd-*/pptpctrl
+			src/pptpd-*/bcrelay"
+
+	local MMODS_DIR="$MODS_DIR/pptp"
+
+	mkdir -p $MMODS_DIR/{etc,bin,lib,strg/mybox/smb,var/log/smb}
+	#mkdir -p $MMODS_DIR/usr/lib/pptpd
+
+	for x in $BIN_LIST;do
+		cp_modules "$x" "$MMODS_DIR"
+	done
+
+	for x2 in $PPTP_LIB;do
+		cp_lib "$x2" "$MMODS_DIR";
+	done
+
+	cd $MMODS_DIR
+	del_modules "$START_POINT/build/pkg/pptp-${VER}.bz2"
+	tar -jcvf $START_POINT/build/pkg/pptp-${VER}.bz2 * |sort
+}
+
+function ppp_pkg() {
+	cd $START_POINT
+	local PPP_LIB="src/ppp-*/pppd/plugins/winbind.so
+		       src/ppp-*/pppd/plugins/dhcp/dhcpc.so
+		       src/ppp-*/pppd/plugins/radius/radattr.so
+		       src/ppp-*/pppd/plugins/radius/radius.so"
+
+	local MMODS_DIR="$MODS_DIR/ppp"
+
+	local BIN_LIST="src/ppp-*/pppd/pppd"
+
+	mkdir -p $MMODS_DIR/{etc,bin,lib,strg/mybox/smb,var/log/smb}
+	mkdir -p $MMODS_DIR/usr/smb
+	mkdir -p $MMODS_DIR/usr/lib/pptpd
+
+	for x in $BIN_LIST;do
+		cp_modules "$x" "$MMODS_DIR"
+	done
+
+	for x1 in $PPP_LIB;do
+		cp -av "$x1" "$MMODS_DIR/lib"
+		strip --strip-debug "$MMODS_DIR/lib/$(basename $x1)"
+	done
+
+	cd $MMODS_DIR
+	del_modules "$START_POINT/build/pkg/ppp-${VER}.bz2"
+	tar -jcvf $START_POINT/build/pkg/ppp-${VER}.bz2 * |sort
+}
+
+function winbindd_pkg() {
+	cd $START_POINT
+	local SMB_DIR=/usr/smb
+	local MMODS_DIR="$MODS_DIR/winbindd"
+	local LIB_EX="/usr/lib/liblber.so /usr/lib/liblber-*.so* /usr/lib/libldap-*.so* /usr/lib/libldap.so"
+	mkdir -p $MMODS_DIR/{etc,bin,lib,strg/mybox/smb,var/log/smb}
+	mkdir -p $MMODS_DIR/usr/smb
+
+	if [ ! -d "$SMB_DIR" ]; then
+		echo "samba not compile yet"
+		exit	
+	else
+		cp -av $SMB_DIR $MMODS_DIR/usr
+		SMB_DIR2="$MMODS_DIR/usr/smb"
+		if [ "$SMB_DIR2" = "" ]; then
+			echo "SMB_DIR2 empty"
+			exit
+		fi
+		cp_modules "$SMB_DIR2/bin/net" "$MMODS_DIR"
+		cp_modules "$SMB_DIR2/bin/ntlm_auth" "$MMODS_DIR"
+		cp_modules "$SMB_DIR2/bin/wbinfo" "$MMODS_DIR"
+		cp_modules "$SMB_DIR2/sbin/nmbd" "$MMODS_DIR"
+		cp_modules "$SMB_DIR2/sbin/winbindd" "$MMODS_DIR"
+		#cp_modules "$SMB_DIR2/sbin/smbd" "$MMODS_DIR"
+		mkdir -p $MMODS_DIR/var/log
+		strip -v $SMB_DIR2/lib/charset/*
+		rm -rfv $SMB_DIR2/sbin
+		rm -rfv $SMB_DIR2/bin
+		rm -rfv $SMB_DIR2/man
+		rm -rfv $SMB_DIR2/swat
+		rm -rfv $SMB_DIR2/var
+		rm -rfv $SMB_DIR2/lib/vfs
+		rm -rfv $SMB_DIR2/lib/rpc
+		rm -fv $SMB_DIR2/lib/*.msg
+		rm -rfv $SMB_DIR2/include
+	fi
+	for x1 in $LIB_EX;do
+		cp -av "$x1" "$MMODS_DIR/lib"
+		strip --strip-debug "$MMODS_DIR/lib/$(basename $x1)"
+	done
+	cd $MMODS_DIR
+	del_modules "$START_POINT/build/pkg/winbindd-${VER}.bz2"
+	tar -jcvf $START_POINT/build/pkg/winbindd-${VER}.bz2 * |sort
+}
+
+function ips_pkg() {
+	cd $START_POINT
+	local MMODS_DIR="$MODS_DIR/ips"
+	local BIN_LIST="src/snort/src/snort_inline src/barnyard*/src/barnyard"
+	#local BIN_LIST="src/snort/src/snort src/barnyard*/src/barnyard"
+	local UNICODE="src/snort/etc/unicode.map"
+
+	# snort 2.6.x
+	#local _DNLIBS="src/snort/src/dynamic-preprocessors/build/usr/lib/snort_dynamicpreprocessor/libsf_*.so*
+	local _DNLIBS="src/snort/src/dynamic-plugins/sf_engine/.libs/libsf_engine.so*"
+
+	mkdir -p $MMODS_DIR/{etc,bin,lib}
+
+	for x in $BIN_LIST;do
+		cp_modules "$x" "$MMODS_DIR"
+	done
+
+	# snort 2.6.x
+	for x in $_DNLIBS;do
+		cp -av "$x" "$MMODS_DIR/lib"
+	done
+
+	mv -v $MMODS_DIR/bin/snort_inline $MMODS_DIR/bin/snortd
+	#mv -v $MMODS_DIR/bin/snort $MMODS_DIR/bin/snortd
+
+	#mkdir -p $MMODS_DIR/usr/ips_rules
+	cd $MMODS_DIR
+	del_modules "$START_POINT/build/pkg/ips-${VER}.bz2"
+	tar -jcvf $START_POINT/build/pkg/ips-${VER}.bz2 * |sort
+}
+
+function shaper_pkg() {
+	cd $START_POINT
+	local MMODS_DIR="$MODS_DIR/shaper"
+	local BIN_LIST="src/HTB-tools*/q_checkcfg
+			src/HTB-tools*/q_parser
+			src/HTB-tools*/q_show
+			/sbin/tc"
+
+	mkdir -p $MMODS_DIR/{etc,bin,lib}
+
+	for x in $BIN_LIST;do
+		cp_modules "$x" "$MMODS_DIR"
+	done
+
+	cd $MMODS_DIR
+	del_modules "$START_POINT/build/pkg/shaper-${VER}.bz2"
+	tar -jcvf $START_POINT/build/pkg/shaper-${VER}.bz2 * |sort
+}
+
+function nmap_pkg() {
+	cd $START_POINT
+	local MMODS_DIR="$MODS_DIR/nmap"
+	
+	mkdir -p $MMODS_DIR/{bin,lib}
+	mkdir -p $MMODS_DIR/usr/share
+	cp_modules "/usr/bin/nmap" "$MMODS_DIR"
+	cp -av /usr/share/nmap $MMODS_DIR/usr/share
+	cd $MMODS_DIR
+	del_modules "$START_POINT/build/pkg/nmap-${VER}.bz2"
+	tar -jcvf $START_POINT/build/pkg/nmap-${VER}.bz2 * |sort
+}
+
+function tcpdump_pkg() {
+	cd $START_POINT
+	local MMODS_DIR="$MODS_DIR/tcpdump"
+	mkdir -p $MMODS_DIR/{bin,lib}
+	local nbtf=$(ls src/tcpdump-*/tcpdump)
+	cp_modules "$nbtf" "$MMODS_DIR"
+	cd $MMODS_DIR
+	del_modules "$START_POINT/build/pkg/tcpdump-${VER}.bz2"
+	tar -jcvf $START_POINT/build/pkg/tcpdump-${VER}.bz2 * |sort
+}
+
+function nbtscan_pkg() {
+	cd $START_POINT
+	local MMODS_DIR="$MODS_DIR/nbtscan"
+	mkdir -p $MMODS_DIR/{bin,lib}
+	local nbtf=$(ls src/nbtscan-*/nbtscan)
+	cp_modules "$nbtf" "$MMODS_DIR"
+	cd $MMODS_DIR
+	del_modules "$START_POINT/build/pkg/nbtscan-${VER}.bz2"
+	tar -jcvf $START_POINT/build/pkg/nbtscan-${VER}.bz2 * |sort
+}
+
+function ssh_pkg() {
+	cd $START_POINT
+	local MMODS_DIR="$MODS_DIR/ssh"
+	mkdir -p $MMODS_DIR/{bin,lib}
+	#local d1=$(ls -d src/openssh-*)
+	local d1=$(ls -d src/dropbear-*)
+	cp_modules "$d1/ssh" "$MMODS_DIR"
+	cp_modules "$d1/scp" "$MMODS_DIR"
+	cp_modules "$d1/sshd" "$MMODS_DIR"
+	cp_modules "$d1/sshdkey" "$MMODS_DIR"
+	cd $MMODS_DIR
+	del_modules "$START_POINT/build/pkg/ssh-${VER}.bz2"
+	tar -jcvf $START_POINT/build/pkg/ssh-${VER}.bz2 * |sort
+}
+
+function lcd_pkg() {
+	cd $START_POINT
+	local MMODS_DIR="$MODS_DIR/lcd"
+	mkdir -p $MMODS_DIR/{bin,lib,etc}
+	local lcdl=$(ls -d src/lcdproc-*-mybox)
+	cp_modules "$lcdl/rel/lcds" "$MMODS_DIR"
+	cp_modules "$lcdl/rel/lcdp" "$MMODS_DIR"
+	cp_modules "$lcdl/rel/lcde" "$MMODS_DIR"
+	cp -v $lcdl/awie_con/*.conf $MMODS_DIR/etc
+	cp -v $lcdl/rel/lib/*.so $MMODS_DIR/lib
+	cd $MMODS_DIR
+	del_modules "$$START_POINT/build/pkg/lcd/lcd.bz2"
+	[ ! -d "$START_POINT/build/pkg/lcd" ] && mkdir -p $START_POINT/build/pkg/lcd
+	tar -jcvf $START_POINT/build/pkg/lcd/lcd.bz2 * |sort
+}
+
+function perl_pkg() {
+	cd $START_POINT
+	local MMODS_DIR="$MODS_DIR/perl5"
+	local pbin="/usr/bin/perl"
+	mkdir -p $MMODS_DIR/{usr/lib,bin,lib,etc}
+	mkdir -p $MMODS_DIR/usr/lib/perl5/5.8.8
+	mkdir -p $MMODS_DIR/usr/lib/perl5/vendor_perl/5.8.8
+	mkdir -p $MMODS_DIR/usr/lib/perl5/vendor_perl/5.8.6
+	cp -av /usr/lib/perl5/5.8.8 $MMODS_DIR/usr/lib/perl5
+	cp -av /usr/lib/perl5/vendor_perl/5.8.8 $MMODS_DIR/usr/lib/perl5/vendor_perl
+	cp -av /usr/lib/perl5/vendor_perl/5.8.6 $MMODS_DIR/usr/lib/perl5/vendor_perl
+	cp_modules "$pbin" "$MMODS_DIR"
+	cd $MMODS_DIR
+	del_modules "$START_POINT/build/pkg/perl5-${VER}.bz2"
+	tar -jcvf $START_POINT/build/pkg/perl5-${VER}.bz2 * |sort
+}
+
+function php_pkg() {
+	cd $START_POINT
+	local MMODS_DIR="$MODS_DIR/php"
+	mkdir -p $MMODS_DIR/{bin,lib,etc}
+	local phpl=$(ls src/php-*/sapi/cgi/php-cgi)
+	cp_modules "$phpl" "$MMODS_DIR" upxk
+	cp -av src/php-*/perl/.libs/perl.so $MMODS_DIR/lib
+	cd $MMODS_DIR
+	mv -v bin/php-cgi bin/php
+	strip --strip-debug $MMODS_DIR/lib/perl.so
+	del_modules "$START_POINT/build/pkg/php-${VER}.bz2"
+	tar -jcvf $START_POINT/build/pkg/php-${VER}.bz2 * |sort
+}
+
+function ntp_pkg() {
+	cd $START_POINT
+	local MMODS_DIR="$MODS_DIR/ntp"
+	mkdir -p $MMODS_DIR/{bin,lib,etc}
+	local BIN_LIST="/usr/sbin/ntpdate /usr/sbin/ntpd"
+	for x in $BIN_LIST;do
+		cp_modules "$x" "$MMODS_DIR"
+	done
+	cd $MMODS_DIR
+	del_modules "$START_POINT/build/pkg/ntp-${VER}.bz2"
+	tar -jcvf $START_POINT/build/pkg/ntp-${VER}.bz2 * |sort
+}
+
+function snmp_pkg() {
+	cd $START_POINT
+	local MMODS_DIR="$MODS_DIR/snmp"
+	mkdir -p $MMODS_DIR/{bin,lib,etc}
+	#local snmpl=$(ls src/ucd-snmp-*/agent/snmpd)
+	local snmpl=$(ls src/net-snmp-*/agent/snmpd)
+	cp_modules "$snmpl" "$MMODS_DIR" upxk
+	cd $MMODS_DIR
+	del_modules "$START_POINT/build/pkg/snmp-${VER}.bz2"
+	tar -jcvf $START_POINT/build/pkg/snmp-${VER}.bz2 * |sort
+}
+
+function dhcp_pkg() {
+	cd $START_POINT
+	local MMODS_DIR="$MODS_DIR/dhcpd"
+	local BIN_LIST="src/dhcp-*/work.linux-2.2/server/dhcpd
+			src/dhcp-*/work.linux-2.2/relay/dhcrelay"
+
+	mkdir -p $MMODS_DIR/{bin,lib,etc}
+
+	for x in $BIN_LIST;do
+		cp_modules "$x" "$MMODS_DIR"
+	done
+	cd $MMODS_DIR
+	del_modules "$START_POINT/build/pkg/dhcp-${VER}.bz2"
+	tar -jcvf $START_POINT/build/pkg/dhcp-${VER}.bz2 * |sort
+}
+
+function dns_pkg() {
+	cd $START_POINT
+	local MMODS_DIR="$MODS_DIR/ddns"
+	local BIN_LIST="src/bind-*/bin/named/named src/inadyn/bin/linux/ddnsd"
+	mkdir -p $MMODS_DIR/{bin,lib,etc}
+
+	for x in $BIN_LIST;do
+		cp_modules "$x" "$MMODS_DIR" upxk
+	done
+
+	cd $MMODS_DIR
+	del_modules "$START_POINT/build/pkg/dns-${VER}.bz2"
+	tar -jcvf $START_POINT/build/pkg/dns-${VER}.bz2 * |sort
+}
+function spam_pkg() {
+	cd $START_POINT
+	local MMODS_DIR="$MODS_DIR/spam"
+	mkdir -p $MMODS_DIR/{bin,lib,etc}
+	local pkg="/usr/bin/spamc"
+	local SPAMD="/usr/bin/spamd"
+	cp_modules "$pkg" "$MMODS_DIR" upxk
+	cp -av $SPAMD $MMODS_DIR/bin
+	perl -pi -e 's/#!\/usr/#!/' $MMODS_DIR/bin/spamd
+	cd $MMODS_DIR
+	del_modules "$START_POINT/build/pkg/spam-${VER}.bz2"
+	tar -jcvf $START_POINT/build/pkg/spam-${VER}.bz2 * |sort
+}
+
+function syslog_pkg() {
+	cd $START_POINT
+	local MMODS_DIR="$MODS_DIR/syslog"
+	#local BIN_LIST="src/sysklogd-*/syslogd src/sysklogd-*/klogd"
+	local BIN_LIST="src/sysklogd-*/syslogd src/sysklogd-*/klogd src/ulogd2/src/ulogd"
+	local _FLIBS="src/ulogd2/output/.libs/ulogd_output_SYSLOG.so.0.0.0 
+			src/ulogd2/filter/raw2packet/.libs/ulogd_raw2packet_BASE.so.0.0.0
+			src/ulogd2/filter/.libs/ulogd_filter_IFINDEX.so.0.0.0
+			src/ulogd2/input/packet/.libs/ulogd_inppkt_NFLOG.so.0.0.0
+			src/ulogd2/input/flow/.libs/ulogd_inpflow_NFCT.so.0.0.0"
+
+	mkdir -p $MMODS_DIR/{bin,lib,etc}
+
+	for x in $BIN_LIST;do
+		cp_modules "$x" "$MMODS_DIR"
+	done
+	for x in $_FLIBS;do
+		cp_lib "$x" "$MMODS_DIR"
+	done
+	mv -v $MMODS_DIR/lib/ulogd_output_SYSLOG.so.0.0.0 $MMODS_DIR/lib/ulogd_output_SYSLOG.so
+	mv -v $MMODS_DIR/lib/ulogd_raw2packet_BASE.so.0.0.0 $MMODS_DIR/lib/ulogd_raw2packet_BASE.so
+	mv -v $MMODS_DIR/lib/ulogd_filter_IFINDEX.so.0.0.0 $MMODS_DIR/lib/ulogd_filter_IFINDEX.so
+	mv -v $MMODS_DIR/lib/ulogd_inppkt_NFLOG.so.0.0.0 $MMODS_DIR/lib/ulogd_inppkt_NFLOG.so
+	mv -v $MMODS_DIR/lib/ulogd_inpflow_NFCT.so.0.0.0 $MMODS_DIR/lib/ulogd_inpflow_NFCT.so
+	cd $MMODS_DIR
+	del_modules "$START_POINT/build/pkg/syslog-${VER}.bz2"
+	tar -jcvf $START_POINT/build/pkg/syslog-${VER}.bz2 * |sort
+}
+
+function conntrack_pkg() {
+	cd $START_POINT
+	local MMODS_DIR="$MODS_DIR/conntrack"
+	local BINF=$(ls src/conntrack-tools-*/src/conntrack)
+	local _FLIBS="src/conntrack-tools-*/extensions/.libs/*.so"
+	mkdir -p $MMODS_DIR/{etc,bin,lib}
+	cp_modules "$BINF" "$MMODS_DIR"
+	for x in $_FLIBS;do
+		cp_lib "$x" "$MMODS_DIR"
+	done
+	cd $MMODS_DIR
+	del_modules "$START_POINT/build/pkg/conntrack-${VER}.bz2"
+	tar -jcvf $START_POINT/build/pkg/conntrack-${VER}.bz2 * |sort
+}
+
+function clamav_pkg() {
+	cd $START_POINT
+	local MMODS_DIR="$MODS_DIR/clamav"
+	local BIN_LIST="/bin/clamd"
+	mkdir -p $MMODS_DIR/{bin,lib,etc}
+	for x in $BIN_LIST;do
+		cp_modules "$x" "$MMODS_DIR"
+	done
+	cd $MMODS_DIR
+	del_modules "$START_POINT/build/pkg/clamav-${VER}.bz2"
+	tar -jcvf $START_POINT/build/pkg/clamav-${VER}.bz2 * |sort
+}
+
+function l2tp_pkg() {
+	cd $START_POINT
+	local MMODS_DIR="$MODS_DIR/l2tp"
+	local BIN_LIST="src/xl2tpd-*/xl2tpd"
+	mkdir -p $MMODS_DIR/{bin,lib,etc}
+	for x in $BIN_LIST;do
+		cp_modules "$x" "$MMODS_DIR"
+	done
+	cd $MMODS_DIR
+	del_modules "$START_POINT/build/pkg/l2tp-${VER}.bz2"
+	tar -jcvf $START_POINT/build/pkg/l2tp-${VER}.bz2 * |sort
+}
+
+#function squid_pkg() {
+#	cd $START_POINT
+#	local MMODS_DIR="$MODS_DIR/squid"
+#	local BIN_LIST="src/squid-*/src/squid src/squidclamav/cff src/linux-identd-*/identd"
+#	mkdir -p $MMODS_DIR/{bin,lib,etc/cf}
+#	for x in $BIN_LIST;do
+#		cp_modules "$x" "$MMODS_DIR"
+#	done
+#	cp -av ./configs/squid.etc/* "$MMODS_DIR/etc/cf"
+#	cd $MMODS_DIR/bin
+#	ln -sf httpsd cff-http
+#	cd $MMODS_DIR	
+#	del_modules "$START_POINT/build/pkg/squid-${VER}.bz2"
+#	tar -jcvf $START_POINT/build/pkg/squid-${VER}.bz2 * |sort
+#}
+
+function squid_pkg() {
+	cd $START_POINT
+	local MMODS_DIR="$MODS_DIR/squid"
+	local BIN_LIST="src/squid-mybox/src/squid src/squid-mybox/helpers/basic_auth/NCSA/ncsa_auth"
+	mkdir -p $MMODS_DIR/{bin,lib,etc/cf}
+	for x in $BIN_LIST;do
+		cp_modules "$x" "$MMODS_DIR"
+	done
+	for ff in src/squid-mybox/filters/cfmod_*.so; do
+		cp_lib "$ff" "$MMODS_DIR" cf
+	done
+	cp -av ./configs/squid.etc/* "$MMODS_DIR/etc/cf"
+	cd $MMODS_DIR	
+	del_modules "$START_POINT/build/pkg/squid-${VER}.bz2"
+	tar -jcvf $START_POINT/build/pkg/squid-${VER}.bz2 * |sort
+}
+
+function service_pkg() {
+	cd $START_POINT
+	local MMODS_DIR="$MODS_DIR/service"
+	mkdir -p $MMODS_DIR/service
+	sh mk_enc
+	cd $MMODS_DIR
+	cp -av $START_POINT/service_enc/* $MMODS_DIR/service
+	del_modules "$START_POINT/build/pkg/service-${VER}.bz2"
+	tar -jcvf $START_POINT/build/pkg/service-${VER}.bz2 * |sort
+}
+
+PLIST="
+pptp_pkg
+ppp_pkg
+winbindd_pkg
+ips_pkg
+shaper_pkg
+#nmap_pkg
+tcpdump_pkg
+nbtscan_pkg
+ssh_pkg
+lcd_pkg
+perl_pkg
+php_pkg
+ntp_pkg
+snmp_pkg
+dhcp_pkg
+dns_pkg
+spam_pkg
+syslog_pkg
+conntrack_pkg
+clamav_pkg
+l2tp_pkg
+squid_pkg
+service_pkg"
+
+for f in $PLIST; do
+	if [ ! -z "$1" ];then
+		if [ "$1" = "$f" ]; then
+			echo "BUILD PACKAGE: $f"
+			$f
+			exit
+		fi
+	else
+		echo "BUILD PACKAGE: $f"
+		$f
+	fi
+done

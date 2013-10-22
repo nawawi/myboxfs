@@ -1,0 +1,26 @@
+BODY {
+ 	background-color:#F1F1DE;
+	margin:0px;
+}
+
+.keytxt {
+	height:20px;
+	width:154px;
+	border:1px solid #6A8447;
+	background-color:#6A8447;
+	background-image:url("/intouch/images/img_23.gif");
+	padding-top:4px;
+	padding-left:15px;
+	padding-right:15px;
+	font-family:tahoma;
+	font-size:10px;
+	font-weight:bold;
+	color: #6A8447;
+
+} 
+
+.wlcmtxt {
+	font-family:tahoma;
+	font-size:12px;
+	color: #EDEDCE;
+}

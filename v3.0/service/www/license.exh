@@ -1,0 +1,139 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="license";
+include_once('page.exl');
+
+$_LMSG=array();
+$_LMSG[0]="No license file. Please upload valid license file.";
+$_LMSG[1]="Invalid license Key. Please upload valid license file.";
+$_LMSG[2]="License expired. Please upload new license file.";
+$_LMSG[3]="License updated, please wait system reboot.";
+$_LMSG[4]="Invalid license file.";
+$_LMSG[5]="Updating license failed.";
+
+$msg_reply='';
+
+if(isset($do_save)&&$do_save==1) {
+	if(move_uploaded_file("$filename","$_DOWNLOAD_PATH/$filename_name")) {
+		if($filename_name!="mfs-license.exc") {
+			$msg_reply="{$_LMSG[4]}";
+			@unlink("$_DOWNLOAD_PATH/$filename_name");
+		} else {
+			@rename("$_LICENSE_PATH","$_ROOT_DIR/mfs-license.exc.bak");
+			if(!copy("$_DOWNLOAD_PATH/$filename_name","$_LICENSE_PATH")) {
+				@unlink("/etc/license.dat");
+				$msg_reply="{$_LMSG[5]}";
+			}
+		}
+	}
+	if($msg_reply=='') {
+		mybox_session_logout();
+		mybox_echo_query("mfs-reboot");
+		$xt=time();
+		mybox_send_logout(7);
+		exit;
+	}
+}
+@session_start();
+$_mm=$_SESSION['mybox_license_id'];
+if(!isset($h)||$h==''||$h!=$_mm || !isset($t) || $t=='') exit;
+if($msg_reply=='') $msg_reply="{$_LMSG[$l]}";
+?>
+<head>
+<title>MyAdmin</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<script type='text/javascript'>
+	if(top.frames.length!=0) top.location=self.document.location;
+	defaultStatus="Mybox Internet Security - License Update";
+	function Trim(str) {return(str.replace(/^\s*/,'').replace(/\s*$/,'').replace(/^\t*/,'').replace(/\t*$/,'').replace(/^\f*/,'').replace(/\f*$/,'').replace(/^\r*/,'').replace(/\r*$/,''));}
+	function basename (path) { var m1=/.*\//;var m2=/.*\\/; if(path.match(m1)!=null) { return path.replace(m1,''); } else if(path.match(m2)!=null) {return path.replace(m2,'')}; return false;}
+	function check_licensefile() {
+		var file=document.f.filename.value;
+		if(file=='') { alert("No license file defined"); return false; }
+		file=basename(file);
+		uf=Trim(file);
+		if(uf!="mfs-license.exc") {
+			alert("Invalid license file");
+			return false;
+		}
+		return true;
+	};
+	function __submit() {
+		if(!check_licensefile()) {return false;};
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	};
+	function __loc() {
+		var LeftPosition = (screen.width) ? (screen.width-500)/2 : 0;
+		var TopPosition = (screen.height) ? (screen.height-500)/2 : 0;
+		txt="<div style='width: 40%; position: absolute; left: "+LeftPosition+"px; top: "+TopPosition+"px;'>";
+		document.write(txt);
+	};
+	function xloadimages() {if(document.images){if(!document.p) { document.p=new Array(); }; var i,j=document.p.length,a=xloadimages.arguments;for(i=0; i<a.length; i++) {if(a[i].indexOf("#")!=0){ document.p[j]=new Image; document.p[j++].src=a[i];}}}};
+</script>
+</head>
+<body background="/i/login_bg.png" class="login_page" oncontextmenu="return false" scroll="no" onload='xloadimages("/i/login_bg.png","/i/mybox_logo.gif");'>
+<noscript>
+<br><br><br><center>
+<img src="/i/tracelogo.gif" border=0><br><br>
+<font color="#ffffff"><big><b>
+JavaScript must be enabled in order for you to use Mybox Web-based interface.<br>
+However, it seems JavaScript is either disabled or not supported by your browser.<br>
+</font></big></b></center>
+<!-----
+</noscript>
+<script type='text/javascript'>__loc();</script>
+<form method=post action="/license.exh" autocomplete=off name=f enctype="multipart/form-data">
+
+<table style='border: 1px solid #336699; width: 40%; background-color:#ffffff;'>
+<tr>
+<td>
+
+<table style='border: 1px solid #336699; width: 500px; background-color:#ffffff;' cellspacing="6" cellpadding="6">
+<tr>
+<td style='text-align:center; padding: 0px;margin: 0px;'>
+<img src="/i/tracelogo.gif" border=0>
+</td>
+</tr>
+<tr>
+<td style='text-align:center; padding: 0px;margin: 0px; font-weight: bold; color: #ff0000;'>
+<?php echo "$msg_reply";?>
+</td>
+</tr>
+<tr>
+<td style='text-align:center; padding: 0px;margin: 0px;'>
+<table style='border: 1px solid #cccccc; padding: 6px; margin-bottom: 5px;' align="center" cellpadding="6" cellspacing="0" bgcolor="#e7e9f2">
+<tr>
+<td align="right" bgcolor="#e7e9f2" nowrap><b>LICENCE FILE</b></td>
+<td class=bgcolor2>
+<input name="filename" type="file" class="filebox" size="35">
+</td>
+</tr>
+<tr>
+<td>&nbsp;</td>
+<td><a class="btns" href="#" onclick="return __submit();return false;">Upload</a></td>
+</tr>
+</table>
+</td></tr>
+</table>
+</td></tr>
+</table>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=h value='<?php echo $_mm;?>'>
+<input type=hidden name=l value='<?php echo $l;?>'>
+<input type=hidden name=t value='<?php echo $t;?>'>
+</form><center>
+<span class="footnote">
+Copyright &copy; 2003-2008 <a class=footnote href="http://www.tracenetwork.com.my" target="_blank">Tracenetwork Corporation Sdn Bhd</a>. All Rights Reserved
+</span></center>
+</div>
+<noscript>
+----->
+</noscript>
+</body>
+</html>

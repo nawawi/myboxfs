@@ -1,0 +1,96 @@
+/* $id mybox_style.css (c) Tracenetwork Corporation Sdn. Bhd. $ */
+html {overflow-x: auto;font-family: Arial, Helvetica, sans-serif;}
+body {font-family: Arial, Helvetica, sans-serif;font-size: 11px;font-weight: normal;margin-left: 1px;margin-right: 1px;margin-top: 1px;margin-bottom: 0px;background-color: #ffffff;padding: 0px;}
+input,select,div,span,p,font,td,table,a,ul,li,ol,tbody {font-family: Arial, Helvetica, sans-serif;font-size: 11px;}
+pre {border: 0px;background: #ffffff;padding: 1em;font-family: courier new, courier;white-space: pre;line-height: 11px;font-size: 11px;height: 150px;width: 95%;overflow: auto;}
+a,a:visited,a:hover,alink {font-size: 11px;font-weight: normal;text-decoration: none;}
+a {color: #003399;text-decoration: none;}
+a:hover {color: #FF6600;text-decoration: underline;}
+img {border: 0px;}
+/* login/license page */
+.footnote {font-size: 11px;color: #cccccc;text-decoration: none;margin-top: 5px;padding: 2px;padding-right: 2px;}
+a.footnote,a:visited.footnote,a:hover.footnote,a:link.footnote {font-size: 11px;color: #cccccc;text-decoration: none;}
+a:hover.footnote {font-size: 11px;color: #cccccc;text-decoration: underline;}
+.login_page {background: #336699 url(/i/login_bg.png) no-repeat top center;background-attachment: fixed;}
+.login_page td {font-size: 11px;}
+.bgcolor1 {background-color: #336699; }
+.bgcolor2 {background-color: #e7e9f2; }
+.bgcolor3 {background-color: #EEEEFF; }
+.bgcolor4 {background-color: #D5DFF3; }
+.block { border-color: #000000; border-style: solid; border-width: 1px; }
+.button {font-size: 11px;font-weight: bold;border-width: 1px;padding-left: 6px;padding-right: 6px;padding-top: 1px;padding-bottom: 1px;}
+.button-small {font-size: 10px;font-weight: bold;border-width: 1px;padding-left: 6px;padding-right: 6px;padding-top: 0px;padding-bottom: 0px;}
+.notice {text-align: center;font-size: 11px;background: #ff6600;color: #ffffff;font-weight: bold;padding-left: 4px;padding-right: 4px;padding-top: 2px;padding-bottom: 2px;}
+
+/* sub tabs */
+ul#tabnav {font-size: 11px;font-weight: bold;list-style-type: none;margin: 0px;padding-left: 11px;line-height: 14px;}
+ul#tabnav li.tabinact {float: left;border-left: 1px solid #999999;background-color: #777777;color: #FFFFFF;padding: 0px;white-space: nowrap;}
+ul#tabnav li.tabinact a {float: left;display: block;text-decoration: none;padding: 4px 14px 4px 14px;color: #FFFFFF;}
+ul#tabnav li.tabact {float: left;background-color: #EEEEEE;color: #000000;padding: 4px 14px 4px 14px;white-space: nowrap;}
+.tabcont {background-color: #EEEEEE;padding-right: 10px;padding-left: 10px;padding-top: 10px;padding-bottom: 5px;}
+/* main tabs */
+.tabs {border-bottom: 1px solid #ccc;margin: 0px;padding-bottom: 23px;padding-left: 11px;}
+.tabs ul, .tabs li {display: inline;list-style-type: none;margin: 0px;padding: 0px;}
+.tabs a:link, .tabs a:visited {background: #FEFADE;border: 1px solid #ccc;color: black;float: left;font-weight: normal; line-height: 14px;margin-right: 4px;padding:4px 14px 4px 14px;text-decoration: none;}
+.tabs a:link.tabact, .tabs a:visited.tabact {background: #ffffff;border-bottom: 1px solid #ffffff;color: #000;cursor: pointer;font-weight: bold;}
+.tabs .tabact {text-decoration: none;background: #ffffff;border-bottom: 1px solid #ffffff;color: #000000;font-weight: bold;font-size: 11px;}
+td.tabact {color: #efefef;font-weight: bold;background-color: #ddad08;border: 0px;}
+div.container {border-style: none solid solid;border-color: #cccccc;border-width: 0pt 1px 1px;width: 100%;}
+table.container {padding: 10px;width: 98%;}
+.data {border-collapse: collapse;border: 1px solid #ccc;margin-top: 3px;margin-right: 2em;margin-bottom: 2em;width: 100%;padding: 5em;}
+.data td {border-bottom: 1px solid #ddd;text-align: left;padding: 3px;border: 1px solid #ccc;}
+.datanb {border-collapse: collapse;border: none;margin-top: 3px;margin-right: 2em;margin-bottom: 2em;width: 100%;padding: 5em;}
+.datanb td {padding: 3px;border: none;}
+.blue {background: #d8e4f1;border:1px solid #d8e4f1;}
+thead.blue {background-color: #d8e4f1;color: #ffffff;border: 1px solid #ccc; background: url(/i/menu/menu_sec_bg.gif);}
+thead.blue_nobg {background-color: #d8e4f1;color: #000000;border: 1px solid #ccc;}
+td.inputblue {background-color: #d8e4f1;color: black;border:1px solid #ccc;}
+td.blue {background-color: #d8e4f1;height: 11px;border: none;padding:0px;}
+td.tdname {border: 0px; font-size: 11px;font-weight: bold;background-color: #d8e4f1;padding-right: 10px;padding-left: 8px;width: 30%; text-align: right;}
+td.tdvalue {border: 0px; font-size: 11px;width: 70%;background-color: #EEEEFF;padding-left: 3px;padding-top: 4px;padding-bottom: 4px;}
+.filebox {border: 1px solid #999999; font-size: 11px;font-weight: normal;padding-top: 2px;padding-bottom: 1px;height: 22px;}
+.valbox {font-size: 11px;background-color: #ffffff;border: 1px solid #999999;font-weight: normal;padding-left: 2px;padding-right: 0px;padding-top: 2px;padding-bottom: 1px;}
+.valbox2 {font-size: 11px;background-color: #ffffff;border: 1px solid #999999;font-weight: normal;padding-left: 2px;padding-right: 0px;padding-top: 2px;padding-bottom: 1px;width: 200px;}
+.searchbox {font-size: 11px;background: #EEEEFF url("/i/search.gif") no-repeat right;border: 1px solid #999999;font-weight: normal;padding-left: 2px;padding-right: 0px;padding-top: 2px;padding-bottom: 1px;}
+.valbox3 {font-size: 11px;background-color: #EEEEFF;border: 0px; border-bottom: 1px dotted #cccccc;font-weight: bold;padding-left: 2px;padding-right: 0px;padding-top: 2px;padding-bottom: 1px;}
+.selbox {font-size: 11px;background-color: #ffffff;border: 1px solid #999999;font-weight: normal;padding-left: 2px;}
+.sectitle {background-color: #ffffff;border: 0px;font-weight: normal;margin-top: 1px;margin-bottom: 1px;font-size: 13px;}
+.subtitle {font-style: normal;background-color: #ffffff;border:0px;font-weight: normal;margin-top: 1px;margin-bottom: 1px;font-size: 11px;}
+.notehr {border-top: 1px solid #cccccc;font-weight: normal;margin-top: 1px;margin-bottom: 1px;}
+.def {padding: 2px;border: 1px solid #ff6600;background: #fae5b0;font-size: 11px;}
+.notedef {background: #fff2f2;font-weight: bold;border: 1px solid red;padding: 5px;}
+.boxdef {font-size: 11px;font-weight: normal;padding: 0px;margin: 0px;width: 200px;}
+.urlbox {font-size: 11px;background-color: #EEEEFF;border: 1px solid #cccccc;font-weight: normal;padding: 1px;height: 18px;}
+.defselbox {font-size: 11px;background: #ffffff url("/i/selbut.gif") no-repeat right;border: 1px solid #999999;font-weight: normal;padding-left: 2px;padding-right: 0px;padding-top: 2px;padding-bottom: 1px;cursor: pointer;}
+.defselbox2 {font-size: 11px;background-color: #ffffff;border: 1px solid #999999;border-top: 0px;font-weight: normal;padding: 0px;padding-bottom: 2px;margin: 0px;table-layout: fixed;display: block;position: absolute;}
+.defselbox3 {font-size: 11px;margin: 0px;padding: 0px;padding-left: 2px;cursor: pointer;}
+/* box */
+.c {width: 4; height: 4;}
+.bc {color: #000000; background-color: #d8e4f1; table-layout: fixed;}
+.bn {color: #ffffff; background-color: #ff6600; table-layout: fixed;}
+.tl {padding: 0; width: 4; text-align: left; vertical-align: top;}
+.tr {padding: 0; width: 4; text-align: right; vertical-align: top;}
+.bl {padding: 0; width: 4; text-align: left; vertical-align: bottom;}
+.br {padding: 0; width: 4; text-align: right; vertical-align: bottom;}
+td.linedash_a {border:1px dashed #CCCCCC;}
+td.linedash_t {border-top:1px dashed #CCCCCC;}
+td.linedash_b {border-bottom:1px dashed #CCCCCC;}
+td.linedash_l {border-left:1px dashed #CCCCCC;}
+td.linedash_r {border-right:1px dashed #CCCCCC;}
+td.linedot_a {border:1px dotted #CCCCCC;}
+td.linedot_t {border-top:1px dotted #CCCCCC;}
+td.linedot_b {border-bottom:1px dotted #CCCCCC;}
+td.linedot_l {border-left:1px dotted #CCCCCC;}
+td.linedot_r {border-right:1px dotted #CCCCCC;}
+td.line_a {border:1px solid #CCCCCC;}
+td.line_t {border-top:1px solid #CCCCCC;}
+td.line_b {border-bottom:1px solid #CCCCCC;}
+td.line_l {border-left:1px solid #CCCCCC;}
+td.line_r {border-right:1px solid #CCCCCC;}
+/* button link */
+a.btn, a:link.btn, a:visited.btn {background-image: url(/i/menu/btgm.gif);background-repeat: repeat-x;background-position:left top;background-attachment: scroll;height: 21px;width: 100px;padding: 3px 15px 3px 15px;text-align:center;border:1px solid #999;border-bottom: none;border-top: none;text-decoration:none;white-space: nowrap;font-size: 12px;font-weight: normal;color: black;}
+a.btns, a:link.btns, a:visited.btns {background-image: url(/i/menu/btgm.gif);background-repeat: repeat-x;background-position:left top;background-attachment: scroll;height: 21px;width: 100px;padding: 2px 15px 2px 15px;text-align:center;border:1px solid #999;border-top: none;text-decoration:none;white-space: nowrap;font-size: 10px;font-weight: bold;color: black;}
+a:hover.btn, a:hover.btns {background-image: url(/i/menu/bthm.gif);background-repeat: repeat-x;background-position:left top;background-attachment: scroll;color: black;cursor: pointer;}
+/* log page */
+td.logb_1 {height: 20px;}
+td.logb_2 {padding: 2px;}

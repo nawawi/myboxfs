@@ -1,0 +1,346 @@
+
+FIRST OF ALL, DON'T MAIL ME IF YOU SIT BEHIND ONE OF THOSE MAILGATES WHICH USE IP BLACKLISTS! THANKS.
+
+Table of Contents:
+-------------------
+
+1.0 Status
+2.0 Thanks
+3.0 Install
+	3.1 Squidclam config
+4.0 Performance
+5.0 Tempfs
+6.0 Common Errors
+7.0 FAQ
+8.0 Sample squid.conf
+
+Code Status:
+-------------
+
+squidclam is a program to scan files served to win32
+machines by a squid proxy. 
+
+At the moment squidclam is pretty small, scans files for viruses
+and is doing it's job pretty well for me.
+
+If you know what your doing and have some knowledge in C and secure
+programing please give it a try and provide some feedback.
+
+If you have comments, questions whatever please let me know also. 
+
+If you like to get an answer, don't use an account with rtbls for spam
+"protection" to contact me
+And no I won't change my setup to use a smarthost!
+
+Thanks:
+--------
+to
+    the clamav team www.clamav.net for there OSS virus scanner
+    the squid team www.squid-cache.org for there HTTP Proxy
+    Michael Lang http://www.jackal-net.at/ for the idea.
+    Tommaso Di Donato for excessiv testing, debugging, docu.
+    Petr Kristof_CZ for debugging and spec file.
+    Jakub Schmidtke for his fix for the broken unlink.
+    cedric_krier for fixing the close socket and FSIZE bug.
+    2nd_change@mail.ru for reading the readme (half) ;)
+	Steve-o for unix socket patch
+
+
+Install:
+---------
+
+    - get and install clamav
+		since version 0.13 squidclam uses clamd so make sure 
+        it's listening for TCP connections
+		
+    - get and install (lib)curl
+
+    - create a tmpfs or ramdisk and mount it at /dev/shm (since 0.17 this is the default location)
+
+    - compile squidclam
+
+        cd squidclam-$RELEASENUM
+        ./configure
+        make
+        make install OR just copy the file squidclam to a location you like.
+		make DESTDIR=/usr/local/bin install is another option.
+        and maybe using checkinstall is a good idea too...
+
+    - configure squid to use squidclam
+
+        add the following to your squid.conf
+        "redirect_program /usr/local/bin/squidclam"
+        "redirect_children 15"  # make a wise choice
+
+        and this line to your acl list to prevent loops
+        "redirector_access deny localhost"
+
+        squid doesn't pass complete ssl urls to the redirector.
+        Therefor scanning them is pretty useless add something like the following 
+        to avoid this and save bandwidth.
+        "acl SSL_ports port 443 563"
+        "redirector_access deny SSL_ports"
+
+    - test it at www.eicar.com
+
+    - provide me some feedback to squidclam AT users DoT sourceforge DoT net ;)
+      don't use such a braindeath mailer with ip blacklists if you want me to answer.
+
+Squidclam config:
+-----------------
+
+	Since version 0.10 there is support for a config file in squidclam.
+	Default this is /etc/squidclam.conf. There is a sample.conf file in
+	the source tarball where you can get an idea of the syntax.
+	Lines longer than 100 characters aren't allowed. This
+	should be enough in nearly any case. Mixed lines (config and comments)
+	are not allowed. So please use
+
+	# define which proxy to use
+	proxy = http://127.0.0.1:3128
+
+	instead of
+
+	proxy = http://127.0.0.1:3128  # define which proxy to use
+	
+
+Performance:
+-------------
+
+    There is a performance decrease. That couldn't be avoided using the
+    redirector system. You can probably increase the speed by allowing
+    more squidclam instances. But this will produce higher load for your
+    proxy system.
+
+    The access to the www now is working the following way.
+
+    browser    -> squid
+    squid      -> squidclam
+    squidclam  -> fetch from www and cache in your proxy listening on lo
+    squidclam <-> check for virus
+    squidclam  -> squid (answer)
+    squid      -> serve page to browser which should already be cached because
+                  squidclam fetched it just befor (some tweaking of squid required)
+
+    So there is the time squidclam needs to check the file for a virus
+    thats added to the normal time to get a file. Because there are so
+    many different files which may contain a virus squidclam scanns every
+    file.
+
+    You can increase the performance of your system with the following tweaks.
+    
+        - use a ramdisk for the temporary files. You REALLY want this!
+        - make sure squidclam uses your proxy
+        - Make sure squidclam has access to a fast (local) nameserver to
+          avoid lookup delays
+        - if you have a high load system change the virus db reload
+          intervall to something to suite your needs #define RLDB (1000)
+        - place the virus db on a ramdisk too
+		- squidclam prozesses = 15 + users
+
+
+Tempfs: 
+--------
+
+new: (since 0.17 default)
+   make sure there is a line like the following in you /etc/fstab.
+   none /dev/shm tmpfs rw,noexec,nosuid,nodev,size=XXXm  0 0
+
+   
+old: (still ok if you use the right config)
+    Add the following line to /etc/fstab
+    "tmpfs /tmpdata tmpfs rw,noexec,size=XXXm 0 0"
+
+    Make the new Directory
+    mkdir /tmpdata
+
+    Mount tmpfs
+    imount /tmpdata
+
+
+Here it is how to create a ramdisk in FreeBSD5.x -6.x. Thanks to Tommaso
+    
+/sbin/mdconfig -a -t malloc -s 64M -u 10
+/sbin/newfs -U /dev/md10
+/sbin/mount /dev/md10 /mnt/ramdisk
+
+First line, create a ramdisk called md10, of size 64Mb
+Second line, create the filesystem on the device (in this case, UFS)
+Third line, mount the device under a specified mountpoint.
+
+For deleting the disk, after unmounting it
+/sbin/mdconfig -d -u 10
+
+    
+Common Errors:
+---------------
+
+E: clamd is not running or not listening for TCP connections
+S1: start clamd
+S2: netstat -tulpen | grep clamd
+
+E: squid is "misconfigured" and doesn't allow local access
+S1: correct this error ;)
+S2: try using squidclam on the console by typing something like the following.
+    <type>
+    ./squidclam <ENTER>
+    http://www.eicar.com/download/eicar.com - - GET <ENTER>
+    </type>
+    Have a look at /var/log/messages
+    
+E: squidclam isn't working
+S1: build squidclam by using the command make debug and see whats going on
+    perhaps change ERRIGNORE in squidclam.h to suite your needs.
+S2: check the logs!
+
+FAQ:
+----
+
+This is the section where I answer the questions of those poor people sitting
+behind an ip based blacklist... And of course the questions which are asked very often ;)
+
+--- FAQ 1 ---
+
+> I compiled the squidclam-0.18 package and installed it on a
+> SLES 9 x86_64 machine. Compiling and installing was no problem, but
+> as I tested the download of the eicar testvirus, I could download the file
+> eicar.com without being detected as virus in 3 of 10 cases.
+> (used Netscape from Linux and IE from XP)
+
+You probably tried the https files 3 times. Your problem is, squidclam doesn't
+get the right URL from squid to download and check the https content. Squidclam
+can and will handle https content the right way if you give it the URL as
+explained above. So this is sadly not a bug but expected behaviour.  Maybe
+there will be a better way to handle https in the future. 
+
+For now you have the following possibilities
+
+- disallow https (bad IMHO)
+- allow only trusted https sites (keep an eye on your logs)
+- perform a man in the middle attack on the https content
+
+--- FAQ 2 ---
+
+> Will squidclam support unix sockets?
+
+Yes it will.
+
+--- FAQ 3 ---
+
+> Does squidclam allow continuous and non-blocking downloads or does it block
+> downloading files until it has successfully scaned them?
+
+as every program that uses the squid redirect_program switch
+squidclam first completes the download (action) and after that gives
+the url back to squid (which after scanning already has a copy of
+the data in its cache).
+
+> Does squidclam scan ftp-data?
+
+if squid is allowed to fetch ftp data squidclam scans it. You can
+quickly confirm this doing a ./squidclam
+ftp://your.favorit.ftp.server.ru/eicar.test.file.zip - - GET
+
+--- FAQ 4 ---
+
+> I tried squidclam 0.21 and noticed, that http->https redirect down not
+> work. I found several sites, that I get error:
+
+https isn't working because squid doesn't hand over complete
+https urls to the redirect program. Or at least I don't know how to
+tweak it to do so without patching the source.
+
+> Virus Information
+> The URL you requested http://xxx.xxx.xx/ is infected by a Virus (
+> squidclam_get_file_failed)
+> The Request is blocked
+>
+> I had such apache config:
+>
+> <VirtualHost mail:80>
+>     ServerName xxx.xxx.xx
+>     RedirectMatch ^/(.*)$ https://mail.xxx.xx/$1
+> </VirtualHost>
+>
+> So, could you fix that bug?
+
+Not really I think. This seems to be broken by design.
+
+You can have a somewhat less "annoying" setup if you uncomment
+#define ERRIGNORE in src/squidclam.c line 51.
+This makes squidclam an opt-in instead of an opt-out. So squidclam
+only triggers on "real" virii every error is ignored. Therefor you
+have to test your setup thoroughly to be sure everything is up and
+working.
+
+Another option you may want to choose is deleting line 283 and 284
+in src/squidclam.c and only adding a putchar('\n'); instead. This
+means you won't get any complaints about missing or unreadable or
+unfetchable files any more. But you keep getting the other error
+stuff.
+
+Choose your poison :}
+
+I'm currently thinking for a better solution but currently I'm out
+of ideas. Maybe I'll bundly it with tinyproxy but this gets me into
+even more though different trouble.
+
+
+--- FAQ 5 ---
+
+> To be ...
+
+continued
+
+
+Sample squid.conf:
+-------------------
+
+icp_port 0
+#hierarchy_stoplist cgi-bin ?
+#acl QUERY urlpath_regex cgi-bin \?
+#no_cache deny QUERY
+redirect_program /usr/local/bin/squidclam
+redirect_children 15
+auth_param basic children 5
+auth_param basic realm Squid proxy-caching web server
+auth_param basic credentialsttl 2 hours
+refresh_pattern ^ftp:       1440    20% 10080
+refresh_pattern ^gopher:    1440    0%  1440
+refresh_pattern .       0   20% 4320
+refresh_pattern         \.gif$          10080   100%  43200 override-expire
+refresh_pattern         \.jpg$          10080  100%  43200 override-expire
+refresh_pattern .               960     90%     43200   reload-into-ims
+acl all src 0.0.0.0/0.0.0.0
+acl manager proto cache_object
+acl localhost src 127.0.0.1/255.255.255.255
+acl network  src  192.168.11.0/255.255.255.0
+acl to_localhost dst 127.0.0.0/8
+acl SSL_ports port 443 563
+acl Safe_ports port 80      # http
+acl Safe_ports port 21      # ftp
+acl Safe_ports port 443 563 # https, snews
+acl Safe_ports port 70      # gopher
+acl Safe_ports port 210     # wais
+acl Safe_ports port 1025-65535  # unregistered ports
+acl Safe_ports port 280     # http-mgmt
+acl Safe_ports port 488     # gss-http
+acl Safe_ports port 591     # filemaker
+acl Safe_ports port 777     # multiling http
+acl Safe_ports port 901     # SWAT
+acl purge method PURGE
+acl CONNECT method CONNECT
+redirector_access deny SSL_ports
+redirector_access deny localhost
+http_access allow manager localhost
+http_access deny manager
+http_access allow purge localhost
+http_access deny purge
+http_access deny !Safe_ports
+http_access deny CONNECT !SSL_ports
+http_access allow network
+http_access allow localhost
+http_access deny all
+http_reply_access allow all
+icp_access allow all
+forwarded_for off

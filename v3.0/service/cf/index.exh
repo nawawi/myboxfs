@@ -1,0 +1,132 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="cf_index.exh";
+include_once('page.exl');
+if(!isset($c)||$c=='') exit;
+if($c=='none') exit;
+$ext=0;
+if(isset($t)&&$t=='ext') $ext=1;
+if(isset($t)&&$t=='mime') $ext=2;
+$ip=$a;
+$auth=$i;
+$url=$u;
+$acl=$c;
+$fw_admin=mybox_fget_contents("/var/sys/fw_admin");
+if($fw_admin=='') $fw_admin="admin@mybox.net.my";
+if($auth=="" || $auth=="-") $auth="none";
+if($ip=="" || $ip=="0.0.0.0") $ip=trim($_SERVER['REMOTE_ADDR']);
+$referer=trim($_SERVER['HTTP_REFERER']);
+@session_write_close();
+@ob_end_clean();
+?>
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1">
+<title>
+<?php if($ext==1){?>
+The requested file extention is not permitted
+<?php }elseif($ext==2){?>
+The requested mime type is not permitted
+<?php }else{?>
+The requested location is not permitted
+<?php }?>
+</title>
+<link href="http://mybox.internal.proxy:6062/c/default.css" rel="stylesheet" type="text/css">
+<script type="text/javascript">
+if ( top != self ) top.location.href = unescape(window.location.pathname);
+</script>
+</head>
+<body scroll=auto>
+<table align="center" cellpadding=0 cellspacing=0 width="80%">
+<tr>
+<td>
+<div class="block1">
+<table border=0 cellpadding=0 cellspacing=0>
+<tr>
+<td>
+<img src="http://mybox.internal.proxy:6062/i/mybox-logo.gif" alt="">
+</td>
+<td width="5%">
+<img src="http://mybox.internal.proxy:6062/i/warning.gif" alt="">
+</td>
+<td>
+<H2>
+<?php if($ext==1){?>
+The requested file extention is not permitted
+<?php }elseif($ext==2){?>
+The requested mime type is not permitted
+<?php }else{?>
+The requested location is not permitted
+<?php }?>
+</H2> 
+</td>
+</tr>
+</table>
+</div>
+
+</td>
+</tr>
+
+<tr>
+<td>
+<div class="windowed">
+<P>
+While trying to retrieve the URL: <A HREF="<?php echo $url;?>"><?php echo wordwrap($url, 500, "<br />",true);?></A>
+<P>
+The following action was encountered:
+<UL>
+<LI>
+<b><font color=red>
+Access Denied. <?php if($ext==1){?>Access to that file extention is not permitted<?php }else{?>Site Access Not Permitted.<?php }?></font>
+</b>
+<P>
+Access control configuration prevents your request from 
+being allowed at this time. Please contact your Proxy Administrator if 
+you feel this is incorrect.
+</UL>
+<P>Your Administrator is <?php echo $fw_admin;?>.
+</DIV>
+<br>
+<div class="windowed">
+<P>
+Administrative information:<br>
+<table style='border: 0px; padding: 0px; margin: 0px;'>
+<tr><td style='width: 130px; vertical-align: top; white-space: nowrap; table-layout: fixed;'><B>Your IP address</td><td><b>:</b> <?php echo $ip;?></B></td></tr>
+<?php if($auth!="" && $auth!="none"){?>
+<tr><td style='width: 130px; vertical-align: top; white-space: nowrap; table-layout: fixed;'><B>Authentication</td><td><b>:</b> <?php echo $auth;?></B></td></tr>
+<?php }?>
+<tr><td style='width: 130px; vertical-align: top; white-space: nowrap; table-layout: fixed;'><B>Attempted location</td><td><b>:</b> <A HREF="<?php echo $url;?>"><?php echo wordwrap($url, 500, "<br />",true);?></A></B></td></tr>
+<?php if($ext==1){
+	if(preg_match("/\/.*\.(\S+)$/",$url,$mm)) {
+		echo "<tr><td><B>Extention</td><td><b>:</b> ".strtoupper($mm[1])."</B></td></tr>";	
+	}
+}
+?>
+<?php if($referer!=''){?>
+<tr><td style='width: 130px; vertical-align: top; white-space: nowrap; table-layout: fixed;'><B>Referrer location</td><td><b>:</b> <?php echo wordwrap($referer, 100, "<br />",true);?></B></td></tr>
+<?php }?>
+<tr><td style='width: 130px; vertical-align: top; white-space: nowrap; table-layout: fixed;'><B>Error code</td><td><b>:</b> <?php echo $acl;?></B></td></tr>
+<tr><td style='width: 130px; vertical-align: top; white-space: nowrap; table-layout: fixed;'><B>Current time</td><td><b>:</b> <?php echo date('d-M-Y H:i:s O');?></B></td></tr>
+</table>
+</div>
+<br>
+<div class="block1" style='text-align: right;'>
+<span class="footnote">Powered by Mybox Firewall System - <a href="http://www.mybox.net.my/" class="footnote" target=_blank>http://www.mybox.net.my/</a></span>
+</div>
+</td>
+</tr>
+</table>
+</body>
+</html>
+<?php 
+$ldate=time();
+$acl=strtoupper($acl);
+$sc=mybox_url_get_country($url);			
+$txt="URL=$url UC=$sc HOST=$ip AUTH=$auth STATUS=DENIED ACL=$acl";
+mybox_write_log($ldate,"httpproxy_urlfilter","HTTP-PROXY-URL-FILTER",$txt);
+flush();
+exit;
+?>
+

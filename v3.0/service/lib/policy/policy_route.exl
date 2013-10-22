@@ -1,0 +1,36 @@
+<?php 
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+
+function do_policy_routes() {
+	global $_QUITE;
+	do_policy_routes_clear();
+	if(file_exists("/var/sys/route_policy_pol")) {
+		iptables_open(1);
+		mybox_init_echo($_QUIET,"INFO","Loading routing policy rules");
+		do_iptable("*mangle");
+		do_iptable(":ACL1004-01 - [0:0]");
+		do_iptable(":ACL1004-02 - [0:0]");
+		do_iptable("-F ACL1004-01");
+		do_iptable("-F ACL1004-02");
+		$buff=file("/var/sys/route_policy_pol");
+		if(count($buff)!=0) {
+			foreach($buff as $lx) {
+				if($lx=='') continue;
+				do_iptable($lx);
+			}
+		}
+		unset($buff,$lx);
+		policy_close();
+	}
+}
+
+function do_policy_routes_clear() {
+	iptables_open(1);
+	do_iptable("*mangle");
+	do_iptable(":ACL1004-01 - [0:0]");
+	do_iptable(":ACL1004-02 - [0:0]");
+	do_iptable("-F ACL1004-01");
+	do_iptable("-F ACL1004-02");
+	policy_close();
+}
+?>

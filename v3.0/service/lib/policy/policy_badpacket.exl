@@ -1,0 +1,64 @@
+<?php 
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+
+function do_policy_badpacket($db_id='') {
+	global $_DB_NAME;
+
+	if(file_exists("/var/sys/init_no_restart")) return;
+
+	$close_db=0;
+	if($db_id=='') {
+		$db_id=mybox_db_connect($_DB_NAME);
+		$close_db=1;
+	} 
+	iptables_open(1);
+	do_iptable("*filter");
+	do_iptable(":ACL1000-01-PI - [0:0]");
+	do_iptable(":ACL1000-01-PF - [0:0]");
+
+	$_packet_bad_flag=0;$_packet_bad_ip=0;$_packet_small=0;$_packet_bogus=0;
+	$result=mybox_db_query("select * from misc where name like \"packet_%\" ",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			if(trim($row['name'])=="packet_bad_flag") $_packet_bad_flag=trim($row['val']);
+			if(trim($row['name'])=="packet_bad_ip") $_packet_bad_ip=trim($row['val']);
+			if(trim($row['name'])=="packet_small") $_packet_small=trim($row['val']);
+			if(trim($row['name'])=="packet_bogus") $_packet_bogus=trim($row['val']);
+		}
+	}
+
+	if($_packet_bad_flag==1) {
+		do_iptable("-A ACL1000-01-PI -p tcp --tcp-option 64 -m recent --name packet_bad_flag --set -j DROP");
+		do_iptable("-A ACL1000-01-PI -p tcp --tcp-option 128 -m recent --name packet_bad_flag --set -j DROP");
+	}
+
+	if($_packet_bad_ip==1) {
+		do_iptable("-A ACL1000-01-PI -m ipv4options --ssrr -m recent --name packet_bad_ip --set -j DROP");
+		do_iptable("-A ACL1000-01-PI -m ipv4options --lsrr -m recent --name packet_bad_ip --set -j DROP");
+		do_iptable("-A ACL1000-01-PI -m ipv4options --rr -m recent --name packet_bad_ip --set -j DROP");
+	}
+
+	if($_packet_small==1) {
+		do_iptable("-A ACL1000-01-PI -p udp -m length --length 0:27 -m recent --name packet_small --set -j DROP");
+		do_iptable("-A ACL1000-01-PI -p tcp -m length --length 0:39 -m recent --name packet_small --set -j DROP");
+		do_iptable("-A ACL1000-01-PI -p icmp -m length --length 0:27 -m recent --name packet_small --set -j DROP");
+		do_iptable("-A ACL1000-01-PI -p 30 -m length --length 0:31 -m recent --name packet_small --set -j DROP");
+		do_iptable("-A ACL1000-01-PI -p 47 -m length --length 0:39 -m recent --name packet_small --set -j DROP");
+		do_iptable("-A ACL1000-01-PI -p 50 -m length --length 0:49 -m recent --name packet_small --set -j DROP");
+		do_iptable("-A ACL1000-01-PI -p 51 -m length --length 0:35 -m recent --name packet_small --set -j DROP");
+		do_iptable("-A ACL1000-01-PI -m length --length 0:19 -m recent --name packet_small --set -j DROP");
+	}
+
+	if($_policy_bogus==1) {
+		do_iptable("-A ACL1000-01-PI -p all -m conntrack --ctstate INVALID -j REJECT");
+		do_iptable("-A ACL1000-01-PF -p all -m conntrack --ctstate INVALID -j REJECT");
+	}
+
+	policy_close();
+	if($close_db==1) {
+		mybox_db_close($db_id);
+	}
+}
+
+
+?>

@@ -1,0 +1,121 @@
+#!/bin/php -Cq
+<?php 
+// ddns.init - last update 19-Jan-2007
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="ddns";
+include_once('clib.exl');
+putenv("PATH=/bin:/service/tools:/service/init");
+
+$_QUIET=0;
+mybox_init_set_alarm(30);
+
+if(!file_exists("/bin/ddnsd")) {
+	mybox_init_echo($_QUIET,"ERROR","Cannot execute ddns.init. Internal error!");
+	exit(1);
+}
+
+function ddns_status() {
+	global $_QUIET;
+	$pid=mybox_get_progpid("ddnsd");
+	if($pid!='') {
+		if($_QUIET==0) echo "* ddnsd (pid $pid) is running...\n";
+		return 0;
+	}
+	return 1;
+}
+
+function ddns_start() {
+	global $_QUIET, $_DB_NAME, $_ROOT_DIR;
+
+	if(file_exists("$_ROOT_DIR/scripts/ddns/start")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/ddns/start");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/ddns/pre-start")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/ddns/pre-start");
+	}
+
+	$db_id=mybox_db_connect($_DB_NAME);
+	$result=mybox_db_query("select * from dns_ddns",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_user=$row['user'];
+			$_pass=mybox_str_decrypt($row['pass']);
+			$_stat=$row['stat'];
+			$_hostname=$row['hostname'];
+			$_provider=$row['provider'];
+		}
+	}
+	mybox_db_close($db_id);
+	if($_stat==0) {
+		mybox_init_echo($_QUIET,"INFO","Dynamic DNS service disabled");
+		exit(1);
+	}
+	$opt='';
+	if($_provider!='' && $_user!='' && $_pass!='' && $_hostname!='') {
+		$opt="--dyndns_system $_provider -u $_user -p $_pass -a $_hostname --background --syslog";
+		mybox_save_to_file("/etc/inadyn.conf","$opt\n");
+	}
+	//echo "ddnsd $opt\n";
+	if(@ddns_status()==1 && $opt!='') {
+		if(mybox_exec_cmd("ddnsd")==0) {
+			mybox_init_echo($_QUIET,"INFO","Starting Dynamic DNS service");
+			@touch("/var/sys/chk_ddnsd");
+			if(file_exists("$_ROOT_DIR/scripts/ddns/post-start")) {
+				mybox_execq_cmd("$_ROOT_DIR/scripts/ddns/post-start");
+			}
+			return 0;
+		}
+	}
+	mybox_init_echo($_QUIET,"ERROR","Starting Dynamic DNS service failed");
+	return 1;
+}
+
+function ddns_stop() {
+	global $_QUIET, $_ROOT_DIR;
+
+	@unlink("/var/sys/chk_ddnsd");
+
+	if(file_exists("$_ROOT_DIR/scripts/ddns/stop")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/ddns/stop");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/ddns/pre-stop")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/ddns/pre-stop");
+	}
+
+	if(mybox_killall("ddnsd")==0) {
+		@unlink("/etc/inadyn.conf");
+		mybox_init_echo($_QUIET,"INFO","Shutting down Dynamic DNS service");
+		if(file_exists("$_ROOT_DIR/scripts/ddns/post-stop")) {
+			mybox_execq_cmd("$_ROOT_DIR/scripts/ddns/post-stop");
+		}
+		return 0;
+	}
+	mybox_init_echo($_QUIET,"ERROR","Shutting down Dynamic DNS service failed");
+	return 1;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=ddns_start();
+		break;
+	case 'stop':
+		$ret=ddns_stop();
+		break;
+	case 'restart':
+		$ret=ddns_stop();
+		sleep(2);
+		$ret=ddns_start();
+		break;
+	case 'status':
+		$ret=ddns_status();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/status]\n";
+		break;
+}
+exit($ret);
+?>

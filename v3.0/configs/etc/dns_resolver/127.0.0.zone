@@ -1,0 +1,13 @@
+$ORIGIN 0.0.127.in-addr.arpa.
+
+@                       1D IN SOA       localhost. do-not-reply.mybox-notify.net. (
+                                        1178269157      ; serial
+                                        3H              ; refresh
+                                        15M             ; retry
+                                        1W              ; expiry
+                                        1D )            ; minimum
+
+                        1D IN NS        localhost.
+1                       1D IN PTR       localhost.
+
+

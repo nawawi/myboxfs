@@ -1,0 +1,9 @@
+#!/bin/sh
+# $Id: pgrep.sh,v 1.1 2007/09/29 04:50:56 nawawi Exp $
+# Copyright (c) 2007 Tracenetwork Corporation Sdn. Bhd.
+
+w=$1
+[ -z "$w" -a "$w" = "" ] && exit 1;
+ps -ww |grep "$w" |grep -v grep |grep -v pgrep | awk '{print $1}'
+exit 0;
+

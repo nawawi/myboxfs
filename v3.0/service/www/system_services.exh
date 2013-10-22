@@ -1,0 +1,578 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="system_services";
+include_once('page.exl');
+mybox_chk_session();
+mybox_send_nocache();
+
+
+
+$db_id=mybox_db_connect($_DB_NAME);
+
+if(!isset($tab)||$tab=='') $tab=1;
+
+if($tab==1) {
+	if(isset($do_save)&&$do_save==1 && mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+		if($port=='') $port='161';
+		if($comm=='') $comm='mybox';
+		if($sysname=='') $sysname='mybox';
+		if(preg_match("/^(\d+)$/",$port)) {
+			$location=trim(mybox_escape_str($location));
+			$contact=trim(mybox_escape_str($contact));
+			$sysname=trim(mybox_escape_str($sysname));
+			mybox_db_query("update service_snmp set port='$port',comm='$comm',sysname='$sysname',stat='$stat',location='$location',contact='$contact',alist='$snmpacl'",$db_id);
+			$msg="SNMP service updated";
+			mybox_echo_query("snmp-restart");
+		} else {
+			$msg="Invalid Port number $port";
+		}
+	} else {
+		if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+			$msg="Permission denied";
+		}
+	}
+	$result=mybox_db_query("select * from service_snmp",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_port=$row['port'];
+			$_stat=$row['stat'];
+			$_comm=$row['comm'];
+			$_sysname=$row['sysname'];
+			$_location=$row['location'];
+			$_contact=$row['contact'];
+			$_alist=$row['alist'];
+		}	
+	}
+}
+if($tab==2) {
+	if(isset($do_save)&&$do_save==1 && mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+		if($port=='') $port='5052';
+		if(preg_match("/^(\d+)$/",$port)) {
+			mybox_db_query("update service_ssh set port='$port',stat='$stat'",$db_id);
+			$msg="SSH service updated";
+			mybox_echo_query("xinet-reload");
+		} else {
+			$msg="Invalid Port number $port";
+		}
+	} else {
+		if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+			$msg="Permission denied";
+		}
+	}
+	$result=mybox_db_query("select * from service_ssh",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_port=$row['port'];
+			$_stat=$row['stat'];
+		}	
+	}
+}
+
+
+if($tab==3) {
+	if(isset($do_save)&&$do_save==1 && mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+		if($port=='') $port='5053';
+		if(preg_match("/^(\d+)$/",$port)) {
+			mybox_db_query("update service_ftp set port='$port',stat='$stat'",$db_id);
+			$msg="FTP service updated";
+			mybox_echo_query("xinet-reload");
+		} else {
+			$msg="Invalid Port number '$port'";
+		}
+	} else {
+		if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+			$msg="Permission denied";
+		}
+	}
+	$result=mybox_db_query("select * from service_ftp",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_port=$row['port'];
+			$_stat=$row['stat'];
+		}	
+	}
+}
+
+if($tab==4) {
+	if(isset($do_save)&&$do_save==1 && mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+		mybox_db_query("update misc set val='$ntp_acl_stat' where name='ntp_acl_stat'",$db_id);
+		mybox_db_query("update misc set val='$ntp_acl' where name='ntp_acl'",$db_id);
+		$msg="NTP service updated";
+		mybox_echo_query("policy-acl");
+	} else {
+		if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+			$msg="Permission denied";
+		}
+	}
+	$_ntp_acl_stat=0;$_ntp_acl='';
+	$result=mybox_db_query("select * from misc where name like \"ntp_%\"",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			if(trim($row['name'])=="ntp_acl_stat") $_ntp_acl_stat=trim($row['val']);
+			if(trim($row['name'])=="ntp_acl") $_ntp_acl=trim($row['val']);
+		}	
+	}
+}
+
+if($tab==1 || $tab==4) {
+	$list_array1=mybox_ipname_array($db_id);
+	$list_array2=mybox_defnetwork_array($db_id);
+	$list_array3=array();
+	if(count($list_array1)!=0) {
+		foreach($list_array1 as $a) {
+			if(strpos($a,"(Network)")!==FALSE) $list_array3[]="$a";	
+		}
+	}
+	unset($a);
+	if(count($list_array2)!=0) {
+		foreach($list_array2 as $a => $b) {
+			if($a=='any') continue;
+			if(is_array($b)) {
+				if($b['type'] == 1) $list_array3[]="$a";
+			} 
+		}
+	};
+	$_tl=array();$_nml=array();
+	if(count($list_array3)!=0) {
+		foreach($list_array3 as $x) {
+			if($x=='') continue;
+			$_tl[$x]=$x;
+		}
+	}
+	unset($x);
+}
+
+?>
+<html>
+<head>
+<title>MyAdmin</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<script type='text/javascript' src="/j/mybox_func.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?php echo $_LOGIN['auth_id'];?>";
+	page_load();
+</script>
+<script type='text/javascript'>
+	function do_submit() {
+		<?php if($tab==1){?>
+		var list=document.f.mr;
+		var lr='';
+		var ti=0;
+		if(list.length==0) {
+			pop_msg("No network defined");
+			return false;
+		}
+		for(var i=0;i<list.length;i++) {
+			if(list.options[i]!=null && list.options[i].value!='') {
+				ti++;
+				lr +=list.options[i].value;
+				lr +=',';
+			}
+		}
+		<?php if($tab==1){?>
+		document.f.snmpacl.value=lr;
+		<?php }?>
+		<?php if($tab==4){?>
+		document.f.ntp_acl.value=lr;
+		<?php }?>
+		<?php }?>
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	}
+<?php if($tab==1 || $tab==4){?>
+	function inmoveto(a) {
+		if(a=="right") {
+			var p=document.f.mr.length;
+			var lstlenght=document.f.ml.length;
+			var list=document.f.ml;
+			for(var i=0;i<lstlenght;i++) {
+				if(list[i]!=null && list[i].value!='') {
+					if(list.options[i].selected==true) {
+						document.f.mr[p]=new Option(list.options[i].text,list.options[i].value);
+						list[i]=null;
+						p++;
+					}
+				}
+			}
+		}
+
+		if(a=="left") {
+			var p=document.f.ml.length;
+			var lstlenght=document.f.mr.length;
+			var list=document.f.mr;
+			for(var i='0';i<lstlenght;i++) {
+				if(list[i]!=null && list[i].value!='') {
+					if(list.options[i].selected==true) {
+						document.f.ml[p]=new Option(list.options[i].text,list.options[i].value);
+						list[i]=null;
+						p++;
+					}
+				}
+			}
+		}
+	}
+<?php }?>
+<?php if($tab==2 || $tab==3) {?>
+function do_enab_s(id,val) {
+	if(val==0) {
+		do_hide(id);
+	} else {
+		do_show(id);
+	}
+}
+<?php }?>
+function waitcount() {
+	page_reload('200','<?php echo "/system_services.exh?tab=$tab&col=$col&ddev=$ddev";?>');
+};
+</script>
+</head>
+<body onload="load_menu('sub1','t1d2','s1i2');" scroll="auto">
+<form name=f method=post action="/system_services.exh" onsubmit="return do_submit();">
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 0px;'>
+<tr>
+<td>
+<?php mybox_page_section("System / Local Services");?>
+<br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="/system_services.exh?tab=1" <?php if($tab==1){?>class="tabact"<?php }?>>SNMP</a></li>
+<li><a href="/system_services.exh?tab=2" <?php if($tab==2){?>class="tabact"<?php }?>>SSH</a></li>
+<li><a href="/system_services.exh?tab=3" <?php if($tab==3){?>class="tabact"<?php }?>>FTP</a></li>
+<li><a href="/system_services.exh?tab=4" <?php if($tab==4){?>class="tabact"<?php }?>>NTP</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td>
+<?php mybox_page_msg($msg);?>
+<br>
+
+<!-- tab container -->
+<?php if($tab==1) {
+if($_alist!='') {
+	$_nml=preg_split("/,/",$_alist);
+	if(count($_nml)!=0) {
+		foreach($_nml as $a) {
+			if($a=='') continue;
+			if($_tl[$a]==$a) unset($_tl[$a]);
+		}
+	} else {
+		$_nml[]="$_alist";
+	}
+	unset($a);
+} else {
+	$_tl=$list_array3;
+}
+
+
+?>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Enable SNMP</td>
+<td width="70%" valign="middle" class="tdvalue">
+<?php 
+$data_a=array("On"=>"1","Off"=>"0");
+echo mybox_select_box('stsel1',$data_a,$_stat,'stat');
+?>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Port service</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="port" type="text" class="valbox2" value="<?php echo $_port;?>"> 
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Community string</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="community" type="text" class="valbox2" value="<?php echo $_comm;?>"> 
+</td>
+</tr>
+<tr>
+<td width="30%" valign="middle" class="tdname">Device Name</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="sysname" type="text" class="valbox2" value="<?php echo $_sysname;?>"> 
+</td>
+</tr>
+<tr>
+<td width="30%" valign="middle" class="tdname">Device Location</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="location" type="text" class="valbox2" value="<?php echo $_location;?>"> 
+</td>
+</tr>
+<tr>
+<td width="30%" valign="middle" class="tdname">Device Contact</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="contact" type="text" class="valbox2" value="<?php echo $_contact;?>"> 
+</td>
+</tr>
+<tr> 
+<td valign="top" class="tdname">Allowed Networks</td>
+<td valign="top" class="tdvalue"> 
+
+<table style='border: 0px; padding: 0px; margin: 0px;'>
+<tr>
+<td valign=top style='border: 0px; font-style: italic; font-weight: bold;' colspan=2>
+Available networks
+</td>
+<td valign=top style='border: 0px; font-style: italic; font-weight: bold;'>
+Selected networks
+</td>
+</tr>
+<tr>
+<td valign=top style='border: 0px; text-align: center;'>
+<select name=ml size=7 multiple class=selbox style='height: 105px; width: 150px;'>
+<?php 
+foreach($_tl as $n) {
+	if($n=='') continue;
+	$px=mybox_get_defname($n,1,'def1',$db_id);
+	echo "<option value='$n' $px>$n</option>";
+	unset($px);
+}
+unset($n);
+?>
+</select>
+</td>
+<td valign=absmiddle style='border: 0px; text-align: center;'>
+
+<table class="data" style='border: 0px; padding: 0px; margin: 0px;'>
+<tr>
+<td valign=top style='border: 0px;'>
+<a name="sini"><a class="btns" href="#sini" onclick="return inmoveto('right');return false;"> >> </a>
+</td>
+</tr>
+<tr>
+<td valign=top style='border: 0px;'>
+<a name="sini"><a class="btns" href="#sini" onclick="return inmoveto('left');return false;"> << </a>
+</td>
+</tr>
+</table>
+
+</td>
+<td valign=top style='border: 0px; text-align: center;'>
+<select name=mr size=7 multiple class=selbox style='height: 105px; width: 150px;'>
+<?php 
+foreach($_nml as $a) {
+	if($a=='') continue;
+	$px=mybox_get_defname($a,1,'def1',$db_id);
+	echo "<option value='$a' $px>$a</option>";
+	unset($px);
+}
+unset($a);
+?>
+</select>
+</td>
+</tr>
+</table>
+<span id='def1' class='def' style='display: none; position: absolute;'></span>
+</td>
+</tr>
+</tbody>
+</table>
+<input type=hidden name=snmpacl value=''>
+<?php }//tab==1?>
+<?php if($tab==2) {?>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Enable SSH</td>
+<td width="70%" valign="middle" class="tdvalue">
+<?php 
+$data_a=array("On"=>"1","Off"=>"0");
+$set_a=array("act"=>"do_enab_s('se1','b');");
+echo mybox_select_box('stsel2',$data_a,$_stat,'stat',$set_a);
+?>
+</td>
+</tr>
+<tr id='se1' style='display: none;'>  
+<td width="30%" valign="middle" class="tdname">Access user</td>
+<td width="70%" valign="middle" class="tdvalue">
+<input name="user" type="text" class="valbox2" value="mfs" readonly> 
+</td>
+</tr>
+<tr>  
+<td width="30%" valign="middle" class="tdname">Port service</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="port" type="text" class="valbox2" value="<?php echo $_port;?>"> 
+</td>
+</tr>
+</tbody>
+</table>
+<script type='text/javascript'>
+do_enab_s('se1','<?php echo $_stat;?>');
+</script>
+<?php }//tab==2?>
+
+<?php if($tab==3) {?>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Enable FTP</td>
+<td width="70%" valign="middle" class="tdvalue">
+<?php 
+$data_a=array("On"=>"1","Off"=>"0");
+$set_a=array("act"=>"do_enab_s('se2','b');");
+echo mybox_select_box('stsel3',$data_a,$_stat,'stat',$set_a);
+?>
+</td>
+</tr>
+<tr id='se2' style='display: none;'>  
+<td width="30%" valign="middle" class="tdname">Access user</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="user" type="text" class="valbox2" value="ftp1" readonly> 
+</td>
+</tr>
+<tr>
+<td width="30%" valign="middle" class="tdname">Port service</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="port" type="text" class="valbox2" value="<?php echo $_port;?>"> 
+</td>
+</tr>
+</tbody>
+</table>
+<script type='text/javascript'>
+do_enab_s('se2','<?php echo $_stat;?>');
+</script>
+<?php }//tab==3?>
+
+<?php if($tab==4) {
+if($_ntp_acl!='') {
+	$_nml=preg_split("/,/",$_ntp_acl);
+	if(count($_nml)!=0) {
+		foreach($_nml as $a) {
+			if($a=='') continue;
+			if($_tl[$a]==$a) unset($_tl[$a]);
+		}
+	} else {
+		$_nml[]="$_ntp_acl";
+	}
+	unset($a);
+} else {
+	$_tl=$list_array3;
+}
+
+
+?>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Enable NTP</td>
+<td width="70%" valign="middle" class="tdvalue">
+<?php 
+$data_a=array("On"=>"1","Off"=>"0");
+echo mybox_select_box('stsel4',$data_a,$_ntp_acl_stat,'ntp_acl_stat');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="top" class="tdname">Allowed Networks</td>
+<td valign="top" class="tdvalue"> 
+
+<table style='border: 0px; padding: 0px; margin: 0px;'>
+<tr>
+<td valign=top style='border: 0px; font-style: italic; font-weight: bold;' colspan=2>
+Available networks
+</td>
+<td valign=top style='border: 0px; font-style: italic; font-weight: bold;'>
+Selected networks
+</td>
+</tr>
+<tr>
+<td valign=top style='border: 0px; text-align: center;'>
+<select name=ml size=7 multiple class=selbox style='height: 105px; width: 150px;'>
+<?php 
+foreach($_tl as $n) {
+	if($n=='') continue;
+	$px=mybox_get_defname($n,1,'def1',$db_id);
+	echo "<option value='$n' $px>$n</option>";
+	unset($px);
+}
+unset($n);
+?>
+</select>
+</td>
+<td valign=absmiddle style='border: 0px; text-align: center;'>
+
+<table class="data" style='border: 0px; padding: 0px; margin: 0px;'>
+<tr>
+<td valign=top style='border: 0px;'>
+<input type=button value=" >> " class="button-small" style='font-weight: bold; font-family: terminal;' onclick="inmoveto('right');">
+</td>
+</tr>
+<tr>
+<td valign=top style='border: 0px;'>
+<input type=button value=" << " class="button-small" style='font-weight: bold; font-family: terminal;' onclick="inmoveto('left');">
+</td>
+</tr>
+</table>
+
+</td>
+<td valign=top style='border: 0px; text-align: center;'>
+<select name=mr size=7 multiple class=selbox style='height: 105px; width: 150px;'>
+<?php 
+foreach($_nml as $a) {
+	if($a=='') continue;
+	$px=mybox_get_defname($a,1,'def1',$db_id);
+	echo "<option value='$a' $px>$a</option>";
+	unset($px);
+}
+unset($a);
+?>
+</select>
+</td>
+</tr>
+</table>
+<span id='def1' class='def' style='display: none;position: absolute;'></span>
+</td>
+</tr>
+</tbody>
+</table>
+<input type=hidden name=ntp_acl value=''>
+<?php }//tab==4?>
+
+<br>
+<table align=right>
+<tbody>
+<tr>
+<td>
+<a name="sini"><a class="btn" href="#sini" onclick="return do_submit();return false;">Save</a>
+</tr> 
+</tbody>
+</table>
+
+</td>
+</tr>
+</table>
+
+
+<!-- end tab container -->
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?php echo $tab;?>>
+<input type=hidden name=col value=<?php echo $col;?>>
+<input type=hidden name=ddev value="<?php echo $_dev;?>">
+</form>
+<script type='text/javascript'>page_kill();</script>
+</body>
+</html>
+
+<?php mybox_db_close($db_id);?>

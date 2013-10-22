@@ -1,0 +1,863 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="proxy_ftp";
+include_once('page.exl');
+mybox_chk_session();
+mybox_send_nocache();
+
+$db_id=mybox_db_connect($_DB_NAME);
+
+
+if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+	if(isset($do_id)&&$do_id=='apply_chg') {
+		$msg="<script>waitcount();</script>";
+		mybox_echo_query("ftp_proxy-restart");
+	}
+
+	if(isset($do_save)&&$do_save==1) {
+		if($tab==1) {
+			if($cf_ftp_download=='') $cf_ftp_download="0";
+			if($cf_ftp_upload=='') $cf_ftp_upload="0";
+			mybox_db_query("update cf set val='$cf_ftp_stat' where name='cf_ftp_stat'",$db_id);
+			mybox_db_query("update cf set val='$cf_ftp_network' where name='cf_ftp_network'",$db_id);
+			mybox_db_query("update cf set val='$cf_ftp_upload' where name='cf_ftp_download'",$db_id);
+			mybox_db_query("update cf set val='$cf_ftp_download' where name='cf_ftp_upload'",$db_id);
+			$msg="Configuration saved";
+		}
+		if($tab==2) {
+			mybox_db_query("update cf set val='$cf_ftp_av_stat' where name='cf_ftp_av_stat'",$db_id);
+			mybox_db_query("update cf set val='$cf_ftp_ext_stat' where name='cf_ftp_ext_stat'",$db_id);
+			$txt='';			
+			if(count($ext)!=0) {
+				$c=0;
+				foreach($ext as $ln) {
+					$ln=trim($ln);
+					$ln=ltrim($ln,'#');
+					if($ln=='') continue;
+					$ln=ltrim($ln,".");
+					if($ln=='') continue;
+					if(!isset($eopt[$c])) $ln="#$ln";
+					$txt .="$ln\n";
+					$c++;	
+				}
+				unset($c);
+			}
+			mybox_save_to_file("$_PAT_PATH/blacklist/FTP_EXT_BLOCK","$txt");
+			unset($txt,$ln);
+			$txt='';			
+			if(count($eext)!=0) {
+				$c=0;
+				foreach($eext as $ln) {
+					$ln=trim($ln);
+					$ln=ltrim($ln,'#');
+					if($ln=='') continue;
+					$ln=ltrim($ln,".");
+					if($ln=='') continue;
+					if(!isset($eeopt[$c])) $ln="#$ln";
+					$txt .="$ln\n";
+					$c++;	
+				}
+				unset($c);
+			}
+			$msg="Configuration saved";
+		}
+
+		if($tab==3) {
+			if($col==2) {
+				if(isset($do_save)&&$do_save==1) {
+					if($do_id!='edit') {
+						$name=trim($name);
+						if($av=='') $av=0;
+						if($av!='') $av=1;
+						if($ext=='') $ext=0;
+						if($ext!='') $ext=1;
+						if($src=='any' || $src=="<< Not set >>") $src='';
+						if($dst=='any' || $dst=="<< Not set >>") $dst='';
+						if($trans!='') $trans=1;
+						if($trans=='') $trans=0;
+						$result=mybox_db_query("select name from cf_ftp_exclude where name='$name'",$db_id);
+						if(mybox_db_num_rows($result)==0) {
+							mybox_db_query("insert into cf_ftp_exclude (name,src,dst,av,ext,trans) values ('$name','$src','$dst','$av','$ext','$trans')",$db_id);
+							$msg='Exception saved';
+						} else {
+							$msg="Exception name '$name' already exist";
+						}
+					}
+					if($do_id=='edit') {
+						$name=trim($name);
+						$nameold=trim($nameold);
+						if($av=='') $av=0;
+						if($av!='') $av=1;
+						if($ext=='') $ext=0;
+						if($ext!='') $ext=1;
+						if($src=='any' || $src=="<< Not set >>") $src='';
+						if($dst=='any' || $dst=="<< Not set >>") $dst='';
+						if($trans!='') $trans=1;
+						if($trans=='') $trans=0;
+						if($name!=$nameold) {
+							$result=mybox_db_query("select name from cf_ftp_exclude where name='$name'",$db_id);
+							if(mybox_db_num_rows($result)!=0) {
+								$msg="Exception name '$name' already exist";
+							} else {
+								mybox_db_query("update cf_ftp_exclude set name='$name',src='$src',dst='$dst',av='$av',ext='$ext',trans='$trans' where id='$id'",$db_id);
+								$msg='Exception list updated';$col=1;$do_id='';
+							}
+						} else {
+							mybox_db_query("update cf_ftp_exclude set name='$name',src='$src',dst='$dst',av='$av',ext='$ext',trans='$trans' where id='$id'",$db_id);
+							$msg='Exception list updated';$col=1;$do_id='';
+						}
+					}
+				}
+			}
+		}
+	}
+	if($tab==3 && $col==1) {
+		if(isset($do_save)&&$do_save==2) {
+			if(is_array($del) && count($del)!=0) {
+				foreach($del as $x) {
+					if($x!='') mybox_db_query("delete from cf_ftp_exclude where id='$x'",$db_id);
+				}
+			} else {
+				if($del!='') mybox_db_query("delete from cf_ftp_exclude where id='$del'",$db_id);
+			}
+		}
+	}
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied";
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+if((!isset($col)||$col=='')&&($tab==3)) $col=1;
+$_error=0;
+
+if($tab!='') {
+	$list_array=array();
+	$list_array1=mybox_ipname_array($db_id);
+	$list_array2=mybox_defnetwork_array($db_id);
+	$list_array3=array();
+	$list_array4=array();
+	$list_array=$list_array1;
+	if(count($list_array1)!=0) {
+		foreach($list_array1 as $a) {
+			if(strpos($a,"(Network)")!==FALSE || strpos($a,"(Broadcast)")!==FALSE) continue;
+			$list_array3[]="$a";	
+		}
+	}
+	unset($a);
+	$list_array4=$list_array3;
+	if(count($list_array2)!=0) {
+		foreach($list_array2 as $a => $b) {
+			if($tab==1 && $a=='any') continue;
+			if(is_array($b)) {
+				if($b['type'] <= 2) $list_array[]="$a";
+				if($b['type'] == 2) {
+					$list_array3[]="$a";
+					$list_array4[]="$a";
+				}
+				if($b['group']!='') {
+					$list_array3[]=$b['group'];
+				}
+			} 
+		}
+	}
+
+	$result=mybox_db_query("select * from cf where name like \"cf_ftp_%\"",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			if(trim($row['name'])=="cf_ftp_stat") $_cf_ftp_stat=trim($row['val']);
+			if(trim($row['name'])=="cf_ftp_network") $_cf_ftp_network=trim($row['val']);
+			if(trim($row['name'])=="cf_ftp_upload") $_cf_ftp_upload=trim($row['val']);
+			if(trim($row['name'])=="cf_ftp_download") $_cf_ftp_download=trim($row['val']);
+			if(trim($row['name'])=="cf_ftp_av_stat") $_cf_ftp_av_stat=trim($row['val']);
+			if(trim($row['name'])=="cf_ftp_ext_stat") $_cf_ftp_ext_stat=trim($row['val']);
+		}
+		if(count($list_array)!=0) {
+			foreach($list_array as $x) {
+				if($x=='') continue;
+				$_tl[$x]=$x;
+			}
+		}
+		unset($x);
+		if($_cf_ftp_network!='') {
+			$_nml=preg_split("/,/",$_cf_ftp_network);
+			if(count($_nml)!=0) {
+				foreach($_nml as $a) {
+					if($a=='') continue;
+					if($_tl[$a]==$a) unset($_tl[$a]);
+				}
+			} else {
+				$_nml[]="$_cf_ftp_network";
+			}
+			unset($a);
+		} else {
+			$_tl=$list_array;
+		}
+	}
+}
+
+?>
+<html>
+<head>
+<title>MyAdmin</title>
+<META FTP-EQUIV="Pragma" CONTENT="no-cache">
+<META FTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<script type='text/javascript' src="/j/mybox_func.js"></script>
+<script type='text/javascript' src="/j/mybox_overlib.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?php echo $_LOGIN['auth_id'];?>";
+	page_load();
+</script>
+<script type='text/javascript'>
+	function do_changes() {
+		self.location.href='<?php echo "/proxy_ftp.exh?tab=$tab&col=$col&f=$f&do_id=apply_chg";?>';	
+	};
+function waitcount() {
+	page_reload('700','<?php echo "/proxy_ftp.exh?tab=$tab&do_tab=$do_tab&col=$col&col2=$col2&f=$f";?>');
+};
+</script>
+</head>
+<body onload="load_menu('sub6','t6d2','s6i2');" scroll="auto">
+<form name=f method=post action="/proxy_ftp.exh">
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 0px;'>
+<tr>
+<td>
+<?php mybox_page_section("Proxy / FTP");?>
+<br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="/proxy_ftp.exh?tab=1" <?php if($tab==1){?>class="tabact"<?php }?>>Global</a></li>
+<li><a href="/proxy_ftp.exh?tab=2" <?php if($tab==2){?>class="tabact"<?php }?>>Anti-Virus</a></li>
+<li><a href="/proxy_ftp.exh?tab=3" <?php if($tab==3){?>class="tabact"<?php }?>>Exceptions</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td> 
+<?php mybox_page_msg($msg);?>
+<br>
+
+<!-- tab container -->
+<?php if($tab==1) {?>
+<script type='text/javascript'>
+	function do_submit() {
+		var dsize=Trim(document.f.cf_ftp_download.value);
+		if(!isnum(dsize)) {
+			pop_msg("Invalid Maximum FTP download size");
+			return false;
+		}
+		var usize=Trim(document.f.cf_ftp_upload.value);
+		if(!isnum(usize)) {
+			pop_msg("Invalid Maximum FTP upload size");
+			return false;
+		}
+
+		var list=document.f.mr;
+		var lr='';
+		var ti=0;
+		for(var i=0;i<list.length;i++) {
+			if(list.options[i]!=null && list.options[i].value!='') {
+				ti++;
+				lr +=list.options[i].value;
+				lr +=',';
+			}
+		}
+		if(lr=='') {
+			pop_msg("No Allowed Network defined");
+			return false;
+		}
+		document.f.cf_ftp_network.value=lr;
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	};
+
+	function inmoveto(a) {
+		if(a=="right") {
+			var p=document.f.mr.length;
+			var lstlenght=document.f.ml.length;
+			var list=document.f.ml;
+			for(var i=0;i<lstlenght;i++) {
+				if(list[i]!=null && list[i].value!='') {
+					if(list.options[i].selected==true) {
+						document.f.mr[p]=new Option(list.options[i].text,list.options[i].value);
+						list[i]=null;
+						p++;
+					}
+				}
+			}
+		}
+
+		if(a=="left") {
+			var p=document.f.ml.length;
+			var lstlenght=document.f.mr.length;
+			var list=document.f.mr;
+			for(var i='0';i<lstlenght;i++) {
+				if(list[i]!=null && list[i].value!='') {
+					if(list.options[i].selected==true) {
+						document.f.ml[p]=new Option(list.options[i].text,list.options[i].value);
+						list[i]=null;
+						p++;
+					}
+				}
+			}
+		}
+	};
+
+</script>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td valign="middle" class="tdname">Enable FTP Proxy</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("On"=>"1","Off"=>"0");
+if(!isset($_cf_ftp_stat)||$_cf_ftp_stat=='') $_cf_ftp_stat=0;
+echo mybox_select_box('hpsel1',$data_a,$_cf_ftp_stat,'cf_ftp_stat');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="top" class="tdname">Allowed Network</td>
+<td valign="top" class="tdvalue"> 
+<table style='border: 0px; padding: 0px; margin: 0px;'>
+<tr>
+<td valign=top style='border: 0px; font-style: italic; font-weight: bold;' colspan=2>
+Available networks
+</td>
+<td valign=top style='border: 0px; font-style: italic; font-weight: bold;'>
+Selected networks
+</td>
+</tr>
+<tr>
+<td valign=top style='border: 0px; text-align: center;'>
+<select name=ml size=7 multiple class=selbox style='height: 105px; width: 200px;'>
+<?php 
+if(count($_tl)!=0) {
+	foreach($_tl as $n) {
+		$px=mybox_get_defname($n,1,'def1',$db_id);
+		echo "<option value='$n' $px>$n</option>";
+		unset($px);
+	}
+	unset($n);
+}
+?>
+</select>
+</td>
+<td valign=absmiddle style='border: 0px; text-align: center;'>
+
+<table class="data" style='border: 0px; padding: 0px; margin: 0px;'>
+<tr>
+<td valign=top style='border: 0px;'>
+<a name="sini"><a class="btns" href="#sini" onclick="return inmoveto('right');return false;"> >> </a>
+</td>
+</tr>
+<tr>
+<td valign=top style='border: 0px;'>
+<a name="sini"><a class="btns" href="#sini" onclick="return inmoveto('left');return false;"> << </a>
+</td>
+</tr>
+</table>
+
+</td>
+<td valign=top style='border: 0px; text-align: center;'>
+<select name=mr size=7 multiple class=selbox style='height: 105px; width: 200px;'>
+<?php 
+if(count($_nml)!=0) {
+	foreach($_nml as $a) {
+		$px=mybox_get_defname($a,1,'def1',$db_id);
+		echo "<option value='$a' $px>$a</option>";
+		unset($px);
+	}
+	unset($a);
+}
+?>
+</select>
+</td>
+</tr>
+</table>
+<span id='def1' class='def' style='display: none; position: absolute;'></span>
+</td>
+</tr>
+
+<tr> 
+<td valign="middle" class="tdname">Maximum FTP download traffic</td>
+<td valign="middle" class="tdvalue"> 
+<input name="cf_ftp_download" type="text" class="valbox" style='width: 100px;' value="<?php echo $_cf_ftp_download;?>"> bytes/second (0=disable)
+</td>
+</tr>
+
+<tr> 
+<td valign="middle" class="tdname">Maximum FTP upload traffic</td>
+<td valign="middle" class="tdvalue"> 
+<input name="cf_ftp_upload" type="text" class="valbox" style='width: 100px;' value="<?php echo $_cf_ftp_upload;?>"> bytes/second (0=disable)
+</td>
+</tr>
+
+
+
+</tbody>
+</table>
+<input type=hidden name=cf_ftp_network value=''>
+<?php }//tab==1?>
+
+<?php if($tab==2) {?>
+<script type='text/javascript'>
+	function do_submit() {
+		if(document.f.cf_ftp_ext_stat.value!=0) {
+			if(chk_dup_val('ext','text')==true) {
+				return false;
+			};
+		};
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	};
+	function enab_ec(val) {
+		if(val!=0) {
+			do_show('e2');do_show('e22');
+		} else {
+			do_hide('e2');do_hide('e22');
+		}
+	};
+
+
+	function add_newext() {
+		if(chk_dup_val('ext','text')==true) {
+			return false;
+		};
+		var i=document.getElementById('exttab').rows.length;
+		var tab=document.getElementById('exttab').insertRow(0);
+		tab.insertCell(0).innerHTML="<input type=text name=ext[] value='' size=16 class='urlbox'>";
+		tab.insertCell(1).innerHTML="<input type=checkbox name=eopt["+i+"] value=''>";
+		tab.insertCell(2).innerHTML="<a href='#' id='t"+i+"' onclick=\"delete_row_a('t"+i+"','exttab');return false;\"><img src='<?php echo $_PNG['delete'];?>' border=0 alt='' title=''></a>";
+		i=null;tab=null;
+	};
+
+
+
+</script>
+<table width="100%">
+<tbody>
+<tr>
+<td>
+
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td valign="top" class="tdname">Enable Anti-Virus scanning</td>
+<td valign="top" class="tdvalue">
+<?php 
+$data_a=array("On"=>"1","Off"=>"0");
+if(!isset($_cf_ftp_av_stat)||$_cf_ftp_av_stat=='') $_cf_ftp_av_stat=0;
+echo mybox_select_box('hpsel7',$data_a,$_cf_ftp_av_stat,'cf_ftp_av_stat');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="top" class="tdname">Extension blocking</td>
+<td valign="top" class="tdvalue">
+<?php 
+$data_a=array("On"=>"1","Off"=>"0");
+$set_a=array("act"=>"enab_ec('b')");
+if(!isset($_cf_ftp_ext_stat)||$_cf_ftp_ext_stat=='') $_cf_ftp_ext_stat=0;
+echo mybox_select_box('hpsel8',$data_a,$_cf_ftp_ext_stat,'cf_ftp_ext_stat',$set_a);
+?>
+</td>
+</tr>
+<tr id='e22' style='display: none;'> 
+<td valign="top" class="tdname">Extension type to check</td>
+<td valign="top" class="tdvalue">
+<div style='margin-top: 2px; padding-top: 2px;'>
+<a name="sini"><a class="btns" href="#sini" onclick="return add_newext();return false;">Add new</a>
+</div>
+<div id='e2' style='background: #ffffff; display: none; table-layout: fixed; white-space: nowrap; border: 1px solid #ccc; padding: 0px; margin-top: 5px; margin-bottom: 5px; overflow-x: hidden; overflow-y: auto; width: 200px; height: 100px;'>
+<table id='exttab' class='datanb' style='background: #ffffff; border: 0px; margin-top: 0em; margin-bottom: 0em; padding: 0px; width: 100%;'>
+<col width="*">
+<col style='border: 0px; width: 5px; text-align: right;'>
+<col style='border: 0px; width: 5px; text-align: right;'>
+<?php 
+$f_array=array();
+$f_array=mybox_file2array("$_PAT_PATH/blacklist/FTP_EXT_BLOCK");
+if(count($f_array)!=0) {
+	$i=0;
+	foreach($f_array as $i => $n) {
+		$st='checked';
+		if($n{0}=="#") {
+			$st="";
+			$n=ltrim($n,'#');
+		}
+		echo "
+			<tr>
+			<td><input type=text name=ext[] value='$n' size=16 class='urlbox'></td>
+			<td><input type=checkbox name=eopt[$i] $st></td>
+			<td><a href='#' id='t$i' onclick=\"delete_row_a('t$i','exttab');return false;\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a></td>
+			</tr>
+		";
+		$i++;
+	}
+}
+?>
+</table>
+</div>
+</td>
+</tr>
+
+</tbody>
+</table>
+
+
+
+</td>
+</tr>
+</table>
+<script type="text/javascript">
+enab_ec('<?php echo $_cf_ftp_ext_stat;?>');
+</script>
+<?php }// tab==2?>
+
+
+<?php if($tab==3) {
+if(!isset($col)||$col=='') $col=1;
+?>
+
+<table width="100%" border="0" cellpadding="0" cellspacing="0">
+<tr><td>
+<ul id="tabnav">
+<li class="<?php if($col==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=1) { echo "<a href=\"/proxy_ftp.exh?tab=$tab&col=1\">"; }?>Exception list<?php if($col!=1) { echo "</a>"; }?></li>
+<li class="<?php if($col==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=2) { echo "<a href=\"/proxy_ftp.exh?tab=$tab&col=2\">"; }?><?php if($do_id=='edit') { echo "Edit list"; } else { echo "New exception list"; }?><?php if($col!=2) { echo "</a>"; }?></li>
+</ul>
+</td></tr>
+<tr> 
+<td class="tabcont">
+<?php if($col==1) {
+// counting
+$currentPage = $FTP_SERVER_VARS["PHP_SELF"];
+$maxRows_Recordset=50;
+if(!isset($pageNum_Recordset)) $pageNum_Recordset=0;
+$startRow_Recordset=@($pageNum_Recordset * $maxRows_Recordset);
+$query_Recordset="select * from cf_ftp_exclude order by id ASC";
+$query_limit_Recordset=sprintf("%s LIMIT %d, %d", $query_Recordset, $startRow_Recordset, $maxRows_Recordset);
+
+$Recordset=mybox_db_query($query_limit_Recordset, $db_id);
+if(!isset($totalRows_Recordset) || $totalRows_Recordset=='') {
+	$all_Recordset=mybox_db_query($query_Recordset,$db_id);
+	$totalRows_Recordset=mybox_db_num_rows($all_Recordset);
+}
+$totalPages_Recordset=@ceil($totalRows_Recordset/$maxRows_Recordset)-1;
+$queryString_Recordset=null;
+if(!empty($_SERVER['QUERY_STRING'])) {
+	$params=explode("&", $_SERVER['QUERY_STRING']);
+  	$newParams=array();
+  	foreach ($params as $param) {
+		if(stristr($param, "pageNum_Recordset")==true) continue;
+		if(stristr($param, "totalRows_Recordset")==true) continue;
+		if(stristr($param, "maxRows_Recordset")==true) continue;
+		if(stristr($param, "tab")==true) continue;
+		if(stristr($param, "col")==true) continue;
+		if(stristr($param, "do_id")==true) continue;
+		array_push($newParams, $param);
+  	}
+  	if(count($newParams) != 0) {
+    		$queryString_Recordset="&" . implode("&", $newParams);
+  	}
+}
+$queryString_Recordset=sprintf("&totalRows_Recordset=%d%s&tab=$tab&col=$col&do_id=$do_id",$totalRows_Recordset,$queryString_Recordset);
+if($pageNum_Recordset > 0) { 
+	$pagefirst=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, 0, $queryString_Recordset);
+	$pageprev=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, max(0, $pageNum_Recordset - 1), $queryString_Recordset);
+	$button1="<a href='$pagefirst'><img src='{$_PNG['first']}' border=0 alt='' title=''></a>\n";
+	$button2="<a href='$pageprev'><img src='{$_PNG['prev']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button1="<img src='{$_PNG['first']}' border=0 alt='' title=''>\n";
+	$button2="<img src='{$_PNG['prev']}' border=0 alt='' title=''>\n";
+}
+if($pageNum_Recordset < $totalPages_Recordset) {
+	$pagenext=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, min($totalPages_Recordset, $pageNum_Recordset + 1), $queryString_Recordset);
+	$pagelast=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, $totalPages_Recordset, $queryString_Recordset);
+	$button3="<a href='$pagenext'><img src='{$_PNG['next']}' border=0 alt='' title=''></a>\n";
+	$button4="<a href='$pagelast'><img src='{$_PNG['last']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button3="<img src='{$_PNG['next']}' border=0 alt='' title=''>\n";
+	$button4="<img src='{$_PNG['last']}' border=0 alt='' title=''>\n";
+}
+unset($pagefirst,$pageprev,$pagenext,$pagelast);
+$x=1;
+$_cnum=1;
+if(!isset($pageNum_Recordset)||$pageNum_Recordset==''||$pageNum_Recordset==0) {
+	$_cnum=1;
+} else {
+	$_cnum=($pageNum_Recordset * $maxRows_Recordset);
+	if($_cnum <= 0) {
+		$_cnum=1;
+	} else {
+		$_cnum +=1;
+	}
+}
+if($totalRows_Recordset > 0 && mybox_db_num_rows($Recordset)!=0) {
+	echo "
+		<table width='100%' class=data>
+		<thead class='blue'>
+      		<tr>
+        	<td style='font-weight: bold; width: 2%; border-right: 0px;'>#</td> 
+        	<td style='font-weight: bold; width: 100px; border-right: 0px;border-left: 0px;'>Name</td>
+		<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Exception</td>
+        	<td style='border-left: 0px;table-layout: fixed; white-space: nowrap; width: 5%; font-weight: bold; text-align: right;'>&nbsp;</td>
+      		</tr>
+		</thead>
+		<tbody>
+	";
+	do {
+		$_id=$row['id'];
+		if($_id=='') continue;
+		$_name=trim($row['name']);
+		$_src=mybox_get_defname(trim($row['src']),2,0,$db_id);
+		$_dst=mybox_get_defname(trim($row['dst']),2,0,$db_id);
+		$_av=trim($row['av']);
+		$_ext=trim($row['ext']);
+		$_trans=trim($row['trans']);
+		$_dex='';
+		if($_trans==1) $_dex .="Transparent mode / ";
+		if($_av==1) $_dex .="Antivirus / ";
+		if($_ext==1) $_dex .="Extension blocking / ";
+		$_dex=trim($_dex);
+		$_dex=trim($_dex,'/');
+		$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff; cursor: pointer;'";
+		$lo="onclick=\"self.location.href='/proxy_ftp.exh?tab=$tab&col=2&id=$_id&do_id=edit';\" ";
+		echo "
+			<tr $lt>
+        		<td $lo valign=top style='text-align: right; vertical-align: top;'>$_cnum</td>
+        		<td $lo valign=top style='vertical-align: top; width: 100px;'><b>$_name</b></td>
+			<td $lo valign=top style='vertical-align: top;'>
+			<table style='border: 0px; padding: 0px; margin: 0px;'>
+			<tr style='border: 0px;'>
+			<td style='vertical-align: top; border: 0px; font-weight: bold; text-align: right;'>Skipping:</td><td style='vertical-align: top; border: 0px; font-style: italic;'>$_dex</td>
+			</tr>
+			<tr style='border: 0px;'>
+			<td style='vertical-align: top; border: 0px; font-weight: bold; text-align: right'>For:</td>
+			<td style='vertical-align: top; border: 0px; font-style: italic;'>
+			<table style='vertical-align: top; border: 1px solid #cccccc; padding: 2px; margin: 0px;'>
+		";
+		if($_src!='') {
+			echo "
+				<tr style='border: 0px;'>
+				<td style='vertical-align: top; border: 0px; padding: 0px; margin: 0px; font-weight: bold; text-align: left;'>
+				source hosts/nets
+				</td>
+				<td style='vertical-align: top; border: 0px; padding: 0px; padding-left: 10px;'>
+				$_src
+				</td>
+				</tr>
+			";
+		}
+		if($_dst!='') {
+			echo "
+				<tr style='border: 0px;'>
+				<td style='vertical-align: top; border: 0px; padding: 0px; margin: 0px; font-weight: bold; text-align: left;'>
+				destination hosts/nets
+				</td>
+				<td style='vertical-align: top; border: 0px; padding: 0px; padding-left: 10px;'>
+				$_dst
+				</td>
+				</tr>
+			";
+		}
+
+		echo "
+			</table>
+			</td>
+			</tr>
+			</table>
+			</td>
+			<td style='table-layout: fixed; white-space: nowrap; text-align: right; vertical-align: top;' align=right>
+			<a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='/proxy_ftp.exh?tab=$tab&col=$col&do_save=2&del=$_id&pageNum_Recordset=$pageNum_Recordset&totalPages_Recordset=$totalPages_Recordset';\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a>
+			<input type=checkbox name=del[] value=$_id>
+			</td>
+			</tr>
+		";
+		$_cnum++;
+		$x++;
+	} while($row=mybox_db_fetch_assoc($Recordset));
+	if($_cnum >= 1) {
+		echo "
+			<tr>
+			<td style='text-align: right; background: #ffffff;' align=right valign=top colspan=4>
+			<a href='#' onclick='do_delete(2);return false;'>Delete</a> / <a href='#' onclick='dotoggle();return false;'>Toggle</a> <img src='{$_PNG['arrow_rtr']}' border=0 alt='' title=''></td>
+			</tr>
+		";
+	}
+	echo mybox_print_nextpage($pageNum_Recordset,$totalPages_Recordset,$totalRows_Recordset,$maxRows_Recordset,$queryString_Recordset,$currentPage,'4',$button1,$button2,$button3,$button4);
+	echo "</tbody></table>";
+} else {
+	echo "
+	<br>
+	<span class='notedef'>
+	There are no exception list defined.
+	</span>
+	<br><br>
+	";$_error=1;
+}?>
+
+<?php }//col==1?>
+<?php if($col==2) {
+$_dst=0;
+if($do_id=='edit') {
+	$result=mybox_db_query("select * from cf_ftp_exclude where id='$id'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=trim($row['name']);
+			$_src=trim($row['src']);
+			$_dst=trim($row['dst']);
+			$_av=trim($row['av']);
+			$_ext=trim($row['ext']);
+			$_trans=trim($row['trans']);
+		}
+	}
+	unset($result);
+}
+
+?>
+<script type="text/javascript">
+	function do_submit() {
+		var name=Trim(document.f.name.value);
+		if(name=='') {
+			pop_msg("Exception name empty");
+			document.f.name.focus();
+			return false;
+		};
+		var ok='0';
+		if(document.f.av.checked) ok++;
+		if(document.f.ext.checked) ok++;
+		if(document.f.trans.checked) ok++;
+		if(ok==0) {
+			pop_msg("Please select at least one check to skip");
+			return false;
+		};
+		ok='0';
+		if(document.f.src.value!='' && document.f.src.value!='<< Not set >>') ok++;
+		if(document.f.dst.value!='' && document.f.dst.value!='<< Not set >>') ok++;
+		if(ok==0) {
+			pop_msg("Please select at least one parameter to skip for");
+			return false;
+		};
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	};
+</script>
+<table class="datanb" width="100%">
+<tbody>
+<tr style='border: 1px solid #ccc;'> 
+<td valign="middle" class="tdname">Name</td>
+<td valign="middle" class="tdvalue">
+<input name="name" type="text" class="valbox2" value="<?php echo $_name;?>" onkeypress="return strip_defname(event);">
+<?php if($do_id=='edit'){?>
+<input name="nameold" type="hidden" value="<?php echo $_name;?>">
+<?php }?>
+</td>
+</tr>
+<tr style='border: 1px solid #ccc;'>
+<td valign="top" class="tdname">Skip these checks</td>
+<td valign="top" class="tdvalue">
+<input type=checkbox name=av <?php if($_av==1) echo "checked";?>> Antivirus<br>
+<input type=checkbox name=ext <?php if($_ext==1) echo "checked";?>> Extension blocking<br>
+<input type=checkbox name=trans <?php if($_trans==1) echo "checked";?>> Transparent mode host/nets<br>
+</td>
+</tr>
+<tr style='border: 1px solid #ccc;'>  
+<td valign="middle" class="tdname">For these source hosts/networks</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array();
+foreach($list_array as $a) {
+	if($a=='any') continue;
+	$data_a[$a]=$a;
+}
+if(!isset($_src)||$_src=='') $_src='<< Not set >>';
+$data_a["<< Not set >>"]="<< Not set >>";
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($data_a,'src',"$_src",'hpsel16','hpsel16a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+echo mybox_defwin('hpsel16','200px','#ffffff','#999999','#336699','#ffffff','Source hosts/networks','#ffffff','100px','hidden','auto',$txt);
+?>
+</td>
+</tr>
+
+<tr style='border: 1px solid #ccc;'>  
+<td valign="middle" class="tdname">For these destination hosts/networks</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array();
+foreach($list_array as $a) {
+	if($a=='any') continue;
+	$data_a[$a]=$a;
+}
+if(!isset($_dst)||$_dst=='') $_dst='<< Not set >>';
+$data_a["<< Not set >>"]="<< Not set >>";
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($data_a,'dst',"$_dst",'hpsel17','hpsel17a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+echo mybox_defwin('hpsel17','200px','#ffffff','#999999','#336699','#ffffff','Destination hosts/networks','#ffffff','100px','hidden','auto',$txt);
+?>
+</td>
+</tr>
+
+</tbody>
+</table>
+<span id='def1' class='def' style='display: none; position: absolute;'></span>
+<?php }//col=2?>
+</td>
+</tr>
+</table>
+
+<?php }//tab==3?>
+<?php if($_error!=1){?>
+<table align=right>
+<tbody>
+<tr>
+<td><a name="sini"><a class="btn" href="#sini" onclick="return do_changes();return false;">Reload</a></td>
+<?php if($col!=1){?>
+<td>
+<a name="sini"><a class="btn" href="#sini" onclick="return do_submit();return false;"><?php if($do_id=='edit') { echo "Update"; } else { echo "Save";}?></a>
+</td></tr> 
+<?php  } ?>
+</tbody>
+</table>
+<?php }?>
+<!-- end tab container -->
+
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value='<?php echo $tab;?>'>
+<input type=hidden name=col value='<?php echo $col;?>'>
+<?php if($tab==3 && $col==2) {?>
+<input type=hidden name=id value='<?php echo $id;?>'>
+<input type=hidden name=do_id value='<?php echo $do_id;?>'>
+<?php  } ?>
+</form>
+<script type='text/javascript'>page_kill();</script>
+</body>
+</html>
+
+<?php mybox_db_close($db_id);?>

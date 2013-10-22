@@ -1,0 +1,852 @@
+#!/bin/php -f
+<?php 
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="mfs-syslog";
+include_once("clib.exl");
+putenv("PATH=/bin:/service/tools:/service/init");
+
+$_DISABLE=0;
+if(mybox_license() < 0) $_DISABLE=1;
+
+function __write_clean($file) {
+	mybox_save_to_file($file,"");
+}
+
+function parse_sshlog($ldate,$pid,$str) {
+	// dropbear
+	//$pat1="password\s+auth\s+succeeded\s+for\s+'(\w+)'\s+from\s+(\S+)";
+	//$pat2="exit\s+after\s+auth\s+\((\S+)\)\:\s+Exited\s+normally";
+	//$pat3="bad\s+password\s+attempt\s+for\s+'(\w+)'\s+from\s+(\S+)";
+	//$pat4="login\s+attempt\s+for\s+nonexistent\s+user\s+from\s+(\S+)";
+	//$pat5="client\s+trying\s+multiple\s+usernames\s+from\s+(\S+)";
+	// openssh
+	$pat1="Accepted\s+password\s+for\s+(\w+)\s+from\s+(\S+)";
+	$pat2="Connection\s+closed\s+by\s+(\S+)";
+	$pat3="Failed\s+password\s+for\s+(\w+)\s+from\s+(\S+)";
+	$pat4="Invalid\s+user\s+(\w+)\s+from\s+(\S+)";
+	//$pat5="input_userauth_request\:\s+invalid\s+user\s+(\w+)";
+	$thisyear=date('Y');
+	if(preg_match("/$pat1/",$str,$match)) {
+		$who=trim($match[1]);
+		$ip="unknown";
+		if(preg_match("/([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})/",$match[2],$mm)) {
+			$ip="{$mm[1]}.{$mm[2]}.{$mm[3]}.{$mm[4]}";
+		}
+		if($who!='mfs') {
+			mybox_kill($pid,9);
+			$txt="TYPE=ssh USER=$who IP=$ip MSG=Invalid login request";
+			mybox_write_log($ldate,"auth","AUTH",$txt);
+			mybox_ftp_ssh_console_reset_password();
+			return;
+		}
+		$txt="TYPE=ssh USER=$who IP=$ip MSG=Password Accepted";
+		mybox_chk_ssh_logout('1',$pid,$ldate,$ip);
+		mybox_write_log($ldate,"auth","AUTH",$txt);
+		mybox_ftp_ssh_console_reset_password();
+		return;
+	} elseif(preg_match("/$pat2/",$str,$match)) {
+		$who=$match[1];
+		$ip=mybox_chk_ssh_logout('2',$pid,$ldate);
+		$txt="TYPE=ssh USER=$who IP=$ip MSG=Session logout";
+		mybox_write_log($ldate,"auth","AUTH",$txt);
+		mybox_ftp_ssh_console_reset_password();
+		return;
+	} elseif(preg_match("/$pat3/",$str,$match)) {
+		$who=$match[1];
+		$ip="unknown";
+		if(preg_match("/([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})/",$match[2],$mm)) {
+			$ip="{$mm[1]}.{$mm[2]}.{$mm[3]}.{$mm[4]}";
+		}
+		mybox_kill($pid,9);
+		$txt="TYPE=ssh USER=$who IP=$ip MSG=Password incorrect";
+		mybox_write_log($ldate,"auth","AUTH",$txt);
+		mybox_ftp_ssh_console_reset_password();
+		return;
+	} elseif(preg_match("/$pat4/",$str,$match)) {
+		$ip="unknown";
+		$who=$mm[1];
+		if($who=='') $who="unknown";
+		if(preg_match("/([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})/",$match[2],$mm)) {
+			$ip="{$mm[1]}.{$mm[2]}.{$mm[3]}.{$mm[4]}";
+		}
+		mybox_kill($pid,9);
+		mybox_ftp_ssh_console_reset_password();
+		$txt="TYPE=ssh USER=$who IP=$ip MSG=Invalid login request";
+		mybox_write_log($ldate,"auth","AUTH",$txt);
+		return;
+	/*} elseif(preg_match("/$pat5/",$str,$match)) {
+		$ip="unknown";
+		if(preg_match("/([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})/",$match[1],$mm)) {
+			$ip="{$mm[1]}.{$mm[2]}.{$mm[3]}.{$mm[4]}";
+		}
+		mybox_kill($pid,9);
+		mybox_ftp_ssh_console_reset_password();
+		$txt="TYPE=ssh USER=unknown IP=$ip MSG=Invalid login request";
+		mybox_write_log($ldate,"auth","AUTH",$txt);
+		return;*/
+	} else {
+		mybox_ftp_ssh_console_reset_password();
+		mybox_write_log($ldate,"sshd","SSH",$str);
+	}
+	return;
+}
+
+function parse_ftplog($ldate,$str) {
+	$pat1="\[pid\s+(\d+)\]\s+CONNECT\:\s+Client\s+\"(\S+)\"";
+	$pat2="\[pid\s+(\d+)\]\s+\[(\S+)\]\s+OK\s+LOGIN\:\s+Client\s+\"(\S+)\"";
+
+	if(preg_match("/$pat1/",$str,$match)) {
+		return;
+	} elseif(preg_match("/$pat2/",$str,$match)) {
+		$pid=$match[1];
+		$who=trim($match[2]);
+		$ip="unknown";
+		if(preg_match("/([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})/",$match[3],$mm)) {
+			$ip="{$mm[1]}.{$mm[2]}.{$mm[3]}.{$mm[4]}";
+		}
+		if($who!='ftp1') {
+			mybox_kill($pid,9);
+			$txt="TYPE=ftp USER=$who IP=$ip MSG=Invalid login request";
+			mybox_write_log($ldate,"auth","AUTH",$txt);
+			mybox_ftp_ssh_console_reset_password();
+			return;
+		}
+		$ppid=preg_split("/\s+/",mybox_get_progpid("ftpd"));
+		if(count($ppid)!=0) {
+			$tag=0;
+			foreach($ppid as $xpid) {
+				if($xpid=="$pid") {
+					$tag=1; continue;
+				}
+				if($tag==1) {
+					$pid2=$xpid;
+					$tag=0;
+				}
+			}
+		}
+		mybox_chk_ftp_logout('1',$pid,$pid2,$ldate,$ip);
+		$txt="TYPE=ftp USER=$who IP=$ip MSG=Password Accepted";
+		mybox_write_log($ldate,"auth","AUTH",$txt);
+		mybox_ftp_ssh_console_reset_password();
+		return;
+	} else {
+		mybox_ftp_ssh_console_reset_password();
+		@mybox_write_ftplog($ldate,$str);
+	}
+	return;
+}
+
+function parse_ddnslog($ldate,$str) {
+	$thisyear=date('Y');
+	$pat1="I\:INADYN\:\s+IP\s+address\s+for\s+alias\s+\'(\S+)\'\s+needs\+update\s+to\s+\'(\S+)\'";
+	$pat2="W\:\'RC_IP_CONNECT_FAILED\'";
+	$pat3="I\:INADYN\:\s+Alias\s+\'(\S+)\'\s+to\s+IP\s+\'(\S+)\'\s+updated\s+successful";
+
+	if(preg_match("/$pat1/",$str,$match)) {
+		$host=$match[1];
+		$ip=$match[2];
+		$txt="IP address for host $host needs update to $ip";
+		mybox_write_log($ldate,"dydns","DDNS",$txt);
+		return;
+	}
+	if(preg_match("/$pat2/",$str,$match)) {
+		$txt="host updating failed";
+		mybox_write_log($ldate,"dydns","DDNS",$txt);
+		return;
+	}
+	if(preg_match("/$pat3/",$str,$match)) {
+		$host=$match[1];
+		$ip=$match[2];
+		$txt="host $host to $ip updated successful";
+		mybox_write_log($ldate,"dydns","DDNS",$txt);
+		return;
+	}
+	return;
+}
+
+function parse_dnslog($ldate,$str) {
+	if(stripos($str,"starting BIND")!==FALSE ||
+		stripos($str,"loading configuration from")!==FALSE ||
+		stripos($str,"set maximum open files to")!==FALSE) {
+		return;
+	}
+	mybox_write_log($ldate,"dns","DNS",$str);
+	return;
+}
+
+function parse_snmplog($ldate,$str) {
+	if(stripos($str,"NET-SNMP version")!==FALSE) {
+		$str="SNMP service running in background";
+	}
+	if(stripos($str,"cannot open")!==FALSE ||
+		stripos($str,"could not open")!==FALSE ||
+		stripos($str,"skipping")!==FALSE) {
+		return;
+	}
+	if(preg_match("/No\s+(\S+)\s+line\s+in\s+\/proc\/vmstat/",$str)) return;
+	mybox_write_log($ldate,"snmpd","SNMP",$str);
+	return;
+}
+
+function parse_ntplog($ldate,$str) {
+	mybox_write_log($ldate,"ntpd","NTP",$str);
+	return;
+}
+
+function parse_cronlog($ldate,$str) {
+	mybox_write_log($ldate,"cron","CRON",$str);
+	return;
+}
+
+function parse_froxlog($ldate,$str) {
+	mybox_write_log($ldate,"ftpproxy_info","FTP-PROXY-INFO",$str);
+	return;
+}
+
+$_SOPHOS_SOCK_FAILED=0;
+function parse_p3scanlog($ldate,$str) {
+	global $_SOPHOS_SOCK_FAILED;
+	if(preg_match("/Can't write to sophie socket/",$str)) {
+		$_SOPHOS_SOCK_FAILED++;
+		if($_SOPHOS_SOCK_FAILED >= 5 && file_exists("/var/sys/chk_sophosd")) {
+			mybox_echo_query("sophos-restart");
+			$_SOPHOS_SOCK_FAILED=0;
+		}
+	}
+	if(stripos("This is probably a bug",$str)!==FALSE) {
+		@exec("pkill -9 -f p3scan");
+		return;
+	}
+	mybox_write_log($ldate,"mailproxy","MAIL-PROXY",$str);
+	return;
+}
+
+function parse_spamlog($ldate,$str) {
+	mybox_write_log($ldate,"spamfilter","SPAM-FILTER",$str);
+	return;
+}
+
+function parse_sophoslog($ldate,$str) {
+	mybox_write_log($ldate,"sophosav","SOPHOS-AV",$str);
+	return;
+}
+
+function parse_snortlog($ldate,$pid,$str) {
+	global $_ROOT_DIR;
+	$_IPS_CNT=array();
+	$_IPS_CNT=mybox_ips_cnt(0);
+
+	$pat="\[\d+\:(\S+)\:\d+\]\s+\[(D|A)\]\s+(\S+)\s+(.*?)\s+\[Classification\:\s+(.*?)\]\s+\[Priority\:\s+(\d+)\]\s+\{(\S+)\}\s+(\S+)\s+\-\>\s+(\S+)";
+	$pat2="\[\d+\:(\S+)\:\d+\]\s+(\S+)\:\s+(.*?)\s+\[Classification\:\s+(.*?)\]\s+\[Priority\:\s+(\d+)\]\s+\{(\S+)\}\s+(\S+)\s+\-\>\s+(\S+)";		
+	if(preg_match("/^$pat$/",$str,$match)) {
+		$sid=$match[1];
+		$act=$match[2];
+		$sig=$match[3];
+		$txt=$match[4];
+		$classf=$match[5];
+		$classp=$match[6];
+		$proto=mybox_getprotobynumber($match[7]);
+		$src=$match[8];
+		$dst=$match[9];
+	
+		if($classp==1) $classp="high";
+		if($classp==2) $classp="medium";
+		if($classp==3) $classp="low";
+		if($classp >= 4) $classp="info";
+		$sport='any';
+		$dport='any';
+
+		if(strpos($sig,"spp_stream4")!==FALSE) return;
+		if(strpos($sig,"snort")!==FALSE) return;
+		$action="DROP";
+		if($act=="A") $action="ALERT";
+		if($action=="DROP") $_IPS_CNT['drop']++;
+		if($action=="ALERT") $_IPS_CNT['alert']++;
+
+		mybox_ips_cnt(1,$_IPS_CNT);
+
+		if(strpos($src,':') !== FALSE) {
+			list($src1,$sport)=preg_split("/\:/",$src);
+			$src=$src1;
+		}
+		if(strpos($dst,':') !== FALSE) {
+			list($dst1,$dport)=preg_split("/\:/",$dst);
+			$dst=$dst1;
+		}
+		if($src!='0.0.0.0' && $dst!='0.0.0.0') {
+			$sc=mybox_get_country($src);
+			$dc=mybox_get_country($dst);
+			$txtt="PROTO=$proto SRC=$src SC=$sc SPORT=$sport DST=$dst DC=$dc DPORT=$dport SIG=$sig ACTION=$action PRIORITY=$classp MSG=$txt";
+			$rtag="ips";
+			if($sig=="[IM]") {
+				$rtag="im";
+			} elseif($sig=="[P2P]") {
+				$rtag="p2p";
+			} else {
+				$sig="IPS";
+			}
+			mybox_write_log($ldate,$rtag,$sig,$txtt);			
+		}
+		return;
+	}
+	if(preg_match("/^$pat2$/",$str,$match)) {
+		$sid=$match[1];
+		$sig=$match[2];
+		$txt=$match[3];
+		$classf=$match[4];
+		$classp=$match[5];
+		$proto=mybox_getprotobynumber($match[6]);
+		$src=$match[7];
+		$dst=$match[8];
+	
+		if($classp==1) $classp="high";
+		if($classp==2) $classp="medium";
+		if($classp==3) $classp="low";
+		if($classp >= 4) $classp="info";
+		$sport='any';
+		$dport='any';
+
+		if(stripos($sig,"snort")!==FALSE) return;
+		$sig="$sig";
+
+		$action="DROP";
+		$_IPS_CNT['drop']++;
+
+		mybox_ips_cnt(1,$_IPS_CNT);
+
+		if(strpos($src,':') !== FALSE) {
+			list($src1,$sport)=preg_split("/\:/",$src);
+			$src=$src1;
+		}
+		if(strpos($dst,':') !== FALSE) {
+			list($dst1,$dport)=preg_split("/\:/",$dst);
+			$dst=$dst1;
+		}
+		if($src!='0.0.0.0' && $dst!='0.0.0.0') {
+			$sc=mybox_get_country($src);
+			$dc=mybox_get_country($dst);
+			$txtt="PROTO=$proto SRC=$src SC=$sc SPORT=$sport DST=$dst DC=$dc DPORT=$dport SIG=$sig ACTION=$action PRIORITY=$classp MSG=$txt";
+			mybox_write_log($ldate,"ips","IPS",$txtt);
+		}
+		return;
+	}
+	if(file_exists("/var/sys/ips-do-debug")) {
+		$logname=date('Ymd');
+		mybox_append_to_file("$_ROOT_DIR/ipsdebug-{$logname}.txt","$str\n");
+		return;
+	}
+}
+
+#### kernel
+function parse_pflog($ldate,$str) {
+	$_KMSG=array();
+	$_KMSG=unserialize(mybox_fget_contents("/var/sys/fwmsg"));
+	$pat="F:(\S+):(\S+):(\S+)\s+(.*)";
+	if(preg_match("/$pat/",$str,$match)) {
+		$type1=$match[1];
+		$action=$match[2];
+		$id=$match[3];
+		$txt=$match[4];
+		$note=$_KMSG[$type1][$id];
+		if($type1=='I') {
+			$type='Inbound';
+		} elseif($type1=='O') {
+			$type='Outbound';
+		} elseif($type1=='dnat') {
+			$type='DNAT';
+		} elseif($type1=='snat') {
+			$type='SNAT';
+		} elseif($type1=='B') {
+			$type='Blacklist';
+		} elseif($type1=='E') {
+			$type='System';
+		}
+
+		if($action=="ACCEPT") $action="PASS";
+		if($note=='') $note="none";
+
+		$src='';$dst='';$proto='';
+		$sc='';$dc='';
+		unset($match);
+
+		if(preg_match("/SRC=(\S+)/",$str,$match)) {
+			$src=$match[1];
+			$sc=mybox_get_country($src);
+			unset($match);
+		}
+		if(preg_match("/DST=(\S+)/",$str,$match)) {
+			$dst=$match[1];
+			$dc=mybox_get_country($dst);
+			unset($match);
+		}
+
+		if(preg_match("/PROTO=(\S+)/",$str,$match)) {
+			$proto=mybox_getprotobynumber($match[1]);
+			if($proto!=$match[1]) {
+				$txt=preg_replace("/PROTO=(\S+)/","PROTO=$proto",$txt);
+			}
+			unset($match);
+		}
+		if($type1=='B') {
+			$txt="$txt ACTION=$action NOTE=\"$note\" SRC_C=\"$sc\" DST_C=\"$dc\"";
+			mybox_write_log($ldate,"blacklist","BLACKLIST",$txt);
+		} else {
+			$txt="$txt DIRECTION=$type ACTION=$action NOTE=\"$note\" SRC_C=\"$sc\" DST_C=\"$dc\"";
+			mybox_write_log($ldate,"packetfilter","PACKET-FILTER",$txt);
+		}
+		return 0;
+	}
+	return 1;
+}
+
+function parse_kernellog($ldate,$str) {
+
+	$pat1="\[.*?\]\s+(\S+)\:\s+(\S+)\:\s+(\S+)\:\s+(.*)";
+ 	$pat2="\[.*?\]\s+(.*)";
+	
+	if(preg_match("/$pat1/",$str,$match)) {
+		$type1='';$type='';
+		if(preg_match("/NIC Link is (Up|Down)/",$match[4],$mm)) {
+			$type1=$mm[1];
+			if($type1=="Up") $type="INFO";
+			if($type1=="Down") $type="ERROR";
+		}
+		if($type=='') return 0;
+		$str="{$match[2]} {$match[4]}";
+		mybox_write_log($ldate,"system","SYSTEM","TYPE=$type MSG=$str");
+		if($type1=="Up") {
+			mybox_alert_queue("[INFO] NIC Link Up","$str","8");
+		}
+		if($type1=="Down") {
+			mybox_alert_queue("[WARNING] NIC Link Down","$str","9");
+		}
+		return 0;
+	} else if(preg_match("/$pat2/",$str,$match)) {
+		$txt=trim($match[1]);
+		if(preg_match("/printk\:\s+(\d+)\s+messages suppressed/",$txt)) {
+			@exec("dmesg -c");
+			return 0;
+		}
+		if(stripos($txt,"ip_tables")!==FALSE ||
+			stripos($txt,"arp_tables")!==FALSE ||
+			stripos($txt,"ip_conntrack")!==FALSE ||
+			stripos($txt,"Netfilter")!==FALSE ||
+			stripos($txt,"Copyright")!==FALSE ||
+			stripos($txt,"RAMDISK")!==FALSE ||
+			stripos($txt,"modifications")!==FALSE ||
+ 			stripos($txt,"linux")!==FALSE ||
+ 			stripos($txt,"Kernel command")!==FALSE ||
+ 			stripos($txt,"nfnetlink")!==FALSE ||
+	 		stripos($txt,"squashfs")!==FALSE) {
+			return 0;
+		}
+		if(strpos($txt,"/")!==FALSE && strpos($txt,"-")!==FALSE && strpos($txt,"|")!==FALSE) {
+			return 0;
+		}
+		if($txt=="|") return 0;
+		mybox_write_log($ldate,"kernel","KERNEL",$txt);
+		return 0;
+	}
+	return 0;
+}
+
+function parse_arplog($ldate,$str) {
+	if(preg_match("/ARP_ANTIDOTE\:\s+(.*)/",$str,$match)) {
+		$txt=trim($match[1]);
+		if(!preg_match("/cached haddr\:(\S+)\s+twin haddr\:(\S+)/",$txt)) return 0;
+		mybox_write_log($ldate,"arp","ARP-SPOOF",$txt);
+		return 0;
+	}
+}
+
+function parse_portscanlog($ldate,$str) {
+
+	$_pscan_drop="REJECT";
+	$_pscan_log=0;
+	if(file_exists("/var/sys/portscan_drop")) {
+		$_pscan_drop=mybox_fget_contents("/var/sys/portscan_drop");
+	}
+	if(file_exists("/var/sys/portscan_log")) {
+		$_pscan_log=mybox_fget_contents("/var/sys/portscan_log");
+	}
+	$_PSCAN_CNT=array();
+	$_PSCAN_CNT=mybox_pscan_cnt(0);
+
+	if(preg_match("/PORTSCAN\:\s+(.*)/",$str,$match)) {
+		if($_pscan_drop=="DROP") $_PSCAN_CNT['drop']++;
+		if($_pscan_drop=="REJECT") $_PSCAN_CNT['drop']++;
+		if($_pscan_drop=="PASS") $_PSCAN_CNT['pass']++;
+		mybox_pscan_cnt(1,$_PSCAN_CNT);
+		if($_pscan_log==0) return;
+		$txt=trim($match[1]);
+		unset($match);
+		$src='';$dst='';$proto='';
+		$sc='';$dc='';
+		if(preg_match("/SRC=(\S+)/",$txt,$match)) {
+			$src=$match[1];
+			$sc=mybox_get_country($src);
+			unset($match);
+		}
+		if(preg_match("/DST=(\S+)/",$txt,$match)) {
+			$dst=$match[1];
+			$dc=mybox_get_country($dst);
+			unset($match);
+		}
+
+		if(preg_match("/PROTO=(\S+)/",$str,$match)) {
+			$proto=mybox_getprotobynumber($match[1]);
+			if($proto!=$match[1]) {
+				$txt=preg_replace("/PROTO=(\S+)/","PROTO=$proto",$txt);
+			}
+			unset($match);
+		}
+		$txt="$txt ACTION=$_pscan_drop SRC_C=\"$sc\" DST_C=\"$dc\"";
+		mybox_write_log($ldate,"portscan","PORTSCAN-PROTECTION",$txt);
+		return 0;
+	}
+}
+
+function parse_spywarelog($ldate,$str) {
+	if(preg_match("/SPYWARE\:(\d+)\:(\d+)\s+(.*)/",$str,$match)) {
+		$id=trim($match[1]);
+		$drop=trim($match[2]);
+		$txt=trim($match[3]);
+		unset($match);
+		$src='';$dst='';$proto='';
+		$sc='';$dc='';
+		$_drop="DROP";
+		if($drop==2) $_drop="REJECT";
+		if(preg_match("/SRC=(\S+)/",$txt,$match)) {
+			$src=$match[1];
+			$sc=mybox_get_country($src);
+			unset($match);
+		}
+		if(preg_match("/DST=(\S+)/",$txt,$match)) {
+			$dst=$match[1];
+			$dc=mybox_get_country($dst);
+			unset($match);
+		}
+
+		if(preg_match("/PROTO=(\S+)/",$str,$match)) {
+			$proto=mybox_getprotobynumber($match[1]);
+			if($proto!=$match[1]) {
+				$txt=preg_replace("/PROTO=(\S+)/","PROTO=$proto",$txt);
+			}
+			unset($match);
+		}
+		$txt="$txt RULES=$id ACTION=$_drop SRC_C=\"$sc\" DST_C=\"$dc\"";
+		mybox_write_log($ldate,"spyware","SPYWARE",$txt);
+		return 0;
+	}
+}
+
+function parse_floodlog($ldate,$str) {
+	if(preg_match("/^(SYNC_FLOOD|ICMP_FLOOD|UDP_FLOOD)\:\s+(.*)/",$str,$match)) {
+		$txt=trim($match[2]);
+		unset($match);
+		$src='';$dst='';$proto='';
+		$sc='';$dc='';
+		if(preg_match("/SRC=(\S+)/",$txt,$match)) {
+			$src=$match[1];
+			$sc=mybox_get_country($src);
+			unset($match);
+		}
+		if(preg_match("/DST=(\S+)/",$txt,$match)) {
+			$dst=$match[1];
+			$dc=mybox_get_country($dst);
+			unset($match);
+		}
+
+		if(preg_match("/PROTO=(\S+)/",$str,$match)) {
+			$proto=mybox_getprotobynumber($match[1]);
+			if($proto!=$match[1]) {
+				$txt=preg_replace("/PROTO=(\S+)/","PROTO=$proto",$txt);
+			}
+			unset($match);
+		}
+		$txt="$txt ACTION=DROP SRC_C=\"$sc\" DST_C=\"$dc\"";
+		mybox_write_log($ldate,"flood","DOS-FLOODING-PROTECTION",$txt);
+	}
+}
+
+
+function read_syslog_buffer($time,$prog,$pid,$msg) {
+	global $_DISABLE;
+
+	if($time!='' && $prog!='' && $msg!='' && $_DISABLE!=1) {
+		switch($prog) {
+			case 'barnyard':
+				@parse_snortlog($time,$pid,$msg);
+			break;
+			case 'sshd':
+				@parse_sshlog($time,$pid,$msg);
+			break;
+			case 'pppd':
+			case 'pptpd':
+			case 'nmbd':
+			case 'smbd':
+			case 'bcrelay':
+				@mybox_write_pptplog($time,$pid,$prog,$msg);
+			break;
+			case 'MYBOX_LOGIN':
+				if(preg_match("/AUTH_CONSOLE/",$msg)) {
+					@mybox_write_consolelogin($time,$msg);
+				}
+			break;
+			case 'dhcpd':
+				@mybox_write_dhcplog($time,$msg);
+			break;
+			case 'vsftpd':
+				@parse_ftplog($time,$msg);
+			break;
+			case 'INADYN':
+				@parse_ddnslog($time,$msg);
+			break;
+			case 'named':
+				@parse_dnslog($time,$msg);
+			break;
+			case 'snmpd':
+				@parse_snmplog($time,$msg);
+			break;
+			case 'ntpd':
+				@parse_ntplog($time,$msg);
+			break;
+			case 'crond':
+				@parse_cronlog($time,$msg);
+			break;
+			case 'frox':
+				@parse_froxlog($time,$msg);
+			break;
+			case 'p3scan':
+				@parse_p3scanlog($time,$msg);
+			break;
+			case 'spamd':
+				@parse_spamlog($time,$msg);
+			break;
+			case 'sophos':
+				@parse_sophoslog($time,$msg);
+			break;
+			case 'kernel':
+				if(preg_match("/ARP_ANTIDOTE\:/",$msg)) {
+					@parse_arplog($time,$msg);
+					break;
+				}
+				@parse_kernellog($time,$msg);
+			break;
+			case 'ulogd':
+				if(preg_match("/^F:(\S+):(\S+):(\S+)/",$msg)) {
+					@parse_pflog($time,$msg);
+					break;
+				}
+				if(preg_match("/^PORTSCAN/",$msg)) {
+					@parse_portscanlog($time,$msg);
+					break;
+				}
+				if(preg_match("/^SPYWARE/",$msg)) {
+					@parse_spywarelog($time,$msg);
+					break;
+				}
+				if(preg_match("/^(SYNC_FLOOD|ICMP_FLOOD|UDP_FLOOD)/",$msg)) {
+					@parse_floodlog($time,$msg);
+					break;
+				}
+			break;
+			default:
+			break;
+		}
+
+	}
+	$buff='';
+}
+
+# squid
+function read_squid_access_buffer($str) {
+	list($ldate,$elapsed,$host,$status,$byte,$method,$url,$auth,$peer,$type)=preg_split("/\s+/",$str);
+	if($auth=="-") $auth="none";
+	if($type=="-") $type="none";
+	if($byte==0) return;
+	if($host=="127.0.0.1") return;
+	$byte=mybox_size_readable($byte,null,'%d%s');
+	$sc=mybox_url_get_country($url);
+	$txt="ELAPSED=$elapsed HOST=$host STATUS=$status SIZE=$byte METHOD=$method URL=$url UC=$sc AUTH=$auth PEER=$peer TYPE=$type";
+	mybox_write_log($ldate,"httpproxy_access","HTTP-PROXY-ACCESS",$txt);
+	return 0;
+}
+
+function cc_domain_redirect($url) {
+	if(preg_match("/(.*?)\:\/\/(.*?)\//",$url,$mm)) {
+        	return "{$mm[1]}://{$mm[2]}";
+	}
+	return $url;
+}
+
+function read_squid_cache_buffer($str) {
+	if(preg_match("/(\d\d\d\d)\/(\d\d)\/(\d\d)\s(\d\d)\:(\d\d)\:(\d\d)\|(.*)/",$str,$mm)) {
+		$ldate=strtotime("{$mm[2]}/{$mm[3]}/{$mm[1]} {$mm[4]}:{$mm[5]}:{$mm[6]}");
+		$otxt=trim($mm[7]);
+		if($otxt=='') return;
+		$mm=array();
+		if(preg_match("/cfmod_(\S+)\:\s+URL=(\S+)\s+CLIENT=(\S+)\s+USER=(\S+)\s+MSG=(.*)/",$otxt,$mm)) {
+			$mm[2]=trim($mm[2]);
+			$mm[3]=trim($mm[3]);
+			$mm[4]=trim($mm[4]);
+			$mm[5]=trim($mm[5]);
+			$auth=$mm[4];
+			if($auth=="(null)") $auth="none";
+			$sc=mybox_url_get_country($mm[2]);
+			$txt="URL={$mm[2]} UC=$sc HOST={$mm[3]} AUTH=$auth MSG={$mm[5]}";
+			$tr='';$trc='';
+			if($mm[1]=="content") {
+				$trc="HTTP-PROXY-CONTENT-REMOVAL";
+				$tr="httpproxy_contentremoval";
+			}
+			if($tr!='' && $trc!='') {
+				mybox_write_log($ldate,$tr,$trc,$txt);
+			}
+			return 0;
+		} elseif(preg_match("/cfmod_redirect\:\s+URL=(\S+)\s+REDIRECT=(\S+)\s+CLIENT=(\S+)\s+USER=(\S+)/",$otxt,$mm)) {
+			$mm[1]=trim($mm[1]);
+			$mm[2]=trim($mm[2]);
+			$mm[3]=trim($mm[3]);
+			$mm[4]=trim($mm[4]);
+			$auth=$mm[4];
+			if($auth=="(null)") $auth="none";
+			$url=cc_domain_redirect($mm[1]);
+			$redi=cc_domain_redirect($mm[2]);
+			$txt="URL=$url REDIRECT=$redi HOST={$mm[3]} AUTH=$auth";
+			mybox_write_log($ldate,"httpproxy_siteredirection","HTTP-PROXY-SITE-REDIRECTION",$txt);
+			return 0;
+		} elseif(preg_match("/TYPE=(\S+)\s+METHOD=(\S+)\s+URL=(\S+)\s+ACTION=(\S+)\s+ACL=(\S+)\s+CLIENT=(\S+)\s+AUTH=(\S+)/",$otxt,$mm)) {
+			$type=trim($mm[1]);
+			$method=trim($mm[2]);
+			$url=trim($mm[3]);
+			$action=trim($mm[4]);
+			$acl=trim($mm[5]);
+			$ip=trim($mm[6]);
+			$auth=trim($mm[7]);
+			if($auth=="(null)") $auth="none";
+			if(preg_match("/^MYBOX_/",$acl) || $acl=='all') return 0;
+			if(preg_match("/(\S+)\_ERR\_ACCESS\_(\S+)\_DENIED/",$acl,$mt)) {
+				$acl=$mt[2];
+			}			
+			$acl=strtoupper($acl);
+			$sc=mybox_url_get_country($url);			
+			$txt="URL=$url UC=$sc HOST=$ip AUTH=$auth STATUS=$action ACL=$acl";
+			mybox_write_log($ldate,"httpproxy_urlfilter","HTTP-PROXY-URL-FILTER",$txt);
+			return 0;
+		} else {
+			if(preg_match("/The (request|reply)/",$otxt)) return;
+			if(preg_match("/^TYPE=/",$otxt)) return;
+			if(stripos($otxt,"clientReadBody:")!==FALSE) return;
+			if(stripos($otxt,"clientProcessBody:")!==FALSE) return;
+			mybox_write_log($ldate,"httpproxy_cache","HTTP-PROXY-INFO",$otxt);
+			return 0;
+		}
+		return 1;
+	}
+	return 1;
+}
+
+# https
+function read_https_buffer($str) {
+	if(preg_match("/(\S+)\s+\S+\s+\S+\s+\[(\d+)\/(\S+)\/(\d+)\:(\d+\:\d+\:\d+)\s+\+\d+\]\s+\"(.*?)\"\s+(\d+)\s+(\d+)\s+\"(.*?)\"\s+\"(.*)\"/",$str,$mm)) {
+		$ldate=strtotime("{$mm[2]} {$mm[3]} {$mm[4]} {$mm[5]}");	
+		$ip=$mm[1];
+		$action=$mm[6];
+		$status=$mm[7];
+		$byte=$mm[8];
+		$refer=$mm[9];
+		$agent=$mm[10];
+		$sc=mybox_url_get_country($ip);
+		$byte=mybox_size_readable($byte,null,'%d%s');
+		$txt="HOST=$ip SC=$sc ACTION=$action STATUS=$status SIZE=$byte REFERER=$refer AGENT=$agent";
+		mybox_write_log($ldate,"httpsd","HTTPS",$txt);
+		return 0;
+	}
+	return 0;
+}
+
+@ob_end_flush();
+ob_implicit_flush(true);
+
+function system_loop() {
+	proc_nice(-5);
+	if($po=fopen("php://stdin","r")) {
+		while($buff=fgets($po)) {
+			$buff=trim($buff);
+			if($buff=='') continue;
+			list($date,$prog,$pid,$msg)=preg_split("/,/",$buff,4);
+			$msg=trim($msg);
+			if($date=='' || $prog=='' || $msg=='') continue;
+			$time=strtotime($date);
+			if($time==FALSE) continue;
+			read_syslog_buffer($time,$prog,$pid,$msg);
+			unset($buff,$date,$prog,$pid,$msg,$time);
+		}
+		@fclose($po);
+	}
+	exit;
+}
+
+function cf_loop() {
+	__write_clean("/var/log/squid.access");
+	proc_nice(-5);
+	if($po=fopen("php://stdin","r")) {
+		while($buff=fgets($po)) {
+			$buff=trim($buff);
+			if($buff=='') continue;
+			read_squid_access_buffer($buff);
+			__write_clean("/var/log/squid.access");
+			unset($buff);
+		}
+		@fclose($po);
+	}
+	exit;
+}
+function cfc_loop() {
+	__write_clean("/var/log/squid.cache");
+	proc_nice(-5);
+	if($po=fopen("php://stdin","r")) {
+		while($buff=fgets($po)) {
+			$buff=trim($buff);
+			if($buff=='') continue;
+			read_squid_cache_buffer($buff);
+			__write_clean("/var/log/squid.cache");
+			unset($buff);
+		}
+		@fclose($po);
+	}
+	exit;
+}
+
+function https_loop() {
+	__write_clean("/var/log/https.log");
+	proc_nice(-5);
+	if($po=fopen("php://stdin","r")) {
+		while($buff=fgets($po)) {
+			$buff=trim($buff);
+			if($buff=='') continue;
+			read_https_buffer($buff);
+			__write_clean("/var/log/https.log");
+			unset($buff);
+		}
+		@fclose($po);
+	}
+	exit;
+}
+
+if($_SERVER["argv"][1]=="sys") {
+	system_loop();
+}
+if($_SERVER["argv"][1]=="cf") {
+	cf_loop();
+}
+if($_SERVER["argv"][1]=="cfc") {
+	cfc_loop();
+}
+if($_SERVER["argv"][1]=="https") {
+	https_loop();
+}
+exit;
+?>

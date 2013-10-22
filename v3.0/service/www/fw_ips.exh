@@ -1,0 +1,1518 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="fw_ips";
+include_once('page.exl');
+
+mybox_chk_session();
+mybox_send_nocache();
+
+$db_id=mybox_db_connect($_DB_NAME);
+
+function ips_change_drop_do($file,$drop,$xdrop) {
+	if(!file_exists($file)) return;
+	$wr='';
+	$buff=mybox_file2array($file);
+	if(count($buff)==0) return;
+	foreach($buff as $ln) {
+		$ln=trim($ln);
+		if($ln=='') continue;
+		if(preg_match("/^($xdrop|#xdrop)\s/",$ln,$mm)) {
+			$str=$mm[1];
+			$_dr="$drop";
+			if($str{0}=='#') {
+				$_dr="#$drop";
+			}
+			$ln=preg_replace("/^($xdrop|#xdrop)\s/","$_dr ",$ln); 
+		}
+		$wr .="$ln\n";
+	}
+	if($wr!='') mybox_save_to_file($file,"$wr");
+}
+
+function ips_change_drop($drop) {
+	global $_PAT_PATH;
+	$xdrop="reject";
+	if($drop=="reject") $xdrop="drop";
+	if(file_exists("$_PAT_PATH/ips_active.array")) {
+		$buff=unserialize(mybox_fget_contents("$_PAT_PATH/ips_active.array"));
+		if(count($buff)!=0) {
+			foreach($buff as $ln) {
+				if($ln=='') continue;
+				ips_change_drop_do($ln,$drop,$xdrop);
+			}	
+		}
+		unset($buff);
+	}
+}
+
+if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+	if(isset($do_id)&&$do_id=='apply_chg') {
+		if($tab==1 || $tab==2) {
+			mybox_echo_query("ips-restart");
+		}
+		if($tab==3) {
+			mybox_echo_query("policy-dos");
+		}
+		if($tab==4) {
+			mybox_echo_query("policy-pscan");
+		}
+		if($tab==5) {
+			mybox_echo_query("policy-ips-all");
+		}
+		$msg="<script>waitcount();</script>";
+	}
+	if($tab==1) {
+		if(isset($do_save)&&$do_save==1) {
+			if($ips_http_server=="<< Not set >>") $ips_http_server='';
+			if($ips_dns_server=="<< Not set >>") $ips_dns_server='';
+			if($ips_smtp_server=="<< Not set >>") $ips_smtp_server='';
+			if($ips_sql_server=="<< Not set >>") $ips_sql_server='';
+			$ips_net=trim($ips_net,",");
+			mybox_db_query("update misc set val='$ips_stat' where name='ips_stat'",$db_id);
+			mybox_db_query("update misc set val='$ips_drop' where name='ips_drop'",$db_id);
+			mybox_db_query("update misc set val='$ips_net' where name='ips_net'",$db_id);
+			mybox_db_query("update misc set val='$ips_http_server' where name='ips_http_server'",$db_id);
+			mybox_db_query("update misc set val='$ips_dns_server' where name='ips_dns_server'",$db_id);
+			mybox_db_query("update misc set val='$ips_smtp_server' where name='ips_smtp_server'",$db_id);
+			mybox_db_query("update misc set val='$ips_sql_server' where name='ips_sql_server'",$db_id);
+			$msg="Configuration saved";
+			$_xips_drop="drop";
+			if($ips_drop==2) $_xips_drop="reject";
+			mybox_save_to_file("$_PAT_PATH/ips_drop","$_xips_drop");
+			ips_change_drop($_xips_drop);
+
+		}
+	}
+	if($tab==2) {
+		if($col==1) {
+			if(isset($stat)) {
+				if($stat==1) { $stat=0; } else { $stat=1;}
+			}
+			if(isset($do_save)&&$do_save==3) $stat=0;
+			if(isset($do_save)&&$do_save==2) $stat=1;
+			if(is_array($del) && count($del)!=0) {
+				foreach($del as $xfile) {
+					if(file_exists("$_PAT_PATH/rules/$xfile/stat")) {
+						mybox_save_to_file("$_PAT_PATH/rules/$xfile/stat","$stat\n");
+					}
+				}
+			} else {
+				if($del!='') {
+					if(file_exists("$_PAT_PATH/rules/$del/stat")) {
+						mybox_save_to_file("$_PAT_PATH/rules/$del/stat","$stat\n");
+					}	
+				}
+			}
+			unset($stat,$del);
+		}
+		if($col==2) {
+			$result=mybox_db_query("select val from misc where name='ips_drop' ",$db_id);
+			$_ips_drop=1;$_xips_drop="drop";
+			if(mybox_db_num_rows($result)!=0) {
+				$_ips_drop=mybox_db_fetch_single($result);
+				if($_ips_drop==2) $_xips_drop="reject";
+			}
+			mybox_save_to_file("$_PAT_PATH/ips_drop","$_xips_drop");
+			unset($_ips_drop);
+			if(isset($do_save)&&$do_save==1 && isset($f)&&$f!='' && isset($do_act)&&$do_act!='') {
+				$buff=mybox_file2array("$_PAT_PATH/rules/$f/rules");
+				if(count($buff)!=0) {
+					if($do_act==1 || $do_act==2) {
+						if(is_array($del) && count($del)!=0) {
+							foreach($del as $n) {
+								$_str=$buff[$n];
+								if($_str=='') continue;
+								if($do_act==1) {
+									if($_str{0}=='#') {
+										$buff[$n]=ltrim($_str,'#');
+									}
+									unset($_str);
+								} else {
+									if($_str{0}!='#') {
+										$_str="#$_str";
+										$buff[$n]="$_str";
+									}
+									unset($_str);
+								}
+							}
+						} else {
+							if($del!='') {
+								if($do_act==1) {
+									$_str=$buff[$del];
+									if($_str!='' && $_str{0}=='#') {
+										$buff[$del]=ltrim($_str,'#');
+									}
+									unset($_str);
+								} else {
+									$_str=$buff[$del];
+									if($_str!='' && $_str{0}!='#') {
+										$_str="#$_str";
+										$buff[$del]="$_str";
+									}
+									unset($_str);
+								}
+							}
+						}
+					}
+					if($do_act==3 || $do_act==4) {
+						if(is_array($del) && count($del)!=0) {
+							foreach($del as $n) {
+								$_str=$buff[$n];
+								if($_str=='') continue;
+								if($do_act==3) {
+									if(preg_match("/^(drop|reject|sdrop|#drop|#reject|#sdrop)\s/",$_str,$mm)) {
+										$_dr=$mm[1];
+										if($_dr{0}=='#') {
+											$_dr="#alert";
+										} else {
+											$_dr="alert";
+										}
+										$_str=preg_replace("/^(drop|reject|sdrop|#drop|#reject|#sdrop)\s/","$_dr ",$_str);
+										$buff[$n]=preg_replace("/\(msg\:\"\[D\]/",'(msg:"[A]',$_str);
+									}
+									unset($_str,$_dr);
+								} else {
+									if(preg_match("/^(alert|#alert)\s/",$_str,$mm)) {
+										$_dr=$mm[1];
+										if($_dr{0}=='#') {
+											$_dr="#$_xips_drop";
+										} else {
+											$_dr="$_xips_drop";
+										}
+										$_str=preg_replace("/^(alert|#alert)\s/","$_dr ",$_str);
+										$buff[$n]=preg_replace("/\(msg\:\"\[A\]/",'(msg:"[D]',$_str);
+									}
+									unset($_str,$_dr);
+								}
+							}
+						} else {
+							if($del!='') {
+								$_str=$buff[$del];
+								if($do_act==3) {
+									if($_str!='' && preg_match("/^(drop|reject|sdrop|#drop|#reject|#sdrop)\s/",$_str,$mm)) {
+										$_dr=$mm[1];
+										if($_dr{0}=='#') {
+											$_dr="#alert";
+										} else {
+											$_dr="alert";
+										}
+										$_str=preg_replace("/^(drop|reject|sdrop|#drop|#reject|#sdrop)\s/","$_dr ",$_str);
+										$buff[$del]=preg_replace("/\(msg\:\"\[D\]/",'(msg:"[A]',$_str);
+									}
+									unset($_str,$_dr);
+								} else {
+									if($_str!='' && preg_match("/^(alert|#alert)\s/",$_str,$mm)) {
+										$_dr=$mm[1];
+										if($_dr{0}=='#') {
+											$_dr="#$_xips_drop";
+										} else {
+											$_dr="$_xips_drop";
+										}
+										$_str=preg_replace("/^(alert|#alert)\s/","$_dr ",$_str);
+										$buff[$del]=preg_replace("/\(msg\:\"\[A\]/",'(msg:"[D]',$_str);
+									}
+									unset($_str,$_dr);
+								}
+							}
+						}
+					}
+				}
+				@copy("$_PAT_PATH/rules/$f/rules","$_PAT_PATH/rules/$f/rules.bck");
+				if($fd=fopen("$_PAT_PATH/rules/$f/rules", "w")) {
+					foreach($buff as $lx) {
+						fwrite($fd,"$lx\n");
+					}
+					fclose($fd);
+				}
+				unset($buff,$del,$n,$lx,$ll);
+			}
+		}
+	}
+	if($tab==3) {
+		if(isset($do_save)&&$do_save==1) {
+			mybox_db_query("update misc set val='$ips_dos_tcp_stat' where name='ips_dos_tcp_stat'",$db_id);
+			mybox_db_query("update misc set val='$ips_dos_udp_stat' where name='ips_dos_udp_stat'",$db_id);
+			mybox_db_query("update misc set val='$ips_dos_icmp_stat' where name='ips_dos_icmp_stat'",$db_id);
+			mybox_db_query("update misc set val='$ips_dos_tcp_log' where name='ips_dos_tcp_log'",$db_id);
+			mybox_db_query("update misc set val='$ips_dos_udp_log' where name='ips_dos_udp_log'",$db_id);
+			mybox_db_query("update misc set val='$ips_dos_icmp_log' where name='ips_dos_icmp_log'",$db_id);
+			mybox_db_query("update misc set val='$ips_dos_tcp_mode' where name='ips_dos_tcp_mode'",$db_id);
+			mybox_db_query("update misc set val='$ips_dos_udp_mode' where name='ips_dos_udp_mode'",$db_id);
+			mybox_db_query("update misc set val='$ips_dos_icmp_mode' where name='ips_dos_icmp_mode'",$db_id);
+			$ips_dos_tcp_src_rate=trim($ips_dos_tcp_src_rate);
+			$ips_dos_tcp_dst_rate=trim($ips_dos_tcp_dst_rate);
+			$ips_dos_udp_src_rate=trim($ips_dos_udp_src_rate);
+			$ips_dos_udp_dst_rate=trim($ips_dos_udp_dst_rate);
+			$ips_dos_icmp_src_rate=trim($ips_dos_icmp_src_rate);
+			$ips_dos_icmp_dst_rate=trim($ips_dos_icmp_dst_rate);
+
+			if($ips_dos_tcp_src_rate!='') {
+				mybox_db_query("update misc set val='$ips_dos_tcp_src_rate' where name='ips_dos_tcp_src_rate'",$db_id);
+			}
+			if($ips_dos_tcp_dst_rate!='') {
+				mybox_db_query("update misc set val='$ips_dos_tcp_dst_rate' where name='ips_dos_tcp_dst_rate'",$db_id);
+			}
+			if($ips_dos_udp_src_rate!='') {
+				mybox_db_query("update misc set val='$ips_dos_udp_src_rate' where name='ips_dos_udp_src_rate'",$db_id);
+			}
+			if($ips_dos_udp_dst_rate!='') {
+				mybox_db_query("update misc set val='$ips_dos_udp_dst_rate' where name='ips_dos_udp_dst_rate'",$db_id);
+			}
+			if($ips_dos_icmp_src_rate!='') {
+				mybox_db_query("update misc set val='$ips_dos_icmp_src_rate' where name='ips_dos_icmp_src_rate'",$db_id);
+			}
+			if($ips_dos_icmp_dst_rate!='') {
+				mybox_db_query("update misc set val='$ips_dos_icmp_dst_rate' where name='ips_dos_icmp_dst_rate'",$db_id);
+			}
+			$msg="Configuration saved";
+
+		}
+	}
+	if($tab==4) {
+		if(isset($do_save)&&$do_save==1) {
+			mybox_db_query("update misc set val='$ips_pscan_stat' where name='ips_pscan_stat'",$db_id);
+			mybox_db_query("update misc set val='$ips_pscan_drop' where name='ips_pscan_drop'",$db_id);
+			mybox_db_query("update misc set val='$ips_pscan_log' where name='ips_pscan_log'",$db_id);
+			$msg="Configuration saved";
+		}
+	}
+	if($tab==5) {
+		if($col==1) {
+			if(isset($do_save)&&$do_save==2) {
+				if(is_array($del) && count($del)!=0) {
+					foreach($del as $x) {
+						if($x!='') mybox_db_query("delete from ips_exclude where id='$x'",$db_id);
+					}
+				} else {
+					if($del!='') mybox_db_query("delete from ips_exclude where id='$del'",$db_id);
+				}
+			}
+		}
+		if($col==2) {
+			if(isset($do_save)&&$do_save==1) {
+				if($do_id!='edit') {
+					$name=trim($name);
+					if($ips=='') { $ips=0; } else { $ips=1; }
+					if($tcpf=='') { $tcpf=0; } else { $tcpf=1; }
+					if($udpf=='') { $udpf=0; } else { $udpf=1; }
+					if($icmpf=='') { $icmpf=0; } else { $icmpf=1; }
+					if($pscan=='') { $pscan=0; } else { $pscan=1; }
+					if($src=='any') $src='';
+					if($dst=='any') $dst='';
+					$result=mybox_db_query("select name from ips_exclude where name='$name'",$db_id);
+					if(mybox_db_num_rows($result)==0) {
+						mybox_db_query("insert into ips_exclude (name,src,dst,ips,tcpf,udpf,icmpf,pscan) values ('$name','$src','$dst','$ips','$tcpf','$udpf','$icmpf','$pscan')",$db_id);
+						$msg='Exception saved';
+					} else {
+						$msg="Exception name '$name' already exist";
+					}
+				}
+				if($do_id=='edit') {
+					$name=trim($name);
+					$nameold=trim($nameold);
+					if($ips=='') { $ips=0; } else { $ips=1; }
+					if($tcpf=='') { $tcpf=0; } else { $tcpf=1; }
+					if($udpf=='') { $udpf=0; } else { $udpf=1; }
+					if($icmpf=='') { $icmpf=0; } else { $icmpf=1; }
+					if($pscan=='') { $pscan=0; } else { $pscan=1; }
+					if($src=='any') $src='';
+					if($dst=='any') $dst='';
+					if($name!=$nameold) {
+						$result=mybox_db_query("select name from ips_exclude where name='$name'",$db_id);
+						if(mybox_db_num_rows($result)!=0) {
+							$msg="Exception name '$name' already exist";
+						} else {
+							mybox_db_query("update ips_exclude set name='$name',src='$src',dst='$dst',ips='$ips',tcpf='$tcpf',udpf='$udpf',icmpf='$icmpf',pscan='$pscan' where id='$id'",$db_id);
+							$msg='Exception list updated';$col=1;$do_id='';
+						}
+					} else {
+						mybox_db_query("update ips_exclude set name='$name',src='$src',dst='$dst',ips='$ips',tcpf='$tcpf',udpf='$udpf',icmpf='$icmpf',pscan='$pscan' where id='$id'",$db_id);
+						$msg='Exception list updated';$col=1;$do_id='';
+					}
+				}
+			}
+		}
+	}
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied";
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+if((!isset($col)||$col=='')&&($tab==2 || $tab==5)) $col=1;
+$_error=0;
+
+if($tab==1 || $tab==5) {
+	$list_array=array();
+	$list_array1=mybox_ipname_array($db_id);
+	$list_array2=mybox_defnetwork_array($db_id);
+	$list_array3=array();
+	$list_array=$list_array1;
+	if(count($list_array1)!=0) {
+		foreach($list_array1 as $a) {
+			if(strpos($a,"(Network)")!==FALSE || strpos($a,"(Broadcast)")!==FALSE) continue;
+			$list_array3[]="$a";	
+		}
+	}
+	unset($a);
+	if(count($list_array2)!=0) {
+		foreach($list_array2 as $a => $b) {
+			if($tab==1 && $a=='any') continue;
+			if(is_array($b)) {
+				if($b['type'] <= 2) $list_array[]="$a";
+				if($b['type'] == 2) $list_array3[]="$a";
+				if($b['group']!='') {
+					$list_array3[]=$b['group'];
+				}
+			} 
+		}
+	}
+}
+
+?>
+<html>
+<head>
+<title>MyAdmin</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<script type='text/javascript' src="/j/mybox_func.js"></script>
+<script type='text/javascript' src="/j/mybox_overlib.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?php echo $_LOGIN['auth_id'];?>";
+	page_load();
+</script>
+<script type='text/javascript'>
+	function do_changes() {
+		self.location.href='<?php echo "/fw_ips.exh?tab=$tab&col=$col&f=$f&do_id=apply_chg";?>';	
+	};
+	<?php if($tab==2) {?>
+	function do_submit() {
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	};
+	function do_active(val) {
+		if(chkdel()==true) {
+			document.f.do_save.value=val;
+			document.f.submit();
+			return true;
+		}
+		pop_msg("Please select which rules you want to save");
+		return false;
+	};
+	<?php }?>
+
+function waitcount() {
+	page_reload('700','<?php echo "/fw_ips.exh?tab=$tab&do_tab=$do_tab&col=$col&col2=$col2&f=$f";?>');
+}
+</script>
+</head>
+<body onload="load_menu('sub5','t5d4','s5i4');" scroll="auto">
+<form name=f method=post action="/fw_ips.exh">
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 0px;'>
+<tr>
+<td>
+<?php mybox_page_section("Firewall / Intrusion Protection");?>
+<br><br>
+<?php if($tab==2 && $col==2) { mybox_page_search($str); }?>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="/fw_ips.exh?tab=1" <?php if($tab==1){?>class="tabact"<?php }?>>Global</a></li>
+<li><a href="/fw_ips.exh?tab=2" <?php if($tab==2){?>class="tabact"<?php }?>>Signatures</a></li>
+<li><a href="/fw_ips.exh?tab=3" <?php if($tab==3){?>class="tabact"<?php }?>>DOS/Flooding Protection</a></li>
+<li><a href="/fw_ips.exh?tab=4" <?php if($tab==4){?>class="tabact"<?php }?>>Portscan Protection</a></li>
+<li><a href="/fw_ips.exh?tab=5" <?php if($tab==5){?>class="tabact"<?php }?>>Exceptions</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td> 
+<?php mybox_page_msg($msg);?>
+<br>
+
+<!-- tab container -->
+<?php if($tab==1) {
+$_tl=array();
+$result=mybox_db_query("select * from misc where name like \"ips_%\" ",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_name=trim($row['name']);
+		$_val=trim($row['val']);
+		$_name="_$_name";
+		$$_name="$_val";
+	}
+	unset($_name,$_val);
+	$_xips_drop="drop";
+	if($_ips_drop==2) $_xips_drop="reject";
+	mybox_save_to_file("$_PAT_PATH/ips_drop","$_xips_drop");
+
+	if(count($list_array)!=0) {
+		foreach($list_array as $x) {
+			if($x=='') continue;
+			$_tl[$x]=$x;
+		}
+	}
+	unset($x);
+	if($_ips_net!='') {
+		$_nml=preg_split("/,/",$_ips_net);
+		if(count($_nml)!=0) {
+			foreach($_nml as $a) {
+				if($a=='') continue;
+				if($_tl[$a]==$a) unset($_tl[$a]);
+			}
+		} else {
+			$_nml[]="$_ips_net";
+		}
+		unset($a);
+	} else {
+		$_tl=$list_array;
+	}
+}
+
+?>
+<script type='text/javascript'>
+	function do_submit() {
+		var list=document.f.mr;
+		var lr='';
+		var ti=0;
+		for(var i=0;i<list.length;i++) {
+			if(list.options[i]!=null && list.options[i].value!='') {
+				ti++;
+				lr +=list.options[i].value;
+				lr +=',';
+			}
+		}
+		if(lr=='') {
+			pop_msg("No Local Network defined");
+			return false;
+		}
+		document.f.ips_net.value=lr;
+		if(document.f.btsave) document.f.btsave.disabled=true;
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	}
+	function inmoveto(a) {
+		if(a=="right") {
+			var p=document.f.mr.length;
+			var lstlenght=document.f.ml.length;
+			var list=document.f.ml;
+			for(var i=0;i<lstlenght;i++) {
+				if(list[i]!=null && list[i].value!='') {
+					if(list.options[i].selected==true) {
+						document.f.mr[p]=new Option(list.options[i].text,list.options[i].value);
+						list[i]=null;
+						p++;
+					}
+				}
+			}
+		}
+
+		if(a=="left") {
+			var p=document.f.ml.length;
+			var lstlenght=document.f.mr.length;
+			var list=document.f.mr;
+			for(var i='0';i<lstlenght;i++) {
+				if(list[i]!=null && list[i].value!='') {
+					if(list.options[i].selected==true) {
+						document.f.ml[p]=new Option(list.options[i].text,list.options[i].value);
+						list[i]=null;
+						p++;
+					}
+				}
+			}
+		}
+	}
+</script>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td valign="middle" class="tdname">Enable Intrusion Protection</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("On"=>"1","Off"=>"0");
+if(!isset($_ips_stat)||$_ips_stat=='') $_ips_stat=0;
+echo mybox_select_box('pfipssel1',$data_a,$_ips_stat,'ips_stat');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="top" class="tdname">Local Network</td>
+<td valign="top" class="tdvalue"> 
+<table style='border: 0px; padding: 0px; margin: 0px;'>
+<tr>
+<td valign=top style='border: 0px; font-style: italic; font-weight: bold;' colspan=2>
+Available networks
+</td>
+<td valign=top style='border: 0px; font-style: italic; font-weight: bold;'>
+Selected networks
+</td>
+</tr>
+<tr>
+<td valign=top style='border: 0px; text-align: center;'>
+<select name=ml size=7 multiple class=selbox style='height: 105px; width: 200px;'>
+<?php 
+foreach($_tl as $n) {
+	$px=mybox_get_defname($n,1,'def1',$db_id);
+	echo "<option value='$n' $px>$n</option>";
+	unset($px);
+}
+unset($n);
+?>
+</select>
+</td>
+<td valign=absmiddle style='border: 0px; text-align: center;'>
+
+<table class="data" style='border: 0px; padding: 0px; margin: 0px;'>
+<tr>
+<td valign=top style='border: 0px;'>
+<a name="sini"><a class="btns" href="#sini" onclick="return inmoveto('right');return false;"> >> </a>
+</td>
+</tr>
+<tr>
+<td valign=top style='border: 0px;'>
+<a name="sini"><a class="btns" href="#sini" onclick="return inmoveto('left');return false;"> << </a>
+</td>
+</tr>
+</table>
+
+</td>
+<td valign=top style='border: 0px; text-align: center;'>
+<select name=mr size=7 multiple class=selbox style='height: 105px; width: 200px;'>
+<?php 
+foreach($_nml as $a) {
+	$px=mybox_get_defname($a,1,'def1',$db_id);
+	echo "<option value='$a' $px>$a</option>";
+	unset($px);
+}
+unset($a);
+?>
+</select>
+</td>
+</tr>
+</table>
+<span id='def1' class='def' style='display: none; position: absolute;'></span>
+</td>
+</tr>
+
+<tr> 
+<td valign="middle" class="tdname">Blocking policy</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array();
+foreach($_IPS_DROP as $a => $b) {
+	if(!isset($_ips_drop)||$_ips_drop=='') $_ips_drop=1;
+	$data_a[$b]=$a;
+}
+if(!isset($_ips_drop)||$_ips_drop=='') $_ips_drop=1;
+echo mybox_select_box('pfipssel2',$data_a,$_ips_drop,'ips_drop');
+?>
+</td>
+</tr>
+
+<tr> 
+<td valign="top" class="tdname">Peformance tuning</td>
+<td valign="top" class="tdvalue">
+<table class="data" style='border: 0px; margin-bottom: 0em;'>
+<tr>
+<td valign=top style='border: 0px; width: 100px;'> 
+HTTP Servers
+</td>
+<td valign=top style='border: 0px;'> 
+<?php 
+if(!isset($_ips_http_server)||$_ips_http_server=='') $_ips_http_server='<< Not set >>';
+$list_array3["<< Not set >>"]="<< Not set >>";
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($list_array3,'ips_http_server',"$_ips_http_server",'fwipsl1','fwipsl1a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+echo mybox_defwin('fwipsl1','200px','#ffffff','#999999','#336699','#ffffff','HTTP Servers','#ffffff','100px','hidden','auto',$txt);
+?>
+</td></tr>
+<tr>
+<td valign=top style='border: 0px; width: 100px;'> 
+DNS Servers
+</td>
+<td valign=top style='border: 0px;'> 
+<?php 
+if(!isset($_ips_dns_server)||$_ips_dns_server=='') $_ips_dns_server='<< Not set >>';
+$list_array3["<< Not set >>"]="<< Not set >>";
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($list_array3,'ips_dns_server',"$_ips_dns_server",'fwipsl2','fwipsl2a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+echo mybox_defwin('fwipsl2','200px','#ffffff','#999999','#336699','#ffffff','DNS Servers','#ffffff','100px','hidden','auto',$txt);
+?>
+</td></tr>
+<tr>
+<td valign=top style='border: 0px; width: 100px;'> 
+SMTP Servers
+</td>
+<td valign=top style='border: 0px;'> 
+<?php 
+if(!isset($_ips_smtp_server)||$_ips_smtp_server=='') $_ips_smtp_server='<< Not set >>';
+$list_array3["<< Not set >>"]="<< Not set >>";
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($list_array3,'ips_smtp_server',"$_ips_smtp_server",'fwipsl3','fwipsl3a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+echo mybox_defwin('fwipsl3','200px','#ffffff','#999999','#336699','#ffffff','SMTP Servers','#ffffff','100px','hidden','auto',$txt);
+?>
+</td></tr>
+<tr>
+<td valign=top style='border: 0px; width: 100px;'> 
+SQL Servers
+</td>
+<td valign=top style='border: 0px;'> 
+<?php 
+if(!isset($_ips_sql_server)||$_ips_sql_server=='') $_ips_sql_server='<< Not set >>';
+$list_array3["<< Not set >>"]="<< Not set >>";
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($list_array3,'ips_sql_server',"$_ips_sql_server",'fwipsl4','fwipsl4a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+echo mybox_defwin('fwipsl4','200px','#ffffff','#999999','#336699','#ffffff','SQL Servers','#ffffff','100px','hidden','auto',$txt);
+?>
+</td></tr>
+</table>
+
+</td>
+</tr>
+
+</tbody>
+</table>
+<input type=hidden name=ips_net value=''>
+<?php }//tab==1?>
+<?php if($tab==2) {
+	if($col==1) {
+		$_rule_active='';$_rule_active_array=array();
+		$buff_array=array();
+		$buff_array=mybox_dir2array("$_PAT_PATH/rules/*");
+		if(count($buff_array)!=0) {
+			echo "
+				<table class='data' width='100%'>
+				<thead class='blue'> 
+				<tr>
+				<td style='font-weight: bold; border-right: 0px;'></td> 
+				<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Rules name</td>
+				<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Description</td>
+				<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Rule count</td>
+				<td style='font-weight: bold; border-right: 0px;border-left: 0px;' width=2%>Active</td>
+				<td style='font-weight: bold; border-left: 0px;' width=2%></td>
+				</tr></thead>
+				<tbody>
+			";
+			foreach($buff_array as $ln) {
+				if(!file_exists("$ln/stat")) continue;
+				$lnx=basename($ln);
+				$_cnt=0;
+				$_cnt=@count(mybox_file2array("$ln/rules"));
+				$f='rule';
+				if($_cnt > 1) $f='rules';
+				$_info='';
+				$_info=mybox_fget_contents("$ln/info");
+				$stat=0;
+				$stat=mybox_fget_contents("$ln/stat");
+				if($stat=='') $stat=0;
+				if($stat==1) {
+					$_rule_active .="include $ln/rules\n";
+					$_rule_active_array[]="$ln/rules";
+				}
+				$lo="onclick=\"self.location.href='/fw_ips.exh?tab=$tab&col=2&f=$lnx'; return false;\"";
+				$lk="style=' cursor: pointer;'";
+				echo "<tr $lk>";
+				echo "<td width='1%' style='border-right: 0px;' $lo><img src='{$_PNG['df_close']}' border=0 alt='' title=''></td>";
+				echo "<td align=center style='border-left: 0px; font-weight: bold;' $lo>$lnx</td>";
+				echo "<td $lo>$_info</td>";
+				echo "<td $lo>$_cnt $f</td>";
+				echo "<td width=2% style='text-align: center;' align=center><a href='/fw_ips.exh?tab=$tab&col=$col&stat=$stat&del=$lnx'><img src='{$_PNG_YESNO[$stat]}' border=0 alt='' title=''></a></td>";
+				echo "<td width=2% style='text-align: right;' align=right><input type=checkbox name=del[] value='$lnx'></td>";
+      				echo "</tr>";
+			}
+			echo "
+				<tr>
+				<td style='text-align: right;' align=right valign=top colspan=6><a href='#' onclick='do_active(3);return false;'>Disable</a> / <a href='#' onclick='do_active(2);return false;'>Enable</a> / <a href='#' onclick='dotoggle();return false;'>Toggle</a> <img src='{$_PNG['arrow_rtr']}' border=0 alt='' title=''></td>
+				</tr>
+				</tbody></table>
+			";
+			if($_rule_active!='') {
+				mybox_save_to_file("$_PAT_PATH/ips.config-last","$_rule_active");
+				mybox_save_to_file("$_PAT_PATH/ips_active.array",serialize($_rule_active_array));
+			}
+		} else {
+			echo "
+			<br>
+			<span class='notedef'>
+			There are no signatures available.
+			</span>
+			<br><br>
+			";$_error=1;
+
+		}
+
+	} // col==1 
+	if($col==2) {
+
+		$currentPage = $HTTP_SERVER_VARS["PHP_SELF"];
+		$maxRows_Recordset=100;
+		if(!isset($pageNum_Recordset)||$pageNum_Recordset=='') $pageNum_Recordset=0;
+		$startRow_Recordset=@($pageNum_Recordset * $maxRows_Recordset);
+		if($startRow_Recordset < 0) $startRow_Recordset=0;
+		$row_Recordset=array();
+		$line=array();
+		$line=@file("$_PAT_PATH/rules/$f/rules");
+		if(count($line)!=0) {
+			$i=0;
+			for($x=$startRow_Recordset;$x < count($line);$x++) {
+				$buff="{$line[$x]} [mynum=$x]";
+				if($i!=$maxRows_Recordset) {
+					if($str!='') {
+						if(stripos($buff,$str)===FALSE) continue;
+					}
+					array_push($row_Recordset,$buff);
+					$i++;
+				}
+			}
+		}
+		if(!isset($totalRows_Recordset)||$totalRows_Recordset=='') {
+			$totalRows_Recordset=count($line);
+		}
+		$totalPages_Recordset=@ceil($totalRows_Recordset/$maxRows_Recordset)-1;
+		$queryString_Recordset=null;
+		if(!empty($_SERVER['QUERY_STRING'])) {
+			$params=explode("&", $_SERVER['QUERY_STRING']);
+			$newParams=array();
+			foreach ($params as $param) {
+				if(stristr($param, "pageNum_Recordset")==true) continue;
+				if(stristr($param, "totalRows_Recordset")==true) continue;
+				if(stristr($param, "maxRows_Recordset")==true) continue;
+				if(stristr($param, "str")==true) continue;
+				if(stristr($param, "f")==true) continue;
+				array_push($newParams, $param);
+			}
+			if(count($newParams) != 0) {
+				$queryString_Recordset="&" . implode("&", $newParams);
+			}
+		}
+
+		$queryString_Recordset=sprintf("&totalRows_Recordset=%d%s&str=$str&f=$f", 
+			$totalRows_Recordset, 
+			$queryString_Recordset);
+
+		if($pageNum_Recordset > 0) { 
+			$pagefirst=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, 0, $queryString_Recordset);
+			$pageprev=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, max(0, $pageNum_Recordset - 1), $queryString_Recordset);
+			$button1="<a href='$pagefirst'><img src='{$_PNG['first']}' border=0 alt='' title=''></a>\n";
+			$button2="<a href='$pageprev'><img src='{$_PNG['prev']}' border=0 alt='' title=''></a>\n";
+		} else {
+			$button1="<img src='{$_PNG['first']}' border=0 alt='' title=''>\n";
+			$button2="<img src='{$_PNG['prev']}' border=0 alt='' title=''>\n";
+		}
+		if($pageNum_Recordset < $totalPages_Recordset) {
+			$pagenext=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, min($totalPages_Recordset, $pageNum_Recordset + 1), $queryString_Recordset);
+			$pagelast=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, $totalPages_Recordset, $queryString_Recordset);
+			$button3="<a href='$pagenext'><img src='{$_PNG['next']}' border=0 alt='' title=''></a>\n";
+			$button4="<a href='$pagelast'><img src='{$_PNG['last']}' border=0 alt='' title=''></a>\n";
+		} else {
+			$button3="<img src='{$_PNG['next']}' border=0 alt='' title=''>\n";
+			$button4="<img src='{$_PNG['last']}' border=0 alt='' title=''>\n";
+		}
+		unset($pagefirst,$pageprev,$pagenext,$pagelast);
+		unset($x,$buff,$line);
+		$_cnum=1;
+		if(!isset($pageNum_Recordset)||$pageNum_Recordset==''||$pageNum_Recordset==0) {
+			$_cnum=1;
+		} else {
+			$_cnum=($pageNum_Recordset * $maxRows_Recordset);
+			if($_cnum <= 0) {
+				$_cnum=1;
+			} else {
+				$_cnum +=1;
+			}
+		}
+
+		if($totalRows_Recordset >0 && count($row_Recordset)!=0) {
+			$classf=unserialize(mybox_fget_contents("$_PAT_PATH/classification.array"));
+			echo "
+				<script type='text/javascript'>
+				function do_sela(val) {
+					self.location.href='/fw_ips.exh?tab=2&col=2&del=$n&pageNum_Recordset=$pageNum_Recordset&totalRows_Recordset=$totalRows_Recordset&str=$str&f=$f&do_save=1&do_act='+val;
+				}
+				</script>
+				<table class='data' width='100%'>
+				<thead class='blue'> 
+				<tr>
+				<td style='font-weight: bold; border-right: 0px;'><a href='#' onclick=\"self.location.href='/fw_ips.exh?tab=2&col=1'; return false;\" title='Back to main'><img src='{$_PNG['df_up']}' border=0 alt='' title=''></a></td> 
+				<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Messages</td>
+				<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Classification</td>
+				<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Priority</td>
+				<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Action</td>
+				<td style='font-weight: bold; border-right: 0px;border-left: 0px;' width=2%>Active</td>
+				<td style='font-weight: bold; border-left: 0px;' width=2%></td>
+				</tr></thead>
+				<tbody>
+			";
+			$data_a=array("Alert"=>"3","Drop"=>"4");
+			foreach($row_Recordset as $row) {
+				if(preg_match("/\[mynum\=(\d+)\]/",$row,$mm)) {
+					$n=$mm[1];
+					unset($mm);
+				}
+				$row=trim($row);
+				if($row=='') continue;
+				$stat=1;
+				if($row{0}=='#') $stat=0;
+				$msg='';$sid='';$ctype='';$priority='Info';$classp='none';
+				if(preg_match("/\(msg\:\"\S+\s+(.*?)\"\;/",$row,$mm)) {
+					$msg=htmlentities($mm[1]);
+				}
+				unset($mm);
+				if(preg_match("/sid\:(\S+)\;/",$row,$mm)) {
+					$sid=$mm[1];
+				}
+				unset($mm);
+				$t1=4;
+				if(preg_match("/^(alert|#alert)\s+/",$row)) {
+					$t1=3;
+				}
+				if(preg_match("/classtype\:(\S+)\;/",$row,$mm)) {
+					$ctype=$mm[1];
+					$classp=$classf[$ctype][0];
+					$priority=$classf[$ctype][1];
+					if($priority==4) {
+						$priority="Info";
+					} elseif($priority==3) {
+						$priority="Low";
+					} elseif($priority==2) {
+						$priority="Medium";
+					} else {
+						if($priority > 4) $priority="Info";
+						if($priority < 2) $priority="High";
+					}
+				}
+				unset($mm);
+				$stat1=1;
+				if($stat==1) $stat1=2;
+				$details="http://info.mybox.com.my/info/sigs.html?sid=$sid";
+				if($sid >= 2000000) $details="http://www.bleedingthreats.net";
+				$set_a=array("width"=>"60px","act"=>"self.location.href='/fw_ips.exh?tab=2&col=2&del=$n&pageNum_Recordset=$pageNum_Recordset&totalRows_Recordset=$totalRows_Recordset&str=$str&f=$f&do_save=1&do_act='b''");
+				echo "
+					<tr>
+					<td width=1% style='border-right: 0px;'><a href='$details' target=_blank><img src='{$_PNG['info']}' border=0 alt='' title=''></a></td>
+					<td style='border-left: 0px; font-weight: bold;'>$msg</td>
+					<td>$classp</td>
+					<td>$priority</td>
+					<td width=2% $lo>
+					".mybox_select_box("ddsel$n",$data_a,$t1,"dd$n",$set_a)."
+					</td>
+					<td width=2% style='text-align: center;' align=center $lo><a href='/fw_ips.exh?tab=2&col=2&do_act=$stat1&del=$n&pageNum_Recordset=$pageNum_Recordset&totalRows_Recordset=$totalRows_Recordset&str=$str&f=$f&do_save=1'><img src='{$_PNG_YESNO[$stat]}' border=0 alt='' title=''></a></td>
+					<td width=2% style='text-align: right;' align=right><input type=checkbox name=del[] value=$n></td>
+					</tr>
+				";
+				$_cnum++;
+			}
+			echo "<tr>";
+			echo "<td style='text-align: right; border-right: 0px; background: #ffffff;' valign=top colspan=7>";
+			echo "<table align=right style='text-align: right; margin: 0px; padding: 0px; border: 0px;'>";
+			echo "<tr>";
+			$set_a=array("width"=>"100px");
+			$data_a=array("<< Select >>"=>"","Enable"=>"1","Disable"=>"2","Alert"=>"3","Drop"=>"4");
+			echo "<td align=right style='margin: 0px; padding: 0px; border: 0px; vertical-align: bottom;'>".mybox_select_box('fsipss1',$data_a,'','do_act',$set_a)."</td>";
+			echo "<td align=right style='margin: 0px; padding: 0px; border: 0px; vertical-align: bottom;'>";
+			echo "&nbsp;&nbsp;<a href='#' onclick='dotoggle();return false;'>Toggle</a> <img src='{$_PNG['arrow_rtr']}' border=0 alt='' title=''></td>";
+			echo "</tr></table>";
+			echo "</td></tr>";
+			echo mybox_print_nextpage($pageNum_Recordset,$totalPages_Recordset,$totalRows_Recordset,$maxRows_Recordset,$queryString_Recordset,$currentPage,'7',$button1,$button2,$button3,$button4);
+			echo "</tbody></table>";
+		} else {
+			echo "
+			<span class='notedef'>
+			There are no rules available.
+			</span>
+			<br><br>
+			";$_error=1;
+		}?>
+
+<?php 
+	} // col==2
+} // tab==2
+?>
+
+<?php if($tab==3) {
+$result=mybox_db_query("select * from misc where name like \"ips_dos_%\" ",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_name=trim($row['name']);
+		$_val=trim($row['val']);
+		$_name="_$_name";
+		$$_name="$_val";
+	}
+	unset($_name,$_val);
+}
+
+?>
+<script type='text/javascript'>
+	function do_submit() {
+		var tcpsrcp=Trim(document.f.ips_dos_tcp_src_rate.value);
+		var tcpdstp=Trim(document.f.ips_dos_tcp_dst_rate.value);
+		var udpsrcp=Trim(document.f.ips_dos_udp_src_rate.value);
+		var udpdstp=Trim(document.f.ips_dos_udp_dst_rate.value);
+		var icmpsrcp=Trim(document.f.ips_dos_icmp_src_rate.value);
+		var icmpdstp=Trim(document.f.ips_dos_icmp_dst_rate.value);
+		if(tcpsrcp=='' || !isnum(tcpsrcp) || tcpsrcp >= 100000) {
+			pop_msg("Invalid value for source packet rate "+tcpsrcp+"");
+			return false;
+		}
+		if(tcpdstp=='' || !isnum(tcpdstp) || tcpdstp >= 100000) {
+			pop_msg("Invalid value for destination packet rate "+tcpdstp+"");
+			return false;
+		}
+		if(udpsrcp=='' || !isnum(udpsrcp) || udpsrcp >= 100000) {
+			pop_msg("Invalid value for source packet rate "+udpsrcp+"");
+			return false;
+		}
+		if(udpdstp=='' || !isnum(udpdstp) || udpdstp >= 100000) {
+			pop_msg("Invalid value for destination packet rate "+udpdstp+"");
+			return false;
+		}
+		if(icmpsrcp=='' || !isnum(icmpsrcp) || icmpsrcp >= 100000) {
+			pop_msg("Invalid value for source packet rate "+icmpsrcp+"");
+			return false;
+		}
+		if(icmpdstp=='' || !isnum(icmpdstp) || icmpdstp >= 100000) {
+			pop_msg("Invalid value for destination packet rate "+icmpdstp+"");
+			return false;
+		}
+		if(document.f.btsave) document.f.btsave.disabled=true;
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	}
+
+</script>
+<table width="100%">
+<tbody>
+<tr>
+<td>
+<table class="data" width="100%" style='padding-bottom: 0em;'>
+<tr>
+<td valign="middle" class="tdname">TCP SYN Flood Protection</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+if(!isset($_ips_dos_tcp_stat)||$_ips_dos_tcp_stat=='') $_ips_dos_tcp_stat=0;
+echo mybox_select_box('pfipssel3',$data_a,$_ips_dos_tcp_stat,'ips_dos_tcp_stat');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Mode</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array();
+foreach($_IPS_DOS as $a => $b) {
+	$data_a[$b]=$a;
+	if(!isset($_ips_dos_tcp_mode)||$_ips_dos_tcp_mode=='') $_ips_dos_tcp_mode=$a;
+}
+echo mybox_select_box('pfipssel4',$data_a,$_ips_dos_tcp_mode,'ips_dos_tcp_mode');
+?>
+</select>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Logging</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+if(!isset($_ips_dos_tcp_log)||$_ips_dos_tcp_log=='') $_ips_dos_tcp_log=0;
+echo mybox_select_box('pfipssel5',$data_a,$_ips_dos_tcp_log,'ips_dos_tcp_log');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Source packet rate</td>
+<td valign="middle" class="tdvalue"> 
+<input name="ips_dos_tcp_src_rate" type="text" class="valbox" size="10" value="<?php echo $_ips_dos_tcp_src_rate;?>"> (packets/second)
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Destination packet rate</td>
+<td valign="middle" class="tdvalue"> 
+<input name="ips_dos_tcp_dst_rate" type="text" class="valbox" size="10" value="<?php echo $_ips_dos_tcp_dst_rate;?>"> (packets/second)
+</td>
+</tr>
+</table>
+
+
+<table class="data" width="100%" style='padding-bottom: 0em;'>
+<tr>
+<td valign="middle" class="tdname">UDP Flood Protection</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+if(!isset($_ips_dos_udp_stat)||$_ips_dos_udp_stat=='') $_ips_dos_udp_stat=0;
+echo mybox_select_box('pfipssel6',$data_a,$_ips_dos_udp_stat,'ips_dos_udp_stat');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Mode</td>
+<td valign="middle" class="tdvalue"> 
+<?php 
+$data_a=array();
+foreach($_IPS_DOS as $a => $b) {
+	$data_a[$b]=$a;
+	if(!isset($_ips_dos_udp_mode)||$_ips_dos_udp_mode=='') $_ips_dos_udp_mode=$a;
+}
+echo mybox_select_box('pfipssel7',$data_a,$_ips_dos_udp_mode,'ips_dos_udp_mode');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Logging</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+if(!isset($_ips_dos_udp_log)||$_ips_dos_udp_log=='') $_ips_dos_udp_log=0;
+echo mybox_select_box('pfipssel8',$data_a,$_ips_dos_udp_log,'ips_dos_udp_log');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Source packet rate</td>
+<td valign="middle" class="tdvalue"> 
+<input name="ips_dos_udp_src_rate" type="text" class="valbox" size="10" value="<?php echo $_ips_dos_udp_src_rate;?>"> (packets/second)
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Destination packet rate</td>
+<td valign="middle" class="tdvalue"> 
+<input name="ips_dos_udp_dst_rate" type="text" class="valbox" size="10" value="<?php echo $_ips_dos_udp_dst_rate;?>"> (packets/second)
+</td>
+</tr>
+</table>
+
+
+<table class="data" width="100%" style='padding-bottom: 0em;'>
+<tr>
+<td valign="middle" class="tdname">ICMP Flood Protection</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+if(!isset($_ips_dos_icmp_stat)||$_ips_dos_icmp_stat=='') $_ips_dos_icmp_stat=0;
+echo mybox_select_box('pfipssel9',$data_a,$_ips_dos_icmp_stat,'ips_dos_icmp_stat');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Mode</td>
+<td valign="middle" class="tdvalue"> 
+<?php 
+$data_a=array();
+foreach($_IPS_DOS as $a => $b) {
+	$data_a[$b]=$a;
+	if(!isset($_ips_dos_icmp_mode)||$_ips_dos_icmp_mode=='') $_ips_dos_icmp_mode=$a;
+}
+echo mybox_select_box('pfipssel10',$data_a,$_ips_dos_icmp_mode,'ips_dos_icmp_mode');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Logging</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+if(!isset($_ips_dos_icmp_log)||$_ips_dos_icmp_log=='') $_ips_dos_icmp_log=0;
+echo mybox_select_box('pfipssel11',$data_a,$_ips_dos_icmp_log,'ips_dos_icmp_log');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Source packet rate</td>
+<td valign="middle" class="tdvalue"> 
+<input name="ips_dos_icmp_src_rate" type="text" class="valbox" size="10" value="<?php echo $_ips_dos_icmp_src_rate;?>"> (packets/second)
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Destination packet rate</td>
+<td valign="middle" class="tdvalue"> 
+<input name="ips_dos_icmp_dst_rate" type="text" class="valbox" size="10" value="<?php echo $_ips_dos_icmp_dst_rate;?>"> (packets/second)
+</td>
+</tr>
+</table>
+
+</td>
+</tr>
+</tbody>
+</table>
+<?php }//tab==3?>
+<?php if($tab==4) {
+$_ips_pscan_stat=0;$_ips_pscan_drop=2;$_ips_pscan_log=1;
+$result=mybox_db_query("select * from misc where name like \"ips_pscan%\" ",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		if(trim($row['name'])=="ips_pscan_stat") $_ips_pscan_stat=trim($row['val']);
+		if(trim($row['name'])=="ips_pscan_drop") $_ips_pscan_drop=trim($row['val']);
+		if(trim($row['name'])=="ips_pscan_log") $_ips_pscan_log=trim($row['val']);
+	}
+}
+?>
+<script type="text/javascript">
+	function do_submit() {
+		if(document.f.btsave) document.f.btsave.disabled=true;
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	}
+</script>
+<table class="data" width="100%">
+<tbody>
+<tr>
+<td valign="middle" class="tdname">Portscan Protection</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+if(!isset($_ips_pscan_stat)||$_ips_pscan_stat=='') $_ips_pscan_stat=0;
+echo mybox_select_box('pfipssel12',$data_a,$_ips_pscan_stat,'ips_pscan_stat');
+?>
+</td>
+</tr>
+<tr>
+<td valign="middle" class="tdname">Policy</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array();
+foreach($_PFP as $a => $p) {
+	$data_a[$p]=$a;
+	if(!isset($_ips_pscan_drop)||$_ips_pscan_drop=='') $_ips_pscan_drop=$a;
+}
+echo mybox_select_box('pfipssel13',$data_a,$_ips_pscan_drop,'ips_pscan_drop');
+?>
+</td>
+</tr>
+<tr>
+<td valign="middle" class="tdname">Logging</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+if(!isset($_ips_pscan_log)||$_ips_pscan_log=='') $_ips_pscan_log=0;
+echo mybox_select_box('pfipssel14',$data_a,$_ips_pscan_log,'ips_pscan_log');
+?>
+</td>
+</tr>
+</tbody>
+</table>
+<?php }//tab==4?>
+<?php if($tab==5) {?>
+
+<table width="100%" border="0" cellpadding="0" cellspacing="0">
+<tr><td>
+<ul id="tabnav">
+<li class="<?php if($col==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=1) { echo "<a href=\"/fw_ips.exh?tab=$tab&col=1\">"; }?>Exception list<?php if($col!=1) { echo "</a>"; }?></li>
+<li class="<?php if($col==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=2) { echo "<a href=\"/fw_ips.exh?tab=$tab&col=2\">"; }?><?php if($do_id=='edit') { echo "Edit list"; } else { echo "New exception list"; }?><?php if($col!=2) { echo "</a>"; }?></li>
+</ul>
+</td></tr>
+<tr> 
+<td class="tabcont">
+<?php if($col==1) {?>
+<?php 
+// counting
+$currentPage = $HTTP_SERVER_VARS["PHP_SELF"];
+$maxRows_Recordset=50;
+if(!isset($pageNum_Recordset)) $pageNum_Recordset=0;
+$startRow_Recordset=@($pageNum_Recordset * $maxRows_Recordset);
+$query_Recordset="select * from ips_exclude order by id ASC";
+$query_limit_Recordset=sprintf("%s LIMIT %d, %d", $query_Recordset, $startRow_Recordset, $maxRows_Recordset);
+
+$Recordset=mybox_db_query($query_limit_Recordset, $db_id);
+if(!isset($totalRows_Recordset) || $totalRows_Recordset=='') {
+	$all_Recordset=mybox_db_query($query_Recordset,$db_id);
+	$totalRows_Recordset=mybox_db_num_rows($all_Recordset);
+}
+$totalPages_Recordset=@ceil($totalRows_Recordset/$maxRows_Recordset)-1;
+$queryString_Recordset=null;
+if(!empty($_SERVER['QUERY_STRING'])) {
+	$params=explode("&", $_SERVER['QUERY_STRING']);
+  	$newParams=array();
+  	foreach ($params as $param) {
+		if(stristr($param, "pageNum_Recordset")==true) continue;
+		if(stristr($param, "totalRows_Recordset")==true) continue;
+		if(stristr($param, "maxRows_Recordset")==true) continue;
+		if(stristr($param, "tab")==true) continue;
+		if(stristr($param, "col")==true) continue;
+		if(stristr($param, "do_id")==true) continue;
+		array_push($newParams, $param);
+  	}
+  	if(count($newParams) != 0) {
+    		$queryString_Recordset="&" . implode("&", $newParams);
+  	}
+}
+$queryString_Recordset=sprintf("&totalRows_Recordset=%d%s&tab=$tab&col=$col&do_id=$do_id",$totalRows_Recordset,$queryString_Recordset);
+if($pageNum_Recordset > 0) { 
+	$pagefirst=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, 0, $queryString_Recordset);
+	$pageprev=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, max(0, $pageNum_Recordset - 1), $queryString_Recordset);
+	$button1="<a href='$pagefirst'><img src='{$_PNG['first']}' border=0 alt='' title=''></a>\n";
+	$button2="<a href='$pageprev'><img src='{$_PNG['prev']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button1="<img src='{$_PNG['first']}' border=0 alt='' title=''>\n";
+	$button2="<img src='{$_PNG['prev']}' border=0 alt='' title=''>\n";
+}
+if($pageNum_Recordset < $totalPages_Recordset) {
+	$pagenext=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, min($totalPages_Recordset, $pageNum_Recordset + 1), $queryString_Recordset);
+	$pagelast=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, $totalPages_Recordset, $queryString_Recordset);
+	$button3="<a href='$pagenext'><img src='{$_PNG['next']}' border=0 alt='' title=''></a>\n";
+	$button4="<a href='$pagelast'><img src='{$_PNG['last']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button3="<img src='{$_PNG['next']}' border=0 alt='' title=''>\n";
+	$button4="<img src='{$_PNG['last']}' border=0 alt='' title=''>\n";
+}
+unset($pagefirst,$pageprev,$pagenext,$pagelast);
+$x=1;
+$_cnum=1;
+if(!isset($pageNum_Recordset)||$pageNum_Recordset==''||$pageNum_Recordset==0) {
+	$_cnum=1;
+} else {
+	$_cnum=($pageNum_Recordset * $maxRows_Recordset);
+	if($_cnum <= 0) {
+		$_cnum=1;
+	} else {
+		$_cnum +=1;
+	}
+}
+if($totalRows_Recordset >0 && mybox_db_num_rows($Recordset)!=0) {
+	echo "
+		<table width='100%' class=data>
+		<thead class='blue'>
+      		<tr>
+        	<td style='font-weight: bold; width: 2%; border-right: 0px;'>#</td> 
+        	<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Name</td>
+		<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Exception</td>
+        	<td style='width: 5%; font-weight: bold; text-align: right; border-left: 0px;'>&nbsp;</td>
+      		</tr>
+		</thead>
+		<tbody>
+	";
+	do {
+		$_id=$row['id'];
+		if($_id=='') continue;
+		$_name=trim($row['name']);
+		$_src=mybox_get_defname(trim($row['src']),2,0,$db_id);
+		$_dst=mybox_get_defname(trim($row['dst']),2,0,$db_id);
+		$_ips=trim($row['ips']);
+		$_tcpf=trim($row['tcpf']);
+		$_udpf=trim($row['udpf']);
+		$_icmpf=trim($row['icmpf']);
+		$_pscan=trim($row['pscan']);
+
+		$_dex='';$_spx='';
+		if($_ips==1) $_dex .="<i>- Intrusion Protection</i><br>";
+		if($_tcpf==1) $_dex .="<i>- TCP SYN Flood Protection</i><br>";
+		if($_udpf==1) $_dex .="<i>- UDP Flood Protection</i><br>";
+		if($_icmpf==1) $_dex .="<i>- ICMP Flood Protection</i><br>";
+		if($_pscan==1) $_dex .="<i>- Portscan Protection</i><br>";
+
+		if($_src=='') $_src='any';
+		if($_dst=='') $_dst='any';
+		$_spx ="$_src <img src='{$_PNG['arrow_right_s']}' border=0 alt='' title=''> $_dst";
+	
+		$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff; cursor: pointer;'";
+		$lo="onclick=\"self.location.href='/fw_ips.exh?tab=$tab&col=2&id=$_id&do_id=edit';\" ";
+		echo "
+			<tr $lt>
+        		<td $lo style='vertical-align: top;'>$_cnum</td>
+        		<td $lo style='vertical-align: top;'><b>$_name</b></td>
+			<td $lo style='vertical-align: top;'>
+			<p style='font-weight: bold; margin: 0px;padding:0px;'>$_spx</p>
+			$_dex
+			</td>
+			<td style='text-align: right; vertical-align: top;' align=right>
+			<a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='/fw_ips.exh?tab=$tab&col=$col&do_save=2&del=$_id&pageNum_Recordset=$pageNum_Recordset&totalPages_Recordset=$totalPages_Recordset';\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a>
+			<input type=checkbox name=del[] value=$_id>
+			</td>
+			</tr>
+		";
+		$_cnum++;$x++;
+	} while($row=mybox_db_fetch_assoc($Recordset));
+	if($_cnum >= 1) {
+		echo "
+		<tr>
+		<td style='text-align: right; background: #ffffff;' align=right valign=top colspan=4>
+		<a href='#' onclick='do_delete(2);return false;'>Delete</a> / <a href='#' onclick='dotoggle();return false;'>Toggle</a> <img src='{$_PNG['arrow_rtr']}' border=0 alt='' title=''></td>
+		</tr>
+		";
+	}
+	echo mybox_print_nextpage($pageNum_Recordset,$totalPages_Recordset,$totalRows_Recordset,$maxRows_Recordset,$queryString_Recordset,$currentPage,'4',$button1,$button2,$button3,$button4);
+	echo "</tbody></table>";
+} else {
+	echo "
+	<br>
+	<span class='notedef'>
+	There are no exception list defined.
+	</span>
+	<br><br>
+	";$_error=1;
+}?>
+
+<?php }//col==1?>
+<?php if($col==2) {
+$_src='any';
+$_dst='any';
+if($do_id=='edit') {
+	$result=mybox_db_query("select * from ips_exclude where id='$id'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=trim($row['name']);
+			$_src=trim($row['src']);
+			$_dst=trim($row['dst']);
+			$_ips=trim($row['ips']);
+			$_tcpf=trim($row['tcpf']);
+			$_udpf=trim($row['udpf']);
+			$_icmpf=trim($row['icmpf']);
+			$_pscan=trim($row['pscan']);
+		}
+		if($_src=='') $_src='any';
+		if($_dst=='') $_dst='any';
+	}
+}
+?>
+<script type="text/javascript">
+	function do_submit() {
+		var name=Trim(document.f.name.value);
+		if(name=='') {
+			pop_msg("Exception name empty");
+			document.f.name.focus();
+			return false;
+		}
+		var src=document.f.src.value;
+		var dst=document.f.dst.value;
+		if(src==dst) {
+			pop_msg("Source and destination cannot be same");
+			return false;	
+		}
+		var ok=0;
+		if(document.f.ips.checked) ok++;
+		if(document.f.tcpf.checked) ok++;
+		if(document.f.udpf.checked) ok++;
+		if(document.f.icmpf.checked) ok++;
+		if(document.f.pscan.checked) ok++;
+		if(ok==0) {
+			pop_msg("Please choose which protections want to skip");
+			return false;
+		}
+		if(document.f.btsave) document.f.btsave.disabled=true;
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	}
+</script>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td valign="middle" class="tdname">Name</td>
+<td valign="middle" class="tdvalue">
+<input name="name" type="text" class="valbox2" value="<?php echo $_name;?>" onkeypress="return strip_defname(event);">
+<?php if($do_id=='edit'){?>
+<input name="nameold" type="hidden" value="<?php echo $_name;?>">
+<?php }?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">For these source networks</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if(!isset($_src)||$_src=='') $_src='any';
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($list_array,'src',"$_src",'fwipsl5','fwipsl5a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+echo mybox_defwin('fwipsl5','200px','#ffffff','#999999','#336699','#ffffff','Source Networks','#ffffff','100px','hidden','auto',$txt);
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">OR For these destination networks</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if(!isset($_dst)||$_dst=='') $_dst='any';
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($list_array,'dst',"$_dst",'fwipsl6','fwipsl6a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+echo mybox_defwin('fwipsl6','200px','#ffffff','#999999','#336699','#ffffff','Destination Networks','#ffffff','100px','hidden','auto',$txt);
+?>
+</td>
+</tr>
+<tr> 
+<td valign="top" class="tdname">Skip these checks</td>
+<td valign="top" class="tdvalue">
+<input type=checkbox name=ips <?php if($_ips==1) echo "checked";?>> Intrusion Protection<br>
+<input type=checkbox name=tcpf <?php if($_tcpf==1) echo "checked";?>> TCP SYN Flood Protection<br>
+<input type=checkbox name=udpf <?php if($_udpf==1) echo "checked";?>> UDP Flood Protection<br>
+<input type=checkbox name=icmpf <?php if($_icmpf==1) echo "checked";?>> ICMP Flood Protection<br>
+<input type=checkbox name=pscan <?php if($_pscan==1) echo "checked";?>> Portscan Protection<br>
+</td>
+</tr>
+</tbody>
+</table>
+
+<?php }//col=2?>
+</td>
+</tr>
+</table>
+
+<?php }//tab==5?>
+<?php if($_error!=1){?>
+<table align=right>
+<tbody>
+<tr>
+<td><a name="sini"><a class="btn" href="#sini" onclick="return do_changes();return false;">Reload</a></td>
+<?php if($col!=1){?>
+<td>
+<a name="sini"><a class="btn" href="#sini" onclick="<?php if($tab==2 && $col==2){echo "return do_active(1);"; }else{ echo "return do_submit();"; }?>return false;"><?php if($do_id=='edit') { echo "Update"; } else { echo "Save";}?></a>
+</td></tr> 
+<?php  } ?>
+</tbody>
+</table>
+<?php }?>
+<!-- end tab container -->
+
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value='<?php echo $tab;?>'>
+<input type=hidden name=col value='<?php echo $col;?>'>
+<?php if($col==2) {?>
+<input type=hidden name=f value='<?php echo $f;?>'>
+<?php  } ?>
+<?php if($tab==5 && $col==2) {?>
+<input type=hidden name=id value='<?php echo $id;?>'>
+<input type=hidden name=do_id value='<?php echo $do_id;?>'>
+<?php  } ?>
+</form>
+<script type='text/javascript'>page_kill();</script>
+</body>
+</html>
+
+<?php mybox_db_close($db_id);?>

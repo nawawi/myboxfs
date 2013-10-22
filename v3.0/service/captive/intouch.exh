@@ -1,0 +1,231 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+if(!isset($_AWIE_CODE)||$_AWIE_CODE=='') exit;
+$_SYSID="intouch.exh";
+?>
+
+<html>
+<head>
+<title>Intouch@Wifi - NSA Hotspot Gateway - Powered By Tracenetwork</title>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<link rel="stylesheet" type="text/css" href="/intouch/scripts/style.css" />
+<script type='text/javascript'>
+function Trim(str) {return(str.replace(/^\s*/,'').replace(/\s*$/,'').replace(/^\t*/,'').replace(/\t*$/,'').replace(/^\f*/,'').replace(/\f*$/,'').replace(/^\r*/,'').replace(/\r*$/,''));}
+</script>
+</head>
+<body scroll=auto>
+<table width="800" border="0" cellpadding="0" cellspacing="0" align="center">
+<tr valign='top'>
+<td>
+<table width="800" border="0" cellpadding="0" cellspacing="0" align="center">
+<tr valign='top'>
+<td width='47' height='110'>&nbsp;</td>
+<td width='110' height='110'><img src='/intouch/images/logo_allson.gif'></td>
+<td width='596' height='110' valign='middle' align="right">
+<object classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" codebase="http://download.macromedia.com/pub/shockwave/cabs/flash/swflash.cab#version=6,0,29,0" width="560" height="72">
+<param name="movie" value="/intouch/images/bannerwithoutline.swf">
+<param name="quality" value="high">
+<embed src="/intouch/images/bannerwithoutline.swf" quality="high" pluginspage="http://www.macromedia.com/go/getflashplayer" type="application/x-shockwave-flash" width="560" height="72"></embed>
+</object>
+</td>
+<td width='47' height='110'>&nbsp;</td>
+</tr>
+</table>			
+</td>
+</tr>
+<tr valign='top'>
+<td>
+<table width="800" border="0" cellpadding="0" cellspacing="0" align="center">
+<tr valign='top'>
+<td width='70' height='16'><img src='/intouch/images/img_01.gif'></td>
+<td height='16'><img src='/intouch/images/img_02.gif' height="16" width="660"></td>
+<td width='70' height='16'><img src='/intouch/images/img_03.gif'></td>
+</tr>
+</table>			
+</td>
+</tr>
+<tr valign='top'>
+<td>
+<table width="800" border="0" cellpadding="0" cellspacing="0" align="center">
+<tr valign='top'>
+<td width='70' height='85'><img src='/intouch/images/img_04.gif'></td>
+<td width='333' height='85'><img src='/intouch/images/img_06.gif'></td>
+<td width='327' height='85' background="/intouch/images/img_07.gif"></td>
+<td width='70' height='85'><img src='/intouch/images/img_05.gif'></td>
+</tr>
+</table>			
+</td>
+</tr>
+<tr valign='top'>
+<td>
+<table width="800" border="0" cellpadding="0" cellspacing="0" align="center"  background="/intouch/images/img_10.gif">
+<tr valign='top'>
+<td width='147' height='212' background="/intouch/images/img_34.gif"><img src="/intouch/images/img_08.gif"></td>
+<td width='301' height='212' class='wlcmtxt' align='right'>
+<?php 
+if($_ok==1) {
+	echo "Welcome to intouch@wifi Internet Hotspot";
+}
+if(isset($msg)&&$msg!='') {
+	echo "<br><br>$msg";
+}
+?>
+<?php if($_ok==0) {?>
+Failed to get you MAC Address
+<?php } elseif($_ok==1 || $_ok==2) {?>
+<script type="text/javascript">
+function do_submit() {
+	<?php if($_ok==1) {?>
+	var p=Trim(document.f.wifikey.value);
+	if(p=='') {
+		document.f.wifikey.focus();
+		return false;
+	}
+	<?php }?>
+	<?php if($_ok==1) {?>
+	document.f.just_login.value='1';
+	<?php }?>
+	<?php if($_f4==1) {?>
+	document.f.force_logout.value='1';
+	<?php }?>
+	<?php if($_ok==2) {?>
+	document.f.just_login.value='2';
+	<?php }?>
+	document.f.do_save.value='1';
+	document.f.submit();
+	return true;
+}
+</script>
+<?}?>
+
+</td>
+<td width='294' height='212'>
+<form action="http://mybox.captive.portal:<?php echo $_CAPTIVE['port'];?>/index.exh" method="post" name="f">
+<table width="294" height='212' border="0" cellpadding="0" cellspacing="0" align="center">
+<tr valign='top'>
+<td>
+<?php if($_ok==1) {?>
+<table width="294" height='122' border="0" cellpadding="0" cellspacing="0" align="center">
+<tr valign='top'>
+<td width='15' height='48'><img src='/intouch/images/img_11.gif'></td>
+<td height='48' colspan='2'><img src='/intouch/images/img_13.gif'></td>
+<td width='15' height='48'><img src='/intouch/images/img_12.gif'></td>
+</tr>			
+<tr valign='top'>
+<td width='15' height='33'><img src='/intouch/images/img_14.gif'></td>
+<td height='33' colspan='2'><img src='/intouch/images/img_16.gif'></td>
+<td width='15' height='33'><img src='/intouch/images/img_15.gif'></td>
+</tr>		
+<tr valign='top'>
+<td width='15' height='20' background='/intouch/images/img_17.gif'></td>
+<td bgcolor='#6A8447' height='20' width='110'><img src='/intouch/images/img_22.gif'></td>
+<td bgcolor='#6A8447' height='20'><input type='password' name='wifikey' class='keytxt'></td>
+<td width='15' height='20' background='/intouch/images/img_18.gif'></td>
+</tr>		
+<tr valign='top'>
+<td width='15' height='21'><img src='/intouch/images/img_19.gif'></td>
+<td height='20' colspan='2'><img src='/intouch/images/img_21.gif'></td>
+<td width='15' height='21'><img src='/intouch/images/img_20.gif'></td>
+</tr>	
+</table>
+<script type='text/javascript'>
+document.f.wifikey.focus();
+</script>
+<?php } else {?>
+
+<table width="294" height='122' border="0" cellpadding="0" cellspacing="0">
+<tr valign='top'>
+<td colspan='3' style='font-size: 12px; color: #ffffff;'>
+<?php if($_myname!='') echo "Wifi key: $_myname<br>";?>
+<?php if($_mytimen!='') {
+	$_mytimen=date('d/m/Y h:i:s A',$_mytimen);
+	echo "Login time: $_mytimen<br>";
+}?>
+<?php if($_mytime!='') {
+	$_mytime=date('d/m/Y h:i:s A',$_mytime);
+	echo "Login timeout: $_mytime<br>";
+}?>
+IP Address: <?php echo $_uip;?>
+<?php if($_umac!='') echo "<br>MAC Address: $_umac";?>
+<?php if($_uhost!='' && $_ok!=2) echo "<br>URL: $_uhost";?>
+</td>
+</tr>	
+</table>
+
+<?php } ?>
+
+<?php 
+$txt="L O G I N";
+if($_ok==1 && $_f4==1) {
+	$txt="R E L O G I N";
+}
+if($_ok==2) $txt="L O G O U T";
+?>
+<p align="right"><input type="button" value="<?php echo $txt;?>" onclick="return do_submit();"></p>
+<?php if($_f4==1) {?>
+<input type=hidden name='force_logout' value='0'>
+<?php }?>
+<input type=hidden name='myip' value='<?php echo $_uip;?>'>
+<input type=hidden name='myurl' value='<?php echo $_uhost;?>'>
+<input type=hidden name='mymac' value='<?php echo $_umac;?>'>
+<input type=hidden name='just_login' value='0'>
+<input type=hidden name='do_save' value='0'>
+<input type=hidden name='serial' value='<?php echo time();?>'>
+</form>
+</td>
+</tr>
+<tr valign='top'>
+<td>
+<table width="294" height='90' border="0" cellpadding="0" cellspacing="0" align="center">
+<tr valign="top">
+<td style="font-family:arial; color:#EDEDCE; font-size:11px; text-align:right; padding:10px;">
+<b>Term & Conditions Apply</b><br>
+any enquires please contact hotel front desk or email to us at support@intouchwifi.com
+</td>
+</tr>
+</table>
+</td>
+</tr>
+</table>
+</td>
+<td width='58' height='212' background="/intouch/images/img_09.gif"><img src='/intouch/images/img_09.gif' border='0'></td>
+</tr>
+</table>			
+</td>
+</tr>
+<tr valign='top'>
+<td>
+<table width="800" border="0" cellpadding="0" cellspacing="0" align="center" >
+<tr valign='top'>
+<td width='70' height='124' background="/intouch/images/img_25.gif"></td>
+<td height='124' background="/intouch/images/img_26.gif"><img src="/intouch/images/img_27.gif"></td>
+<td width='70' height='124' background="/intouch/images/img_24.gif"></td>
+</tr>
+</table>			
+</td>
+</tr>
+<tr valign='top'>
+<td>
+<table width="800" border="0" cellpadding="0" cellspacing="0" align="center" >
+<tr valign='top'>
+<td width='70' height='22' background="/intouch/images/img_28.gif"></td>
+<td height='22' background="/intouch/images/img_30.gif">&nbsp;</td>
+<td width='70' height='22' background="/intouch/images/img_29.gif"></td>
+</tr>
+</table>			
+</td>
+</tr>
+<tr valign='top'>
+<td>
+<table width="800" border="0" cellpadding="0" cellspacing="0" align="center" >
+<tr valign='top'>
+<td width='70' height='31' background="/intouch/images/img_31.gif"></td>
+<td height='31'><a href="http://www.tracenetworkcorporation.com" target="_blank"><img src="/intouch/images/img_32.gif" border=0></a></td>
+<td height='31' background="/intouch/images/img_33.gif"><img src="/intouch/images/img_33.gif"></td>
+</tr>
+</table>			
+</td>
+</tr>
+</table>
+</body>
+</html>

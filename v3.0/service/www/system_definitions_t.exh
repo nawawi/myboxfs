@@ -1,0 +1,588 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="system_definitions_s";
+include_once('page.exl');
+mybox_chk_session();
+mybox_send_nocache();
+$db_id=mybox_db_connect($_DB_NAME);
+
+function clean_file_cache() {
+	@unlink("/var/sys/deftime.cache");
+	@unlink("/var/sys/defname.cache");
+}
+
+function del_name($id,$table,$db_id) {
+	$name='';
+	$result=mybox_db_query("select name from $table where id='$id'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		$name=mybox_db_fetch_single($result);
+	}
+	mybox_db_query("delete from $table where id='$id'",$db_id);
+	if($name!='') {
+		update_def($name,"","2",$db_id);
+	}
+}
+
+function update_def($name,$nameold,$opt,$db_id) {
+	if($opt==1) {
+		foreach(array("pf_inbound","pf_outbound") as $table) {
+			$result=mybox_db_query("select id,event from $table",$db_id);
+			if(mybox_db_num_rows($result)!=0) {
+				while($row=mybox_db_fetch_assoc($result)) {
+					$_id=$row['id'];
+					$_event=trim($row['event']);
+					if($_event=="$nameold") {
+						mybox_db_query("update $table set event='$name' where id='$_id'",$db_id);
+					}
+				}
+			}
+			unset($result,$_id,$_event);
+		}
+		unset($table);
+
+		// dnat,snat
+		foreach(array("pf_dnat","pf_snat","pf_map") as $table) {
+			$result=mybox_db_query("select id,event from $table",$db_id);
+			if(mybox_db_num_rows($result)!=0) {
+				while($row=mybox_db_fetch_assoc($result)) {
+					$_id=$row['id'];
+					$_event=trim($row['event']);
+					$_fwdp=trim($row['fwdp']);
+					if($_event=="$nameold") {
+						mybox_db_query("update $table set event='$name' where id='$_id'",$db_id);
+					}
+				}
+			}
+			unset($result,$_id,$_event);
+		} // foreach
+		unset($table);
+	}
+	if($opt==2) {
+		foreach(array("pf_inbound","pf_outbound") as $table) {
+			$result=mybox_db_query("select id,event from $table",$db_id);
+			if(mybox_db_num_rows($result)!=0) {
+				while($row=mybox_db_fetch_assoc($result)) {
+					$_id=$row['id'];
+					$_event=trim($row['event']);
+					if($_event=="$name") {
+						mybox_db_query("delete from $table where id='$_id'",$db_id);
+					}
+				}
+			}
+			unset($result,$_id,$_event);
+		}
+		unset($table);
+
+
+		// dnat,snat
+		foreach(array("pf_dnat","pf_snat","pf_map") as $table) {
+			$result=mybox_db_query("select id,event from $table",$db_id);
+			if(mybox_db_num_rows($result)!=0) {
+				while($row=mybox_db_fetch_assoc($result)) {
+					$_id=$row['id'];
+					$_event=trim($row['event']);
+					if($_event=="$name") {
+						mybox_db_query("delete from $table where id='$_id'",$db_id);
+					}
+				}
+			}
+			unset($result,$_id,$_event);
+		}
+		unset($table);
+	}
+}
+
+if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+	if($tab==1) {
+		if(isset($do_save)&&$do_save==2) {
+			if(is_array($del) && count($del)!=0) {
+				foreach($del as $x) {
+					if($x!='') del_name($x,"deftimes",$db_id);
+				}
+			} else {
+				if($del!='') del_name($del,"deftimes",$db_id);
+			}
+			clean_file_cache();
+		}
+	}
+	if($tab==2) {
+		if(isset($do_save)&&$do_save==1) {
+			if($do_id!='edit') {
+				$name=trim($name);
+				$note=mybox_escape_str($note);
+				$timedays=trim($timedays,",");
+				$result=mybox_db_query("select name from deftimes where name='$name'",$db_id);
+				if(mybox_db_num_rows($result)==0) {
+					mybox_db_query("insert into deftimes (name,val,val2,val3,note) values ('$name','$timedays','$timestart','$timeend','$note')",$db_id);
+					$msg='Definition saved';
+					clean_file_cache();
+				} else {
+					$msg="Definition name '$name' already exist";
+				}
+			}
+			if($do_id=='edit') {
+				$name=trim($name);
+				$nameold=trim($nameold);
+				$note=mybox_escape_str($note);
+				$timedays=trim($timedays,",");
+				if($name!=$nameold) {
+					$result=mybox_db_query("select name from deftimes where name='$name'",$db_id);
+					if(mybox_db_num_rows($result)!=0) {
+						$msg="Definition name '$name' already exist";
+					} else {
+						mybox_db_query("update deftimes set name='$name',val='$timedays',val2='$timestart',val3='$timeend',note='$note' where id='$id'",$db_id);
+						$msg='Definition updated';$do_id='';$tab=1;
+						clean_file_cache();update_def($name,$nameold,"1",$db_id);
+					}
+				} else {
+					mybox_db_query("update deftimes set name='$name',val='$timedays',val2='$timestart',val3='$timeend',note='$note' where id='$id'",$db_id);
+					$msg='Definition updated';$do_id='';$tab=1;
+					clean_file_cache();
+				}
+			}
+		}
+	}
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied";
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+?>
+<html>
+<head>
+<title>MyAdmin</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<LINK REL=StyleSheet HREF="/c/mybox_calendar.css" TYPE="text/css">
+<script type='text/javascript' src="/j/mybox_func.js"></script>
+<script type='text/javascript' src="/j/mybox_overlib.js"></script>
+<script type='text/javascript'>
+calendar=null;
+function showCalendar(id) {var el = document.getElementById(id);if (calendar != null) {calendar.hide();} else {var cal = new Calendar(true, null, selected, closeHandler);cal.weekNumbers = true;cal.showsTime = true;cal.time24 = true;cal.showsOtherMonths = false;calendar = cal;cal.setRange(1900, 2070);cal.create();}calendar.setDateFormat('%d-%m-%Y %H:%M');calendar.parseDate(el.value);calendar.sel = el;calendar.showAtElement(el, "Br");return false;}
+function selected(cal, date) {cal.sel.value = date;}
+function closeHandler(cal) {cal.hide();calendar = null;}
+</script>
+<script type='text/javascript' src="/j/mybox_calendar.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?php echo $_LOGIN['auth_id'];?>";
+	page_load();
+</script>
+</head>
+<body onload="load_menu('sub2','t2d3','s2i3');" scroll="auto">
+<form name=f method=post action="/system_definitions_t.exh">
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 0px;'>
+<tr>
+<td>
+<?php mybox_page_section("Definitions / Time Event");?>
+<br><br>
+<?php if($tab==1) { mybox_page_search($str); }?>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="/system_definitions_t.exh?tab=1" <?php if($tab==1){?>class="tabact"<?php }?>>Time Event</a></li>
+<li><a href="/system_definitions_t.exh?tab=2" <?php if($tab==2){?>class="tabact"<?php }?>><?php if($do_id=='edit'){?>Edit<?php }else{?>New<?php }?> Time Event</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td> 
+<?php mybox_page_msg($msg);?>
+<br>
+
+<!-- tab container -->
+
+<?php if($tab==1) {?>
+
+<table width="100%" class=data>
+<thead class="blue">
+      <tr>
+        <td style='font-weight: bold; width: 2%;border-right: 0px;'>#</td> 
+        <td style='font-weight: bold;border-left: 0px;border-right: 0px;'>Name</td>
+	<td style='font-weight: bold; border-left: 0px;border-right: 0px;'></td>
+        <td style='width: 5%; border-right: 0px; border-left: 0px; text-align: right;'>&nbsp;</td>
+      </tr>
+</thead>
+<tbody>
+<?php 
+// counting
+$currentPage = $HTTP_SERVER_VARS["PHP_SELF"];
+$maxRows_Recordset=50;
+if(!isset($pageNum_Recordset)) $pageNum_Recordset=0;
+$startRow_Recordset=@($pageNum_Recordset * $maxRows_Recordset);
+if(isset($str)&&$str!='') {
+	$strn=mybox_escape_str($str);
+	$query_Recordset="select * from deftimes where name like \"%$strn%\" order by id ASC";
+} else {
+	$query_Recordset="select * from deftimes order by id ASC";
+}
+$query_limit_Recordset=sprintf("%s LIMIT %d, %d", $query_Recordset, $startRow_Recordset, $maxRows_Recordset);
+
+$Recordset=mybox_db_query($query_limit_Recordset, $db_id);
+if(isset($totalRows_Recordset)) {
+	$totalRows_Recordset=$totalRows_Recordset;
+} else {
+	$all_Recordset=mybox_db_query($query_Recordset,$db_id);
+	$totalRows_Recordset=mybox_db_num_rows($all_Recordset);
+}
+$totalPages_Recordset=@ceil($totalRows_Recordset/$maxRows_Recordset)-1;
+$queryString_Recordset=null;
+if(!empty($_SERVER['QUERY_STRING'])) {
+	$params=explode("&", $_SERVER['QUERY_STRING']);
+  	$newParams=array();
+  	foreach ($params as $param) {
+		if(stristr($param, "pageNum_Recordset")==true) continue;
+		if(stristr($param, "totalRows_Recordset")==true) continue;
+		if(stristr($param, "maxRows_Recordset")==true) continue;
+		if(stristr($param, "tab")==true) continue;
+		if(stristr($param, "do_id")==true) continue;
+		if(stristr($param, "str")==true) continue;
+		if(stristr($param, "do_list")==true) continue;
+		array_push($newParams, $param);
+  	}
+  	if(count($newParams) != 0) {
+    		$queryString_Recordset="&" . implode("&", $newParams);
+  	}
+}
+$queryString_Recordset=sprintf("&totalRows_Recordset=%d%s&tab=$tab&str=$str&do_id=$do_id&do_list=$do_list",$totalRows_Recordset,$queryString_Recordset);
+if($pageNum_Recordset > 0) { 
+	$pagefirst=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, 0, $queryString_Recordset);
+	$pageprev=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, max(0, $pageNum_Recordset - 1), $queryString_Recordset);
+	$button1="<a href='$pagefirst'><img src='{$_PNG['first']}' border=0 alt='' title=''></a>\n";
+	$button2="<a href='$pageprev'><img src='{$_PNG['prev']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button1="<img src='{$_PNG['first']}' border=0 alt='' title=''>\n";
+	$button2="<img src='{$_PNG['prev']}' border=0 alt='' title=''>\n";
+}
+if($pageNum_Recordset < $totalPages_Recordset) {
+	$pagenext=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, min($totalPages_Recordset, $pageNum_Recordset + 1), $queryString_Recordset);
+	$pagelast=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, $totalPages_Recordset, $queryString_Recordset);
+	$button3="<a href='$pagenext'><img src='{$_PNG['next']}' border=0 alt='' title=''></a>\n";
+	$button4="<a href='$pagelast'><img src='{$_PNG['last']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button3="<img src='{$_PNG['next']}' border=0 alt='' title=''>\n";
+	$button4="<img src='{$_PNG['last']}' border=0 alt='' title=''>\n";
+}
+unset($pagefirst,$pageprev,$pagenext,$pagelast);
+$x=1;
+$_cnum=1;
+if(!isset($pageNum_Recordset)||$pageNum_Recordset==''||$pageNum_Recordset==0) {
+	$_cnum=1;
+} else {
+	$_cnum=($pageNum_Recordset * $maxRows_Recordset);
+	if($_cnum <= 0) {
+		$_cnum=1;
+	} else {
+		$_cnum +=1;
+	}
+}
+do {
+	$_id=$row['id'];
+	if($_id=='') continue;
+	$_name=$row['name'];
+	$_val=$row['val'];
+	$_val=trim(trim($_val),",");
+	if($_val!='') $_val=" <font color=black>on</font> <font color=blue>$_val</font>";
+	$_val2=trim($row['val2']);
+	$_val3=trim($row['val3']);
+	if($_val2!='' && $_val3!='') {
+		$_val="From <font color=blue>$_val2</font> <font color=black>until</font> <font color=blue>$_val3 $_val</font>";
+	} else {
+		if($_val2!='') $_val="From <font color=blue>$_val2 $_val</font>";
+		if($_val3!='') $_val="From <font color=blue>$_val3 $_val</font>";
+	}
+	$_val=trim($_val);
+	$_note=mybox_unescape_str($row['note']);
+	if($_note!='') $_note=mybox_print_note($_note);
+
+	$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff;cursor: pointer; '";
+	$lo='';
+	$lo="onclick=\"self.location.href='/system_definitions_t.exh?tab=2&id=$_id&do_id=edit';\" ";
+	echo "
+	<tr $lt>
+        <td $lo style='vertical-align: top;'>$_cnum</td>
+        <td $lo style='vertical-align: top; table-layout: fixed; white-space: nowrap; color: green;'><b>$_name</b></td>
+	<td $lo style='vertical-align: top;border-right: 0px;'>
+	<b>$_val</b>
+	$_note
+	</td>
+	<td style='border-left: 0px;text-align: right; vertical-align: bottom; table-layout: fixed; white-space: nowrap;'>
+	<a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='/system_definitions_t.exh?tab=$tab&do_list=$do_list&str=$str&do_save=2&del=$_id&pageNum_Recordset=$pageNum_Recordset&totalPages_Recordset=$totalPages_Recordset';\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a>
+	<input type=checkbox name=del[] value=$_id>
+	</td>
+	</tr>
+	";
+	$_cnum++;
+	$x++;
+} while($row=mybox_db_fetch_assoc($Recordset));
+
+if($x > 1 && $_id!=0) {
+?>
+<tr>
+<td style='text-align: right; background: #ffffff;' align=right valign=top colspan=4>
+<a href='#' onclick='do_delete(2);return false;'>Delete</a> / <a href='#' onclick='dotoggle();return false;'>Toggle</a> <img src='<?php echo $_PNG['arrow_rtr'];?>' border=0 alt='' title=''></td>
+</tr>
+<?php  } else {?>
+<tr>
+<td style='text-align: left; border-right: 0px; background: #ffffff;' valign=top colspan=4>
+No record available.
+</td></tr>
+<?php }
+echo mybox_print_nextpage($pageNum_Recordset,$totalPages_Recordset,$totalRows_Recordset,$maxRows_Recordset,$queryString_Recordset,$currentPage,'4',$button1,$button2,$button3,$button4);
+?>
+
+</tbody>
+</table>
+
+
+<?php }//tab==1?>
+
+<?php if($tab==2){
+if($do_id=='edit') {
+	$result=mybox_db_query("select * from deftimes where id='$id'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_id=$row['id'];
+			$_name=$row['name'];
+			$_val=$row['val'];
+			$_timestart=$row['val2'];
+			$_timeend=$row['val3'];
+			$_note=mybox_unescape_str($row['note']);
+		}
+		$_timeday_array=preg_split("/,/",$_val);
+	}
+}
+?>
+<script type='text/javascript'>
+	function do_submit() {
+		var name=Trim(document.f.name.value);
+		if(name=='') {
+			pop_msg("Definition name empty");
+			document.f.name.focus();
+			return false;
+		}
+		if(name.match(/,/)!=null || name.match(/\$/)!=null || name.match(/;/)!=null || name.match(/'/)!=null) {
+			pop_msg("Invalid Definition name '"+name+"'");
+			document.f.name.focus();
+			return false;
+		}
+		var timestart=Trim(document.f.timestart.value);
+		var timeend=Trim(document.f.timeend.value);
+		var ok=0;
+		var chk=0;
+		var m1=/^(\d\d)\-(\d\d)\-(\d\d\d\d)\s+(\d\d)\:(\d\d)$/;
+		var m2=/^(\d\d)\:(\d\d)$/;
+		if(timestart!='') {
+			if(timestart.match(m1)!=null) {
+				ok=1;chk=1;
+			} else if(timestart.match(m2)!=null) {
+				ok=1;chk=1;
+			} 
+			if(ok==0) {
+				pop_msg("Invalid start date/time format");
+				return false;
+			}
+		}
+		ok=0;
+		if(timeend!='') {
+			if(timeend.match(m1)!=null) {
+				ok=1;chk=1;
+			} else if(timeend.match(m2)!=null) {
+				ok=1;chk=1;
+			} 
+			if(ok==0) {
+				pop_msg("Invalid stop date/time format");
+				return false;
+			}
+		}
+		var list=document.f.timeday;
+		var lday='';
+		for(var i=0;i<list.length;i++) {
+			if(list.options[i]!=null) {
+				lday +=list.options[i].value;
+				lday +=',';
+			}
+		}
+		if(chk!=1 && lday=='') {
+			pop_msg("No Time Event defined");
+			return false;
+		}
+		document.f.timedays.value=lday;
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	}
+
+	function inmoveto(a) {
+		if(a=="right") {
+			var p=document.f.timeday.length;
+			var lstlenght=document.f.timedayt.length;
+			var list=document.f.timedayt;
+			for(var i='0';i<lstlenght;i++) {
+				if(list[i]!=null && list[i].value!='') {
+					if(list.options[i].selected==true) {
+						document.f.timeday[p]=new Option(list.options[i].text,list.options[i].value);
+						list[i]=null;
+						p++;
+					}
+				}
+			}
+		}
+
+		if(a=="left") {
+			var p=document.f.timedayt.length;
+			var lstlenght=document.f.timeday.length;
+			var list=document.f.timeday;
+			for(var i='0';i<lstlenght;i++) {
+				if(list[i]!=null && list[i].value!='') {
+					if(list.options[i].selected==true) {
+						document.f.timedayt[p]=new Option(list.options[i].text,list.options[i].value);
+						list[i]=null;
+						p++;
+					}
+				}
+			}
+		}
+	}
+</script>
+<table width="100%" class="data">
+<tr> 
+<td valign="middle" class="tdname">Name</td>
+<td valign="middle" class="tdvalue">
+<input name="name" type="text" class="valbox2" value="<?php echo $_name;?>">
+<?php if($do_id=='edit') {?><input name="nameold" type=hidden value="<?php echo $_name;?>"><?php }?>
+</td>
+</tr>
+<tr>
+<td valign="top" class="tdname">Event</td>
+
+<td valign="top" class="tdvalue">
+
+<table class="data" style='border: 0px; padding: 0px; margin: 0px;'>
+<tr>
+<td valign=top style='border: 0px; width: 40%;'>
+<table class="data" style='border: 0px; padding: 0px; margin: 0px;'>
+<tr>
+<td valign=top style='border: 0px; text-align: center;'>
+<select name=timedayt size=7 multiple class=selbox style='height: 105px; width: 100px;'>
+<?php 
+$_tmon=array("Mon"=>"Monday","Tue"=>"Tuesday","Wed"=>"Wednesday","Thu"=>"Thursday","Fri"=>"Friday","Sat"=>"Saturday","Sun"=>"Sunday");
+$tk='';
+if(count($_timeday_array)!=0) {
+	foreach($_timeday_array as $x) {
+		if($_tmon[$x]!='') {
+			$tk .="<option value='$x'>{$_tmon[$x]}</option>";
+			unset($_tmon[$x]);
+		}
+	} 
+}
+foreach($_tmon as $n => $m) {
+	echo "<option value='$n'>$m</option>";
+}
+?>
+</select>
+</td>
+<td valign=absmiddle style='border: 0px; text-align: center;'>
+<table class="data" style='border: 0px; padding: 0px; margin: 0px;'>
+<tr>
+<td valign=top style='border: 0px;'>
+<a name="sini"><a class="btns" href="#sini" onclick="return inmoveto('right');return false;"> >> </a>
+</td>
+</tr>
+<tr>
+<td valign=top style='border: 0px;'>
+<a name="sini"><a class="btns" href="#sini" onclick="return inmoveto('left');return false;"> << </a>
+</td>
+</tr>
+</table>
+</td>
+</td>
+<td valign=top style='border: 0px; text-align: center;'>
+<select name=timeday size=7 multiple class=selbox style='height: 105px; width: 100px;'>
+<?php echo $tk;?>
+</select>
+</td>
+</tr>
+</table>
+</td>
+<td valign=top style='border: 0px; width: 60%;'>
+<table class="data" style='border: 0px; padding: 0px; margin: 0px;'>
+<tr>
+<td valign=top style='border: 0px; font-weight: bold; width: 10%;'>
+Start
+</td><td valign=top style='border: 0px; width: 90%;'><b>: </b>
+<input type="text" name="timestart" id="timestart" size="20" value="<?php echo $_timestart;?>" class="valbox">
+&nbsp;<input type="image" src="/i/clock.gif" alt="Start date selector" border="0" align="absmiddle" onclick="return showCalendar('timestart');">&nbsp;
+</td></tr>
+<tr>
+<td valign=top style='border: 0px; font-weight: bold; width: 10%;'>
+Stop
+</td><td valign=top style='border: 0px; width: 90%;'><b>: </b>
+<input type="text" name="timeend" id="timeend" size="20" value="<?php echo $_timeend;?>" class="valbox">
+&nbsp;<input type="image" src="/i/clock.gif" alt="End date selector" border="0" align="absmiddle" onclick="return showCalendar('timeend');">
+</td>
+</tr>
+<tr>
+<td valign=top style='border: 0px;' colspan=2>
+You can change the date/time setting by edit<br>the start and stop input box
+</td>
+</tr>
+</table>
+</td>
+</tr>
+</table>
+<input type=hidden name=timedays value=''>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Comment</td>
+<td valign="middle" class="tdvalue">
+<input name="note" type="text" class="valbox2" value="<?php echo $_note;?>">
+</td>
+</tr>
+</table>
+
+<table align=right>
+<tbody>
+<tr>
+<td>
+<a name="sini"><a class="btn" href="#sini" onclick="return do_submit();return false;"><?php if($do_id=='edit') { echo "Update"; } else { echo "Save";}?></a>
+</td>  
+</tr> 
+</tbody>
+</table>
+
+</td>
+</tr>
+</table>
+
+
+
+<?php }//tab==2?>
+<!-- end tab container -->
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?php echo $tab;?>>
+<input type=hidden name=id value='<?php echo $id;?>'>
+<input type=hidden name=do_id value='<?php echo $do_id;?>'>
+</form><br><br>
+<script type='text/javascript'>page_kill();</script>
+</body>
+</html>
+<?php mybox_db_close($db_id);?>

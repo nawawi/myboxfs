@@ -1,0 +1,324 @@
+#!/bin/php -Cq
+<?php 
+// pptp.init - last update 30-Jun-2006
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="pptp";
+include_once('clib.exl');
+putenv("PATH=/bin:/service/tools:/service/init");
+
+$_QUIET=0;
+mybox_init_set_alarm(30);
+
+if(!file_exists("/bin/pppd") || !file_exists("/bin/pptpd") || !file_exists("/bin/pptpctrl") || !file_exists("/bin/bcrelay")) {
+	mybox_init_echo($_QUIET,"ERROR","Cannot execute pptp.init. Internal error!");
+	exit(1);
+}
+
+function pptp_get_ip($_name,$db_id) {
+	$_defnet_array=mybox_defnetwork_array($db_id);
+	$_cmd_array=array();
+	if(isset($_defnet_array[$_name]['name']) && $_defnet_array[$_name]['name']!='') {
+		$_ip=$_defnet_array[$_name]['ip'];
+		$_type=$_defnet_array[$_name]['type'];
+		if($_type==2) $_ip="$_ip/32";
+		$_cmd_array[]="$_ip";
+	} elseif(isset($_defnet_array[$_name]['group']) && $_defnet_array[$_name]['group']!='') {
+		foreach($_defnet_array[$_name] as $a => $b) {
+			if(!is_array($b)) continue;
+			$_ip=$b['ip'];
+			$_type=$b['type'];
+			if($_type==2) $_ip="$_ip/32";
+			$_cmd_array[]="$_ip";
+		}
+	}
+	return $_cmd_array;
+}
+function pptp_config() {
+	global $_QUIET, $_DB_NAME;
+
+	$db_id=mybox_db_connect($_DB_NAME);
+	$_defnet_array=mybox_defnetwork_array($db_id);
+	$_pptp_vpn_stat=0;
+	$_pptp_vpn_auth=1;
+	$_pptp_vpn_debug=0;
+	$_pptp_vpn_pool_type=1;
+	$_pptp_vpn_pool_net='';
+	$_pptp_vpn_dhcp_server='';
+	$_pptp_vpn_dhcp_dev='';
+	$_pptp_vpn_auth_grp='';
+	$_pptp_vpn_user='';
+	$result=mybox_db_query("select * from misc where name like \"pptp_%\"",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			if(trim($row['name'])=="pptp_vpn_stat") $_pptp_vpn_stat=trim($row['val']);
+			if(trim($row['name'])=="pptp_vpn_auth") $_pptp_vpn_auth=trim($row['val']);
+			if(trim($row['name'])=="pptp_vpn_user") $_pptp_vpn_user=trim($row['val']);
+			if(trim($row['name'])=="pptp_vpn_auth_grp") $_pptp_vpn_auth_grp=trim($row['val']);
+			if(trim($row['name'])=="pptp_vpn_debug") $_pptp_vpn_debug=trim($row['val']);
+			if(trim($row['name'])=="pptp_vpn_pool_type") $_pptp_vpn_pool_type=trim($row['val']);
+			if(trim($row['name'])=="pptp_vpn_pool_net") $_pptp_vpn_pool_net=trim($row['val']);
+			if(trim($row['name'])=="pptp_vpn_dhcp_server") $_pptp_vpn_dhcp_server=trim($row['val']);
+			if(trim($row['name'])=="pptp_vpn_dhcp_dev") $_pptp_vpn_dhcp_dev=trim($row['val']);
+		}
+	}
+	unset($result);
+	if($_pptp_vpn_stat==0) {
+		@unlink("/var/sys/chk_pptp");
+		mybox_init_echo($_QUIET,"INFO","PPTP service disabled");
+		return 0;
+	}
+	$_pptp_user=array();
+	if($_pptp_vpn_auth==1) {
+		$_datau=array();
+		$result=mybox_db_query("select * from auth_user where stat='1'",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_name=$row['name'];
+				$_passwd=mybox_str_decrypt($row['passwd']);
+				$_datau[$_name]="$_name\tmybox-pptp-vpn\t$_passwd\t*\n";
+			}
+		}
+		unset($_name,$_passwd);
+		$result=mybox_db_query("select name,members from group_user",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_name=$row['name'];
+				$_members=$row['members'];
+				$lst_a=explode(",",$_members);
+				if(count($lst_a)!=0) {
+					foreach($lst_a as $nm) {
+						if($_datau[$nm]!='') {
+							$_datau[$_name] .=$_datau[$nm];
+						}
+					}
+				} else {
+					if($_datau[$_members]!='') $_datau[$_name] .=$_datau[$_members];
+				}
+			}
+		}
+		unset($_name,$_members,$lst_a,$nm);
+		$_pptp_user='';
+		$_pptp_user_chk=array();
+		if($_pptp_vpn_user!='') {
+			$_ulist=preg_split("/,/",$_pptp_vpn_user);
+			if(count($_ulist)!=0) {
+				foreach($_ulist as $nx) {
+					if($nx=='') continue;
+					if($_datau[$nx]!='') {
+						$_pptp_user .=$_datau[$nx];
+					}
+				}
+			}
+		}
+		$txt_a=explode("\n",$_pptp_user);
+		$_pptp_user='';
+		if(count($txt_a)!=0) {
+			foreach($txt_a as $p) {
+				$p=trim($p);
+				if($p=='') continue;
+				if($_pptp_user_chk[$p]==1) continue;
+				$_pptp_user .="$p\n";
+				$_pptp_user_chk[$p]=1;
+				unset($p);
+			}
+		}
+		if($_pptp_user=='') {
+			mybox_init_echo($_QUIET,"WARNING","* PPTP No authentication defined. exit");
+			return 0;
+		}
+	}
+
+	$_ad_ip='';$_ad_domain='';
+	if($_pptp_vpn_auth==2) {
+		$_ad_ip=mybox_fget_contents("/var/sys/ad_ip");
+		list($_ad_domain,)=preg_split("/\./",mybox_fget_contents("/var/sys/ad_domain"));
+	}
+
+	$_pptpd_conf='';
+	$_pptpd_conf .="speed 115200\n";
+	$_pptpd_conf .="ppp /bin/pppd\n";
+	$_pptpd_conf .="option /etc/ppp/options.pptpd\n";
+	$_pptpd_conf .="stimeout 10\n";
+
+	$_pptp_bcrelay='eth0';
+	if(file_exists("/var/sys/wan_dev")) {
+		$_pptp_bcrelay=mybox_fget_contents("/var/sys/wan_dev");
+	}
+	//$_pptpd_conf .="bcrelay $_pptp_bcrelay\n";
+
+	if($_pptp_vpn_pool_type==1) {
+		$_net=$_defnet_array[$_pptp_vpn_pool_net]['ip'];
+		list($ip,$pref)=preg_split("/\//",$_net);
+		$_ret=mybox_ipcalc($ip,$pref);
+		if(count($_ret)==0) {
+			mybox_init_echo($_QUIET,"WARNING","* PPTP No network defined. Disabled.");
+			return 0;
+		}
+		$_pptp_localip=$_ret['hostmin'];
+		$_min=long2ip(ip2long($_pptp_localip) + 1);
+		$_max='254';
+		if(preg_match("/\.(\d+)$/",$_ret['hostmax'],$mm)) {
+			$_max=$mm[1];
+		}
+		$_pptp_remoteip="{$_min}-{$_max}";
+		$_pptpd_conf .="localip $_pptp_localip\n";
+		$_pptpd_conf .="remoteip $_pptp_remoteip\n";
+	}
+
+	if($_pptp_vpn_debug==1) $_pptpd_conf .="debug\n";
+	//$_pptpd_conf .="logwtmp\n";
+	mybox_save_to_file("/etc/pptpd.conf","$_pptpd_conf");
+
+	if(!is_dir("/etc/ppp")) mybox_mkdirr("/etc/ppp");
+	@symlink("/service/tools/mfs-ppp.exc","/etc/ppp/ip-up");
+	@symlink("/service/tools/mfs-ppp.exc","/etc/ppp/ip-down");
+	chmod("/etc/ppp/ip-up", 0700);
+	chmod("/etc/ppp/ip-down", 0700);
+	
+
+	$_option_conf='';
+	$_option_conf .="name mybox-pptp-vpn\n";
+	$_option_conf .="refuse-pap\n";
+	$_option_conf .="refuse-chap\n";
+	$_option_conf .="refuse-mschap\n";
+	$_option_conf .="require-mschap-v2\n";
+	$_option_conf .="require-mppe-128\n";
+	$_option_conf .="defaultroute\n";
+	$_option_conf .="proxyarp\n";
+	$_option_conf .="lock\n";
+	$_option_conf .="nobsdcomp\n";
+	$_option_conf .="novj\n";
+	$_option_conf .="novjccomp\n";
+	$_option_conf .="nologfd\n";
+	$_option_conf .="mtu 1400\n";
+	$_option_conf .="mru 1400\n";
+	$_option_conf .="auth\n";
+	$_option_conf .="ipparam ipparam\n";
+	$_option_conf .="multilink\n";
+	$_option_conf .="nomppe-stateful\n";
+	$_option_conf .="lcp-echo-failure 4\n";
+	$_option_conf .="lcp-echo-interval 5\n";
+
+	if($_pptp_vpn_auth==2) {
+		$_option_conf .="ms-dns $_ad_ip\n";
+		$_option_conf .="ms-wins $_ad_ip\n";
+		$_option_conf .="plugin /lib/winbind.so\n";
+		if($_pptp_vpn_auth_grp=='') {
+			$_option_conf .="ntlm_auth-helper '/bin/ntlm_auth --helper-protocol=ntlm-server-1'\n";
+		} else {
+			$_ad_domain=strtoupper($_ad_domain);
+			$_option_conf .="ntlm_auth-helper '/bin/ntlm_auth --helper-protocol=ntlm-server-1 --require-membership-of={$_ad_domain}\\\\{$_pptp_vpn_auth_grp}'\n";
+		}
+	}
+
+	if($_pptp_vpn_pool_type==2) {
+		$_server=$_defnet_array[$_pptp_vpn_dhcp_server]['ip'];
+		$_name_dev=mybox_list_namedev($db_id);
+		$_dev=$_name_dev[$_pptp_vpn_dhcp_dev];
+		$_option_conf .="plugin /lib/dhcpc.so dhcp-interface $_dev dhcp-server $_server\n";
+	}
+
+	mybox_save_to_file("/etc/ppp/options.pptpd","$_option_conf");
+
+	if($_pptp_user!='' && $_pptp_vpn_auth==1) {
+		mybox_save_to_file("/etc/ppp/chap-secrets","$_pptp_user");
+		chmod("/etc/ppp/chap-secrets", 0600);
+	}
+	if($_QUIET==0) echo "* Writing PPTP config..\n";
+	return 1;
+}
+
+function pptp_status() {
+	global $_QUIET;
+	$pid=mybox_get_progpid("pptpd");
+	if($pid!='') {
+		if($_QUIET==0) echo "* pptpd (pid $pid) is running...\n";
+		return 0;
+	}
+	return 1;
+}
+
+function pptp_start() {
+	global $_QUIET, $_ROOT_DIR;
+
+	@unlink("/var/sys/chk_pptpd");
+
+	if(file_exists("$_ROOT_DIR/scripts/pptp/start")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/pptp/start");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/pptp/pre-start")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/pptp/pre-start");
+	}
+
+	if(@pptp_config()==1 && @pptp_status()==1) {
+		if(mybox_exec_cmd("pptpd")==0) {
+			mybox_init_echo($_QUIET,"INFO","Starting PPTP service");
+			@touch("/var/sys/chk_pptpd");
+			//@touch("/var/log/wtmp");
+			if(!file_exists("/var/sys/init_no_restart")) mybox_echo_query("policy-restart-quiet");
+			if(file_exists("$_ROOT_DIR/scripts/pptp/post-start")) {
+				mybox_execq_cmd("$_ROOT_DIR/scripts/pptp/post-start");
+			}
+			return 0;
+		}
+	}
+	mybox_init_echo($_QUIET,"ERROR","Starting PPTP service failed");
+	return 1;
+}
+
+function pptp_stop() {
+	global $_QUIET, $_ROOT_DIR;
+	@mybox_killall("bcrelay");
+	@unlink("/var/sys/chk_pptpd");
+
+	if(file_exists("$_ROOT_DIR/scripts/pptp/stop")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/pptp/stop");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/pptp/pre-stop")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/pptp/pre-stop");
+	}
+
+	if(mybox_killall("pptpd")==0) {
+		mybox_init_echo($_QUIET,"INFO","Shutting down PPTP service");
+		@unlink("/var/log/wtmp");
+		@unlink("/etc/pptpd.conf");
+		@unlink("/var/run/utmp");
+		mybox_rmdir("/etc/ppp");
+		if(!file_exists("/var/sys/init_no_restart")) mybox_echo_query("policy-restart-quiet");
+		if(file_exists("$_ROOT_DIR/scripts/pptp/post-stop")) {
+			mybox_execq_cmd("$_ROOT_DIR/scripts/pptp/post-stop");
+		}
+		return 0;
+	}
+	mybox_init_echo($_QUIET,"ERROR","Shutting down PPTP service failed");
+	return 1;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=pptp_start();
+		break;
+	case 'stop':
+		$ret=pptp_stop();
+		break;
+	case 'restart':
+		$ret=pptp_stop();
+		sleep(2);
+		$ret=pptp_start();
+		break;
+	case 'status':
+		$ret=pptp_status();
+		break;
+	case 'config':
+		$ret=pptp_config();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/status]\n";
+		break;
+}
+exit($ret);
+?>

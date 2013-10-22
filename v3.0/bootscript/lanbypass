@@ -1,0 +1,45 @@
+#!/bin/sh
+# $Id: lanbypass.sh,v 1.1 2007/12/22 12:13:20 nawawi Exp $
+# lanbypass for advantech appliance (hwa-3140, hwa-6280A)
+# set advhw option at grub menu.lst
+# eg; advhw=3140
+. /etc/init.boot/functions
+
+HW=$(read_cmdline hwapp);
+if [ "$HW" = "" ]; then
+	echo "No hardware found";
+	exit 1;
+fi
+
+if [ ! -f "/bin/lanbypass$HW" ]; then
+	echo "No command found for hardware '$HW'";
+	exit 1;
+fi
+
+_CMD="/bin/lanbypass$HW";
+
+if [ "$HW" = "3140" ]; then
+	_CMD_ON="$_CMD on";
+	_CMD_OFF="$_CMD off";
+fi
+
+if [ "$HW" = "6280A" ]; then
+	_CMD_ON="$_CMD -e 0; $_CMD -e 1";
+	_CMD_OFF="$_CMD -d 0; $_CMD -d 1";
+fi
+
+case $1 in
+        on|On|ON|1)
+                $($_CMD_ON)
+		exit 0;
+        ;;
+        off|Off|OFF|0)
+                $($_CMD_OFF)
+		exit 0;
+        ;;
+        *)
+                echo "Usage: $0 <on/off>";
+		exit 1;
+        ;;
+esac
+exit 0;

@@ -1,0 +1,74 @@
+#!/bin/sh
+# $Id: spamsa_update,v 1.1 2008/03/06 22:30:56 nawawi Exp $
+# Copyright (c) 2008 Tracenetwork Corporation Sdn. Bhd.
+
+trap "spamsa_clean" 0 1 2 3 15
+
+_VERBOSE=0;
+_HRULES=0;
+_CHANNEL="sync@dl.ronggeng.net::awie_saupdate";
+_FDIR="/strg/mybox/spamsa/sa";
+_TDIR="/usr/share/spamassassin";
+_CDIR="/strg/mybox/spamsa/custom";
+_HDIR="/strg/mybox/spamsa/heuristic";
+_SAUPDATE="/bin/sa-update";
+_SYNC="/bin/rsync -a";
+
+spamsa_clean() {
+	rm -f /tmp/spamsa_update.lck
+	spamsa_log "Update" "Stopping update service";
+	echo "spam-restart-quiet" >> /var/sys/mfsque
+}
+
+spamsa_log() {
+        local title="$1";
+        local msg="$2";
+        logger -t spamd "$title: $msg";
+        if [ "$_VERBOSE" = "1" ]; then
+                echo "$title: $msg";
+        fi
+}
+
+spamsa_chk() {
+        if [ -f "/tmp/spamsa_update.lck" ]; then
+                echo "SPAMSA update service alreading running..";
+                exit 1;
+        fi
+	if [ ! -x "$_SAUPDATE" -a ! -x "$_SYNC" ]; then
+		spamsa_log "Update" "Internal error";
+		exit 1;
+	fi
+	[ ! -d "$_FDIR" ] && mkdir -p $_FDIR 2>/dev/null 
+	[ ! -d "$_TDIR" ] && mkdir -p $_TDIR 2>/dev/null 
+	[ ! -d "$_CDIR" ] && mkdir -p $_CDIR 2>/dev/null 
+	[ ! -d "$_HDIR" ] && mkdir -p $_HDIR 2>/dev/null 
+	:> /tmp/spamsa_update.lck
+	spamsa_log "Update" "Starting update service";
+}
+
+spamsa_update() {
+	if [ "$_VERBOSE" = "1" ]; then
+		_SAUPDATE="$_SAUPDATE -D";
+		_SYNC="$_SYNC -v";
+	fi
+	$_SAUPDATE
+	$_SYNC --delete-after $_TDIR/ $_FDIR/
+	$_SYNC $_CDIR/ $_TDIR/
+	if [ "$_HRULES" = "1" ]; then
+		export RSYNC_PASSWORD=spam
+		$_SYNC --delete-after $_CHANNEL $_HDIR/
+		[ $? = 0 ] && $_SYNC $_HDIR/ $_TDIR/
+	fi
+}
+
+for x in "$@"; do
+        if [ "$x" = "-v" ]; then
+                _VERBOSE=1;
+        elif [ "$x" = "-c" ]; then
+                _HRULES=1;
+        fi
+done
+
+spamsa_chk;
+spamsa_update;
+exit 0;

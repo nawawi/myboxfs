@@ -1,0 +1,5 @@
+Changes since release 2.9.08d
+  Changed signal handler to use SA_NOCLDWAIT for SIGCHLD
+  Corrected setting of config->broken
+  Applied many patches submitted by "Pinky"
+  Applied Sophie patch by Salvatore Toribio

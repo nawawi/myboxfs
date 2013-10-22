@@ -1,0 +1,294 @@
+#!/bin/php -Cq
+<?php 
+// im_proxy.init - last update 12-Dec-2007
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="im_proxy";
+include_once('clib.exl');
+include_once('policy.exl');
+putenv("PATH=/bin:/service/tools:/service/init");
+
+$_QUIET=0;
+mybox_init_set_alarm(30);
+
+if(!file_exists("/bin/imspector")) {
+	mybox_init_echo($_QUIET,"ERROR","Cannot execute im_proxy.init. Internal error!");
+	exit(1);
+}
+
+function im_exception(&$_trans_src,&$_trans_dst,$_networks,$db_id) {
+
+}
+
+function im_trans($_networks,$_trans_src,$_trans_dst) {
+	$_networks=trim($_networks);
+	if($_networks=='') return;
+	$_trans_a=preg_split("/\s+/",$_networks);
+
+	$txt='';
+	$_skp=array();$_skn=array();
+	$_skp1=array();
+	if(count($_trans_src)!=0) {
+		foreach($_trans_src as $ln) {
+			if($ln=='') continue;
+			$_skp[$ln]=1;
+			$txt .="-s $ln -p tcp -m tcp --sport 1:65535 --dport 21 -j RETURN\n";
+		}
+	}
+	unset($ln);
+	if(count($_trans_dst)!=0) {
+		foreach($_trans_dst as $ln) {
+			if($ln=='') continue;
+			$_skp1[$ln]=1;
+			$txt .="-d $ln -p tcp -m tcp --sport 1:65535 --dport 21 -j RETURN\n";
+		}
+	}
+	unset($ln);
+	foreach($_trans_a as $ln) {
+		if($ln=='') continue;
+		if($_skp1[$ln]==1) continue;
+		if($_skn[$ln]==1) continue;
+		$_skn[$ln]=1;
+		$txt .="-s $ln -p tcp -m tcp --sport 1:65535 --dport 21 -j REDIRECT --to-port 2121\n";
+	}
+	if($txt!='') mybox_save_to_file("/var/sys/im_proxy_trans.set",$txt);
+}
+
+function im_networks($db_id,$name) {
+	$_defnet_array=mybox_defnetwork_array($db_id);
+	$namedev_array=mybox_name2dev_array($db_id);
+	$_networks='';
+	if(stripos($name,",")===FALSE) $name="$name,";
+
+	$_nml=preg_split("/,/",$name);
+	if(count($_nml)!=0) {
+		foreach($_nml as $_a) {
+			if($_a=='') continue;
+			if(isset($namedev_array[$_a])&&$namedev_array[$_a]!='') {
+				if(strpos($namedev_array[$_a],"/")===FALSE) {
+					$_networks .="{$namedev_array[$_a]}/32 ";
+				} else {
+					$_networks .="{$namedev_array[$_a]} ";
+				}
+			} else {
+				if(isset($_defnet_array[$_a]['name']) && $_defnet_array[$_a]['name']!='') {
+					if($_defnet_array[$_a]['type']==2) {
+						$_networks .="{$_defnet_array[$_a]['ip']} ";
+					}
+				} elseif(isset($_defnet_array[$_a]['group']) && $_defnet_array[$_a]['group']!='') {
+					foreach($_defnet_array[$_a] as $a1 => $_b) {
+						if(!is_array($_b)) continue;
+						if($_b['type']==1) {
+							$_networks .="{$_b['ip']} ";
+						} elseif($_b['type']==2) {
+							$_networks .="{$_b['ip']}/32 ";
+						}
+					}
+				}
+			}
+		}
+	} else {
+		if(isset($namedev_array[$_a])&&$namedev_array[$_a]!='') {
+			if(strpos($namedev_array[$_a],"/")===FALSE) {
+				$_networks .="{$namedev_array[$_a]}/32 ";
+			} else {
+				$_networks .="{$namedev_array[$_a]} ";
+			}
+		} else {
+			if(isset($_defnet_array[$_list_array]['name']) && $_defnet_array[$_list_array]['name']!='') {
+				if($_defnet_array[$_list_array]['type']==2) {
+					$_networks .="{$_defnet_array[$_list_array]['ip']} ";
+				}
+			} elseif(isset($_defnet_array[$_list_array]['group']) && $_defnet_array[$_list_array]['group']!='') {
+				foreach($_defnet_array[$_list_array] as $a1 => $_b) {
+					if(!is_array($_b)) continue;
+					if($_b['type']==1) {
+						$_networks .="{$_b['ip']} ";
+					} elseif($_b['type']==2) {
+						$_networks .="{$_b['ip']}/32 ";
+					}
+				}
+			}
+		}
+	}
+	unset($a);
+	$_networks=trim($_networks);
+	return $_networks;
+}
+
+function im_config() {
+	global $_DB_NAME, $_QUIET, $_ROOT_DIR;
+
+	@unlink("/var/sys/im_proxy_networks");
+	@unlink("/var/sys/im_proxy.set");
+	@unlink("/etc/frox.conf");
+
+	$db_id=mybox_db_connect($_DB_NAME);
+	$result=mybox_db_query("select * from cf where name like \"cf_im_%\"",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			if(trim($row['name'])=="cf_im_stat") $_cf_im_stat=trim($row['val']);
+			if(trim($row['name'])=="cf_im_network") $_cf_im_network=trim($row['val']);
+			if(trim($row['name'])=="cf_im_upload") $_cf_im_upload=trim($row['val']);
+			if(trim($row['name'])=="cf_im_download") $_cf_im_download=trim($row['val']);
+			if(trim($row['name'])=="cf_im_av_stat") $_cf_im_av_stat=trim($row['val']);
+			if(trim($row['name'])=="cf_im_ext_stat") $_cf_im_ext_stat=trim($row['val']);
+		}
+	}
+	unset($result);
+	if($_cf_im_stat=='') $_cf_im_stat=0;
+	if($_cf_im_av_stat=='') $_cf_im_av_stat=0;
+	if($_cf_im_ext_stat=='') $_cf_im_ext_stat=0;
+	if($_cf_im_network=='') $_cf_im_stat=0;
+
+	if($_cf_im_stat==0) {
+		mybox_init_echo($_QUIET,"INFO","FTP Proxy service disabled");
+		im_proxy_clear();
+		mybox_db_close($db_id);
+		exit(1);
+	}
+
+	$_trans_src=array(); $_trans_dst=array();
+	$_networks=im_networks($db_id,$_cf_im_network);
+	im_exception(&$_trans_src,&$_trans_dst,$_networks,$db_id);
+	im_trans($_networks,$_trans_src,$_trans_dst);
+	mybox_save_to_file("/var/sys/im_proxy_networks","$_networks");
+	mybox_db_close($db_id);
+
+	if(!is_dir("$_ROOT_DIR/ftpproxy")) @mybox_mkdirr("$_ROOT_DIR/ftpproxy");
+	$_config='';
+	$_config .="Listen 0.0.0.0\n";
+	$_config .="Port 2121\n";
+	$_config .="ResolvLoadHack wontresolve.doesntexist.abc\n";
+	$_config .="User mfs\n";
+	$_config .="Group mfs\n";
+	$_config .="WorkingDir $_ROOT_DIR/ftpproxy\n";
+	$_config .="DontChroot Yes\n";
+	$_config .="LogLevel 15\n";
+	$_config .="#LogFile /var/log/frox.log\n";
+	$_config .="XferLogging no\n";
+	$_config .="PidFile /var/run/frox.pid\n";
+	$_config .="BounceDefend yes\n";
+	if($_cf_im_av_stat==1 || $_cf_im_ext_stat==1) {
+		$_config .="VirusScanner '\"/service/tools/mfs-ftpscan.exc\" \"%s\" '\n";
+		$_config .="VSOK 0\n";
+		$_config .="VSProgressMsgs 30\n";
+	}
+	$_config .="Timeout 300\n";
+	$_config .="MaxForks 80\n";
+	$_config .="MaxForksPerHost 5\n";
+	if($_cf_im_download!='' && $_cf_im_download!=0) {
+		$_config .="MaxTransferRate $_cf_im_download\n";
+	}
+	if($_cf_im_upload!='' && $_cf_im_upload!=0) {
+		$_config .="MaxUploadRate $_cf_im_upload\n";
+	}
+	$_config .="ACL Allow * - *\n";
+	mybox_save_to_file("/etc/frox.conf",$_config);
+	$_set=array();
+	$_set['cf_im_stat']="$_cf_im_stat";
+	$_set['cf_im_network']="$_cf_im_network";
+	$_set['cf_im_upload']="$_cf_im_upload";
+	$_set['cf_im_download']="$_cf_im_download";
+	$_set['cf_im_av_stat']="$_cf_im_av_stat";
+	$_set['cf_im_ext_stat']="$_cf_im_ext_stat";
+	mybox_save_to_file("/var/sys/im_proxy.set",serialize($_set));
+	mybox_save_to_file("/var/sys/im_proxy_port","2121");
+	if(file_exists("/etc/frox.conf")) return 1;
+	if($_QUIET==0) echo "* Writing FTP Proxy config failed\n";
+	return 0;
+}
+
+function im_status() {
+	global $_QUIET;
+	$pid=mybox_get_progpid("frox");
+	if($pid!='') {
+		if($_QUIET==0) echo "* frox (pid $pid) is running...\n";
+		return 0;
+	}
+	return 1;
+}
+
+function im_start() {
+	global $_QUIET, $_ROOT_DIR;
+
+	im_proxy_clear();
+	@unlink("/var/sys/chk_frox");
+
+	if(file_exists("$_ROOT_DIR/scripts/im_proxy/start")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/im_proxy/start");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/im_proxy/pre-start")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/im_proxy/pre-start");
+	}
+
+	if(@im_config()==1 && @im_status()==1) {
+		if(mybox_exec_cmd("frox")==0) {
+			mybox_init_echo($_QUIET,"INFO","Starting FTP Proxy service");
+			do_im_proxy_policy();
+			do_policy_admin();
+			@touch("/var/sys/chk_frox");
+			if(file_exists("$_ROOT_DIR/scripts/im_proxy/post-start")) {
+				mybox_execq_cmd("$_ROOT_DIR/scripts/im_proxy/post-start");
+			}
+			return 0;
+		}
+	}
+	mybox_init_echo($_QUIET,"ERROR","Starting FTP Proxy service failed");
+	return 1;
+}
+
+function im_stop() {
+	global $_QUIET, $_ROOT_DIR;
+
+	im_proxy_clear();
+
+	@unlink("/var/sys/chk_frox");
+	@unlink("/var/sys/im_proxy_port");
+
+	if(!file_exists("/var/sys/init_no_restart")) do_policy_admin();
+
+	if(file_exists("$_ROOT_DIR/scripts/im_proxy/stop")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/im_proxy/stop");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/im_proxy/pre-stop")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/im_proxy/pre-stop");
+	}
+	if(mybox_killall("frox")==0) {
+		mybox_init_echo($_QUIET,"INFO","Shutting down FTP Proxy service");
+		if(file_exists("$_ROOT_DIR/scripts/im_proxy/post-stop")) {
+			mybox_execq_cmd("$_ROOT_DIR/scripts/im_proxy/post-stop");
+		}
+		return 0;
+	}
+	mybox_init_echo($_QUIET,"ERROR","Shutting down FTP Proxy service failed");
+	return 1;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=im_start();
+		break;
+	case 'stop':
+		$ret=im_stop();
+		break;
+	case 'restart':
+		$ret=im_stop();
+		sleep(2);
+		$ret=im_start();
+		break;
+	case 'status':
+		$ret=im_status();
+		break;
+	case 'config':
+		$ret=im_config();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/status]\n";
+		break;
+}
+exit($ret);
+?>

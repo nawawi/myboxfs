@@ -1,0 +1,249 @@
+<?php 
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+// policy library for IPS
+
+// IPS execute
+function ips_header() {
+	do_iptable("*traceips");
+	do_iptable(":PREROUTING ACCEPT [0:0]");
+	do_iptable(":INPUT ACCEPT [0:0]");
+	do_iptable(":FORWARD ACCEPT [0:0]");
+	do_iptable(":OUTPUT ACCEPT [0:0]");
+	do_iptable(":POSTROUTING ACCEPT [0:0]");
+}
+
+function ips_exclude($chain,$opt,$db_id) {
+	$namedev_array=mybox_name2dev_array($db_id);
+	$_defnet_array=mybox_defnetwork_array($db_id);
+
+	$where='';$table="ips_exclude";
+	if($opt=="ips") $where="where ips='1'";
+	if($opt=="tcpf") $where="where tcpf='1'";
+	if($opt=="udpf") $where="where udpf='1'";
+	if($opt=="icmpf") $where="where icmpf='1'";
+	if($opt=="pscan") $where="where pscan='1'";
+	if($opt=="im") {
+		$where="where im='1'";
+		$table="imp2p_exclude";
+	}
+	if($opt=="p2p") {
+		$where="where p2p='1'";
+		$table="imp2p_exclude";
+	}
+	if($where=='') return 0;
+
+	$result=mybox_db_query("select src,dst from $table $where",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_src=trim($row['src']);
+			$_dst=trim($row['dst']);
+
+			if($opt=="ips" || $opt=="im" || $opt=="p2p") {
+				$_action="ACCEPT";
+			} elseif($opt=="pscan") {
+				$_action="RETURN";
+			} else {
+				$_action="ACL1011-07";
+			}
+			$_src_array=array();
+			$_dst_array=array();
+			if($_src!='') {
+				if(isset($namedev_array[$_src])&&$namedev_array[$_src]!='') {
+					$_src_array[]="-s {$namedev_array[$_src]}";
+				} else {
+					if(isset($_defnet_array[$_src])&&$_defnet_array[$_src]!='') {
+						$_src_array=list_srcdst_array($_defnet_array,$_src,"1","");
+					}
+				}
+			}
+			if($_dst!='') {
+				if(isset($namedev_array[$_dst])&&$namedev_array[$_dst]!='') {
+					$_dst_array[]="-d {$namedev_array[$_dst]}";
+				} else {
+					if(isset($_defnet_array[$_dst])&&$_defnet_array[$_dst]!='') {
+						$_dst_array=list_srcdst_array($_defnet_array,$_dst,"2","");
+					}
+				}
+			}
+			if(count($_src_array)!=0 && count($_dst_array)!=0) {
+				foreach($_src_array as $src) {
+					if($src=='') continue;
+					foreach($_dst_array as $dst) {
+						if($dst=='') continue;
+						do_iptable("-A $chain $src $dst -j $_action");
+					}
+				}
+			} elseif(count($_src_array)!=0 && count($_dst_array)==0) {
+				foreach($_src_array as $src) {
+					if($src=='') continue;
+					do_iptable("-A $chain $src -j $_action");
+				}
+			} elseif(count($_src_array)==0 && count($_dst_array)!=0) {
+				foreach($_dst_array as $dst) {
+					if($dst=='') continue;
+					do_iptable("-A $chain $dst -j $_action");
+				}
+			}
+			unset($_src,$src,$_dst,$dst);
+		}
+	}
+}
+
+function run_ips_policy($num,$_IPSACL,$_http_proxy_filter_port,$_http_proxy_port,$_ftp_proxy_port,$_captive_port,$_mail_proxy_port,$db_id) {
+	
+	$_gw_ip=mybox_fget_contents("/var/sys/gw_ip");
+	if(isset($_gw_ip)&&$_gw_ip!='') do_iptable("-A INPUT -s $_gw_ip -j ACCEPT");
+	// input
+	if(count($_IPSACL['I'])!=0) {
+		foreach($_IPSACL['I'] as $lx) {
+			if($lx=='') continue;
+			do_iptable("-A INPUT $lx");
+		}
+		unset($lx);
+	}
+		
+	if($_http_proxy_filter_port!='') {
+		do_iptable("-A INPUT -p tcp -m tcp --sport 1:65535 --dport $_http_proxy_filter_port -j ACCEPT");
+	}
+	if($_http_proxy_port!='') {
+		do_iptable("-A INPUT -p tcp -m tcp --sport 1:65535 --dport $_http_proxy_port -j ACCEPT");
+	}
+	if($_ftp_proxy_port!='') {
+		do_iptable("-A INPUT -p tcp -m tcp --sport 1:65535 --dport $_ftp_proxy_port -j ACCEPT");
+	}
+	if($_mail_proxy_port!='') {
+		do_iptable("-A INPUT -p tcp -m tcp --sport 1:65535 --dport $_mail_proxy_port -j ACCEPT");
+	}
+	if($_captive_port!='') {
+		do_iptable("-A INPUT -p tcp -m tcp --sport 1:65535 --dport $_captive_port -j ACCEPT");
+	}
+	do_iptable("-A INPUT -i lo -j ACCEPT");
+	do_iptable("-A INPUT -p esp -j ACCEPT");
+	do_iptable("-A INPUT -p gre -j ACCEPT"); 
+	do_iptable("-A INPUT -m condition --condition \"traceips\" -j ACCEPT");
+	do_iptable("-A INPUT -j NFQUEUE --queue-num $num");
+
+	if(isset($_gw_ip)&&$_gw_ip!='') do_iptable("-A FORWARD -s $_gw_ip -j ACCEPT");
+	if($num==0) {
+		ips_exclude("FORWARD","ips",$db_id);
+	}
+	if($num==1) {
+		ips_exclude("FORWARD","im",$db_id);
+	}
+	if($num==2) {
+		ips_exclude("FORWARD","p2p",$db_id);
+	}
+	if(count($_IPSACL['F'])!=0) {
+		foreach($_IPSACL['F'] as $lx) {
+			if($lx=='') continue;
+			do_iptable("-A FORWARD $lx");
+		}
+		unset($lx);
+	}
+	do_iptable("-A FORWARD -p esp -j ACCEPT");
+	do_iptable("-A FORWARD -p gre -j ACCEPT"); 
+	do_iptable("-A FORWARD -m condition --condition \"traceips\" -j ACCEPT"); 
+	do_iptable("-A FORWARD -j NFQUEUE --queue-num $num");
+	// output
+	if(isset($_gw_ip)&&$_gw_ip!='') do_iptable("-A OUTPUT -s $_gw_ip -j ACCEPT");
+	if(count($_IPSACL['O'])!=0) {
+		foreach($_IPSACL['O'] as $lx) {
+			if($lx=='') continue;
+			do_iptable("-A OUTPUT $lx");
+		}
+		unset($lx);
+	}
+
+	do_iptable("-A OUTPUT -o lo -j ACCEPT");
+	do_iptable("-A OUTPUT -p esp -j ACCEPT");
+	do_iptable("-A OUTPUT -p tcp -m tcp --sport 53:65535 --dport 53 -j ACCEPT");
+	do_iptable("-A OUTPUT -p udp -m udp --sport 53:65535 --dport 53 -j ACCEPT");
+	do_iptable("-A OUTPUT -p gre -j ACCEPT"); 
+	// PUT proxy allowed address
+	if($_http_proxy_filter_port!='') {
+		do_iptable("-A OUTPUT -p tcp -m tcp --dport 1:65535 --sport $_http_proxy_filter_port -j ACCEPT");
+	}
+	if($_http_proxy_port!='') {
+		do_iptable("-A OUTPUT -p tcp -m tcp --dport 1:65535 --sport $_http_proxy_port -j ACCEPT");
+	}
+	if($_ftp_proxy_port!='') {
+		do_iptable("-A OUTPUT -p tcp -m tcp --dport 1:65535 --sport $_ftp_proxy_port -j ACCEPT");
+	}
+	if($_captive_port!='') {
+		do_iptable("-A OUTPUT -p tcp -m tcp --dport 1:65535 --sport $_captive_port -j ACCEPT");
+	}
+	do_iptable("-A OUTPUT -m condition --condition \"traceips\" -j ACCEPT");
+	do_iptable("-A OUTPUT -j NFQUEUE --queue-num $num");
+}
+
+function do_policy_ips($db_id='') {
+	global $_DB_NAME, $_QUIET, $_PAT_PATH;
+
+	@unlink("/var/sys/ips_tab.done");
+	do_policy_ips_clear();
+
+	$close_db=0;
+	if($db_id=='') {
+		$db_id=mybox_db_connect($_DB_NAME);
+		$close_db=1;
+	}
+
+	$_ips_stat=0;$_im_stat=0;$_p2p_stat=0;
+	if(file_exists("$_PAT_PATH/ips.conf")) $_ips_stat=1;
+	if(file_exists("$_PAT_PATH/ips-im.conf")) $_im_stat=1;
+	if(file_exists("$_PAT_PATH/ips-p2p.conf")) $_p2p_stat=1;
+
+	if($_ips_stat==1 || $_im_stat==1 || $_p2p_stat==1) {
+
+		$_IPSACL=array();
+		$_IPSACL=unserialize(mybox_fget_contents("/var/sys/policy_admin.cache"));
+
+		$_http_proxy_filter_port='';
+		if(file_exists("/var/sys/http-filter")) {
+			$_http_proxy_filter_port=mybox_fget_contents("/var/sys/http-filter");
+		}
+		$_http_proxy_port='';
+		if(file_exists("/var/sys/http_proxy_port")) {
+			$_http_proxy_port=mybox_fget_contents("/var/sys/http_proxy_port");
+		}
+		$_ftp_proxy_port='';
+		if(file_exists("/var/sys/ftp_proxy_port")) {
+			$_ftp_proxy_port=mybox_fget_contents("/var/sys/ftp_proxy_port");
+		}
+		$_mail_proxy_port='';
+		if(file_exists("/var/sys/mail_proxy_port")) {
+			$_mail_proxy_port=mybox_fget_contents("/var/sys/mail_proxy_port");
+		}
+		$_captive_port='';
+		if(file_exists("/var/sys/captive_portal_port")) {
+			$_captive_port=mybox_fget_contents("/var/sys/captive_portal_port");
+		}
+
+		iptables_open();
+		mybox_init_echo($_QUIET,"INFO","Loading Intrusion protection rules");
+		ips_header();
+		if($_ips_stat==1) run_ips_policy(0,$_IPSACL,$_http_proxy_filter_port,$_http_proxy_port,$_ftp_proxy_port,$_captive_port,$_mail_proxy_port,$db_id);
+		if($_im_stat==1) run_ips_policy(1,$_IPSACL,$_http_proxy_filter_port,$_http_proxy_port,$_ftp_proxy_port,$_captive_port,$_mail_proxy_port,$db_id);
+		if($_p2p_stat==1) run_ips_policy(2,$_IPSACL,$_http_proxy_filter_port,$_http_proxy_port,$_ftp_proxy_port,$_captive_port,$_mail_proxy_port,$db_id);
+		policy_close();
+		policy_ips_onoff(0);
+	}
+	if($close_db==1) {
+		mybox_db_close($db_id);
+	}
+	@touch("/var/sys/ips_tab.done");
+}
+
+function do_policy_ips_clear() {
+	iptables_open();
+	ips_header();
+	policy_close();
+	policy_ips_onoff(1);
+}
+
+function policy_ips_onoff($stat=0) {
+	if(file_exists("/proc/net/nf_condition/traceips")) {
+		mybox_save_to_file("/proc/net/nf_condition/traceips","$stat\n");
+	}
+}
+?>

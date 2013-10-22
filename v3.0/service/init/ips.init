@@ -1,0 +1,781 @@
+#!/bin/php -Cq
+<?php 
+// ips.init - last update 30-Jun-2006
+// updated to snort2.6.x - 23-Nov-2006
+
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="ips";
+include_once('clib.exl');
+include_once('policy.exl');
+putenv("PATH=/bin:/service/tools:/service/init");
+
+$_QUIET=0;
+mybox_init_set_alarm(60);
+
+if(!file_exists("/bin/snortd")) {
+	mybox_init_echo($_QUIET,"ERROR","Cannot execute ips.init. Internal error!");
+	exit(1);
+}
+
+function ips_gen_sidmsg($_ips_stat,$_im_stat,$_p2p_stat) {
+	global $_PAT_PATH;
+
+	$w='';
+	if($_ips_stat==1) {
+		$buff=array();
+		$buff=mybox_dir2array("$_PAT_PATH/rules/*/rules");
+		if(count($buff)!=0) {
+			foreach($buff as $lx) {
+				$bx=array();
+				$bx=mybox_file2array($lx);
+				if(count($bx)==0) continue;
+				foreach($bx as $ln) {
+					$ln=trim($ln);
+					if($ln=='' || $ln{0}=='#') continue;
+					$sid='';$msg='';
+					if(preg_match("/sid\:(\S+)\;/",$ln,$mm)) {
+                        			$sid=$mm[1];
+                			}
+                			unset($mm);
+                			if(preg_match("/msg\:\"(.*?)\"\;/",$ln,$mm)) {
+                        			$msg=$mm[1];
+                			}
+                			unset($mm);
+                			if($sid!='' && $msg!='') $w .="$sid || $msg\n";
+				}
+			}
+		}
+	}
+	if($_im_stat==1) {
+		$buff=array();
+		$buff=mybox_dir2array("$_PAT_PATH/im_p2p/IM/*");
+		if(count($buff)!=0) {
+			foreach($buff as $lx) {
+				$bx=array();
+				$bx=mybox_file2array($lx);
+				if(count($bx)==0) continue;
+				foreach($bx as $ln) {
+					$ln=trim($ln);
+					if($ln=='') continue;
+					$sid='';$msg='';
+					if(preg_match("/sid\:(\S+)\;/",$ln,$mm)) {
+                        			$sid=$mm[1];
+                			}
+                			unset($mm);
+                			if(preg_match("/msg\:\"(.*?)\"\;/",$ln,$mm)) {
+                        			$msg=$mm[1];
+                			}
+                			unset($mm);
+                			if($sid!='' && $msg!='') $w .="$sid || $msg\n";
+				}
+			}
+		}
+	}
+	if($_p2p_stat==1) {
+		$buff=array();
+		$buff=mybox_dir2array("$_PAT_PATH/im_p2p/P2P/*");
+		if(count($buff)!=0) {
+			foreach($buff as $lx) {
+				$bx=array();
+				$bx=mybox_file2array($lx);
+				if(count($bx)==0) continue;
+				foreach($bx as $ln) {
+					$ln=trim($ln);
+					if($ln=='') continue;
+					$sid='';$msg='';
+					if(preg_match("/sid\:(\S+)\;/",$ln,$mm)) {
+                        			$sid=$mm[1];
+                			}
+                			unset($mm);
+                			if(preg_match("/msg\:\"(.*?)\"\;/",$ln,$mm)) {
+                        			$msg=$mm[1];
+                			}
+                			unset($mm);
+                			if($sid!='' && $msg!='') $w .="$sid || $msg\n";
+				}
+			}
+		}
+	}
+	if($w!='') {
+		mybox_save_to_file("$_PAT_PATH/sid-msg.map","$w");
+	}
+}
+
+function get_address($_defnet_array,$_name,$_opt) {
+	/* from global.exl
+	$_NTYPE['1']="Network";
+	$_NTYPE['2']="IP Address";
+	$_NTYPE['3']="IP Range";
+	$_NTYPE['4']="MAC Address";
+	*/
+	$_var='';
+	if(isset($_defnet_array[$_name]['name']) && $_defnet_array[$_name]['name']!='') {
+		$_type=$_defnet_array[$_name]['type'];
+		$_ip=$_defnet_array[$_name]['ip'];
+		if($_opt==1) {
+			if($_type <= 2) {
+				$_var .="$_ip,";
+			}
+		} elseif($_opt==2) {
+			if($_type == 2) {
+				$_var .="$_ip,";
+			}
+		}
+	} elseif(isset($_defnet_array[$_name]['group']) && $_defnet_array[$_name]['group']!='') {
+		foreach($_defnet_array[$_name] as $a => $b) {
+			if(!is_array($b)) continue;
+			$_type=$b['type'];
+			$_ip=$b['ip'];
+			if($_opt==1) {
+				if($_type <= 2) {
+					$_var .="$_ip,";
+				}
+			} elseif($_opt==2) {
+				if($_type == 2) {
+					$_var .="$_ip,";
+				}
+			}
+		}
+	}
+	$_var=trim($_var,",");
+	return $_var;
+}
+
+function ips_imp2p_onoff($file,$drop) {
+	$buff=mybox_file2array($file);
+	if(count($buff)==0) return 0;
+	$_ff='';
+	foreach($buff as $ln) {
+		$ln=trim($ln);
+		if($ln=='') continue;
+		if($drop==1 || $drop==2) {
+			$_str=preg_replace("/^alert\s/","drop ",$ln);
+			if($_str!='') {
+				$_str=preg_replace("/msg\:\"\[A\]\s/",'msg:"[D] ',$_str);
+			}
+			if($_str!='') $ln="$_str";
+			unset($_str);
+		}
+		if($drop==3) {
+			$_str=preg_replace("/^drop\s/","alert ",$ln);
+			if($_str!='') {
+				$_str=preg_replace("/msg\:\"\[D\]\s/",'msg:"[A] ',$_str);
+			}
+			if($_str!='') $ln="$_str";
+			unset($_str);
+		}
+		$_ff .="$ln\n";	
+	}
+	if($_ff!='') {
+		mybox_save_to_file($file,"$_ff");
+		return 1;
+	}
+	return 0;
+}
+
+function ips_im($db_id) {
+	global $_PAT_PATH;
+
+	$_im_stat=0;$_im_aim=0;$_im_icq=0;$_im_msn=0;$_im_yahoo=0;
+	$_im_irc=0;$_im_jabber=0;$_im_skype=0;
+	$result=mybox_db_query("select * from misc where name like \"im_%\" ",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			if(trim($row['name'])=="im_stat") $_im_stat=trim($row['val']);
+			if(trim($row['name'])=="im_aim") $_im_aim=trim($row['val']);
+			if(trim($row['name'])=="im_icq") $_im_icq=trim($row['val']);
+			if(trim($row['name'])=="im_msn") $_im_msn=trim($row['val']);
+			if(trim($row['name'])=="im_yahoo") $_im_yahoo=trim($row['val']);
+			if(trim($row['name'])=="im_irc") $_im_irc=trim($row['val']);
+			if(trim($row['name'])=="im_jabber") $_im_jabber=trim($row['val']);
+			if(trim($row['name'])=="im_skype") $_im_skype=trim($row['val']);
+		}
+	}
+	if($_im_stat=='') $_im_stat=0;
+	if($_im_stat==1) {
+		$_config='';
+		if($_im_aim!=0) {
+			if($_im_aim==2) {
+				if(file_exists("$_PAT_PATH/im_p2p/IM/aim-transfer") &&
+				ips_imp2p_onoff("$_PAT_PATH/im_p2p/IM/aim-transfer",$_im_aim)==1) {
+					$_config .="include $_PAT_PATH/im_p2p/IM/aim-transfer\n";
+				}
+			} else {
+				if(file_exists("$_PAT_PATH/im_p2p/IM/aim") &&
+				ips_imp2p_onoff("$_PAT_PATH/im_p2p/IM/aim",$_im_aim)==1) {
+					$_config .="include $_PAT_PATH/im_p2p/IM/aim\n";
+				}
+				if(file_exists("$_PAT_PATH/im_p2p/IM/aim-transfer") &&
+				ips_imp2p_onoff("$_PAT_PATH/im_p2p/IM/aim-transfer",$_im_aim)==1) {
+					$_config .="include $_PAT_PATH/im_p2p/IM/aim-transfer\n";
+				}
+			}
+		}
+
+		if($_im_irc!=0) {
+			if($_im_irc==2) {
+				if(file_exists("$_PAT_PATH/im_p2p/IM/irc-transfer") &&
+				ips_imp2p_onoff("$_PAT_PATH/im_p2p/IM/irc-transfer",$_im_irc)==1) {
+					$_config .="include $_PAT_PATH/im_p2p/IM/irc-transfer\n";
+				}
+			} else {
+				if(file_exists("$_PAT_PATH/im_p2p/IM/irc") &&
+				ips_imp2p_onoff("$_PAT_PATH/im_p2p/IM/irc",$_im_irc)==1) {
+					$_config .="include $_PAT_PATH/im_p2p/IM/irc\n";
+				}
+				if(file_exists("$_PAT_PATH/im_p2p/IM/irc-transfer") &&
+				ips_imp2p_onoff("$_PAT_PATH/im_p2p/IM/irc-transfer",$_im_irc)==1) {
+					$_config .="include $_PAT_PATH/im_p2p/IM/irc-transfer\n";
+				}
+			}
+		}
+
+		if($_im_jabber!=0) {
+			if($_im_jabber==2) {
+				if(file_exists("$_PAT_PATH/im_p2p/IM/jabber-transfer") &&
+				ips_imp2p_onoff("$_PAT_PATH/im_p2p/IM/jabber-transfer",$_im_jabber)==1) {
+					$_config .="include $_PAT_PATH/im_p2p/IM/jabber-transfer\n";
+				}
+			} else {
+				if(file_exists("$_PAT_PATH/im_p2p/IM/jabber") &&
+				ips_imp2p_onoff("$_PAT_PATH/im_p2p/IM/jabber",$_im_jabber)==1) {
+					$_config .="include $_PAT_PATH/im_p2p/IM/jabber\n";
+				}
+				if(file_exists("$_PAT_PATH/im_p2p/IM/jabber-transfer") &&
+				ips_imp2p_onoff("$_PAT_PATH/im_p2p/IM/jabber-transfer",$_im_jabber)==1) {
+					$_config .="include $_PAT_PATH/im_p2p/IM/jabber-transfer\n";
+				}
+			}
+		}
+
+		if($_im_msn!=0) {
+			if($_im_msn==2) {
+				if(file_exists("$_PAT_PATH/im_p2p/IM/msn-transfer") &&
+				ips_imp2p_onoff("$_PAT_PATH/im_p2p/IM/msn-transfer",$_im_msn)==1) {
+					$_config .="include $_PAT_PATH/im_p2p/IM/msn-transfer\n";
+				}
+			} else {
+				if(file_exists("$_PAT_PATH/im_p2p/IM/msn") &&
+				ips_imp2p_onoff("$_PAT_PATH/im_p2p/IM/msn",$_im_msn)==1) {
+					$_config .="include $_PAT_PATH/im_p2p/IM/msn\n";
+				}
+				if(file_exists("$_PAT_PATH/im_p2p/IM/msn-transfer") &&
+				ips_imp2p_onoff("$_PAT_PATH/im_p2p/IM/msn-transfer",$_im_msn)==1) {
+					$_config .="include $_PAT_PATH/im_p2p/IM/msn-transfer\n";
+				}
+			}
+		}
+
+		if($_im_yahoo!=0) {
+			if($_im_yahoo==2) {
+				if(file_exists("$_PAT_PATH/im_p2p/IM/yahoo-transfer") &&
+				ips_imp2p_onoff("$_PAT_PATH/im_p2p/IM/yahoo-transfer",$_im_yahoo)==1) {
+					$_config .="include $_PAT_PATH/im_p2p/IM/yahoo-transfer\n";
+				}
+			} else {
+				if(file_exists("$_PAT_PATH/im_p2p/IM/yahoo") &&
+				ips_imp2p_onoff("$_PAT_PATH/im_p2p/IM/yahoo",$_im_yahoo)==1) {
+					$_config .="include $_PAT_PATH/im_p2p/IM/yahoo\n";
+				}
+				if(file_exists("$_PAT_PATH/im_p2p/IM/yahoo-transfer") &&
+				ips_imp2p_onoff("$_PAT_PATH/im_p2p/IM/yahoo-transfer",$_im_yahoo)==1) {
+					$_config .="include $_PAT_PATH/im_p2p/IM/yahoo-transfer\n";
+				}
+			}
+		}
+
+		if($_im_icq!=0 && file_exists("$_PAT_PATH/im_p2p/IM/icq")) {
+			if(ips_imp2p_onoff("$_PAT_PATH/im_p2p/IM/icq",$_im_icq)==1) {
+				$_config .="include $_PAT_PATH/im_p2p/IM/icq\n";
+			}
+		}
+
+		if($_im_skype!=0 && file_exists("$_PAT_PATH/im_p2p/IM/skype")) {
+			if(ips_imp2p_onoff("$_PAT_PATH/im_p2p/IM/skype",$_im_skype)==1) {
+				$_config .="include $_PAT_PATH/im_p2p/IM/skype\n";
+			}
+		}
+		if($_config!='') {
+			mybox_save_to_file("$_PAT_PATH/ips.config-im","$_config");
+		}
+	}
+	return $_im_stat;
+}
+
+function ips_p2p($db_id) {
+	global $_PAT_PATH;
+
+	$_p2p_stat=0;
+	$_p2p_ares=0;
+	$_p2p_bittorren=0;
+	$_p2p_direct=0;
+	$_p2p_ed2k=0;
+	$_p2p_edonkey=0;
+	$_p2p_gnutella=0;
+	$_p2p_kazaa=0;
+	$_p2p_limewire=0;
+	$_p2p_manolito=0;
+	$_p2p_morpheus=0;
+	$_p2p_napster=0;
+	$_p2p_soulseek=0;
+	$_p2p_winmx=0;
+	$_p2p_winny=0;
+
+	$result=mybox_db_query("select * from misc where name like \"p2p_%\" ",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			if(trim($row['name'])=="p2p_stat") $_p2p_stat=trim($row['val']);
+			if(trim($row['name'])=="p2p_ares") $_p2p_ares=trim($row['val']);
+			if(trim($row['name'])=="p2p_bittorrent") $_p2p_bittorrent=trim($row['val']);
+			if(trim($row['name'])=="p2p_direct") $_p2p_direct=trim($row['val']);
+			if(trim($row['name'])=="p2p_ed2k") $_p2p_ed2k=trim($row['val']);
+			if(trim($row['name'])=="p2p_edonkey") $_p2p_edonkey=trim($row['val']);
+			if(trim($row['name'])=="p2p_gnutella") $_p2p_gnutella=trim($row['val']);
+			if(trim($row['name'])=="p2p_kazaa") $_p2p_kazaa=trim($row['val']);
+			if(trim($row['name'])=="p2p_limewire") $_p2p_limewire=trim($row['val']);
+			if(trim($row['name'])=="p2p_manolito") $_p2p_manolito=trim($row['val']);
+			if(trim($row['name'])=="p2p_morpheus") $_p2p_morpheus=trim($row['val']);
+			if(trim($row['name'])=="p2p_napster") $_p2p_napster=trim($row['val']);
+			if(trim($row['name'])=="p2p_soulseek") $_p2p_soulseek=trim($row['val']);
+			if(trim($row['name'])=="p2p_winmx") $_p2p_winmx=trim($row['val']);
+			if(trim($row['name'])=="p2p_winny") $_p2p_winny=trim($row['val']);
+		}
+	}
+	if($_p2p_stat=='') $_p2p_stat=0;
+	if($_p2p_stat==1) {
+		$_config='';
+		if($_p2p_ares!=0 && file_exists("$_PAT_PATH/im_p2p/P2P/ares")) {
+			if(ips_imp2p_onoff("$_PAT_PATH/im_p2p/P2P/ares",$_p2p_ares)==1) {
+				$_config .="include $_PAT_PATH/im_p2p/P2P/ares\n";
+                        }
+                }
+		if($_p2p_bittorrent!=0 && file_exists("$_PAT_PATH/im_p2p/P2P/bittorrent")) {
+			if(ips_imp2p_onoff("$_PAT_PATH/im_p2p/P2P/bittorrent",$_p2p_bittorrent)==1) {
+				$_config .="include $_PAT_PATH/im_p2p/P2P/bittorrent\n";
+			}
+		}
+		if($_p2p_direct!=0 && file_exists("$_PAT_PATH/im_p2p/P2P/direct")) {
+			if(ips_imp2p_onoff("$_PAT_PATH/im_p2p/P2P/direct",$_p2p_direct)==1) {
+				$_config .="include $_PAT_PATH/im_p2p/P2P/direct\n";
+			}
+		}
+		if($_p2p_ed2k!=0 && file_exists("$_PAT_PATH/im_p2p/P2P/ed2k")) {
+			if(ips_imp2p_onoff("$_PAT_PATH/im_p2p/P2P/ed2k",$_p2p_ed2k)==1) {
+				$_config .="include $_PAT_PATH/im_p2p/P2P/ed2k\n";
+			}
+		}
+		if($_p2p_edonkey!=0 && file_exists("$_PAT_PATH/im_p2p/P2P/edonkey")) {
+			if(ips_imp2p_onoff("$_PAT_PATH/im_p2p/P2P/edonkey",$_p2p_edonkey)==1) {
+				$_config .="include $_PAT_PATH/im_p2p/P2P/edonkey\n";
+			}
+		}
+		if($_p2p_gnutella!=0 && file_exists("$_PAT_PATH/im_p2p/P2P/gnutella")) {
+			 if(ips_imp2p_onoff("$_PAT_PATH/im_p2p/P2P/gnutella",$_p2p_gnutella)==1) {
+				$_config .="include $_PAT_PATH/im_p2p/P2P/gnutella\n";
+			}
+		}
+		if($_p2p_kazaa!=0 && file_exists("$_PAT_PATH/im_p2p/P2P/kazaa")) {
+			if(ips_imp2p_onoff("$_PAT_PATH/im_p2p/P2P/kazaa",$_p2p_kazaa)==1) {
+				$_config .="include $_PAT_PATH/im_p2p/P2P/kazaa\n";
+ 			}
+		}
+		if($_p2p_limewire!=0 && file_exists("$_PAT_PATH/im_p2p/P2P/limewire")) {
+			if(ips_imp2p_onoff("$_PAT_PATH/im_p2p/P2P/limewire",$_p2p_limewire)==1) {
+				$_config .="include $_PAT_PATH/im_p2p/P2P/limewire\n";
+			}
+		}
+		if($_p2p_manolito!=0 && file_exists("$_PAT_PATH/im_p2p/P2P/manolito")) {
+			if(ips_imp2p_onoff("$_PAT_PATH/im_p2p/P2P/manolito",$_p2p_manolito)==1) {
+				$_config .="include $_PAT_PATH/im_p2p/P2P/manolito\n";
+			}
+		}
+		if($_p2p_morpheus!=0 && file_exists("$_PAT_PATH/im_p2p/P2P/morpheus")) {
+			if(ips_imp2p_onoff("$_PAT_PATH/im_p2p/P2P/morpheus",$_p2p_morpheus)==1) {
+				$_config .="include $_PAT_PATH/im_p2p/P2P/morpheus\n";
+			}
+		}
+		if($_p2p_napster!=0 && file_exists("$_PAT_PATH/im_p2p/P2P/napster")) {
+			if(ips_imp2p_onoff("$_PAT_PATH/im_p2p/P2P/napster",$_p2p_napster)==1) {
+				$_config .="include $_PAT_PATH/im_p2p/P2P/napster\n";
+			}
+		}
+		if($_p2p_soulseek!=0 && file_exists("$_PAT_PATH/im_p2p/P2P/soulseek")) {
+			if(ips_imp2p_onoff("$_PAT_PATH/im_p2p/P2P/soulseek",$_p2p_soulseek)==1) {
+				$_config .="include $_PAT_PATH/im_p2p/P2P/soulseek\n";
+			}
+		}
+		if($_p2p_winmx!=0 && file_exists("$_PAT_PATH/im_p2p/P2P/winmx")) {
+			if(ips_imp2p_onoff("$_PAT_PATH/im_p2p/P2P/winmx",$_p2p_winmx)==1) {
+				$_config .="include $_PAT_PATH/im_p2p/P2P/winmx\n";
+			}
+		}
+		if($_p2p_winny!=0 && file_exists("$_PAT_PATH/im_p2p/P2P/winny")) {
+			if(ips_imp2p_onoff("$_PAT_PATH/im_p2p/P2P/winny",$_p2p_winny)==1) {
+				$_config .="include $_PAT_PATH/im_p2p/P2P/winny\n";
+			}
+		}
+		if($_config!='') {
+			mybox_save_to_file("$_PAT_PATH/ips.config-p2p","$_config");
+		}
+	}
+	return $_p2p_stat;
+}
+
+function ips_config(&$_ips_stat,&$_im_stat,&$_p2p_stat) {
+	global $_DB_NAME, $_QUIET;
+	global $_PAT_PATH, $_AWIE_CODE;
+
+	$_ips_drop=1;$_ips_stat=0;$_ips_spyware=0;
+	$db_id=mybox_db_connect($_DB_NAME);
+	$result=mybox_db_query("select * from misc where name like \"ips_%\" ",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			if(trim($row['name'])=="ips_stat") $_ips_stat=trim($row['val']);
+			if(trim($row['name'])=="ips_drop") $_ips_drop=trim($row['val']);
+			if(trim($row['name'])=="ips_net") $_ips_net=trim($row['val']);
+			if(trim($row['name'])=="ips_http_server") $_ips_http_server=trim($row['val']);
+			if(trim($row['name'])=="ips_smtp_server") $_ips_smtp_server=trim($row['val']);
+			if(trim($row['name'])=="ips_dns_server") $_ips_dns_server=trim($row['val']);
+			if(trim($row['name'])=="ips_sql_server") $_ips_sql_server=trim($row['val']);
+			if(trim($row['name'])=="ips_spyware") $_ips_spyware=trim($row['val']);
+		}
+	}
+	if($_ips_stat=='') $_ips_stat=0;
+
+	if($_ips_stat==1 && !file_exists("$_PAT_PATH/ips.config-last")) {
+		$_ddbl='';
+		$_ddb=mybox_dir2array("$_PAT_PATH/rules/*");
+		if(count($_ddb)!=0) {
+			foreach($_ddb as $lnx) {
+				if(file_exists("$lnx/stat")) {
+					$_ddbs=mybox_fget_contents("$lnx/stat");
+					if($_ddbs==1) $_ddbl .="include $lnx/rules\n";
+				}
+			}
+			if($_ddbl!='') mybox_save_to_file("$_PAT_PATH/ips.config-last",$_ddbl);
+		}
+	}
+	$_im_stat=0;
+	$_im_stat=ips_im($db_id);
+	$_p2p_stat=0;
+	$_p2p_stat=ips_p2p($db_id);
+
+	if($_ips_stat==0 && $_im_stat==0 && $_p2p_stat==0) {
+		mybox_init_echo($_QUIET,"INFO","IPS service disabled");
+		@mybox_db_close($db_id);
+		return 0;
+	}
+
+	ips_gen_sidmsg($_ips_stat,$_im_stat,$_p2p_stat);
+
+	$_config='';
+
+	if($_ips_stat==1) {
+		$_HOME='';$_HOME_ME='';
+		$_defnet_array=mybox_defnetwork_array($db_id);
+		$namedev_array=mybox_name2dev_array($db_id);
+		foreach($namedev_array as $a => $b) {
+			if(stripos($a,"(Address)")!==FALSE) {
+				$_HOME_ME .="!{$b},";
+			}
+		}
+		unset($a,$b);
+		$_net=preg_split("/,/",$_ips_net);
+		if(count($_net)!=0) {
+			foreach($_net as $n) {
+				if($n=='') continue;
+				$_p='';
+				if(isset($namedev_array[$n])&&$namedev_array[$n]!='') {
+					$_HOME .="{$namedev_array[$n]},";
+				} else {
+					$_p=get_address($_defnet_array,$n,"1");
+					$_HOME .="$_p,";
+				}
+			}
+		}
+		$_HOME=trim($_HOME,",");
+		if($_HOME!='') {
+			$_HOME="[$_HOME]";
+		} else {
+			$_HOME="any";
+		}
+
+		$HTTP_SERVERS='';
+		if($_ips_http_server!='') {
+			if(isset($namedev_array[$_ips_http_server])&&$namedev_array[$_ips_http_server]!='') {
+				$HTTP_SERVERS .="{$namedev_array[$_ips_http_server]},";
+			} else {
+				$_p=get_address($_defnet_array,$_ips_http_server,"2");
+				$HTTP_SERVERS .="$_p,";
+			}
+			if($HTTP_SERVERS!='') {
+				$HTTP_SERVERS=trim($HTTP_SERVERS,",");
+				$HTTP_SERVERS="[$HTTP_SERVERS]";
+			}
+			unset($_p);
+		}
+		$DNS_SERVERS='';
+		if($_ips_dns_server!='') {
+			if(isset($namedev_array[$_ips_dns_server])&&$namedev_array[$_ips_dns_server]!='') {
+				$DNS_SERVERS .="{$namedev_array[$_ips_dns_server]},";
+			} else {
+				$_p=get_address($_defnet_array,$_ips_dns_server,"2");
+				$DNS_SERVERS .="$_p,";
+			}
+			if($DNS_SERVERS!='') {
+				$DNS_SERVERS=trim($DNS_SERVERS,",");
+				$DNS_SERVERS="[$DNS_SERVERS]";
+			}
+			unset($_p);
+		}
+		$SMTP_SERVERS='';
+		if($_ips_smtp_server!='') {
+			if(isset($namedev_array[$_ips_smtp_server])&&$namedev_array[$_ips_smtp_server]!='') {
+				$SMTP_SERVERS .="{$namedev_array[$_ips_smtp_server]},";
+			} else {
+				$_p=get_address($_defnet_array,$_ips_smtp_server,"2");
+				$SMTP_SERVERS .="$_p,";
+			}
+			if($SMTP_SERVERS!='') {
+				$SMTP_SERVERS=trim($SMTP_SERVERS,",");
+				$SMTP_SERVERS="[$SMTP_SERVERS]";
+			}
+			unset($_p);
+		}
+		$SQL_SERVERS='';
+		if($_ips_sql_server!='') {
+			if(isset($namedev_array[$_ips_sql_server])&&$namedev_array[$_ips_sql_server]!='') {
+				$SQL_SERVERS .="{$namedev_array[$_ips_sql_server]},";
+			} else {
+				$_p=get_address($_defnet_array,$_ips_sql_server,"2");
+				$SQL_SERVERS .="$_p,";
+			}
+			if($SQL_SERVERS!='') {
+				$SQL_SERVERS=trim($SQL_SERVERS,",");
+				$SQL_SERVERS="[$SQL_SERVERS]";
+			}
+			unset($_p);
+		}
+		@mybox_db_close($db_id);
+	}
+
+	$_config .="var HTTP_PORTS 80 443 8080\n";
+	$_config .="var SHELLCODE_PORTS !\$HTTP_PORTS\n";
+	$_config .="var ORACLE_PORTS 1521\n";
+	$_config .="var SSH_PORTS 22\n";
+
+	$_ips_conf='';
+	@unlink("$_PAT_PATH/ips.conf");
+	if($_ips_stat==1 && file_exists("$_PAT_PATH/ips.config-last")
+		&& file_exists("$_PAT_PATH/classification.config")
+		&& file_exists("$_PAT_PATH/ips.config-middle")) {
+		$_ips_conf .="var HOME $_HOME\n";
+		$_ips_conf .="var WORLD any\n";
+		$_ips_conf .="$_config";
+		if(!isset($DNS_SERVERS)||$DNS_SERVERS=='') {
+        		$_ips_conf .="var DNS_SERVERS \$HOME\n";
+		} else {
+        		$_ips_conf .="var DNS_SERVERS $DNS_SERVERS\n";
+		}
+		if(!isset($SMTP_SERVERS)||$SMTP_SERVERS=='') {
+        		$_ips_conf .="var SMTP_SERVERS \$HOME\n";
+		} else {
+			$_ips_conf .="var SMTP_SERVERS $SMTP_SERVERS\n";
+		}
+		if(!isset($HTTP_SERVERS)||$HTTP_SERVERS=='') {
+        		$_ips_conf .="var HTTP_SERVERS \$HOME\n";
+		} else {
+        		$_ips_conf .="var HTTP_SERVERS $HTTP_SERVERS\n";
+		}
+		if(!isset($SQL_SERVERS)||$SQL_SERVERS=='') {
+			$_ips_conf .="var SQL_SERVERS \$HOME\n";
+		} else {
+			$_ips_conf .="var SQL_SERVERS $SQL_SERVERS\n";
+		}
+		$_ips_conf .="include $_PAT_PATH/classification.config\n";
+		$_ips_conf .="include $_PAT_PATH/ips.config-middle\n";		
+		$_ips_conf .="include $_PAT_PATH/ips.config-last\n";
+		mybox_save_to_file("$_PAT_PATH/ips.conf","$_ips_conf");
+		if(!file_exists("$_PAT_PATH/ips.conf")) $_ips_stat=0;
+	} else {
+		$_ips_stat=0;
+	}
+
+	$_ips_im_conf='';
+	@unlink("$_PAT_PATH/ips-im.conf");
+	if($_im_stat==1 && file_exists("$_PAT_PATH/ips.config-im")
+		&& file_exists("$_PAT_PATH/classification.config")
+		&& file_exists("$_PAT_PATH/ips.config-im-middle")) {
+		$_ips_im_conf .="$_config";
+		$_ips_im_conf .="include $_PAT_PATH/classification.config\n";
+		$_ips_im_conf .="include $_PAT_PATH/ips.config-im-middle\n";		
+		$_ips_im_conf .="include $_PAT_PATH/ips.config-im\n";
+		mybox_save_to_file("$_PAT_PATH/ips-im.conf","$_ips_im_conf");
+		if(!file_exists("$_PAT_PATH/ips-im.conf")) $_im_stat=0;
+	} else {
+		$_im_stat=0;
+	}
+
+	$_ips_p2p_conf='';
+	@unlink("$_PAT_PATH/ips-p2p.conf");
+	if($_p2p_stat==1 && file_exists("$_PAT_PATH/ips.config-p2p")
+		&& file_exists("$_PAT_PATH/classification.config")
+		&& file_exists("$_PAT_PATH/ips.config-p2p-middle")) {
+		$_ips_p2p_conf .="$_config";
+		$_ips_p2p_conf .="include $_PAT_PATH/classification.config\n";
+		$_ips_p2p_conf .="include $_PAT_PATH/ips.config-p2p-middle\n";		
+		$_ips_p2p_conf .="include $_PAT_PATH/ips.config-p2p\n";
+		mybox_save_to_file("$_PAT_PATH/ips-p2p.conf","$_ips_p2p_conf");
+		if(!file_exists("$_PAT_PATH/ips-p2p.conf")) $_p2p_stat=0;
+	} else {
+		$_p2p_stat=0;
+	}
+
+	if($_ips_stat==0 && $_im_stat==0 && $_p2p_stat==0) {
+		if($_QUIET==0) echo "* Writing IPS config failed\n";
+		ips_rm_ip_que();
+		return 0;
+	}
+	return 1;
+}
+
+function ips_status() {
+	global $_QUIET;
+	$pid=mybox_get_progpid("snortd");
+	if($pid!='') {
+		if($_QUIET==0) echo "* snortd (pid $pid) is running...\n";
+		return 0;
+	}
+	return 1;
+}
+
+function ips_rm_ip_que() {
+	exec("rmmod -f nfnetlink_queue 2>/dev/null");
+}
+
+function ips_chk_ip_que() {
+	exec("lsmod |grep nfnetlink_queue 2>/dev/null",$out,$ret);
+	return $ret;
+}
+
+function ips_run_barnyard() {
+	global $_PAT_PATH;
+	return mybox_exec_cmd("barnyard -X /var/run/barnyard.pid -c $_PAT_PATH/barnyard.conf -d /var/spool/ips_queue -a /var/spool/ips_queue.a -p $_PAT_PATH/classification.config -s $_PAT_PATH/sid-msg.map -g $_PAT_PATH/gen-msg.map -f snort.alert");
+}
+
+function ips_run_snortd($num,$conf) {
+	global $_PAT_PATH;
+	//echo "snortd -H $num -Q -N --nolock-pidfile -c $_PAT_PATH/$conf -l /var/spool/ips_queue\n";
+	return mybox_exec_cmd("snortd -H $num -R .$num -Q -N --nolock-pidfile -c $_PAT_PATH/$conf -l /var/spool/ips_queue");
+}
+
+function ips_start() {
+	global $_PAT_PATH, $_QUIET, $_ROOT_DIR;
+	$_IDS_BLOCK=array();
+	$ipst=@ips_config(&$_ips_stat,&$_im_stat,&$_p2p_stat);
+
+	if(file_exists("$_ROOT_DIR/scripts/ips/start")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/ips/start");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/ips/pre-start")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/ips/pre-start");
+	}
+
+	if(!is_dir("/var/spool/ips_queue")) @mybox_mkdirr("/var/spool/ips_queue");
+	if(!is_dir("/var/spool/ips_queue.a")) @mybox_mkdirr("/var/spool/ips_queue.a");
+	if(!file_exists("$_PAT_PATH/barnyard.conf")) mybox_save_to_file("$_PAT_PATH/barnyard.conf","config daemon\noutput alert_syslog: LOG_AUTH LOG_ALERT\n");
+	$ok=0;	
+	if($ipst==1 && @ips_status()==1) {
+		if(ips_chk_ip_que()==1) {
+			mybox_exec_cmd("modprobe nfnetlink_queue");
+		}
+		mybox_save_to_file("/proc/sys/net/core/rmem_default","8388608\n");
+		mybox_save_to_file("/proc/sys/net/core/rmem_max","16777216\n");
+		if(ips_run_barnyard()==0) {
+			if($_ips_stat==1 && ips_run_snortd(0,"ips.conf")==0) {
+				$ok++;
+			}
+			if($_im_stat==1 && ips_run_snortd(1,"ips-im.conf")==0) {
+				$ok++;
+			}
+			if($_p2p_stat==1 && ips_run_snortd(2,"ips-p2p.conf")==0) {
+				$ok++;
+			}
+			if($ok!=0) {
+				@touch("/var/sys/chk_snortd");
+				mybox_init_echo($_QUIET,"INFO","Starting IPS service");
+				if(!file_exists("/var/sys/init_no_restart")) {
+					mybox_exec_cmd("/service/init/policy.init restart quiet");
+					//do_policy_admin();
+					//do_policy_ips();
+				}
+				@mybox_unlink("/var/spool/ips_queue/*");
+				if(file_exists("$_ROOT_DIR/scripts/ips/post-start")) {
+					mybox_execq_cmd("$_ROOT_DIR/scripts/ips/post-start");
+				}
+
+				policy_ips_onoff(0);
+				return 0;
+			}
+		}
+	}
+	
+	mybox_init_echo($_QUIET,"ERROR","Starting IPS service failed");
+	return 1;
+}
+
+function ips_stop() {
+	global $_QUIET, $_ROOT_DIR;
+
+	@unlink("/var/sys/chk_snortd");
+
+	if(file_exists("$_ROOT_DIR/scripts/ips/stop")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/ips/stop");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/ips/pre-stop")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/ips/pre-stop");
+	}
+
+	policy_ips_onoff(1);
+	do_policy_ips_clear();
+	@mybox_unlink("/var/run/snort_*");
+	if(mybox_killall("snortd")==0 && mybox_killall("barnyard")==0) {
+		mybox_init_echo($_QUIET,"INFO","Shutting down IPS service");
+		//do_policy_ips_clear();
+		ips_rm_ip_que();
+		if(file_exists("$_ROOT_DIR/scripts/ips/post-stop")) {
+			mybox_execq_cmd("$_ROOT_DIR/scripts/ips/post-stop");
+		}
+		return 0;
+	}
+	mybox_init_echo($_QUIET,"ERROR","Shutting down IPS service failed");
+	return 1;
+}
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+$_sig=$_SERVER["argv"][2];
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=ips_start();
+		break;
+	case 'stop':
+		$ret=ips_stop();
+		break;
+	case 'restart':
+		$ret=ips_stop();
+		sleep(2);
+		$ret=ips_start();
+		break;
+	case 'status':
+		$ret=ips_status();
+		break;
+	case 'config':
+		$ret=ips_config();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/status]\n";
+		break;
+}
+exit($ret);
+?>

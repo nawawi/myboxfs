@@ -1,0 +1,118 @@
+<?php 
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+
+// remove if timeout, diffrent from policy_captive.exl
+function chk_captive_timeout($dir="/var/cache/captive") {
+	if(!is_dir("$dir")) return;
+	$buff=mybox_dir2array("$dir/*.*.*.*.*:*:*:*:*:*");
+	if(count($buff)!=0) {
+		foreach($buff as $ls) {
+			$ls=trim($ls);
+			$lsb=basename($ls);
+			if(preg_match("/(\d+\.\d+\.\d+\.\d+)\.(\S+\:\S+\:\S+\:\S+\:\S+\:\S+)/",$lsb,$mm)) {
+				$_myip=$mm[1];
+				$_mymac=$mm[2];
+				$opt=array();
+				$opt=unserialize(mybox_fget_contents("$ls"));
+				if(count($opt)==0) continue;
+				$time=$opt[0];
+				if(time() > $time) {
+					do_access($_myip,$_mymac,'D');
+					@unlink("$ls");
+				}
+			}
+			unset($lsb,$_myip,$_mymac,$opt,$time);
+
+		}
+	}	
+}
+
+function chk_captive_user_islogin($user,$ip,$mac,$dir="/var/cache/captive") {
+	if($user=='') return array("","");
+	if(!is_dir("$dir")) return array("","");
+	$buff=mybox_dir2array("$dir/*.*.*.*.*:*:*:*:*:*");
+	if(count($buff)!=0) {
+		foreach($buff as $ls) {
+			$ls=trim($ls);
+			$lsb=basename($ls);
+			if(preg_match("/(\d+\.\d+\.\d+\.\d+)\.(\S+\:\S+\:\S+\:\S+\:\S+\:\S+)/",$lsb,$mm)) {
+				$_myip=$mm[1];
+				$_mymac=$mm[2];
+				$opt=array();
+				$opt=unserialize(mybox_fget_contents("$ls"));
+				if(count($opt)==0) continue;
+				$time=$opt[0];
+				$name=$opt[1];
+				if($name=="$user" && ($_myip!=$ip && $_mymac!=$mac)) return array("$_myip","$_mymac");
+			}
+			unset($lsb,$_myip,$_mymac,$opt,$time,$name);
+
+		}
+	}
+	return array("","");	
+}
+
+function get_arp($find) {
+	if(!file_exists("/proc/net/arp")) return;
+	$arp=file("/proc/net/arp");
+	if(count($arp)!=0) {
+		unset($arp[0]);
+		foreach($arp as $ls) {
+			$ls=trim($ls);
+			list($ip,$hw,$fg,$mac,$mask,$dev)=preg_split("/\s+/",$ls);
+			if($ip=="$find") return $mac;
+		}
+		unset($arp,$ip);
+	}
+}
+
+function captive_active_user() {
+	$dir="/var/cache/captive";
+	if(!is_dir("$dir")) return array();
+	$_ret_array=array();
+	exec("/bin/iptables -L -t mangle -n -v",$buff,$ret);
+	if(count($buff)!=0) {
+		foreach($buff as $lst) {
+                	$lst=trim($lst);
+			if(preg_match("/(\S+)\s+(\S+)\s+MARK\s+\d+\s+\-\-\s+\S+\s+\S+\s+(\d+\.\d+\.\d+\.\d+)\s+(\d+\.\d+\.\d+\.\d+\/\d+)\s+MAC\s+(\S+\:\S+\:\S+\:\S+\:\S+\:\S+)\s+MARK\s+set\s+0xffffffff/",$lst,$mm)) {				
+				$_pkt=$mm[1];
+				$_byte=$mm[2];
+				$_src=$mm[3];
+				$_dst=$mm[4];
+				$_mac=$mm[5];
+				if($_src=='' || $_src=="0.0.0.0" || $_mac=='') continue;
+				if(!file_exists("$dir/{$_src}.{$_mac}")) continue;
+				$opt=array();
+				$opt=unserialize(mybox_fget_contents("$dir/{$_src}.{$_mac}"));
+				if(count($opt)==0) {
+					@unlink("$dir/{$_src}.{$_mac}");
+					continue;
+				}
+				$_time=$opt[0];
+				$_name=$opt[1];
+				$_timen=$opt[2];
+				if(time() > $_time) {
+					do_access($_src,$_mac,'D');
+					@unlink("$dir/{$_src}.{$_mac}");
+					continue;
+				}
+				$_ret_array[]="$_pkt|$_byte|$_name|$_src|$_mac|$_timen|$_time";
+				unset($_pkt,$_byte,$_src,$_mac,$_timen,$_time,$_name);
+			}
+			unset($mm);
+		}
+	}
+	unset($buff);
+	return $_ret_array;
+}
+
+function captive_log($ldate,$ip,$mac,$msg) {
+	$txt="IP=$ip MAC=$mac MSG=$msg";
+	mybox_write_log($ldate,"captiveportal","CAPTIVE-PORTAL",$txt);
+}
+
+function do_access($ip,$mac='',$opt='A') {
+	if($mac!='') $mac="-m mac --mac-source $mac";
+	return mybox_exec_cmd("/bin/iptables -t mangle -$opt ACL1004-00 -s $ip $mac -j MARK --set-mark 4294967295");
+}
+?>

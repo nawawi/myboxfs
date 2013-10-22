@@ -1,0 +1,519 @@
+#!/bin/php -Cq
+<?php 
+// policy.init, Mybox v3.0 29-Mar-2007
+
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="policy";
+include_once('clib.exl');
+
+$_KMSG=array();
+$_PPTP_STAT=0;
+$_QUIET=0;
+$_DEBUG=0;
+$_XLINE=1;
+
+include_once('policy.exl');
+putenv("PATH=/bin:/service/tools:/service/init");
+
+mybox_init_set_alarm(60);
+
+if(!file_exists("/bin/iptables-restore") || !file_exists("/bin/iptables-save")) {
+	mybox_init_echo($_QUIET,"ERROR","Cannot execute policy.init. Internal error!");
+	exit(1);
+}
+
+
+function filter_header() {
+	/*
+	ACL1000-01 - admin
+	ACL1000-01-PI - bad packet INPUT
+	ACL1000-01-PF - bad packet OUTPUT/FORWARD
+	ACL1000-02 - PSD Action
+	ACL1000-03 - PSD Match
+	ACL1000-04 - Spyware
+	ACL1000-05 - blacklist
+	ACL1000-06  - ICMP
+	ACL1000-07  - Inbound
+	ACL1000-08  - Outbound
+	ACL1000-09  - FORWARD
+	*/
+	do_iptable("*filter");
+	do_iptable(":INPUT DROP [0:0]");
+	do_iptable(":FORWARD DROP [0:0]");
+	do_iptable(":OUTPUT DROP [0:0]");
+	do_iptable(":ACL1000-01 - [0:0]");
+	do_iptable(":ACL1000-01-PI - [0:0]");
+	do_iptable(":ACL1000-01-PF - [0:0]");
+	do_iptable(":ACL1000-02 - [0:0]");
+	do_iptable(":ACL1000-03 - [0:0]");
+	do_iptable(":ACL1000-04 - [0:0]");
+	do_iptable(":ACL1000-05 - [0:0]");
+	do_iptable(":ACL1000-06 - [0:0]");
+	do_iptable(":ACL1000-07 - [0:0]");
+	do_iptable(":ACL1000-08 - [0:0]");
+	do_iptable(":ACL1000-09 - [0:0]");
+}
+
+
+function policy_filter($type,$db_id) {
+	global $_PFP;
+
+	$table='pf_inbound';
+	$_tt='I';
+	if($type=='ACL1000-08') {
+		$table='pf_outbound';
+		$_tt='O';
+	}
+
+	$_KMSG=array();
+	@unlink("/var/sys/fwmsg");
+
+	$_cmdlog='-m state --state NEW -m limit --limit 2/sec --limit-burst 10 -j NFLOG --nflog-prefix';
+	$_deftime_array=mybox_deftimes_array($db_id);
+	$_defnet_array=mybox_defnetwork_array($db_id);
+	$_defservice_array=mybox_defservices_array($db_id);
+	$namedev_array=mybox_name2dev_array($db_id);
+
+	$result=mybox_db_query("select * from $table where stat='1' order by id ASC",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_id=$row['id'];
+			$_srcn=$row['srcn'];
+			$_src=trim($row['src']);
+			$_dstn=$row['dstn'];
+			$_dst=trim($row['dst']);
+			$_service=trim($row['service']);
+			$_action=trim($row['action']);
+			$_event=trim($row['event']);
+			$_log=$row['log'];
+			$_note=mybox_unescape_str($row['note']);
+			if($_note=='') $_note='none';
+			// variable
+			$_cmdlogx='';
+			$_cmd_time='';
+			$_service_array=array();
+			$_src_array=array();
+			$_dst_array=array();
+			$_action=$_PFP[$_action];
+			if($_action=='PASS') $_action='ACCEPT';
+			$_srcnl='';$_dstnl='';
+			if($_srcn==1) $_srcnl='! ';
+			if($_dstn==1) $_dstnl='! ';
+
+			// time
+			if($_event!='') {
+				if(isset($_deftime_array[$_event])&&$_deftime_array[$_event]!='') {
+					$_timeday=$_deftime_array[$_event]['day'];
+					$_timestart=$_deftime_array[$_event]['start'];
+					$_timeend=$_deftime_array[$_event]['stop'];
+					$_cmd_time=time_policy($_timeday,$_timestart,$_timeend);
+				}
+				unset($_deftime_array,$_timeday,$_timestart,$_timeend);
+			}
+			// Log
+			if($_log==1) {
+				$_cmdlogx="$_cmdlog \"F:$_tt:$_action:$_id \"";
+				$_KMSG[$_tt][$_id]="$_note";
+			}
+			if($_service!='any') {
+				$_service_array=list_service_array($_defservice_array,$_service);
+			}
+			if($_src!='any') {
+				if(isset($namedev_array[$_src])&&$namedev_array[$_src]!='') {
+					$_src_array[]="-s $_srcnl{$namedev_array[$_src]}";
+				} else {
+					if(isset($_defnet_array[$_src])&&$_defnet_array[$_src]!='') {
+						$_src_array=list_srcdst_array($_defnet_array,$_src,"1",$_srcnl);
+					}
+				}
+			}
+			if($_dst!='any') {
+				if(isset($namedev_array[$_dst])&&$namedev_array[$_dst]!='') {
+					$_dst_array[]="-d $_dstnl{$namedev_array[$_dst]}";
+				} else {
+					if(isset($_defnet_array[$_dst])&&$_defnet_array[$_dst]!='') {
+						$_dst_array=list_srcdst_array($_defnet_array,$_dst,"2",$_dstnl);
+					}
+				}
+			}
+			if(count($_src_array)!=0 && count($_dst_array)!=0) {
+				foreach($_src_array as $src) {
+					if($src=='') continue;
+					foreach($_dst_array as $dst) {
+						if($dst=='') continue;
+						if(count($_service_array)!=0) {
+							foreach($_service_array as $sr) {
+								if($sr=='') continue;
+								if($_log==1) {
+									do_iptable("-A $type $sr $src $dst $_cmd_time $_cmdlogx");
+								}
+								do_iptable("-A $type $sr $src $dst $_cmd_time -j $_action");
+							}
+						} else {
+							if($_log==1) {
+								do_iptable("-A $type $src $dst $_cmd_time $_cmdlogx");
+							}
+							do_iptable("-A $type $src $dst $_cmd_time -j $_action");
+						}
+					}
+				}
+			} elseif(count($_src_array)!=0 && count($_dst_array)==0) {
+				foreach($_src_array as $src) {
+					if($src=='') continue;
+					if(count($_service_array)!=0) {
+						foreach($_service_array as $sr) {
+							if($sr=='') continue;
+							if($_log==1) {
+								do_iptable("-A $type $sr $src $_cmd_time $_cmdlogx");
+							}
+							do_iptable("-A $type $sr $src $_cmd_time -j $_action");
+						}
+					} else {
+						if($_log==1) {
+							do_iptable("-A $type $src $_cmd_time $_cmdlogx");
+						}
+						do_iptable("-A $type $src $_cmd_time -j $_action");
+					}
+				}
+			} elseif(count($_src_array)==0 && count($_dst_array)!=0) {
+				foreach($_dst_array as $dst) {
+					if($dst=='') continue;
+					if(count($_service_array)!=0) {
+						foreach($_service_array as $sr) {
+							if($sr=='') continue;
+							if($_log==1) {
+								do_iptable("-A $type $sr $dst $_cmd_time $_cmdlogx");
+							}
+							do_iptable("-A $type $sr $dst $_cmd_time -j $_action");
+						}
+					} else {
+						if($_log==1) {
+							do_iptable("-A $type $dst $_cmd_time $_cmdlogx");
+						}
+						do_iptable("-A $type $dst $_cmd_time -j $_action");
+					}
+				}
+			} elseif(count($_src_array)==0 && count($_dst_array)==0) {
+				if(count($_service_array)!=0) {
+					foreach($_service_array as $sr) {
+						if($sr=='') continue;
+						if($_log==1) {
+							do_iptable("-A $type $sr $_cmd_time $_cmdlogx");
+						}
+						do_iptable("-A $type $sr $_cmd_time -j $_action");
+					}
+				} else {
+					if($_log==1) {
+						do_iptable("-A $type $_cmd_time $_cmdlogx");
+					}
+					do_iptable("-A $type $_cmd_time -j $_action");
+				}
+			}
+			unset($_id,$_srcn,$_src,$_dstn,$_dst,$_service,$_event,$_action,$_log,$_cmdl,$_cmdf,$_cmd,$_note);
+		} // while
+	}
+	mybox_save_to_file("/var/sys/fwmsg",serialize($_KMSG));
+}
+
+function policy_create_fwd($opt,$_dev,$fpol,$pol) {
+	global $_PPTP_STAT;
+	if($_PPTP_STAT==1) $_dev[]="ppp+";
+	$list_array=array();
+	$a=array();$a2=array();
+	if($opt==1) {
+		for($x=0;$x<count($_dev);$x++) {
+			$a=$_dev[$x];
+			if($x==0) $list_array[]="-A $fpol -i $a -j $pol";
+			foreach($_dev as $b) {
+				if($b==$a || $a2[$b]==1) continue;
+				$list_array[]="-A $fpol -i $a -o $b -j $pol";
+			}
+			$a2[$a]=1;
+		}
+		unset($a,$b,$i,$x,$a2);
+		foreach($list_array as $rr) do_iptable($rr);
+	}
+	if($opt==2) {
+		for($x=count($_dev)-1;$x >= 0;$x--) {
+			$a=$_dev[$x];
+			if($x==0) $list_array[]="-A $fpol -o $a -j $pol";
+			foreach($_dev as $b) {
+				if($b==$a || $a2[$b]==1) continue;
+				$list_array[]="-A $fpol -i $a -o $b -j $pol";
+			}			
+			$a2[$a]=1;
+		}
+		unset($a,$b,$i,$x,$a2);
+		foreach($list_array as $rr) do_iptable($rr);
+	}
+}
+
+function policy_init($db_id) {
+	global $_DB_NAME, $_QUIET, $_PPTP_STAT;
+	global $_IPSACL, $_ROOT_DIR;
+
+	$_dev=array();
+	$_local=array();
+	$_masqip=array();
+	$_ping=array();
+
+	policy_get_data(&$_dev,&$_local,&$_masqip,&$_ping,$db_id);
+
+	$result=mybox_db_query("select val from misc where name='pptp_vpn_stat'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		$_PPTP_STAT=mybox_db_fetch_single($result);
+	}
+	// start
+	iptables_open();
+	mybox_init_echo($_QUIET,"INFO","Loading Packet Filter rules");
+
+	filter_header();
+	do_iptable("-A INPUT -j ACL1000-01");
+	do_iptable("-A FORWARD -j ACL1000-01");
+	do_iptable("-A INPUT -j ACL1000-03");
+	do_iptable("-A FORWARD -j ACL1000-03");
+
+	do_iptable("-A INPUT -j ACL1000-04");
+	do_iptable("-A FORWARD -j ACL1000-04");
+
+	do_iptable("-A INPUT -j ACL1000-05");
+	do_iptable("-A FORWARD -j ACL1000-05");
+
+	do_iptable("-A INPUT -j ACL1000-06");
+	do_iptable("-A FORWARD -j ACL1000-06");
+
+	// bad packet
+	do_iptable("-A INPUT -j ACL1000-01-PI");
+	do_iptable("-A OUTPUT -j ACL1000-01-PF");
+	do_iptable("-A FORWARD -j ACL1000-01-PF");
+
+	do_iptable("-A INPUT -p all -i lo -s 127.0.0.1 -j ACCEPT");
+	foreach($_local as $_ip => $a) {
+		if($_ip=='') continue;
+		do_iptable("-A INPUT -p all -i lo -s $_ip -j ACCEPT");
+	}
+	unset($_ip,$a);
+	do_iptable("-A INPUT -p tcp -m tcp ! --tcp-flags SYN,RST,ACK SYN -m state --state NEW -j DROP"); 
+	do_iptable("-A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT");
+	do_iptable("-A INPUT -j ACL1000-07");
+
+	do_iptable("-A OUTPUT -p all -s 127.0.0.1 -j ACCEPT");
+	foreach($_local as $_ip => $a) {
+		if($_ip=='') continue;
+		do_iptable("-A OUTPUT -p all -s $_ip -j ACCEPT");
+	}
+	unset($_ip,$a);
+
+	do_iptable("-A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu");
+	do_iptable("-A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT");
+	do_iptable("-A OUTPUT -j ACL1000-08");
+
+	do_iptable("-A FORWARD -p tcp -m tcp ! --tcp-flags SYN,RST,ACK SYN -m state --state NEW -j DROP");
+	do_iptable("-A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu");
+	do_iptable("-A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT"); 
+	do_iptable("-A FORWARD -j ACL1000-09");
+
+	policy_create_fwd('1',$_dev,"ACL1000-09","ACL1000-07");
+	policy_create_fwd('2',$_dev,"ACL1000-09","ACL1000-08");
+
+	// INBOUND/OUTBOUND
+	policy_filter("ACL1000-07",$db_id);
+	policy_filter("ACL1000-08",$db_id);
+
+	policy_close();
+
+	iptables_open();
+	filter_mangle();
+	policy_close();
+
+	iptables_open();
+	nat_header();
+	policy_close();
+
+	iptables_open();
+	nat_raw_header();
+	policy_close();
+}
+
+function policy_start() {
+	global $_DB_NAME, $_QUIET, $_PPTP_STAT;
+	global $_IPSACL, $_ROOT_DIR;
+
+	if(file_exists("$_ROOT_DIR/scripts/policy/start")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/policy/start");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/policy/pre-start")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/policy/pre-start");
+	}
+
+	$db_id=mybox_db_connect($_DB_NAME);
+
+	$_tt=time()+60*2;
+	@mybox_save_to_file("/var/sys/policy_load",$_tt);
+
+	// INIT
+	policy_init($db_id);
+
+	// ACL
+	do_policy_admin($db_id);
+
+	// http proxy acl
+	do_http_sg_policy();
+
+	// ftp proxy acl
+	do_ftp_proxy_acl_policy();
+
+	// mail proxy acl
+	do_mail_acl_policy();	
+
+	// PORTSCAN
+	do_policy_portscan($db_id);
+
+	// BLACKLIST
+	do_policy_blacklist($db_id);
+
+	// ICMP PING/TRACEROUTE
+	do_policy_icmp($db_id);
+
+	// BAD PACKET
+	do_policy_badpacket($db_id);
+
+	// DOS/FLOOD PROTECTION
+	do_policy_dos($db_id);
+
+	// IPS
+	// hook-> policy_admin
+	//if(!file_exists("/var/sys/init_no_restart")) do_policy_ips($db_id);
+	
+	// NAT
+	do_policy_nat($db_id);
+
+	// CAPTIVE
+	// hook-> policy_admin
+	//if(!file_exists("/var/sys/init_no_restart")) do_policy_captive($db_id);
+
+	// policy route
+	do_policy_routes();
+
+	// traffic accounting
+	do_policy_account();
+
+	@mybox_db_close($db_id);
+
+	@unlink("/var/sys/policy_load");
+
+	// clean/post setting
+	if(file_exists("$_ROOT_DIR/scripts/policy/post-start")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/policy/post-start");
+	}
+
+	return 0;
+}
+
+function policy_stop() {
+	global $_QUIET, $_ROOT_DIR;
+
+	if(file_exists("$_ROOT_DIR/scripts/policy/stop")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/policy/stop");
+	}
+
+	if(file_exists("$_ROOT_DIR/scripts/policy/pre-stop")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/policy/pre-stop");
+	}
+
+	foreach(array("filter","raw","nat","mangle","traceips") as $tab) {
+		iptables_open();
+		do_iptable("*{$tab}");
+		policy_close();
+	}
+
+	mybox_init_echo($_QUIET,"INFO","Stopping Packet Filter rules");
+	@unlink("/var/sys/fwmsg");
+	@unlink("/var/sys/policy_load");
+
+	if(file_exists("$_ROOT_DIR/scripts/policy/post-start")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/policy/post-start");
+	}
+
+	// http proxy acl
+	@unlink("/var/sys/urlfilter_policy_drop");
+	// ftp proxy acl
+	@unlink("/var/sys/ftpproxy_policy_drop");
+	// mail proxy acl
+	@unlink("/var/sys/mailproxy_policy_drop");
+
+	// ip accounting
+	@unlink("/var/sys/init_account");
+	return 0;
+}
+
+function policy_clear() {
+	global $_QUIET;
+	policy_stop();
+	iptables_open();
+	do_iptable("*filter");
+	do_iptable(":INPUT ACCEPT [0:0]");
+	do_iptable(":FORWARD ACCEPT [0:0]");
+	do_iptable(":OUTPUT ACCEPT [0:0]");
+	policy_close();
+	mybox_init_echo($_QUIET,"INFO","Packet Filter rules disabled!");
+	@unlink("/var/sys/fwmsg");
+	return 0;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+if($_SERVER["argv"][2]=='debug') $_DEBUG=1;
+
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=policy_start();
+		break;
+	case 'restart':
+		$ret=policy_stop();
+		$ret=policy_start();
+		break;
+	case 'stop':
+		$ret=policy_stop();
+		break;
+	case 'clear':
+		$ret=policy_clear();
+		break;
+	case 'dos':
+		$ret=do_policy_dos();
+		break;
+	case 'blacklist':
+		$ret=do_policy_blacklist();
+		break;
+	case 'ips':
+		$ret=do_policy_ips();
+		break;
+	case 'pscan':
+		$ret=do_policy_portscan();
+		break;
+	case 'ips-all':
+		$ret=0;
+		do_policy_ips();do_policy_portscan();do_policy_dos();
+		break;
+	case 'mod':
+		$ret=0;
+		do_policy_icmp();do_policy_admin();do_policy_badpacket();
+		break;
+	case 'acl':
+		$ret=do_policy_admin();
+		break;
+	case 'lb':
+		$ret=do_policy_lb();
+		break;
+	case 'nat':
+		$ret=do_policy_nat();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/clear/ips/ips-all/dos/pscan/acl/mod/lb/nat]\n";
+		break;
+}
+flush();
+exit($ret);
+?>

@@ -1,0 +1,171 @@
+#!/bin/bash -e
+
+START_POINT=$(pwd)
+cd $START_POINT
+ROOT_DIR=$START_POINT/rootfs
+BUSYBOX_SRC=$START_POINT/src/busybox
+KERNEL_BASE=$START_POINT/kernel_base
+BINARY_LIST="src/net-tools-*/arp
+		/sbin/ip
+		/usr/bin/openssl
+		/sbin/depmod
+		/sbin/modprobe
+		/sbin/lsmod
+		/sbin/rmmod
+		/sbin/vconfig
+		/sbin/microcode_ctl
+		/bin/rrdtool
+		src/nano-*/src/nano
+		src/shttpd-*/src/httpsd
+		src/vsftpd-*/ftpd
+		src/procinfo-*/procinfo
+		src/wget-*/src/wget
+		src/bash/bash
+		/sbin/ethtool
+		/usr/bin/ftp
+		/usr/bin/rsync
+		/mfs-gcc/bin/lzmacat"
+
+SKELS_PATH=$START_POINT/skells
+ZENDLIB=/usr/local/Zend/lib/Optimizer-3.2.0/php-5.2.x/ZendOptimizer.so
+MYBOX_UTIL=$START_POINT/src/mybox
+#NETFILTERLIB="/mfs-gcc/lib/libnfnetlink.so* /mfs-gcc/lib/libnetfilter_log*.so* /mfs-gcc/lib/libnetfilter_queue*.so*"
+rm -rfv $ROOT_DIR
+mkdir -p $ROOT_DIR
+cp -av $SKELS_PATH/* $ROOT_DIR
+
+for t in /lib/libnss*_files*; do
+        cp -av $t $ROOT_DIR/lib
+        [ ! -L "$t" ] && strip $ROOT_DIR/lib/$(basename $t)
+done
+for t in /lib/libnss*_dns*; do
+        cp -av $t $ROOT_DIR/lib
+        [ ! -L "$t" ] && strip $ROOT_DIR/lib/$(basename $t)
+done
+
+#for t in $NETFILTERLIB; do
+#        cp -av $t $ROOT_DIR/lib
+#        [ ! -L "$t" ] && strip $ROOT_DIR/lib/$(basename $t)
+#done
+
+# linux 2.6.x
+cp -av /lib/ld-linux.so.2 $ROOT_DIR/lib
+LDLNX="$(readlink /lib/ld-linux.so.2)"
+cp -av /lib/$LDLNX $ROOT_DIR/lib
+strip $ROOT_DIR/lib/$LDLNX
+
+
+for x in $BINARY_LIST; do
+	if [ -x "$x" ]; then
+        	sh $START_POINT/cp_bin "$x" "$ROOT_DIR"
+	else
+		echo "WARNING ==> $x not found"
+        fi
+done
+
+upx-kernel -d $ROOT_DIR/bin/syslogd
+upx-kernel -d $ROOT_DIR/bin/klogd
+upx-kernel -d $ROOT_DIR/bin/openssl
+
+# PROT_EXEC|PROT_WRITE failed. -> force execve
+upx-bin --best --force-execve $ROOT_DIR/bin/syslogd
+upx-bin --best --force-execve $ROOT_DIR/bin/klogd
+upx-bin --best --force-execve $ROOT_DIR/bin/openssl
+
+
+if [ ! -f "$ZENDLIB" ]; then
+	echo "$ZENDLIB not found"
+	exit
+else
+	cp -v $ZENDLIB $ROOT_DIR/lib
+	strip $ROOT_DIR/lib/$(basename $ZENDLIB)
+	# zendoptimizer 3.2
+	cp -av /mfs-gcc/lib/libgcc_s.so.1 $ROOT_DIR/lib
+fi
+
+
+if [ ! -x "$BUSYBOX_SRC/busybox" ]; then
+	echo "busybox not compile yet"
+	exit
+else
+        BUSYBOXLINK="$(cat $BUSYBOX_SRC/busybox.links |sed -e 's/\/sbin\///g' -e 's/\/bin\///g' |grep -v '^\/')"
+        #BUSYBOXLINK="$(cat $BUSYBOX_SRC/LIST)"
+        sh $START_POINT/cp_bin "$BUSYBOX_SRC/busybox" "$ROOT_DIR"
+        cd $ROOT_DIR/bin
+	for b in $BUSYBOXLINK; do
+                ln -sfv busybox $b
+        done
+fi
+
+if [ ! -d "$MYBOX_UTIL" ]; then
+	echo "mybox utilities not compile yet"
+	exit	
+else
+        sh $START_POINT/cp_bin "$MYBOX_UTIL/mybox" "$ROOT_DIR"
+	cd $ROOT_DIR/bin
+	ln -sf httpsd captived
+	ln -sf nano pico
+	ln -sf bash sh
+	ln -s mybox getkey
+	ln -s mybox login
+	ln -s mybox lcdd
+	ln -s mybox iosh
+	ln -s mybox uplinkd
+	ln -s mybox chkprog
+	ln -s mybox initrc
+	ln -s mybox bootdown
+	ln -s mybox sqlite
+	ln -s mybox ping
+	ln -s mybox taskq
+	ln -s mybox logtail
+	cd $ROOT_DIR
+	ln -s bin/mybox bootup
+	cd $START_POINT
+fi
+
+
+
+cd $START_POINT
+
+cp -v $KERNEL_BASE/*.mpk $ROOT_DIR/tmp
+
+dos2unix $START_POINT/bootscript/init.boot/*
+
+mkdir -p $ROOT_DIR/etc/init.boot
+
+cp -v $START_POINT/bootscript/init.boot/* $ROOT_DIR/etc/init.boot
+chmod 700 $ROOT_DIR/etc/init.boot/*
+
+#cp -v $START_POINT/bootscript/pattern-update.sh $ROOT_DIR/bin/pattern-update
+#chmod 700 $ROOT_DIR/bin/pattern-update
+
+cp -v $START_POINT/bootscript/set_conntrack $ROOT_DIR/bin/set_conntrack
+chmod 700 $ROOT_DIR/bin/set_conntrack
+
+cp -v $START_POINT/bootscript/prog_reload $ROOT_DIR/bin/prog_reload
+chmod 700 $ROOT_DIR/bin/prog_reload
+
+cp -v $START_POINT/bootscript/pgrep $ROOT_DIR/bin/pgrep
+chmod 700 $ROOT_DIR/bin/pgrep
+
+cp -v $START_POINT/bootscript/pkill $ROOT_DIR/bin/pkill
+chmod 700 $ROOT_DIR/bin/pkill
+
+cp -v $START_POINT/bootscript/salin $ROOT_DIR/bin/salin
+chmod 700 $ROOT_DIR/bin/salin
+
+cp -v $START_POINT/bootscript/grub-set-default $ROOT_DIR/bin/grub-set-default
+chmod 700 $ROOT_DIR/bin/grub-set-default
+
+cp -v $START_POINT/bootscript/taskreset $ROOT_DIR/bin/taskreset
+chmod 700 $ROOT_DIR/bin/taskreset
+
+
+#cp -v $START_POINT/configs/ip2country/ip2country $ROOT_DIR/bin/ip2country
+#chmod 700 $ROOT_DIR/bin/ip2country
+cp -v $START_POINT/configs/ip2country/ip-to-country.csv $ROOT_DIR/usr/share/ip-to-country.csv
+
+cd $START_POINT
+sh mk_modules
+
+cp -av $START_POINT/build/pkg/lcd $ROOT_DIR/tmp

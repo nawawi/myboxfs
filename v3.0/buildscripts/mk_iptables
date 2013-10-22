@@ -1,0 +1,39 @@
+#!/bin/bash -e
+
+START=$(pwd)
+SRC_DIR=/usr/src/iptables
+KERNEL_SRC=/usr/src/linux
+KERNEL_BASE=$START/kernel_base
+IPTABLE_TMP=$START/iptables_tmp
+LZMAC="/mfs-gcc/bin/lzmacomp"
+if [ ! -d "$SRC_DIR" ]; then
+	echo "$SRC_DIR not exist"
+	exit;
+fi
+
+if [ ! -d "$KERNEL_SRC" ]; then
+	echo "$KERNEL_SRC not exist"
+	exit;
+fi
+rm -rfv $IPTABLE_TMP
+mkdir -p $KERNEL_BASE
+cd $SRC_DIR
+make clean
+make DO_IPV6=0 DO_MULTI=1 KERNEL_DIR=$KERNEL_SRC BINDIR=/bin LIBDIR=/lib MANDIR=$IPTABLE_TMP
+make DO_IPV6=0 DO_MULTI=1 BINDIR=$IPTABLE_TMP/bin LIBDIR=$IPTABLE_TMP/lib MANDIR=$IPTABLE_TMP install
+
+cd $START
+rm -rfv $IPTABLE_TMP/man*
+cd $IPTABLE_TMP
+strip -v $IPTABLE_TMP/bin/iptables
+upx-kernel $IPTABLE_TMP/bin/iptables
+cp -v $START/src/arptables-*/arptables $IPTABLE_TMP/bin
+upx-kernel $IPTABLE_TMP/bin/arptables
+
+sleep 1
+tar -cvf iptables.tar bin lib |sort
+$LZMAC iptables.tar > iptables.mpk
+rm -fv iptables.tar
+mv -v iptables.mpk $KERNEL_BASE
+rm -rfv $IPTABLE_TMP
+

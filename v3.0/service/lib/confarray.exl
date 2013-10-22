@@ -1,0 +1,195 @@
+<?php 
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+// updated: 19/06/2007
+
+$_LOG_NAME=array();
+$_LOG_NAME[]="Authentication Activities|auth";
+$_LOG_NAME[]="System Activities|system";
+$_LOG_NAME[]="Kernel Messages|kernel";
+$_LOG_NAME[]="Packet Filter|packetfilter";
+$_LOG_NAME[]="HTTPS Service|httpsd";
+$_LOG_NAME[]="SSH Service|sshd";
+$_LOG_NAME[]="DNS Service|dns"; 
+$_LOG_NAME[]="DDNS Service|dydns"; 
+$_LOG_NAME[]="PPTP VPN|pptpvpn";
+$_LOG_NAME[]="PPP Service|pppd";
+$_LOG_NAME[]="Netbios Service|nmb";
+$_LOG_NAME[]="DHCP Service|dhcpd";
+$_LOG_NAME[]="FTP Service|ftp";
+$_LOG_NAME[]="SNMP Service|snmpd";
+$_LOG_NAME[]="NTP Service|ntpd";
+$_LOG_NAME[]="CRON Service|cron";
+$_LOG_NAME[]="Intrusion Protection|ips";
+$_LOG_NAME[]="Portscan Protection|portscan";
+$_LOG_NAME[]="DOS/Flooding Protection|flood";
+$_LOG_NAME[]="ARP Spoof Protection|arp";
+$_LOG_NAME[]="Captive Portal|captiveportal";
+$_LOG_NAME[]="System Update|update";
+$_LOG_NAME[]="Instant Messaging (IM) Control|im";    
+$_LOG_NAME[]="Peer to Peer (P2P) Control|p2p";
+$_LOG_NAME[]="Blacklist|blacklist"; 
+$_LOG_NAME[]="Spyware/Malware protection|spyware"; 
+$_LOG_NAME[]="HTTP Proxy (access)|httpproxy_access"; 
+$_LOG_NAME[]="HTTP Proxy (info)|httpproxy_cache";
+$_LOG_NAME[]="HTTP Proxy (antivirus)|httpproxy_av";
+$_LOG_NAME[]="HTTP Proxy (content removal)|httpproxy_contentremoval";
+$_LOG_NAME[]="HTTP Proxy (site redirection)|httpproxy_siteredirection";
+$_LOG_NAME[]="HTTP Proxy (url filter)|httpproxy_urlfilter";
+$_LOG_NAME[]="FTP Proxy (info)|ftpproxy_info"; 
+$_LOG_NAME[]="FTP Proxy (antivirus)|ftpproxy_av";
+$_LOG_NAME[]="Mail Proxy|mailproxy";
+$_LOG_NAME[]="SOPHOS AV Service|sophosav";
+$_LOG_NAME[]="SPAM Filter|spamfilter"; 
+
+$_CLASSIP=array();
+$_CLASSIP['32']="255.255.255.255";
+$_CLASSIP['32']="255.255.255.254";
+$_CLASSIP['30']="255.255.255.252";
+$_CLASSIP['29']="255.255.255.248";
+$_CLASSIP['28']="255.255.255.240";
+$_CLASSIP['27']="255.255.255.224";
+$_CLASSIP['26']="255.255.255.192";
+$_CLASSIP['25']="255.255.255.128";
+$_CLASSIP['24']="255.255.255.0";
+$_CLASSIP['23']="255.255.254.0";
+$_CLASSIP['22']="255.255.252.0";
+$_CLASSIP['21']="255.255.248.0";
+$_CLASSIP['20']="255.255.240.0";
+$_CLASSIP['19']="255.255.224.0";
+$_CLASSIP['18']="255.255.192.0";
+$_CLASSIP['17']="255.255.128.0";
+$_CLASSIP['16']="255.255.0.0";
+$_CLASSIP['15']="255.254.0.0";
+$_CLASSIP['14']="255.252.0.0";
+$_CLASSIP['13']="255.248.0.0";
+$_CLASSIP['12']="255.240.0.0";
+$_CLASSIP['11']="255.224.0.0";
+$_CLASSIP['10']="255.192.0.0";
+$_CLASSIP['9']="255.128.0.0";
+$_CLASSIP['8']="255.0.0.0";
+$_CLASSIP['7']="254.0.0.0";
+$_CLASSIP['6']="252.0.0.0";
+$_CLASSIP['5']="248.0.0.0";
+$_CLASSIP['4']="240.0.0.0";
+$_CLASSIP['3']="224.0.0.0";
+$_CLASSIP['2']="192.0.0.0";
+$_CLASSIP['1']="128.0.0.0";
+
+$_TTYPE=array();
+$_TTYPE['1']="Ethernet Standard";
+$_TTYPE['2']="Ethernet VLAN";
+	
+$_RTYPE=array();
+$_RTYPE['1']="Interface route";
+$_RTYPE['2']="Gateway route";
+$_RTYPE['3']="Blackhole route";
+
+$_UPLINK_MODE=array();
+$_UPLINK_MODE['1']="Failover (active->passive)";
+$_UPLINK_MODE['2']="Balancer (active->active)";
+
+$_PROTO=array();
+$_PROTO['1']="TCP";
+$_PROTO['2']="UDP";
+$_PROTO['3']="TCP/UDP";
+$_PROTO['4']="ICMP";
+$_PROTO['5']="IP";
+$_PROTO['6']="ESP";
+$_PROTO['7']="AH";
+
+$_ICMP=array();
+$_ICMP['any']="any";
+$_ICMP['echo-request']="echo-request (ping)";
+$_ICMP['echo-reply']="echo-reply (pong)";
+$_ICMP['destination-unreachable']="destination-unreachable";
+$_ICMP['network-unreachable']="network-unreachable";
+$_ICMP['host-unreachable']="host-unreachable";
+$_ICMP['protocol-unreachable']="protocol-unreachable";
+$_ICMP['port-unreachable']="port-unreachable";
+$_ICMP['fragmentation-needed']="fragmentation-needed";
+$_ICMP['source-route-failed']="source-route-failed";
+$_ICMP['network-unknown']="network-unknown";
+$_ICMP['host-unknown']="host-unknown";
+$_ICMP['network-prohibited']="network-prohibited";
+$_ICMP['host-prohibited']="host-prohibited";
+$_ICMP['TOS-network-unreachable']="TOS-network-unreachable";
+$_ICMP['TOS-host-unreachable']="TOS-host-unreachable";
+$_ICMP['communication-prohibited']="communication-prohibited";
+$_ICMP['host-precedence-violation']="host-precedence-violation";
+$_ICMP['precedence-cutoff']="precedence-cutoff";
+$_ICMP['source-quench']="source-quench";
+$_ICMP['redirect']="redirect";
+$_ICMP['network-redirect']="network-redirect";
+$_ICMP['host-redirect']="host-redirect";
+$_ICMP['TOS-network-redirect']="TOS-network-redirect";
+$_ICMP['TOS-host-redirect']="TOS-host-redirect";
+$_ICMP['router-advertisement']="router-advertisement";
+$_ICMP['router-solicitation']="router-solicitation";
+$_ICMP['time-exceeded']="time-exceeded (ttl-exceeded)";
+$_ICMP['ttl-zero-during-transit']="ttl-zero-during-transit";
+$_ICMP['ttl-zero-during-reassembly']="ttl-zero-during-reassembly";
+$_ICMP['parameter-problem']="parameter-problem";
+$_ICMP['ip-header-bad']="ip-header-bad";
+$_ICMP['required-option-missing']="required-option-missing";
+$_ICMP['timestamp-request']="timestamp-request";
+$_ICMP['timestamp-reply']="timestamp-reply";
+$_ICMP['address-mask-request']="address-mask-request";
+$_ICMP['address-mask-reply']="address-mask-reply";
+
+$_NTYPE=array();
+$_NTYPE['1']="Network";
+$_NTYPE['2']="IP Address";
+$_NTYPE['3']="IP Range";
+$_NTYPE['4']="MAC Address";
+
+$_PFP=array();
+$_PFP['1']="PASS";
+$_PFP['2']="DROP";
+$_PFP['3']="REJECT";
+
+$_MONTH=array();
+$_MONTH['01']='January';
+$_MONTH['02']='February';
+$_MONTH['03']='March';
+$_MONTH['04']='April';
+$_MONTH['05']='May';
+$_MONTH['06']='June';
+$_MONTH['07']='July';
+$_MONTH['08']='August';
+$_MONTH['09']='September';
+$_MONTH['10']='October';
+$_MONTH['11']='November';
+$_MONTH['12']='December';
+
+$_INOUTB=array('Inbound traffic only'=>'1',
+		'Outbound traffic only'=>'2',
+		'Inbound and Outbound traffic'=>'3');
+
+$_IPS_DOS=array();
+$_IPS_DOS['1']="Source address only";
+$_IPS_DOS['2']="Destination address only";
+$_IPS_DOS['3']="Source and destination address";
+
+$_IPS_DROP=array();
+$_IPS_DROP['1']="Drop silently"; // drop
+$_IPS_DROP['2']="Terminate connection"; // reject
+
+$_HTTP_CF=array();
+$_HTTP_CF['1']="Standard";
+$_HTTP_CF['2']="Transparent mode";
+$_HTTP_CF['3']="Basic User authentication";
+$_HTTP_CF['4']="Active Directory (SSO)";
+
+$_DNS_CF=array();
+$_DNS_CF[0]="Standard";
+$_DNS_CF[1]="Transparent mode";
+
+// DHCP
+$_WINS_NODE=array();
+$_WINS_NODE['0']="B-Node (no WINS)";
+$_WINS_NODE['1']="None";
+$_WINS_NODE['2']="P-Node (WINS only)";
+$_WINS_NODE['4']="M-Node (Broadcast, then WINS)";
+$_WINS_NODE['8']="H-Node (WINS, then Broadcast)";
+
+?>

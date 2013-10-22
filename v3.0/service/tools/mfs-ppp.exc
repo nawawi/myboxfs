@@ -1,0 +1,28 @@
+#!/bin/php -f
+<?php 
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="mfs-ppp";
+include_once('clib.exl');
+putenv("PATH=/bin:/service/tools:/service/init");
+
+$_app=basename($_SERVER["argv"][0]);
+$_dev=trim($_SERVER["argv"][1]);
+$_tty=trim($_SERVER["argv"][2]);
+$_baud=trim($_SERVER["argv"][3]);
+$_local_ip=trim($_SERVER["argv"][4]);
+$_remote_ip=trim($_SERVER["argv"][5]);
+$_real_ip=trim($_SERVER["argv"][6]);
+$_username=trim($_SERVER["argv"][7]);
+
+
+if($_app=="ip-up") {
+	mybox_chk_pptp_user(1,$_dev,$_remote_ip,$_real_ip,$_username);
+}
+
+if($_app=="ip-down") {
+	mybox_chk_pptp_user(2,$_dev,$_remote_ip,$_real_ip,$_username);
+}
+
+exit(0);
+?>

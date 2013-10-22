@@ -1,0 +1,129 @@
+Version 0.22
+- added gentoo ebuild from mrness (I think) to contrib section.
+- added Makefile in root dir so no need to change to src before make.
+
+Version 0.21
+- Unix Socket support now available thanks to steve-o
+- Probably better size limitation implementedx
+- now using 11 fake useragents to get a bit better security
+- added syslog message if no config file available
+
+Version 0.20
+- corrected squid port in sample.conf thanks to Petr Kristof
+- changed uname -o in configure script to uname for BSD thanks cedric_krier
+
+Version 0.19
+- Code reorganisation. Every byte of code now is in ./src/*
+- Changed README added FreeBSD ramdisk howto, updated install guide
+- Added FAQ section to README
+- Changed configure to suite the new directory layout
+- Tried to answer some mails again and only got this blacklist crap back.
+
+Version 0.18
+- removed obsolete CLAMDSCAN define
+- maintained the Thanks section in the README
+- Comment about those braindeath rtbl smtp filters in README *arg*
+- Fixed two bugs. Thanks to cedric_krier.
+- Bug one: fsize was not variable
+- Bug two: sockets where not closed
+
+Version 0.17
+- Fixed bad bug. Redirect URL is now written again.
+- Fixed configure again. Now there is OS detection and different Makefiles.
+- Changed default ramdisk location to /dev/shm. Should work on any newer linux
+- Some minor fixes concerning unnecessary vars.
+
+Version 0.16
+- virusnames are now displayed again
+- change tempfile rights to 0644 to allow clamd with different user
+- moved all defines to squidclam.h
+- changed mktemp to mktemp -t squidclamXXXXXX for BSD compatibility
+- added another include dir for "broken" environments /usr/local/include
+- tweaked the makefile to (hopefully) work on BSD Systems
+- added a warning to configure if no tempfs is mounted
+
+Version 0.15
+- implemented (ripped) a TCP connection to directly interface clamd
+- nasty system() call removed
+- clamd now has to run on the same machine as squidclam (we use SCAN)
+- using SCAN to scan files. So also md5 clamav signatures can be used
+- there is still no feedback which virus was found.
+- added two new config options to sample.conf (clamdserver and number)
+- corrected the specfile version change part in the configure script
+- removed some unneeded options in configure script
+	
+Version 0.14
+- use wrapper function for clamdscan (still system())
+- added version.h and a part in the configure script to build it
+- Useragent ist now squidclam-$VERSION
+- deletet much clamscan stuff which ist useless with clamd
+- added a "automatic version changer" for squidclam.spec in configure
+
+Version 0.13
+- first test with clamd usage. EXTREMLY INSECURE
+- using system() call so _PLEASE_DON'T_USE_THIS_SOFTWARE_
+
+Version 0.12
+- fixed potential overflow path in printf by changing %s to %.<size>s
+- added debugmessage  to stderr if no tempfile can be created
+- fixed broken unlink thanks to Jakub Schmidtke
+- made the header check uptional to avoid problems with IIS sites
+- introduced a possible DoS vektor through very big files.
+
+Version 0.11
+- modified configure script to only include libs once
+- added a test if compiler is working
+- added a debug routine to the makefile
+- added support for blanks and comments in the config file
+- added support for blank lines in config file
+- added contrib section with RPM spec from Petr Kristof
+
+Version 0.10
+- cleanup README
+- added DESTDIR option to the Makefile
+- added partial config support (no comments and spaces allowed by now)
+- added red background to the php viruscheck page
+
+Version 0.9
+- added a sample squid.conf to the README file
+- added a ugly POST request workaround
+
+Version 0.8
+- fixed a nasty bug with libcurl > 7.12.0
+- don't use ramfs for the download data any more :)
+- added a small configure script
+- added some sections to the readme
+
+Version 0.7
+- Added performance section to the README file
+- Tweaked the default macros in squidclam.c for performance
+- Disabled debugging in the Makefile
+- use files in ramfs to download data -> performance
+
+Version 0.6
+- delete tempfiles on exit
+- put most global vars back in main
+- added a part for ssl urls to the readme (don't scan them)
+- fixed a memory overflow
+
+Version 0.5
+- fixed cpulock while reloading database
+- added some randomness for the reload to not update every instanze at the same time
+- changed reload mode (just exit squidclam. squid will restart it)
+- output reload interval at startup
+
+Version 0.4
+- put all headers only in memory
+- put all files downloaded only in memory
+- save possible virus files to ramdisk/tempfile (for clam and md5sum sigs)
+- addes additional debugging output.
+- solved some problems with the tempfiles (ftruncate)
+- variable error handling (ignore or notify via url change)
+
+Version 0.3
+- addes additional debugging output #define DEBUG to use it.
+- fixed an file offset bug with headers and virus in the same file
+
+Version 0.2
+- fix filedescriptor bug
+- clamav database gets reloaded after RLDB URL's

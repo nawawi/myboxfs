@@ -1,0 +1,55 @@
+# squidclamav.patterns.dist
+#
+# The ordering of lines is this file is critical
+#
+
+# Lines have the form:
+#
+# 	regex|regexi pattern
+#
+# 	abort|aborti pattern
+#
+#	redirect cgi_redirect_url
+# 
+#       logfile /path/to/log_file
+# 
+#       proxy http://127.0.0.1:3128
+# 
+# 
+#	force 0|1
+#
+#       timeout secondes
+#
+#       clamd_ip 127.0.0.1
+#
+#       clamd_port 3310
+#
+#       clamd_local /tmp/clamd
+#
+#	stat 0|1
+#
+# Examples of valid lines:
+#
+# proxy http://127.0.0.1:3128/
+# logfile /usr/local/squidclamav/logs/squidclamav.log
+# redirect http://proxy.domain.com/cgi-bin/clwarn.cgi
+# force 1
+# clamd_ip 192.168.1.5
+# clamd_port 3310
+# timeout 60
+# abort ^.*\.gz$
+# abort ^.*\.bz2$
+# abort ^.*\.pdf$
+# abort ^.*\.js$
+# abort ^.*\.html$
+# abort ^.*\.css$
+# abort ^.*\.xml$
+# abort ^.*\.xsl$
+# abort ^.*\.js$
+# abort ^.*\.ico$
+# aborti ^.*\.gif$
+# aborti ^.*\.png$
+# aborti ^.*\.jpg$
+# aborti ^.*\.swf$
+# content ^.*application\/.*$
+

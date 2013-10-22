@@ -1,0 +1,9 @@
+Linux Kernel 2.6.x Panic Module Installation Guide
+==================================================
+- Untar panic-0.0.1.tgz to /tmp
+- Change directory to /tmp/panic
+- Edit the line 2 of Makefile, modify the KSRC to the directory 
+  where your kernel source is. (like /usr/src/linux)
+- "make"
+- "insmod panic.ko", then the system will be panic.
+ 

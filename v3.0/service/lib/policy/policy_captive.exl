@@ -1,0 +1,131 @@
+<?php 
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+
+function filter_mangle() {	
+	do_iptable("*mangle");
+	do_iptable(":PREROUTING ACCEPT [0:0]");
+	do_iptable(":INPUT ACCEPT [0:0]");
+	do_iptable(":FORWARD ACCEPT [0:0]");
+	do_iptable(":OUTPUT ACCEPT [0:0]");
+	do_iptable(":POSTROUTING ACCEPT [0:0]");
+	do_iptable(":ACL1004-000 - [0:0]");
+	do_iptable(":ACL1004-00 - [0:0]");
+	do_iptable(":ACL1004-01 - [0:0]");
+	do_iptable(":ACL1004-02 - [0:0]");
+	do_iptable("-A PREROUTING -j ACL1004-00");
+	do_iptable("-A PREROUTING -j ACL1004-01");
+	do_iptable("-A INPUT -j ACL1004-000");
+	do_iptable("-A FORWARD -j ACL1004-000");
+	do_iptable("-A OUTPUT -j ACL1004-000");
+	do_iptable("-A OUTPUT -j ACL1004-02");
+}
+
+function captive_clear() {
+	mybox_unlink("/var/cache/captive/*");
+}
+
+function captive_nat($port) {
+	iptables_open(1);
+	do_iptable("*nat");
+	do_iptable("-A ACL1006-000 -m mark --mark 4294967294 -p tcp -m tcp --dport 80 -j REDIRECT --to-port $port");
+	do_iptable("-A ACL1006-000 -m mark --mark 4294967294 -j DROP");
+	policy_close();
+}
+
+function captive_filter($port) {
+	iptables_open(1);
+	do_iptable("*filter");
+	do_iptable("-A ACL1000-07 -m mark --mark 4294967294 -p tcp -m tcp --dport 53 -j ACCEPT");
+	do_iptable("-A ACL1000-07 -m mark --mark 4294967294 -p udp -m udp --dport 53 -j ACCEPT");
+	do_iptable("-A ACL1000-07 -m mark --mark 4294967294 -p udp -m udp --dport 67 -j ACCEPT");
+	do_iptable("-A ACL1000-07 -m mark --mark 4294967294 -p udp -m udp --dport 123 -j ACCEPT");
+	do_iptable("-A ACL1000-07 -m mark --mark 4294967294 -p tcp -m tcp --dport $port -j ACCEPT");
+	do_iptable("-A ACL1000-07 -m mark --mark 4294967295 -p tcp -m tcp --dport $port -j ACCEPT");
+	do_iptable("-A ACL1000-07 -m mark --mark 4294967293 -p tcp -m tcp --dport $port -j ACCEPT");
+	do_iptable("-A ACL1000-07 -m mark ! --mark 4294967294 -m mark ! --mark 4294967295 -m mark ! --mark 4294967293 -p tcp -m tcp --dport $port -j DROP");
+	policy_close();
+}
+
+function do_policy_captive($db_id='') {
+	global $_DB_NAME;
+
+	$close_db=0;
+	if($db_id=='') {
+		$db_id=mybox_db_connect($_DB_NAME);
+		$close_db=1;
+	}
+
+	$_local=array();
+	policy_get_data(&$_dev,&$_local,&$_masqip,&$_ping,$db_id);
+	// captive
+	$_CAPTIVE=array();
+	$_CAPTIVE=unserialize(mybox_fget_contents("/var/sys/captive.cache"));
+	if(count($_CAPTIVE)==0) return;
+
+	if($_CAPTIVE['stat']==1 && $_CAPTIVE['network']!='') {
+		captive_nat($_CAPTIVE['port']);
+		captive_filter($_CAPTIVE['port']);
+
+		iptables_open(1);
+		do_iptable("*mangle");
+		do_iptable(":ACL1004-00 - [0:0]");
+
+		$namedev_array=mybox_name2dev_array($db_id);
+		$_defnet_array=mybox_defnetwork_array($db_id);
+		$_lst=preg_split("/,/",$_CAPTIVE['network']);
+		if(count($_lst)!=0) {
+			foreach($_lst as $_ip) {
+				$_host='';
+				if(isset($namedev_array[$_ip])&&$namedev_array[$_ip]!='') {
+					$_host=$namedev_array[$_ip];
+				} elseif(isset($_defnet_array[$_ip]['name']) && $_defnet_array[$_ip]['name']!='') {
+					$_host=$_defnet_array[$_ip]['ip'];
+				}
+				if($_host!='') {
+					foreach($_local as $_ipx => $a) {
+						if($_ipx=='') continue;
+						if(count($_CAPTIVE['acl_list'])!=0) {
+							foreach($_CAPTIVE['acl_list'] as $_ipxx) {
+								do_iptable("-A ACL1004-00 -s $_ipxx -d $_ipx -j MARK --set-mark 4294967293");
+							}
+						}
+					}
+					unset($_ipx,$a);
+					do_iptable("-A ACL1004-00 -s $_host -m mark ! --mark 4294967293 -m mark ! --mark 4294967295 -j MARK --set-mark 4294967294");
+				}
+			} 
+			unset($_ip,$_lst);
+		}
+		unset($_host,$namedev_array,$_defnet_array,$_ip,$_lst);
+		// remove if timeout else add ip/mac
+		$buff=mybox_dir2array("/var/cache/captive/*.*.*.*.*:*:*:*:*:*");
+		if(count($buff)!=0) {
+			foreach($buff as $ls) {
+				$ls=trim($ls);
+				$lsb=basename($ls);
+				if(preg_match("/(\d+\.\d+\.\d+\.\d+)\.(\S+\:\S+\:\S+\:\S+\:\S+\:\S+)/",$lsb,$mm)) {
+					$_myip=$mm[1];
+					$_mymac=$mm[2];
+					$opt=array();
+					$opt=unserialize(mybox_fget_contents("$ls"));
+					if(count($opt)==0) continue;
+					$time=$opt[0];
+					if(time() > $time) {
+						@unlink("$ls");
+					} else {
+						do_iptable("-A ACL1004-00 -s $_myip -m mac --mac-source $_mymac -j MARK --set-mark 4294967295");
+					}
+				}
+				unset($lsb,$_myip,$_mymac,$opt,$time,$mm);
+			}
+		}
+		unset($buff);
+		policy_close();
+	}
+	if($close_db==1) {
+		mybox_db_close($db_id);
+	}
+}
+
+?>
+

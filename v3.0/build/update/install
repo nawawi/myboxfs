@@ -1,0 +1,133 @@
+#!/bin/sh
+_FORCE=0;
+[ ! -z "$1" -a "$1" = "force" ] && _FORCE=1;
+rm -f /strg/mybox/update/current-firmware >/dev/null 2>&1
+. ./config
+
+
+do_log() {
+        local info="$1"
+        local msg="$2"
+        /service/init/misc.init mybox_slog "$info" "$msg"
+}
+
+do_core_fallback() {
+	local file=$1
+	local fb="/boot/{$file}_fallback.kbck";
+	local fc="/boot/{$file}_fallback";
+	local ft="/boot/$file";
+
+	[ -f "$fc" ] && mv $fc $fb >/dev/null 2>&1
+	[ -f "$ft" ] && mv $ft $fc >/dev/null 2>&1
+}
+
+do_core_recover() {
+	local file=$1
+	local fb="/boot/{$file}_fallback.kbck";
+	local fc="/boot/{$file}_fallback";
+	local ft="/boot/$file";
+
+	[ -f "$fc" ] && mv $fc $ft >/dev/null 2>&1
+	[ -f "$fb" ] && mv $fb $fc >/dev/null 2>&1
+}
+
+update_core() {
+	local txt="Updating kernel"
+	echo -n "$txt.."
+	local LIST="myboxos.bin myboxsys.bin";
+	for f in $LIST; do
+		if [ -f "./$f" ]; then
+			do_core_fallback $1
+			mv $f /boot/$f
+			if [ "$OK" = "1" ]; then
+				do_core_recover "$f"
+				echo -n -e "\r$txt..Failed\n";
+				do_log "ERROR" "[MyUpdate] $txt..Failed";
+				exit 1
+			fi
+		fi
+	done
+	echo -n -e "\r$txt..OK\n";
+	do_log "INFO" "[MyUpdate] $txt..OK";
+	rm -f /boot/myboxos.bin_fallback.bck /boot/myboxsys.bin_fallback.bck >/dev/null 2>&1
+}
+
+update_pkg() {
+	local txt="Updating packages"
+	local _L=
+	echo "$txt.."
+	for f in ./pkg/*; do
+		_L=$(basename $f)
+		if [ -f "/strg/mybox/pkg/$_L" ]; then
+			rm -f /strg/mybox/pkg/$_L && mv $f /strg/mybox/pkg/$_L >/dev/null 2>&1
+			[ $? = 0 ] && echo -e "\t-> $_L "
+		fi
+	done
+	echo ""
+	do_log "INFO" "[MyUpdate] $txt.";
+}
+
+do_check_dep() {
+	local _IS_OK=""
+	local _IS_VER=""
+	echo "Checking update version.."
+	do_log "INFO" "[MyUpdate] Checking update version..";
+	if [ "$_DEP_CHECK" = "1" ]; then
+		if [ -f "/proc/sys/kernel/version" ]; then
+			_IS_VER=$(cat /proc/sys/kernel/version |cut -d ' ' -f 1);
+			if [ "$_IS_VER" != "$_REL_VER" ]; then
+				txt="This update only for Mybox Firewall System $_REL_VER";
+				echo "$txt";
+				do_log "INFO" "[MyUpdate] $txt";
+			fi
+		fi
+		if [ -f "/strg/mybox/update/SYSTEM.INDEX" ]; then
+			_IS_OK=$(grep "$_THIS_VER" /strg/mybox/update/SYSTEM.INDEX);
+			if [ ! -z "$_IS_OK" -a "$_IS_OK" != "" ];then
+				txt="This update ($_THIS_VER) already installed";
+				echo "$txt";
+				do_log "INFO" "[MyUpdate] $txt";
+				exit 1
+			fi	
+		fi
+	fi
+}
+
+
+do_last() {
+	echo "$_THIS_VER" > /strg/mybox/update/SYSTEM.VERSION
+	echo "$_THIS_VER" > /etc/firmware
+	echo "$_THIS_VER" >> /strg/mybox/update/SYSTEM.INDEX
+	if [ "$_REBOOT" = "1" ]; then
+		echo "The system will rebooting now."
+		do_log "INFO" "[MyUpdate] The system will rebooting now";
+		echo "mfs-reboot" > /var/sys/mfsque
+		sleep 10
+		reboot
+		exit 0
+	fi
+}
+
+do_init() {
+	if [ ! -d "/strg/mybox/update" ]; then
+		echo "Creating update directory.."
+		mkdir /strg/mybox/update
+		_DEP_CHECK=0;
+	fi
+	do_check_dep
+	[ "$_UPDATE_KERNEL" = "1" ] && update_core
+	[ "$_UPDATE_PKG" = "1" ] && update_pkg
+	if [ "$_EXTRA_SCRIPT" = "1" ]; then
+		if [ -f "./extra.sh" ]; then
+			sh ./extra.sh
+		fi
+	fi
+}
+echo "Starting Mybox Update($_THIS_VER)"
+do_log "INFO" "[MyUpdate] Starting Mybox Update ($_THIS_VER)";
+do_init
+echo "Mybox Update done."
+do_log "INFO" "[MyUpdate] Mybox Update done ($_THIS_VER)";
+do_last
+exit 0
+

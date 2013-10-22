@@ -1,0 +1,117 @@
+#!/bin/php -f
+<?php 
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+include_once('clib.exl');
+include_once('policy.exl');
+include_once('captive.exl');
+putenv("PATH=/bin:/service/tools:/service/init");
+
+$_AP['1']['mac']="00:13:02:bf:29:d0";
+$_AP['1']['ip']="192.168.10.2";
+$_AP['2']['mac']="";
+$_AP['2']['ip']="";
+$_AP['3']['mac']="";
+$_AP['3']['ip']="";
+$_AP['4']['mac']="";
+$_AP['4']['ip']="";
+
+$_CAPTIVE=array();
+$_CAPTIVE=unserialize(mybox_fget_contents("/var/sys/captive.cache"));
+if(count($_CAPTIVE)==0) {
+	exit;
+}
+
+if($_CAPTIVE['intouch']==1) {
+	if(!extension_loaded('mysql')) {
+		if(!dl('mysql.so')) {
+        		exit("Internal Error: cannot load extension");
+		}
+	}
+
+	function db_connect() {
+		global $_CAPTIVE;
+		$db_id=@mysql_connect($_CAPTIVE['intouch_dbhost'],$_CAPTIVE['intouch_dbuser'],$_CAPTIVE['intouch_dbpass']);
+		$db_s=@mysql_select_db($_CAPTIVE['intouch_dbname'],$db_id);
+		if(!$db_id || !$db_s) die("Cannot connect to database");
+		return $db_id;
+	}
+
+	function db_query($sql,$db_id) {
+		return mysql_query($sql,$db_id);
+	}
+
+	function db_close($db_id) {
+		mysql_close($db_id);
+	}
+
+	function db_num_rows($result) {
+		return mysql_num_rows($result);
+	}
+
+	function db_fetch_array_assoc($result) {
+		return mysql_fetch_array($result,MYSQL_ASSOC);
+	}
+
+	function __datetostr($date,$time) {
+		$_p=explode("/",$date);
+		return strtotime("{$_p[1]}/{$_p[0]}/{$_p[2]} $time");
+		
+	}
+
+	function __permit($num,$opt='D') {
+		global $_AP;
+		$_mac=$_AP[$num]['mac'];
+		$_ip=$_AP[$num]['ip'];
+		if(isset($_mac)&&$_mac!='' && isset($_ip)&&$_ip!='') {
+			if($opt=="A") {
+				do_access($_ip,$_mac,'D');
+				do_access($_ip,$_mac,'A');
+			} else {
+				do_access($_ip,$_mac,'D');
+			}
+		}
+	}
+
+	$_ADEAP=array();
+	$db_id=db_connect();
+	$result=db_query("select * from conf_mgr",$db_id);
+	if(db_num_rows($result)!=0) {
+		while($row=db_fetch_array_assoc($result)) {
+			$_id=$row['id'];
+			if($_id=='') continue;
+			$_room=$row['room'];
+			if(!isset($_AP[$_room])||$_AP[$_room]=='') continue;
+			$_qty=$row['qty'];
+			$_unit=$row['unit'];
+			$_date_start=$row['date_start'];
+			$_time_start=$row['time_start'];
+			$_start=__datetostr($_date_start,$_time_start);
+			$_end=strtotime("$_qty $_unit",$_start);
+			if(time() > $_end) {
+				__permit($_room,'D');
+				continue;
+			}
+			$_ADEAP[$_room]=$_room;
+			if(time() >= $_start) {
+				__permit($_room,'A');
+			}
+		}
+	}
+	if(count($_ADEAP)!=0) {
+		foreach($_ADEAP as $ap) {
+			if(isset($_AP[$ap])) {
+				unset($_AP[$ap]);
+			}
+		}
+	}
+	foreach($_AP as $num) {
+		$_ipx=$num['ip'];
+		$_macx=$num['mac'];
+		do_access($_ipx,$_macx,'D');
+	}
+	@db_close($db_id);
+}
+exit(0);
+?>
+

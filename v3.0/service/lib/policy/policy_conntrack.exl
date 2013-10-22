@@ -1,0 +1,163 @@
+<?php 
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+
+function clear_conntrack() {
+	$_RMC=array();
+	$_RMC[]="ip_nat_ftp";
+	$_RMC[]="ip_conntrack_ftp";
+	$_RMC[]="ip_nat_irc";
+	$_RMC[]="ip_conntrack_irc";
+	$_RMC[]="ip_gre";
+	$_RMC[]="ip_nat_pptp";
+	$_RMC[]="ip_conntrack_pptp";
+	$_RMC[]="ip_nat_tftp";
+	$_RMC[]="ip_conntrack_tftp";
+	$_RMC[]="ip_conntrack_proto_sctp";
+	$_RMC[]="ip_nat_mms";
+	$_RMC[]="ip_conntrack_mms";
+	$_RMC[]="ip_nat_sip";
+	$_RMC[]="ip_conntrack_sip";
+	$_RMC[]="ip_conntrack_netbios_ns";
+	$_RMC[]="ip_nat_h323";
+	$_RMC[]="ip_conntrack_h323";
+
+	foreach($_RMC as $mod) {
+		exec("rmmod -f $mod 2>/dev/null");
+	}
+}
+
+// hook -> policy_admin
+function set_conntrack($_FTP_PORT=0,$db_id='') {
+	global $_DB_NAME, $_QUIET;
+
+	// hook-> fw_pf.exh
+	if(file_exists("/var/sys/conntrack_already_load")) return;
+
+	$close_db=0;
+	if($db_id=='') {
+		$db_id=mybox_db_connect($_DB_NAME);
+		$close_db=1;
+	} 
+	clear_conntrack();
+	if($_FTP_PORT==0) {
+		$result=mybox_db_query("select port,stat from service_ftp",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_ftp_port=$row['port'];
+				$_ftp_stat=$row['stat'];
+				if($_ftp_stat==1) {
+					$_FTP_PORT=$_ftp_port;
+				}
+			}
+		}
+	}
+	$_ftpc=0;$_ircc=0;$_pptpc=0;$_tftpc=0;$_sctpc=0;$_mmsc=0;$_sipc=0;$_biosc=0;$_h323c=0;
+	$result=mybox_db_query("select * from misc where name like \"sysctl_%\" ",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			if(trim($row['name'])=="sysctl_ftpcon_stat") $_ftpc=trim($row['val']);
+			if(trim($row['name'])=="sysctl_irccon_stat") $_ircc=trim($row['val']);
+			if(trim($row['name'])=="sysctl_pptpcon_stat") $_pptpc=trim($row['val']);
+			if(trim($row['name'])=="sysctl_tftpcon_stat") $_tftpc=trim($row['val']);
+			if(trim($row['name'])=="sysctl_sctpcon_stat") $_sctpc=trim($row['val']);
+			if(trim($row['name'])=="sysctl_mmscon_stat") $_mmsc=trim($row['val']);
+			if(trim($row['name'])=="sysctl_sipcon_stat") $_sipc=trim($row['val']);
+			if(trim($row['name'])=="sysctl_netbioscon_stat") $_biosc=trim($row['val']);
+			if(trim($row['name'])=="sysctl_h323con_stat") $_h323c=trim($row['val']);
+		}
+	}
+	unset($result,$_namex,$_valx);
+	if($_ftpc==1) {
+		mybox_exec_cmd("modprobe -q -k ip_conntrack_ftp ports=21,20,$_FTP_PORT");
+		mybox_exec_cmd("modprobe -q -k ip_nat_ftp");	
+	}
+	if($_ircc==1) {
+		mybox_exec_cmd("modprobe -q -k ip_conntrack_irc ports=6660,6667,6668,6669,7000,7001,7002");
+		mybox_exec_cmd("modprobe -q -k ip_nat_irc");	
+	}
+	if($_pptpc==1) {
+		mybox_exec_cmd("modprobe -q -k ip_gre");
+		mybox_exec_cmd("modprobe -q -k ip_conntrack_pptp");
+		mybox_exec_cmd("modprobe -q -k ip_nat_pptp");	
+	}
+	if($_tftpc==1) {
+		mybox_exec_cmd("modprobe -q -k ip_conntrack_tftp");
+		mybox_exec_cmd("modprobe -q -k ip_nat_tftp");	
+	}
+	if($_sctpc==1) {
+		mybox_exec_cmd("modprobe -q -k ip_conntrack_proto_sctp");
+	}
+	if($_mmsc==1) {
+		mybox_exec_cmd("modprobe -q -k ip_conntrack_mms");
+		mybox_exec_cmd("modprobe -q -k ip_nat_mms");	
+	}
+	if($_sipc==1) {
+		mybox_exec_cmd("modprobe -q -k ip_conntrack_sip");
+		mybox_exec_cmd("modprobe -q -k ip_nat_sip");	
+	}
+	if($_biosc==1) {
+		mybox_exec_cmd("modprobe -q -k ip_conntrack_netbios_ns");	
+	}
+	if($_h323c==1) {
+		mybox_exec_cmd("modprobe -q -k ip_conntrack_h323");
+		mybox_exec_cmd("modprobe -q -k ip_nat_h323");	
+	}
+	if($close_db==1) {
+		mybox_db_close($db_id);
+	}
+	@touch("/var/sys/conntrack_already_load");
+}
+function icmp_ping($chain,$_local,$opt) {
+	$_action="DROP";
+	if($opt==1) $_action="ACCEPT";
+	foreach(array("8","0","3") as $t) {
+		foreach($_local as $_ip => $a) {
+			do_iptable("-A $chain -d $_ip -p icmp -m icmp --icmp-type $t -j $_action");
+		}
+	}
+	// alway accept
+	mybox_save_to_file("/proc/sys/net/ipv4/icmp_echo_ignore_all","0\n");
+	return 0;
+}
+
+function icmp_traceroute($chain,$_local,$opt) {
+	$_action="DROP";
+	if($opt==1) $_action="ACCEPT";
+	foreach($_local as $_ip => $a) {
+		do_iptable("-A $chain -p icmp -m icmp --icmp-type 30 -j $_action");
+		do_iptable("-A $chain -p tcp -m tcp --dport 33434 -j $_action");
+		do_iptable("-A $chain -p udp -m udp --dport 33434 -j $_action");
+	}
+	return 0;
+}
+// ICMP PING/TRACEROUTE
+function do_policy_icmp($db_id='') {
+	global $_DB_NAME;
+	$close_db=0;
+	if($db_id=='') {
+		$db_id=mybox_db_connect($_DB_NAME);
+		$close_db=1;
+	} 
+	iptables_open(1);
+	do_iptable("*filter");
+	do_iptable(":ACL1000-06 - [0:0]");
+
+	policy_get_data(&$_dev,&$_local,&$_masqip,&$_ping,$db_id);
+	$_enable_ping=0;$_enable_traceroute=0;
+	$result=mybox_db_query("select * from misc where name like \"sysctl_%\" ",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			if(trim($row['name'])=="sysctl_ping") $_enable_ping=trim($row['val']);
+			if(trim($row['name'])=="sysctl_traceroute") $_enable_traceroute=trim($row['val']);
+		}
+	}
+	icmp_ping("ACL1000-06",$_local,$_enable_ping);
+	icmp_traceroute("ACL1000-06",$_local,$_enable_traceroute);
+	policy_close();
+	if($close_db==1) {
+		mybox_db_close($db_id);
+	}
+}
+
+
+?>

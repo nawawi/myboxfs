@@ -1,0 +1,606 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="fw_blacklist";
+include_once('page.exl');
+mybox_chk_session();
+mybox_send_nocache();
+
+
+
+$db_id2=mybox_db_connect($_DB_BLACKLIST);
+$db_id=mybox_db_connect($_DB_NAME);
+
+if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+	if(isset($do_id)&&$do_id=='apply_chg') {
+		$msg='<script>waitcount();</script>';
+		mybox_echo_query("policy-blacklist");
+	}
+	if($tab==1) {
+		if(isset($do_save)&&$do_save==1) {
+			if($blacklist_spyware_drop=='' || $blacklist_spyware_drop <= 0) $blacklist_spyware_drop=1;
+			mybox_db_query("update misc set val='$blacklist_spyware_stat' where name='blacklist_spyware_stat'",$db_id);
+			mybox_db_query("update misc set val='$blacklist_spyware_block' where name='blacklist_spyware_block'",$db_id);
+			mybox_db_query("update misc set val='$blacklist_spyware_log' where name='blacklist_spyware_log'",$db_id);
+			mybox_db_query("update misc set val='$blacklist_spyware_drop' where name='blacklist_spyware_drop'",$db_id);
+			$msg="Configuration saved";
+		}
+	}
+	if($tab==2) {
+		if($col==1) {
+			if(isset($do_save)&&$do_save==4) {
+				if($log==1) { $log=0; } else { $log=1; }
+				if(is_array($del) && count($del)!=0) {
+					foreach($del as $x) {
+						if($x!='') mybox_db_query("update blacklist set log='$log' where id='$x'",$db_id2);
+					}
+				} else {
+					if($del!='') mybox_db_query("update blacklist set log='$log' where id='$del'",$db_id2);
+				}
+			}
+			if(isset($do_save)&&$do_save==3) {
+				if($stat==1) { $stat=0; } else { $stat=1; }
+				if(is_array($del) && count($del)!=0) {
+					foreach($del as $x) {
+						if($x!='') mybox_db_query("update blacklist set stat='$stat' where id='$x'",$db_id2);
+					}
+				} else {
+					if($del!='') mybox_db_query("update blacklist set stat='$stat' where id='$del'",$db_id2);
+				}
+			}
+			if(isset($do_save)&&$do_save==2) {
+				if(is_array($del) && count($del)!=0) {
+					foreach($del as $x) {
+						if($x!='') mybox_db_query("delete from blacklist where id='$x'",$db_id2);
+					}
+				} else {
+					if($del!='') mybox_db_query("delete from blacklist where id='$del'",$db_id2);
+				}
+			}
+			if(isset($do_save)&&$do_save==1) {
+				if($do_list==1) {
+					if(is_array($del) && count($del)!=0) {
+						foreach($del as $x) {
+							if($x!='') {
+								if($stat!='') mybox_db_query("update blacklist set stat='$stat' where id='$x'",$db_id2);
+								if($log!='') mybox_db_query("update blacklist set log='$log' where id='$x'",$db_id2);
+							}
+						}
+					}
+				}
+				if($do_list==0) {
+					if($stat!='') {
+						mybox_db_query("update blacklist set stat='$stat'",$db_id2);
+					}
+					if($log!='') {
+						mybox_db_query("update blacklist set log='$log'",$db_id2);
+					}
+				}
+			}
+		}
+		if($col==2) {
+			if(isset($do_save)&&$do_save==1) {
+				if($do_id!='edit') {
+					$note=mybox_escape_str($note);
+					$result=mybox_db_query("select ip from blacklist where ip='$ip'",$db_id2);
+					if(mybox_db_num_rows($result)==0) {
+						mybox_db_query("insert into blacklist (ip,note,stat,log) values ('$ip','$note','$stat','$log')",$db_id2);
+						$msg='Configuration saved';
+					} else {
+						$msg="Source '$ip' already exist";
+					}
+				}
+				if($do_id=='edit') {
+					if($stat!='') { $stat='1'; } else { $stat='0'; }
+					if($log!='') { $log='1'; } else { $log='0'; }
+					$note=mybox_escape_str($note);
+					mybox_db_query("update blacklist set ip='$ip',note='$note',stat='$stat',log='$log' where id='$id'",$db_id2);
+					$msg='Configuration saved';$tab=2;$col=1;$do_id='';
+				}
+			}
+		}
+		if($col==3) {
+			if(isset($do_save)&&$do_save==1) {
+				if($blacklist_drop=='' || $blacklist_drop <= 0) $blacklist_drop=1;
+				mybox_db_query("update misc set val='$blacklist_stat' where name='blacklist_stat'",$db_id);
+				mybox_db_query("update misc set val='$blacklist_block' where name='blacklist_block'",$db_id);
+				mybox_db_query("update misc set val='$blacklist_drop' where name='blacklist_drop'",$db_id);
+				$msg="Configuration saved";
+			}
+		}
+	}
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied";
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+if(!isset($col)||$col=='') $col=1;
+if(!isset($do_list)||$do_list=='') $do_list=1;
+?>
+<html>
+<head>
+<title>MyAdmin</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<script type='text/javascript' src="/j/mybox_func.js"></script>
+<script type='text/javascript' src="/j/mybox_overlib.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?php echo $_LOGIN['auth_id'];?>";
+	page_load();
+	function do_changes() {
+		self.location.href='<?php echo "/fw_blacklist.exh?tab=$tab&do_id=apply_chg";?>';	
+	};
+function waitcount() {
+	page_reload('400','<?php echo "/fw_blacklist.exh?tab=$tab&col=$col";?>');
+}
+</script>
+</head>
+<body onload="load_menu('sub5','t5d2','s5i2');" scroll="auto">
+<form name=f method=post action="/fw_blacklist.exh">
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 0px;'>
+<tr>
+<td>
+<?php mybox_page_section("Firewall / Blacklist");?>
+<br><br>
+<?php if($col==1 && $tab==2) { mybox_page_search($str); }?>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="/fw_blacklist.exh?tab=1" <?php if($tab==1){?>class="tabact"<?php }?>>Anti-Spyware</a></li>
+<li><a href="/fw_blacklist.exh?tab=2" <?php if($tab==2){?>class="tabact"<?php }?>>Blacklist</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td> 
+<?php mybox_page_msg($msg);?>
+<br>
+
+<!-- tab container -->
+<?php if($tab==1) {
+
+$result=mybox_db_query("select * from misc where name like \"blacklist_spyware_%\" ",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_name=trim($row['name']);
+		$_val=trim($row['val']);
+		$_name="_$_name";
+		$$_name="$_val";
+	}
+}
+
+?>
+<script type='text/javascript'>
+	function do_submit() {
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	};
+</script>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td valign="middle" class="tdname">Enable Anti-Spyware</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("On"=>"1","Off"=>"0");
+if(!isset($_blacklist_spyware_stat)||$_blacklist_spyware_stat=='') $_blacklist_spyware_stat=0;
+echo mybox_select_box('pfipssel1',$data_a,$_blacklist_spyware_stat,'blacklist_spyware_stat');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Blocking mode</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if(!isset($_blacklist_spyware_block)||$_blacklist_spyware_block=='') {
+	$_blacklist_spyware_block=1;
+} else {
+	if($_blacklist_spyware_block==0) $_blacklist_spyware_block=1;
+}
+echo mybox_select_box('pfipssel2',$_INOUTB,$_blacklist_spyware_block,'blacklist_spyware_block');
+?>
+</td>
+</tr>
+<tr>
+<td valign="middle" class="tdname">Policy</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array();
+foreach(array("1"=>"DROP","2"=>"REJECT") as $a => $p) {
+	$data_a[$p]=$a;
+	if(!isset($_blacklist_spyware_drop)||$_blacklist_spyware_drop=='') $_blacklist_spyware_drop=$a;
+}
+echo mybox_select_box('pfipssel18',$data_a,$_blacklist_spyware_drop,'blacklist_spyware_drop');
+?>
+</td>
+</tr>
+<tr>
+<td valign="middle" class="tdname">Logging</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+if(!isset($_blacklist_spyware_log)||$_blacklist_spyware_log=='') $_blacklist_spyware_log=0;
+echo mybox_select_box('pfipssel3',$data_a,$_blacklist_spyware_log,'blacklist_spyware_log');
+?>
+</td>
+</tr>
+</tbody>
+</table>
+
+<table align=right>
+<tbody>
+<tr>
+<?php if($tab!=3 && $col==1){?><td><a name="sini"><a class="btn" href="#sini" onclick="return do_changes();return false;">Reload</a></td><?php }?>
+<td>
+<a name="sini"><a class="btn" href="#sini" onclick="<?php if($tab==3){echo "return blacklistopt_update();";}else{echo "return do_submit();";}?>return false;"><?php if($do_id=='edit') { echo "Update"; } else { echo "Save";}?></a>
+</tbody>
+</table>
+
+<?php } //tab=1?>
+
+<?php if($tab==2) {?>
+<table width="100%" border="0" cellpadding="0" cellspacing="0">
+<tr><td>
+<ul id="tabnav">
+<li class="<?php if($col==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=1) { echo "<a href=\"/fw_blacklist.exh?tab=$tab&col=1\">"; }?>Source list<?php if($col!=1) { echo "</a>"; }?></li>
+<li class="<?php if($col==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=2) { echo "<a href=\"/fw_blacklist.exh?tab=$tab&col=2\">"; }?><?php if($do_id=='edit') { echo "Edit"; } else { echo "Add new"; }?><?php if($col!=2) { echo "</a>"; }?></li>
+<li class="<?php if($col==3) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=3) { echo "<a href=\"/fw_blacklist.exh?tab=$tab&col=3\">"; }?>Setting<?php if($col!=2) { echo "</a>"; }?></li>
+</ul>
+</td></tr>
+<tr> 
+<td class="tabcont">
+<?php if($col==1) {?>
+<script type='text/javascript'>
+	function do_submit() {
+		var dolist=Trim(document.f.do_list.value);
+		if(dolist==1) {
+			if(chkdel()==false) {
+				return false;
+			}
+		};
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	};
+	function enab_lx(val) {
+		if(val==0) {
+			clear_toggle();
+		}
+	}
+</script>
+<?php 
+
+// counting
+$currentPage = $HTTP_SERVER_VARS["PHP_SELF"];
+$maxRows_Recordset=50;
+if(!isset($pageNum_Recordset)) $pageNum_Recordset=0;
+$startRow_Recordset=@($pageNum_Recordset * $maxRows_Recordset);
+if(isset($str)&&$str!='') {
+	$strn=mybox_escape_str($str);
+	$query_Recordset="select * from blacklist where ip like \"%$strn%\" or note like \"%$strn%\" order by id ASC";
+} else {
+	$query_Recordset="select * from blacklist order by id ASC";
+}
+$query_limit_Recordset=sprintf("%s LIMIT %d, %d", $query_Recordset, $startRow_Recordset, $maxRows_Recordset);
+$Recordset=mybox_db_query($query_limit_Recordset, $db_id2);
+if(isset($totalRows_Recordset)) {
+	$totalRows_Recordset=$totalRows_Recordset;
+} else {
+	$all_Recordset=mybox_db_query($query_Recordset,$db_id2);
+	$totalRows_Recordset=mybox_db_num_rows($all_Recordset);
+}
+$totalPages_Recordset=@ceil($totalRows_Recordset/$maxRows_Recordset)-1;
+$queryString_Recordset=null;
+if(!empty($_SERVER['QUERY_STRING'])) {
+	$params=explode("&", $_SERVER['QUERY_STRING']);
+  	$newParams=array();
+  	foreach ($params as $param) {
+		if(stristr($param, "pageNum_Recordset")==true) continue;
+		if(stristr($param, "totalRows_Recordset")==true) continue;
+		if(stristr($param, "maxRows_Recordset")==true) continue;
+		if(stristr($param, "tab")==true) continue;
+		if(stristr($param, "col")==true) continue;
+		if(stristr($param, "do_id")==true) continue;
+		if(stristr($param, "str")==true) continue;
+		if(stristr($param, "do_list")==true) continue;
+		array_push($newParams, $param);
+  	}
+  	if(count($newParams) != 0) {
+    		$queryString_Recordset="&" . implode("&", $newParams);
+  	}
+}
+$queryString_Recordset=sprintf("&totalRows_Recordset=%d%s&tab=$tab&col=$col&str=$str&do_id=$do_id&do_list=$do_list",$totalRows_Recordset,$queryString_Recordset);
+if($pageNum_Recordset > 0) { 
+	$pagefirst=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, 0, $queryString_Recordset);
+	$pageprev=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, max(0, $pageNum_Recordset - 1), $queryString_Recordset);
+	$button1="<a href='$pagefirst'><img src='{$_PNG['first']}' border=0 alt='' title=''></a>\n";
+	$button2="<a href='$pageprev'><img src='{$_PNG['prev']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button1="<img src='{$_PNG['first']}' border=0 alt='' title=''>\n";
+	$button2="<img src='{$_PNG['prev']}' border=0 alt='' title=''>\n";
+}
+if($pageNum_Recordset < $totalPages_Recordset) {
+	$pagenext=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, min($totalPages_Recordset, $pageNum_Recordset + 1), $queryString_Recordset);
+	$pagelast=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, $totalPages_Recordset, $queryString_Recordset);
+	$button3="<a href='$pagenext'><img src='{$_PNG['next']}' border=0 alt='' title=''></a>\n";
+	$button4="<a href='$pagelast'><img src='{$_PNG['last']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button3="<img src='{$_PNG['next']}' border=0 alt='' title=''>\n";
+	$button4="<img src='{$_PNG['last']}' border=0 alt='' title=''>\n";
+}
+unset($pagefirst,$pageprev,$pagenext,$pagelast);
+$x=1;
+$_cnum=1;
+if(!isset($pageNum_Recordset)||$pageNum_Recordset==''||$pageNum_Recordset==0) {
+	$_cnum=1;
+} else {
+	$_cnum=($pageNum_Recordset * $maxRows_Recordset);
+	if($_cnum <= 0) {
+		$_cnum=1;
+	} else {
+		$_cnum +=1;
+	}
+}
+if($totalRows_Recordset >0 && mybox_db_num_rows($Recordset)!=0) {
+	echo "
+	<table width='100%' class=data>
+	<thead class='blue'>
+      	<tr>
+        <td style='font-weight: bold; width: 2%; border-right: 0px;'>#</td> 
+        <td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Source</td>
+	<td style='font-weight: bold; width: 2%; border-right: 0px;border-left: 0px;'>Log</td>
+	<td style='font-weight: bold; width: 2%; border-right: 0px; border-right: 0px;border-left: 0px;'>Active</td>
+        <td style='width: 5%; border-right: 0px; border-left: 0px; text-align: right; border-left: 0px;'>&nbsp;</td>
+	</tr>
+	</thead>
+	<tbody style='font-weight: bold;'>
+	";
+	do {
+		$_id=$row['id'];
+		if($_id=='') continue;
+		$_ip=$row['ip'];
+		$_note=mybox_unescape_str($row['note']);
+		if($_note!='') $_note=mybox_print_note($_note);
+		$_stat=$row['stat'];
+		$_log=$row['log'];
+		$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff;'";
+		$lo='';
+		$lo="style=' cursor: pointer;' onclick=\"self.location.href='/fw_blacklist.exh?tab=$tab&col=2&id=$_id&do_id=edit';\" ";
+		echo "
+      		<tr $lt>
+        	<td $lo valign=top>$_cnum</td>
+        	<td $lo valign=top>
+		$_ip
+		$_note
+		</td>
+        	<td style='text-align: center; ' align=center><a href='/fw_blacklist.exh?tab=$tab&col=1&do_list=$do_list&str=$str&del=$_id&log=$_log&do_save=4&pageNum_Recordset=$pageNum_Recordset&totalPages_Recordset=$totalPages_Recordset'><img src='{$_PNG_YESNO[$_log]}' border=0 alt='' title=''></a></td>
+        	<td style='text-align: center;' align=center><a href='/fw_blacklist.exh?tab=$tab&col=1&do_list=$do_list&str=$str&del=$_id&stat=$_stat&do_save=3&pageNum_Recordset=$pageNum_Recordset&totalPages_Recordset=$totalPages_Recordset'><img src='{$_PNG_YESNO[$_stat]}' border=0 alt='' title=''></a></td>
+        	<td style='text-align: right; table-layout: fixed; white-space: nowrap;' valign=middle align=right>
+		<a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='/fw_blacklist.exh?tab=$tab&do_list=$do_list&str=$str&col=$col&do_save=2&del=$_id&pageNum_Recordset=$pageNum_Recordset&totalPages_Recordset=$totalPages_Recordset';\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a>
+		<input type=checkbox name=del[] value=$_id></td>
+		</tr>";
+		$_cnum++;
+	} while($row=mybox_db_fetch_assoc($Recordset));
+
+	if($_cnum >= 1) {
+		echo "<tr>";
+		echo "<td style='text-align: right; border-right: 0px; background: #ffffff;' valign=top colspan=5>";
+		echo "<table align=right style='text-align: right; margin: 0px; padding: 0px; border: 0px;'>";
+		echo "<tr>";
+		$data_a=array("Selected rules"=>"1","All rules"=>"0");
+		if(!isset($do_list)||$do_list=='') $do_list=1;
+		$set_a=array("width"=>"100px","act"=>"enab_lx('b')");
+		echo "<td align=right style='margin: 0px; padding: 0px; border: 0px; vertical-align: bottom;'>";
+		echo mybox_select_box('fbsel1',$data_a,$do_list,'do_list',$set_a);
+		echo "</td>";
+		echo "<td align=right style='margin: 0px; padding: 0px; border: 0px;'>";
+		echo "<img src='{$_PNG['arrow_right_s']}' border=0 alt='' title=''>";
+		echo "</td>";
+		$set_a=array("width"=>"100px");
+		$data_a=array("<< Select >>"=>"","Log"=>"1","Nolog"=>"0");
+		echo "<td align=right style='margin: 0px; padding: 0px; border: 0px; vertical-align: bottom;'>";
+		echo mybox_select_box('fbsel2',$data_a,'','log',$set_a);
+		echo "</td>";
+		$set_a=array("width"=>"100px");
+		$data_a=array("<< Select >>"=>"","Enable"=>"1","Disable"=>"0");
+		echo "<td align=right style='margin: 0px; padding: 0px; border: 0px; vertical-align: bottom;'>";
+		echo mybox_select_box('fbsel3',$data_a,'','stat',$set_a);
+		echo "</td>";
+		echo "<td align=right style='margin: 0px; padding: 0px; padding-left: 5px; border: 0px; vertical-align: bottom;'>";
+		echo "<a href='#' onclick='do_delete(2); return false;'>Delete</a> / ";
+		echo "<a href='#' onclick='dotoggle();return false;'>Toggle</a> <img src='{$_PNG['arrow_rtr']}' border=0 alt='' title=''>";
+		echo "</td>";
+		echo "</tr></table>";
+		echo "</td></tr>";
+	}
+	echo mybox_print_nextpage($pageNum_Recordset,$totalPages_Recordset,$totalRows_Recordset,$maxRows_Recordset,$queryString_Recordset,$currentPage,'5',$button1,$button2,$button3,$button4);
+} else {
+	echo "
+	<br>
+	<span class='notedef'>
+	There are no blacklist rules defined.
+	</span>
+	<br><br>
+	";$_error=1;
+}
+
+?>
+
+</tbody>
+</table>
+<?php  } //col==1 ?>
+<?php if($col==2) {
+
+if($do_id=='edit') {
+	$result=mybox_db_query("select * from blacklist where id='$id'",$db_id2);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_id=$row['id'];
+			$_ip=$row['ip'];
+			$_stat=$row['stat'];
+			$_log=$row['log'];
+			$_note=mybox_unescape_str($row['note']);
+		}
+	}
+}
+?>
+<script type='text/javascript'>
+	function do_submit() {
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	};
+</script>
+<table width="100%" class="data">
+<tr> 
+<td valign="middle" class="tdname">Source</td>
+<td valign="middle" class="tdvalue">
+<input name="ip" type="text" class="valbox2" value="<?php echo $_ip;?>">
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Comment</td>
+<td valign="middle" class="tdvalue">
+<input name="note" type="text" class="valbox2" value="<?php echo $_note;?>">
+</td>
+</tr>
+<tr>
+<td valign="middle" class="tdname">Logging</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+if(!isset($_log)||$_log=='') $_log=0;
+echo mybox_select_box('pfipssel4',$data_a,$_log,'log');
+?>
+</td>
+</tr>
+
+<tr> 
+<td valign="middle" class="tdname">Enable this rule</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("On"=>"1","Off"=>"0");
+if(!isset($_stat)||$_stat=='') $_stat=0;
+echo mybox_select_box('pfipssel5',$data_a,$_stat,'stat');
+?>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+</table>
+<?php  } //col==2?>
+
+<?php if($col==3) {
+$result=mybox_db_query("select * from misc where name like \"blacklist_%\" ",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_name=$row['name'];
+		$_val=$row['val'];
+		if($_name=="blacklist_stat") $_blacklist_stat=$_val;
+		if($_name=="blacklist_block") $_blacklist_block=$_val;
+		if($_name=="blacklist_drop") $_blacklist_drop=$_val;
+	}
+}
+?>
+<script type='text/javascript'>
+	function do_submit() {
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	};
+</script>
+<table width="100%" class="data">
+<tbody>
+<tr> 
+<td valign="middle" class="tdname">Enable blacklist</td>
+<td valign="middle" class="tdvalue"> 
+<?php 
+$data_a=array("On"=>"1","Off"=>"0");
+if(!isset($_blacklist_stat)||$_blacklist_stat=='') $_blacklist_stat=0;
+echo mybox_select_box('fbsel1',$data_a,$_blacklist_stat,'blacklist_stat');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Blocking mode</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if(!isset($_blacklist_block)||$_blacklist_block=='') $_blacklist_block=1;
+echo mybox_select_box('fbsel4',$_INOUTB,$_blacklist_block,'blacklist_block');
+?>
+</td>
+</tr>
+<tr>
+<td valign="middle" class="tdname">Policy</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array();
+foreach(array("1"=>"DROP","2"=>"REJECT") as $a => $p) {
+	$data_a[$p]=$a;
+	if(!isset($_blacklist_drop)||$_blacklist_drop=='') $_blacklist_drop=$a;
+}
+echo mybox_select_box('pfipssel18',$data_a,$_blacklist_drop,'blacklist_drop');
+?>
+</td>
+</tr>
+</tbody>
+</table>
+
+<?php  }//col=3?>
+
+<table align=right>
+<tbody>
+<tr>
+<?php if($col==1){?><td><a name="sini"><a class="btn" href="#sini" onclick="return do_changes();return false;">Reload</a></td><?php }?>
+<?php if($_error!=1){?>
+<td>
+<a name="sini"><a class="btn" href="#sini" onclick="return do_submit();return false;"><?php if($do_id=='edit') { echo "Update"; } else { echo "Save";}?></a>
+</td>
+<?php }?>
+</tr> 
+</tbody>
+</table>
+
+</td></tr></table>
+
+<?php } // tab=2?>
+
+
+<!-- end tab container -->
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?php echo $tab;?>>
+<input type=hidden name=col value=<?php echo $col;?>>
+<?php if($col==1) {?>
+<input type=hidden name=pageNum_Recordset value='<?php echo $pageNum_Recordset;?>'>
+<input type=hidden name=totalRows_Recordset value='<?php echo $totalRows_Recordset;?>'>
+<?php  } ?>
+<?php if($do_id=='edit' && $col==2) {?>
+<input type=hidden name=do_id value=edit>
+<input type=hidden name=id value='<?php echo $id;?>'>
+<?php  } ?>
+</form>
+<script type='text/javascript'>page_kill();</script>
+</body>
+</html>
+
+<?php mybox_db_close($db_id); mybox_db_close($db_id2);?>

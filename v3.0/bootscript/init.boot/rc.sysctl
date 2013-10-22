@@ -1,0 +1,100 @@
+#!/bin/sh
+# $Id: rc.sysctl.sh,v 4.1 2007/08/04 01:17:01 nawawi Exp $
+
+trap : 1 2 3 15
+PATH="/bin"
+TERM=linux
+export PATH TERM
+umask 077
+cd /
+
+. /etc/init.boot/functions
+
+echo -n "* Setting kernel parameters.";
+
+if [ -r "/proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_established" ]; then
+	echo "432000" > /proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_established
+fi
+
+# value to tells the TCP/IP stack how often to send TCP keepalive packets to 
+# keep an connection alive if it is currently unused
+if [ -r "/proc/sys/net/ipv4/tcp_keepalive_time" ]; then
+	echo "300" > /proc/sys/net/ipv4/tcp_keepalive_time
+fi
+
+# 0/1 = disable/enable window scaling
+if [ -r "/proc/sys/net/ipv4/tcp_window_scaling" ]; then
+	echo "0" > /proc/sys/net/ipv4/tcp_window_scaling
+fi
+
+if [ -r "/proc/sys/net/ipv4/tcp_timestamps" ]; then
+	echo "0" > /proc/sys/net/ipv4/tcp_timestamps
+fi
+
+# 0/1 = disable/enable smurf attacks protect
+if [ -r "/proc/sys/net/ipv4/icmp_echo_ignore_broadcasts" ]; then
+	echo "1" > /proc/sys/net/ipv4/icmp_echo_ignore_broadcasts
+fi
+
+# 0/1 = disable/enable bad error message protection
+if [ -r "/proc/sys/net/ipv4/icmp_ignore_bogus_error_responses" ]; then
+	echo "1" > /proc/sys/net/ipv4/icmp_ignore_bogus_error_responses
+fi
+
+# 0/1 = disable/enable Syncookies
+if [ -r "/proc/sys/net/ipv4/tcp_syncookies" ]; then
+	echo "1" > /proc/sys/net/ipv4/tcp_syncookies
+fi
+
+# Reduce SYN Floods
+if [ -r "/proc/sys/net/ipv4/tcp_max_syn_backlog" ]; then
+	echo "1208" > /proc/sys/net/ipv4/tcp_max_syn_backlog 
+fi
+
+# 0 = yes 1 = no : Protect ICMP accept redirect
+for f in /proc/sys/net/ipv4/conf/*/accept_redirects; do
+	if [ -f "$f" -a "$f" != "/proc/sys/net/ipv4/conf/lo/accept_redirects" ]; then
+		echo "0" > $f
+	fi
+done
+
+if [ -r "/proc/sys/fs/file-max" ]; then
+	echo "125000" > /proc/sys/fs/file-max
+	ulimit -n 125000
+fi
+
+# arptables
+if ! lsmod 2>/dev/null |grep -q arp_tables; then
+	modprobe -q -k arp_tables >> /dev/null 2>&1
+fi
+
+if ! lsmod 2>/dev/null |grep -q arptable_filter; then
+	modprobe -q -k arptable_filter >> /dev/null 2>&1
+fi
+
+# arp anti spoofing
+for f in /proc/sys/net/ipv4/neigh/*/arp_antidote;do 
+	if [ -f "$f" ]; then
+		echo "2" > $f
+	fi
+done
+
+# arp flux
+for f in /proc/sys/net/ipv4/conf/*/hidden; do
+	if [ -f "$f" -a "$f" != "/proc/sys/net/ipv4/conf/lo/hidden" ]; then
+		echo "1" > "$f"
+	fi
+done
+
+# local socket
+if [ -f "/proc/sys/net/ipv4/tcp_adv_win_scale" ]; then
+	echo "10" > /proc/sys/net/ipv4/tcp_adv_win_scale
+fi
+
+# swap tune - kernel 2.6.x
+if [ -f "/proc/sys/vm/swappiness" ]; then
+	echo "0" > /proc/sys/vm/swappiness
+fi
+
+echo -n -e " Done.\n";
+exit 0

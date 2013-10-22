@@ -1,0 +1,86 @@
+<?php 
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+
+function policy_dns($db_id) {
+	$_defnet_array=mybox_defnetwork_array($db_id);
+	$namedev_array=mybox_name2dev_array($db_id);
+	$alist='';
+	$_dns_acl='';
+	$result=mybox_db_query("select val from misc where name='dns_acl'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		$_dns_acl=trim(mybox_db_fetch_single($result));
+	}
+	unset($result);
+	if($_dns_acl=='') return;
+	$_alist_a=array();
+	$_src_array=array();
+	$_alist_a=preg_split("/,/",$_dns_acl);
+	if(count($_alist_a)!=0) {
+		foreach($_alist_a as $_src) {
+			if(isset($namedev_array[$_src])&&$namedev_array[$_src]!='') {
+				$_src_array[]="{$namedev_array[$_src]}";
+			} else {
+				if(isset($_defnet_array[$_src])&&$_defnet_array[$_src]!='') {
+					$_src_array=list_srcdst_array($_defnet_array,$_src,"3","");
+				}
+			}
+		}
+	} else {
+		$_src=$_dns_acl;
+		if(isset($namedev_array[$_src])&&$namedev_array[$_src]!='') {
+			$_src_array[]="{$namedev_array[$_src]}";
+		} else {
+			if(isset($_defnet_array[$_src])&&$_defnet_array[$_src]!='') {
+				$_src_array=list_srcdst_array($_defnet_array,$_src,"3","");
+			}
+		}
+	}
+	return $_src_array;
+}
+
+function do_policy_dns(&$_IPSACL,$_int,$db_id) {
+	$_dns_acl=array();
+	$_dns_acl=policy_dns($db_id);
+	@unlink("/var/sys/dns_proxy.set");
+	if(count($_dns_acl)!=0) {
+		$_dns_proxy=0;
+		$result=mybox_db_query("select val from misc where name='dns_proxy'",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			$_dns_proxy=trim(mybox_db_fetch_single($result));
+		}
+		unset($result);
+		$_dns_acl_port_a[]="-p udp -m udp --dport 53 -j ACCEPT";
+		$_dns_acl_port_a[]="-p tcp -m tcp --dport 53 -j ACCEPT";
+		$set_a='';
+		foreach($_dns_acl as $dnsx) {
+			foreach($_int as $_ip) {
+				do_iptable("-A ACL1000-01 -s $dnsx -d $_ip -p udp -m udp --sport 53:65535 --dport 53 -j ACCEPT");
+				do_iptable("-A ACL1000-01 -s $dnsx -d $_ip -p tcp -m tcp --sport 53:65535 --dport 53 -j ACCEPT");
+				//$_IPSACL['F'][]="-s $dnsx -d $_ip -p udp -m udp --dport 53 -j ACCEPT";
+				//$_IPSACL['F'][]="-s $dnsx -d $_ip -p tcp -m tcp --dport 53 -j ACCEPT";
+				$_IPSACL['P'][]="-s $dnsx -d $_ip -p udp -m udp --sport 53:65535 --dport 53 -j RETURN";
+				$_IPSACL['P'][]="-s $dnsx -d $_ip -p tcp -m tcp --sport 53:65535 --dport 53 -j RETURN";
+				$_IPSACL['FU'][]="-s $dnsx -d $_ip -p udp -m udp --sport 53:65535 --dport 53 -j ACL1011-07";
+				$_IPSACL['FT'][]="-s $dnsx -d $_ip -p tcp -m tcp --sport 53:65535 --dport 53 -j ACL1011-07";
+
+				if($_dns_proxy==1) $set_a[$dnsx]="$dnsx";
+			}
+		}
+		foreach($_int as $_ip) {
+			$_IPSACL['F'][]="-d $_ip -p udp -m udp --sport 53:65535 --dport 53 -j ACCEPT";
+			$_IPSACL['F'][]="-d $_ip -p tcp -m tcp --sport 53:65535 --dport 53 -j ACCEPT";
+			do_iptable("-A ACL1000-01 -d $_ip -p udp -m udp --dport 53 -j DROP");
+			do_iptable("-A ACL1000-01 -d $_ip -p tcp -m tcp --dport 53 -j DROP");	
+		}
+		if($_dns_proxy==1) mybox_save_to_file("/var/sys/dns_proxy.set",serialize($set_a));
+	}
+}
+
+function do_policy_dns_nat_clear() {
+	iptables_open(1);
+	do_iptable("*nat");
+	do_iptable(":ACL1006-001 - [0:0]");
+	policy_close();
+}
+
+?>

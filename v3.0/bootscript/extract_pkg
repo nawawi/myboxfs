@@ -1,0 +1,20 @@
+#!/bin/sh
+# $Id: extract_pkg.sh,v 1.0 2007/12/31 23:20:00 nawawi Exp $
+
+trap : 1 2 3 15
+PATH="/bin"
+TERM=linux
+export PATH TERM
+umask 077
+cd /
+
+if [ -d "/strg/mybox/pkg" ]; then
+        for f in /strg/mybox/pkg/*.mpk;do
+		tar -C / -axf $f
+		echo -n -e " Extracting packages: $(basename $f)                                  \r*";
+		usleep 0; wait
+        done
+	echo -e "                                       \r* Extracting packages. Done";
+fi
+
+exit 0;

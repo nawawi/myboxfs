@@ -1,0 +1,531 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="vpn_pptp";
+include_once('page.exl');
+mybox_chk_session();
+mybox_send_nocache();
+
+$db_id=mybox_db_connect($_DB_NAME);
+
+function _print_pptp_user() {
+	global $_PNG; 
+	mybox_kill_pptp_user();
+	$_user_array=array();
+	if(file_exists("/var/sys/pptpvpnusers")) {
+		$_user_array=unserialize(mybox_fget_contents("/var/sys/pptpvpnusers"));
+	}
+	$x=0;
+	if(count($_user_array)!=0) {
+		echo "
+			<table width='100%' class=data>
+			<thead class='blue'>
+			<tr>
+			<td style='font-weight: bold; width: 2%;'>#</td>
+			<td style='font-weight: bold;'>User</td>
+			<td style='font-weight: bold;'>Device</td>
+			<td style='font-weight: bold;'>Remote IP</td>
+			<td style='font-weight: bold;'>Local IP</td>
+			<td style='font-weight: bold;'>Logon</td>
+			<td style='font-weight: bold; text-align: right; width: 5%;'></td>
+			</tr>
+			</thead>
+			<tbody>
+		";
+		foreach($_user_array as $tty => $list) {
+			$list=trim($list);
+			if($list=='') continue;
+			list($_remote_ip,$_real_ip,$_username,$_time,$_pid)=preg_split("/\|/",$list);
+			$time=date('d-M-Y h:i:s A',$_time);
+			$x++;
+			echo "
+      				<tr>
+       				<td style='background-color: #ffffff;'>$x</td>
+				<td style='background-color: #ffffff;'>$_username</td>
+				<td style='background-color: #ffffff;'>$tty</td>
+				<td style='background-color: #ffffff;'>$_real_ip</td>
+				<td style='background-color: #ffffff;'>$_remote_ip</td>
+				<td style='background-color: #ffffff;'>$time</td>
+				<td style='text-align: right; table-layout: fixed; white-space: nowrap; background-color: #ffffff;' align=right valign=middle><a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='/vpn_pptp.exh?tab=2&do_id=close&id=$_pid';\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a><input type=checkbox name=del[] value='$_pid'></td>
+				</tr>
+			";
+		}
+		echo "
+			<tr>
+			<td style='text-align: right; background-color: #ffffff;' valign=top colspan=7>[ <a href='#' onclick='do_delete(2);'>Delete</a> / <a href='#' onclick='dotoggle();'>Toggle</a> ] <img src='{$_PNG['arrow_rtr']}' border=0 alt='' title=''></td>
+			</tr>
+			</tbody></table>
+		";
+	} else {
+		echo "
+			<br>
+			<span class='notedef'>
+			There are no connection available.
+			</span>
+			<br><br>
+		";
+	}
+	
+}
+
+if(isset($_GET['pptpuser'])&& time() >= $_GET['pptpuser']) {
+	_print_pptp_user();
+	exit;
+}
+
+if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+	if($tab==1) {
+		if(isset($do_save)&&$do_save==1) {
+			mybox_db_query("update misc set val='$pptp_vpn_stat' where name='pptp_vpn_stat'",$db_id);
+			mybox_db_query("update misc set val='$pptp_vpn_auth' where name='pptp_vpn_auth'",$db_id);
+			mybox_db_query("update misc set val='$pptp_user' where name='pptp_vpn_user'",$db_id);
+			mybox_db_query("update misc set val='$pptp_vpn_auth_grp' where name='pptp_vpn_auth_grp'",$db_id);
+			mybox_db_query("update misc set val='$pptp_vpn_debug' where name='pptp_vpn_debug'",$db_id);
+			mybox_db_query("update misc set val='$pptp_vpn_pool_type' where name='pptp_vpn_pool_type'",$db_id);
+			mybox_db_query("update misc set val='$pptp_vpn_pool_net' where name='pptp_vpn_pool_net'",$db_id);
+			mybox_db_query("update misc set val='$pptp_vpn_dhcp_server' where name='pptp_vpn_dhcp_server'",$db_id);
+			mybox_db_query("update misc set val='$pptp_vpn_dhcp_dev' where name='pptp_vpn_dhcp_dev'",$db_id);
+		}
+		if(isset($do_id)&&$do_id=='apply_chg') {
+			mybox_echo_query("pptp-restart");
+			$msg="<script>waitcount();</script>";
+		}
+	}
+	if($tab==2) {
+		if(isset($do_id)&&$do_id=='close') {
+			mybox_kill($id,9);
+		}
+		if(isset($do_save)&&$do_save==2) {
+			if(count($del)!=0) {
+				foreach($del as $id) {
+					mybox_kill($id,9);
+				}
+			}
+		}
+	}
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied";
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+?>
+<html>
+<head>
+<title>MyAdmin</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<script type='text/javascript' src="/j/mybox_func.js"></script>
+<?php if($tab==2){?>
+<script type='text/javascript' src="/j/mybox_ajax.js"></script>
+<?php }?>
+<?php if($tab==1){?>
+<script type='text/javascript' src="/j/mybox_overlib.js"></script>
+<?php }?>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?php echo $_LOGIN['auth_id'];?>";
+	page_load();
+</script>
+<script type='text/javascript'>
+	<?php if($tab==1) {?>
+	function set_pptp_user() {
+		var list=document.f.mr;
+		var lr='';
+		var ti=0;
+		for(var i=0;i<list.length;i++) {
+			if(list.options[i]!=null && list.options[i].value!='') {
+				ti++;
+				lr +=list.options[i].value;
+				lr +=',';
+			}
+		}
+		document.f.pptp_user.value=lr;
+	};
+	<?php }?>
+	function do_submit() {
+		<?php if($tab==1) {?>
+		set_pptp_user();
+		<?php }?>
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	}
+	function do_changes() {
+		self.location.href='<?php echo "/vpn_pptp.exh?tab=$tab&col=$col&do_id=apply_chg";?>';	
+	}
+<?php if($tab==1) {?>
+	function chk_auth_via(val) {
+		if(val==1) {
+			do_show('t1');
+			do_hide('t2');
+		} else {
+			<?php if(file_exists("/var/sys/ad_join_ok")) {?>
+			do_hide('t1');
+			do_show('t2');
+			<?php } else {?>
+			pop_msg("Active directory authentication not enable");
+			insert_value('namepptpsel2','Local');insert_value('pptp_vpn_auth','1');
+			return false;
+			<?php }?>
+		}
+	}
+	function chk_pool(val) {
+		if(val==1) {
+			do_show('t4');
+			do_hide('t5');
+			do_hide('t6');
+		} else {
+			do_hide('t4');
+			do_show('t5');
+			do_show('t6');
+		}
+	}
+	function inmoveto(a) {
+		if(a=="right") {
+			var p=document.f.mr.length;
+			var lstlenght=document.f.ml.length;
+			var list=document.f.ml;
+			for(var i=0;i<lstlenght;i++) {
+				if(list[i]!=null && list[i].value!='') {
+					if(list.options[i].selected==true) {
+						document.f.mr[p]=new Option(list.options[i].text,list.options[i].value);
+						list[i]=null;
+						p++;
+					}
+				}
+			}
+		}
+
+		if(a=="left") {
+			var p=document.f.ml.length;
+			var lstlenght=document.f.mr.length;
+			var list=document.f.mr;
+			for(var i='0';i<lstlenght;i++) {
+				if(list[i]!=null && list[i].value!='') {
+					if(list.options[i].selected==true) {
+						document.f.ml[p]=new Option(list.options[i].text,list.options[i].value);
+						list[i]=null;
+						p++;
+					}
+				}
+			}
+		}
+	}
+<?php }?>
+function waitcount() {
+	page_reload('400','<?php echo "/vpn_pptp.exh?tab=$tab&col=$col&col2=$col2";?>');
+};
+</script>
+</head>
+<body onload="load_menu('sub7','t7d1','s7i1');" scroll="auto">
+<form name=f method=post action="/vpn_pptp.exh">
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 0px;'>
+<tr>
+<td>
+<?php mybox_page_section("VPN / PPTP");?>
+<br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="/vpn_pptp.exh?tab=1" <?php if($tab==1){?>class="tabact"<?php }?>>Global</a></li>
+<li><a href="/vpn_pptp.exh?tab=2" <?php if($tab==2){?>class="tabact"<?php }?>>Connections</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td> 
+<?php mybox_page_msg($msg);?>
+<br>
+
+<!-- tab container -->
+<?php if($tab==1) { 
+$_pptp_vpn_stat=0;
+$_pptp_vpn_auth=1;
+$_pptp_vpn_debug=0;
+$_pptp_vpn_pool_type=1;
+$_pptp_vpn_pool_net='';
+$_pptp_vpn_dhcp_server='';
+$_pptp_vpn_dhcp_dev='';
+$_pptp_vpn_auth_grp='';
+$_pptp_vpn_user='';
+$result=mybox_db_query("select * from misc where name like \"pptp_%\"",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		if(trim($row['name'])=="pptp_vpn_stat") $_pptp_vpn_stat=trim($row['val']);
+		if(trim($row['name'])=="pptp_vpn_auth") $_pptp_vpn_auth=trim($row['val']);
+		if(trim($row['name'])=="pptp_vpn_user") $_pptp_vpn_user=trim($row['val']);
+		if(trim($row['name'])=="pptp_vpn_auth_grp") $_pptp_vpn_auth_grp=trim($row['val']);
+		if(trim($row['name'])=="pptp_vpn_debug") $_pptp_vpn_debug=trim($row['val']);
+		if(trim($row['name'])=="pptp_vpn_pool_type") $_pptp_vpn_pool_type=trim($row['val']);
+		if(trim($row['name'])=="pptp_vpn_pool_net") $_pptp_vpn_pool_net=trim($row['val']);
+		if(trim($row['name'])=="pptp_vpn_dhcp_server") $_pptp_vpn_dhcp_server=trim($row['val']);
+		if(trim($row['name'])=="pptp_vpn_dhcp_dev") $_pptp_vpn_dhcp_dev=trim($row['val']);
+	}
+}
+unset($result);
+$_tl=array();$_ml=array();
+$result=mybox_db_query("select name from auth_user where stat='1'",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$x=$row['name'];
+		$_tl[$x]=$x;
+	}
+}
+unset($x,$result);
+$result=mybox_db_query("select name from group_user",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$x=$row['name'];
+		$_tl[$x]=$x;
+	}
+}
+unset($x,$result);
+if($_pptp_vpn_user!='') {
+	$_nml=preg_split("/,/",$_pptp_vpn_user);
+	if(count($_nml)!=0) {
+		foreach($_nml as $a) {
+			if($a=='') continue;
+			if($_tl[$a]==$a) unset($_tl[$a]);
+		}
+	} else {
+		$_nml[]="$_pptp_vpn_user";
+	}
+	unset($a);
+}
+
+$list_array=array();
+$list_array1=array();
+$list_array2=mybox_defnetwork_array($db_id);
+if(count($list_array2)!=0) {
+	foreach($list_array2 as $a => $b) {
+		if($a=='any') continue;
+		if(is_array($b)) {
+			if($b['type'] == 1) $list_array[]="$a";
+			if($b['type'] == 2) $list_array1[]="$a";
+		} 
+	}
+}
+$dev_array=mybox_list_namedev($db_id);
+?>
+
+<table class="data" width="100%">
+<tbody>
+<tr>
+<td valign="middle" class="tdname">Enable PPTP VPN</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("On"=>"1","Off"=>"0");
+if(!isset($_pptp_vpn_stat)||$_pptp_vpn_stat=='') $_pptp_vpn_stat=0;
+echo mybox_select_box('pptpsel1',$data_a,$_pptp_vpn_stat,'pptp_vpn_stat');
+?>
+</td>
+</tr>
+
+<tr> 
+<td valign="middle" class="tdname">Authentication via</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("Local"=>"1","Active Directory"=>"2");
+if(!isset($_pptp_vpn_auth)||$_pptp_vpn_auth=='') $_pptp_vpn_auth=1;
+$set_a=array("act"=>"chk_auth_via('b')");
+echo mybox_select_box('pptpsel2',$data_a,$_pptp_vpn_auth,'pptp_vpn_auth',$set_a);
+?>
+</td>
+</tr>
+
+<tr id='t1' style='display: none;'> 
+<td valign="top" class="tdname">Local users</td>
+<td valign="top" class="tdvalue"> 
+
+<table style='border: 0px; padding: 0px; margin: 0px;'>
+<tr>
+<td valign=top style='border: 0px; font-style: italic; font-weight: bold;' colspan=2>
+Available user
+</td>
+<td valign=top style='border: 0px; font-style: italic; font-weight: bold;'>
+Selected user
+</td>
+</tr>
+<tr>
+<td valign=top style='border: 0px; text-align: center;'>
+<select name=ml size=7 multiple class=selbox style='height: 105px; width: 150px;'>
+<?php 
+foreach($_tl as $n) {
+	$px=mybox_get_defname($n,1,'def1',$db_id);
+	echo "<option value='$n' $px>$n</option>";
+	unset($px);
+}
+unset($n);
+?>
+</select>
+</td>
+<td valign=absmiddle style='border: 0px; text-align: center; vertical-align: middle;'>
+
+<table class="data" style='border: 0px; padding: 0px; margin: 0px;'>
+<tr>
+<td valign=top style='border: 0px;'>
+<a name="sini"><a class="btns" href="#sini" onclick="return inmoveto('right');return false;"> >> </a>
+</td>
+</tr>
+<tr>
+<td valign=top style='border: 0px;'>
+<a name="sini"><a class="btns" href="#sini" onclick="return inmoveto('left');return false;"> << </a>
+</td>
+</tr>
+</table>
+
+</td>
+<td valign=top style='border: 0px; text-align: center;'>
+<select name=mr size=7 multiple class=selbox style='height: 105px; width: 150px;'>
+<?php 
+foreach($_nml as $a) {
+	$px=mybox_get_defname($a,1,'def1',$db_id);
+	echo "<option value='$a' $px>$a</option>";
+	unset($px);
+}
+unset($a);
+?>
+</select>
+</td>
+</tr>
+</table>
+<span id='def1' class='def' style='display: none; position: absolute;'></span>
+</td>
+</tr>
+
+<tr id='t2' style='display: none;'> 
+<td valign="middle" class="tdname">AD Group</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array();
+$data_a["<< Not set >>"]="";
+$buff=mybox_fget_contents("/var/sys/ad_join_ok");
+$buff=unserialize($buff);
+if(count($buff)!=0) {
+	unset($buff[0]);
+	foreach($buff as $lx) {
+		if($lx=='') continue;
+		$gg=trim($lx);
+		$g1=strstr($gg,'\\');
+		$g1=trim($g1,'\\');
+		if($g1=='') continue;
+		$data_a[$g1]=$g1;
+	}
+}
+echo mybox_select_box('pptpsel3',$data_a,$_pptp_vpn_auth_grp,'pptp_vpn_auth_grp');
+?>
+</td>
+</tr>
+
+<tr>
+<td valign="middle" class="tdname">Assign IP addresses by</td>
+<td valign="middle" class="tdvalue"> 
+<?php 
+$data_a=array("IP Address pool"=>"1","DHCP Server"=>"2");
+if(!isset($_pptp_vpn_pool_type)||$_pptp_vpn_pool_type=='') $pptp_vpn_pool_type=1;
+$set_a=array("act"=>"chk_pool('b')");
+echo mybox_select_box('pptpsel4',$data_a,$_pptp_vpn_pool_type,'pptp_vpn_pool_type',$set_a);
+?>
+</td>
+</tr>
+<tr id='t4' style='display: none;'>
+<td valign="middle" class="tdname">Pool Network</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($list_array,'pptp_vpn_pool_net',"$_pptp_vpn_pool_net",'tse4','tse4a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+?>
+<?php echo mybox_defwin('tse4','200px','#ffffff','#999999','#336699','#ffffff','Pool Network','#ffffff','100px','hidden','auto',$txt);?>
+</td>
+</tr>
+<tr id='t5' style='display: none;'>
+<td valign="middle" class="tdname">DHCP Server</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($list_array1,'pptp_vpn_dhcp_server',"$_pptp_vpn_dhcp_server",'tse5','tse5a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+?>
+<?php echo mybox_defwin('tse5','200px','#ffffff','#999999','#336699','#ffffff','DHCP Server','#ffffff','100px','hidden','auto',$txt);?>
+</td>
+</tr>
+
+<tr id='t6' style='display: none;'>
+<td valign="middle" class="tdname">on interface</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$dev_array1=array();
+foreach($dev_array as $a => $b) {
+	$dev_array1[$a]=$a;
+}
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($dev_array1,'pptp_vpn_dhcp_dev',"$_pptp_vpn_dhcp_dev",'tse6','tse6a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+?>
+<?php echo mybox_defwin('tse6','200px','#ffffff','#999999','#336699','#ffffff','Device','#ffffff','100px','hidden','auto',$txt);?>
+</td>
+</tr>
+</tbody>
+</table>
+<script type='text/javascript'>
+chk_auth_via(<?php echo $_pptp_vpn_auth;?>);
+chk_pool(<?php echo $_pptp_vpn_pool_type;?>);
+</script>
+<input type='hidden' name='pptp_user' value=''>
+<?php  } //tab==1 ?>
+<?php if($tab==2) {
+echo "<div id='pptpuser'>\n";
+_print_pptp_user();
+echo "</div>\n";
+?>
+<script type='text/javascript'>
+function update_user() {
+	pptpuser_task('<?php echo "/vpn_pptp.exh?_NOLOGIN=1&pptpuser=".time()."";?>');
+}
+window.setInterval(update_user, '5000');
+</script>
+<?php }//tab==2?>
+<?php if($tab==1){?>
+<table align=right>
+<tbody>
+<tr>
+<td><a name="sini"><a class="btn" href="#sini" onclick="return do_changes();return false;">Reload</a></td>
+<td><a name="sini"><a class="btn" href="#sini" onclick="return do_submit();return false;">Save</a></td>
+</tr> 
+</tbody>
+</table>
+<?php }?>
+<!-- end tab container -->
+
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?php echo $tab;?>>
+<input type=hidden name=col value=<?php echo $col;?>>
+</form>
+<script type='text/javascript'>page_kill();</script>
+</body>
+</html>
+
+<?php mybox_db_close($db_id);?>

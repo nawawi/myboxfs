@@ -1,0 +1,100 @@
+<?php 
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+// policy library for portscan
+
+// Portscan execute
+function do_policy_portscan($db_id='') {
+	global $_DB_NAME, $_PFP, $_QUIET;
+
+	if(file_exists("/var/sys/init_no_restart")) return;
+
+	@unlink("/var/sys/portscan_drop");
+	@unlink("/var/sys/portscan_log");
+
+	$_pscan_drop='';
+	$_gw_ip=mybox_fget_contents("/var/sys/gw_ip");
+
+	$close_db=0;
+	if($db_id=='') {
+		$db_id=mybox_db_connect($_DB_NAME);
+		$close_db=1;
+	}
+
+	$_pscan_stat=0;$_pscan_drop=0;
+	$result=mybox_db_query("select * from misc where name like \"ips_pscan_%\" ",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			if(trim($row['name'])=="ips_pscan_stat") $_ips_pscan_stat=trim($row['val']);
+			if(trim($row['name'])=="ips_pscan_drop") $_ips_pscan_drop=trim($row['val']);
+			if(trim($row['name'])=="ips_pscan_log") $_ips_pscan_log=trim($row['val']);
+		}
+		$_pscan_drop=$_PFP[$_ips_pscan_drop];
+	}
+	/* from global.exl
+		$_PFP['1']="PASS";
+		$_PFP['2']="DROP";
+		$_PFP['3']="REJECT";
+	*/
+	do_policy_portscan_clear();
+	if($_ips_pscan_stat==1) {
+		$_IPSACL=array();
+		$_IPSACL=unserialize(mybox_fget_contents("/var/sys/policy_admin.cache"));
+		$_dev=array();$_local=array();$_masqip=array();$_ping=array();
+		policy_get_data(&$_dev,&$_local,&$_masqip,&$_ping,$db_id);
+		iptables_open(1);
+		do_iptable("*filter");
+		do_iptable(":ACL1000-02 - [0:0]");
+		do_iptable(":ACL1000-03 - [0:0]");
+		mybox_init_echo($_QUIET,"INFO","Loading Portscan protection rules");
+
+		// recent
+		if($_ips_pscan_drop==2) {
+			do_iptable("-A ACL1000-02 -m recent --name portscan --rcheck --seconds 300 -j DROP");
+			do_iptable("-A ACL1000-02 -m recent --name portscan --remove");
+		} elseif($_ips_pscan_drop==3) {
+			do_iptable("-A ACL1000-02 -m recent --name portscan --rcheck --seconds 300 -j REJECT");
+			do_iptable("-A ACL1000-02 -m recent --name portscan --remove");
+		}
+
+		if($_ips_pscan_log==1) do_iptable("-A ACL1000-02 -m recent --name portscan --set -m limit --limit 5/sec --limit-burst 10 -j NFLOG --nflog-prefix \"PORTSCAN: \" "); 
+		if($_ips_pscan_drop==1) {
+			do_iptable("-A ACL1000-02 -j ACCEPT");
+		} elseif($_ips_pscan_drop==2) {
+			do_iptable("-A ACL1000-02 -m recent --name portscan --set -j DROP");
+		} else {
+			do_iptable("-A ACL1000-02 -m recent --name portscan --set -j REJECT");
+		}
+		do_iptable("-A ACL1000-03 -s 127.0.0.1 -j RETURN");
+		if(isset($_gw_ip)&&$_gw_ip!='') do_iptable("-A ACL1000-03 -s $_gw_ip -j RETURN");
+		foreach($_local as $_ip => $a) {
+			if($_ip=='') continue;
+			do_iptable("-A ACL1000-03 -s $_ip -j RETURN");
+		}
+		unset($_ip,$a);
+		if(count($_IPSACL['P'])!=0) {
+			foreach($_IPSACL['P'] as $lx) {
+				if($lx=='') continue;
+				do_iptable("-A ACL1000-03 $lx");
+			}
+			unset($lx);
+		}
+		ips_exclude("ACL1000-03","pscan",$db_id);
+		do_iptable("-A ACL1000-03 -m psd --psd-weight-threshold 21 --psd-delay-threshold 300 --psd-lo-ports-weight 1 --psd-hi-ports-weight 3 -j ACL1000-02");
+		mybox_save_to_file("/var/sys/portscan_drop","$_pscan_drop");
+		mybox_save_to_file("/var/sys/portscan_log","$_ips_pscan_log");
+		policy_close();
+	}
+	if($close_db==1) {
+		mybox_db_close($db_id);
+	}
+}
+
+function do_policy_portscan_clear() {
+	iptables_open(1);
+	do_iptable("*filter");
+	do_iptable(":ACL1000-02 - [0:0]");
+	do_iptable(":ACL1000-03 - [0:0]");
+	policy_close();
+}
+
+?>

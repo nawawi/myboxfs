@@ -1,0 +1,458 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="network_arp";
+include_once('page.exl');
+mybox_chk_session();
+mybox_send_nocache();
+$_error=0;
+
+$db_id=mybox_db_connect($_DB_NAME);
+
+if(mybox_chk_level($_LOGIN['auth_id'],2)==1 && isset($do_save)&&$do_save!='') {
+	if($tab==1) {
+		if($do_save==1) {
+			if(count($aid)!=0) {
+				foreach($aid as $id) {
+					$ip=$aip[$id];
+					if($ip=='' || mybox_check_ipv4($ip)==0) continue;
+					$mac=trim($amac[$id]);
+					if($mac=='') continue;
+					$mac=str_replace("-",":",$mac);
+					if(!mybox_check_mac($mac)) {
+						$msg="Invalid MAC Address";
+						break;
+					}
+					$mac=strtoupper($mac);
+					$stat=$astat[$id];
+					$note=mybox_escape_str($anote[$id]);
+					if($stat=='') {
+						$stat=0;
+					} else {
+						$stat=1;
+					}
+					if(preg_match("/^\d+/",$id)) {
+						mybox_db_query("update static_arp set ip='$ip',mac='$mac',stat='$stat',note='$note' where id='$id'",$db_id);
+					} else {
+						$result=mybox_db_query("select * from static_arp where ip='$ip'",$db_id);
+						if(mybox_db_num_rows($result)==0) {
+							$result1=mybox_db_query("select * from static_arp where mac='$mac'",$db_id);
+							if(mybox_db_num_rows($result1)!=0) {
+								$msg="MAC Address already exist";
+							} else {
+								mybox_db_query("insert into static_arp (ip,mac,stat,note) values ('$ip','$mac','$stat','$note')",$db_id);
+							}
+						} else {
+							$msg="IP Address already exist";
+						}
+					}
+					unset($id,$ip,$mac,$note,$state);
+				}
+			}
+		}
+		if($do_save==2) {
+			if(isset($do_id)&&$do_id=='del') {
+				mybox_db_query("delete from static_arp where id='$id'",$db_id);
+			} else {
+				if(count($del)!=0) {
+					foreach($del as $id) {
+						if($id!='') mybox_db_query("delete from static_arp where id='$id'",$db_id);
+					}
+				}
+			}
+		}
+		if($do_save==4) {
+			mybox_arp_flush();
+			sleep(2);
+		}
+	}
+	if($tab==2) {
+		mybox_arp_flush();
+		sleep(2);
+		@unlink("/var/sys/arp_cache.cache");$st=1;
+	}
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied";
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+
+?>
+<html>
+<head>
+<title>MyAdmin</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<script type='text/javascript' src="/j/mybox_func.js"></script>
+<?php if($tab==2){?>
+<script type='text/javascript' src="/j/mybox_overlib.js"></script>
+<?php }?>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?php echo $_LOGIN['auth_id'];?>";
+	page_load();
+</script>
+<script type='text/javascript'>
+<?php if($tab==1){?>
+	function do_changes() {
+		error("Applying changes.. Please..wait..");
+		document.f.do_save.value='4';
+		document.f.submit();
+		return true;
+	};
+	function do_savearp() {
+		if(!chkvalidip()) { return false; };
+		if(!chkvalidmac()) { return false; };
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	}
+	function chkvalidip() {
+		var ip1='';
+		for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='text') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'aip') {
+					ip1=Trim(document.f.elements[i].value);
+					if(ip1!='' && !mip1(ip1)) {
+						pop_msg("Invalid IP Address "+ip1+"");
+						return false;
+					};
+					if(ip1!='') {
+						if(chk_dup_search(i,ip1,'3','aip','text')==true) {
+							return false;
+						}
+					}
+    				}	
+			}
+  		}
+		return true;
+	};
+	function chkvalidmac() {
+		var ip1='';
+		for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='text') {
+			    	if( document.f.elements[i].name.substr( 0, 4 ) == 'amac') {
+					ip1=Trim(document.f.elements[i].value);
+					if(ip1!='' && !mmac(ip1)) {
+						pop_msg("Invalid MAC Address '"+ip1+"'");
+						return false;
+					}
+					if(ip1!='') {
+						if(chk_dup_search(i,ip1,'4','amac','text')==true) {
+							return false;
+						}
+					}
+    				}	
+			}
+  		}
+		return true;
+	};
+
+	function do_add_new() {
+		if(chkvalidip()==false) {return false;};
+		if(chkvalidmac()==false) {return false;};
+		var x=document.getElementById('arptab').rows.length;
+		if(x >= 2) {
+			var i=x - 1;
+		};
+		if(document.getElementById('op1')) {
+			var i=x - 2;
+		};
+		var tab=document.getElementById('arptab').insertRow(i);
+		tab.insertCell(0).innerHTML="<input type=hidden name=aid[new"+i+"] value='new"+i+"'>"+i;
+		tab.insertCell(1).innerHTML="<input type=text name=aip[new"+i+"] value='' size=20 class='valbox3'>";
+		tab.insertCell(2).innerHTML="<input type=text name=amac[new"+i+"] value='' size=20 class='valbox3'>";
+		tab.insertCell(3).innerHTML="<center><input type=checkbox name=astat[new"+i+"]></center>";
+		tab.insertCell(4).innerHTML="<img src='<?php echo $_PNG['note'];?>' border=0 alt='' title=''>&nbsp;<input type=text name=anote[new"+i+"] value='' size=30 class='valbox3'>";
+		tab.insertCell(5).innerHTML="<div style='text-align: right;'><a href='#' id='t"+i+"' onclick=\"delete_row_a('t"+i+"','arptab');return false;\"><img src='<?php echo $_PNG['delete'];?>' border=0 alt='' title=''></a><input type=checkbox name=del[new"+i+"] value=new"+i+"></div>";
+		i=null;tab=null;
+	}
+<?php }?>
+<?php if($tab==2){?>
+function do_clear_cache() {
+	error("Clearing cache.. Please..wait..");
+	document.f.do_save.value='1';
+	document.f.submit();
+	return true;
+}
+<?php }?>
+</script>
+</head>
+<body onload="load_menu('sub4','t4d3','s4i3');" scroll="auto">
+<form name=f method=post action="/network_arp.exh">
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 0px;'>
+<tr>
+<td>
+<?php mybox_page_section("Network / ARP");?>
+<br><br>
+<?php if($tab==2) { mybox_page_search($str); }?>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="/network_arp.exh?tab=1" <?php if($tab==1){?>class="tabact"<?php }?>>Static ARP</a></li>
+<li><a href="/network_arp.exh?tab=2&st=1" <?php if($tab==2){?>class="tabact"<?php }?>>ARP Cache</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td> 
+<?php mybox_page_msg($msg);?>
+<br>
+
+<!-- tab container -->
+<?php if($tab==1){?>
+
+<table id='arptab' width="100%" class=data>
+<thead class="blue">
+      <tr>
+        <td style='font-weight: bold; border-right: 0px;'>#</td> 
+        <td style='font-weight: bold; border-right: 0px;border-left: 0px;'>IP Address</td>
+	<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>MAC Address</td>
+	<td style='font-weight: bold; text-align: center; border-right: 0px;border-left: 0px;'>Active</td>
+	<td style='font-weight: bold; border-left: 0px;' colspan=2>Comment</td>
+      </tr>
+</thead>
+<tbody style='background-color: #ffffff; table-layout: fixed; white-space: nowrap;'>
+<?php 
+$x=1;
+$result=mybox_db_query("select * from static_arp",$db_id);
+if(@mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_id=$row['id'];
+		$_ip=$row['ip'];
+		$_mac=strtoupper($row['mac']);
+		$_stat=$row['stat'];
+		$_note=mybox_unescape_str($row['note']);
+		if($_stat==1) { 
+			$_stat1='checked';
+		} else {
+			$_stat='';
+			$_stat1='';
+		}
+	echo "
+      <tr>
+        <td><input type=hidden name=aid[$_id] value='$_id'>$x</td>
+        <td><input type=text name=aip[$_id] value='$_ip' size=20 class='valbox3'></td>
+        <td><input type=text name=amac[$_id] value='$_mac' size=20 class='valbox3'></td>
+	<td style='text-align: center;' align=center><input type=checkbox name=astat[$_id] $_stat1></td>
+        <td><img src='{$_PNG['note']}' border=0 alt='' title=''>&nbsp;<input type=text name=anote[$_id] value='$_note' size=30 class='valbox3'></td>
+        <td style='text-align: right;' valign=middle align=right><a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='/network_arp.exh?tab=$tab&do_id=del&do_save=2&id=$_id';return false;\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a><input type=checkbox name=del[$_id] value=$_id></td>
+      </tr>";
+	$x++;
+	}
+}
+	if(isset($do_id)&&$do_id==add && mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+	echo "
+      <tr>
+        <td><input type=hidden name=aid[new] value='new'>$x</td>
+        <td><input style='color: red;' type=text name=aip[new] value='$aaip' size=20 class='valbox3'></td>
+        <td><input style='color: red;' type=text name=amac[new] value='$aamac' size=20 class='valbox3'></td>
+	<td style='text-align: center;' align=center><input type=checkbox name=astat[new]></td>
+        <td><img src='{$_PNG['note']}' border=0 alt='' title=''>&nbsp;<input style='color: red;' type=text name=anote[new] value='' size=30 class='valbox3'></td>
+        <td style='text-align: right;''><a href='#' id='t$x' onclick=\"delete_arp('t$x');return false;\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a><input type=checkbox name=del[new$x] value=new$x></td>
+      </tr>";
+	}
+
+if($x > 1) {
+?>
+<tr id='op1'>
+<td style='text-align: right; background-color: #ffffff;' valign=top colspan=6><a href='#' onclick='do_delete(2);'>Delete</a> / <a href='#' onclick='dotoggle();'>Toggle</a> <img src='<?php echo $_PNG['arrow_rtr'];?>' border=0 alt='' title=''></td>
+</tr>
+<?php  } ?>
+<tr>
+<td style='text-align: right; background-color: #ffffff;' valign=top colspan=6>
+<div style='padding: 2px;'>
+<?php if($x > 1 || $do_id=='add'){?>
+<a name="sini"><a class="btns" href="#sini" onclick="return do_savearp();return false;">Save</a>&nbsp;<?php }?><a name="sini"><a class="btns" href="#sini" onclick="return do_add_new();return false;">Add New</a>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+<table align=right>
+<tbody>
+<tr>
+<td colspan=2>
+<a name="sini"><a class="btn" href="#sini" onclick="return do_changes();return false;">Reload</a>
+</td>
+</tbody>
+</table>
+<?php } // col==2?>
+
+<?php if($tab==2) {
+$currentPage = $HTTP_SERVER_VARS["PHP_SELF"];
+$maxRows_Recordset=50;
+if(!isset($pageNum_Recordset)||$pageNum_Recordset=='') $pageNum_Recordset=0;
+$startRow_Recordset=@($pageNum_Recordset * $maxRows_Recordset);
+if($startRow_Recordset < 0) $startRow_Recordset=0;
+$row_Recordset=array();
+$line=array();
+if(isset($st)&&$st==1) {
+	exec("arp -n",$line,$ret);
+	file_put_contents("/var/sys/arp_cache.cache",serialize($line));
+} else {
+	$line=unserialize(mybox_fget_contents("/var/sys/arp_cache.cache"));
+}
+if(count($line)!=0) {
+	$i=0;
+	for($x=$startRow_Recordset;$x < count($line);$x++) {
+		$buff=$line[$x];
+		if($i!=$maxRows_Recordset) {
+			if($str!='') {
+				if(stripos($buff,$str)===FALSE) continue;
+			}
+			array_push($row_Recordset,$buff);
+			$i++;
+		}
+	}
+}
+if(!isset($totalRows_Recordset)||$totalRows_Recordset=='') {
+	$totalRows_Recordset=count($line);
+}
+$totalPages_Recordset=@ceil($totalRows_Recordset/$maxRows_Recordset)-1;
+$queryString_Recordset=null;
+if(!empty($_SERVER['QUERY_STRING'])) {
+	$params=explode("&", $_SERVER['QUERY_STRING']);
+	$newParams=array();
+	foreach ($params as $param) {
+		if(stristr($param, "pageNum_Recordset")==true) continue;
+		if(stristr($param, "totalRows_Recordset")==true) continue;
+		if(stristr($param, "maxRows_Recordset")==true) continue;
+		if(stristr($param, "str")==true) continue;
+		array_push($newParams, $param);
+	}
+	if(count($newParams) != 0) {
+		$queryString_Recordset="&" . implode("&", $newParams);
+	}
+}
+
+$queryString_Recordset=sprintf("&totalRows_Recordset=%d%s&str=$str", 
+	$totalRows_Recordset, 
+	$queryString_Recordset);
+
+if($pageNum_Recordset > 0) { 
+	$pagefirst=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, 0, $queryString_Recordset);
+	$pageprev=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, max(0, $pageNum_Recordset - 1), $queryString_Recordset);
+	$button1="<a href='$pagefirst'><img src='{$_PNG['first']}' border=0 alt='' title=''></a>\n";
+	$button2="<a href='$pageprev'><img src='{$_PNG['prev']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button1="<img src='{$_PNG['first']}' border=0 alt='' title=''>\n";
+	$button2="<img src='{$_PNG['prev']}' border=0 alt='' title=''>\n";
+}
+if($pageNum_Recordset < $totalPages_Recordset) {
+	$pagenext=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, min($totalPages_Recordset, $pageNum_Recordset + 1), $queryString_Recordset);
+	$pagelast=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, $totalPages_Recordset, $queryString_Recordset);
+	$button3="<a href='$pagenext'><img src='{$_PNG['next']}' border=0 alt='' title=''></a>\n";
+	$button4="<a href='$pagelast'><img src='{$_PNG['last']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button3="<img src='{$_PNG['next']}' border=0 alt='' title=''>\n";
+	$button4="<img src='{$_PNG['last']}' border=0 alt='' title=''>\n";
+}
+unset($pagefirst,$pageprev,$pagenext,$pagelast);
+unset($x,$buff,$line);
+$_cnum=1;
+if(!isset($pageNum_Recordset)||$pageNum_Recordset==''||$pageNum_Recordset==0) {
+	$_cnum=1;
+} else {
+	$_cnum=($pageNum_Recordset * $maxRows_Recordset);
+	if($_cnum <= 0) {
+		$_cnum=1;
+	} else {
+		$_cnum +=1;
+	}
+}
+
+if($totalRows_Recordset >0 && count($row_Recordset)!=0) {
+	echo "
+		<table width='100%' class=data>
+		<thead class='blue'>
+      		<tr>
+		<td style='font-weight: bold; width: 2%; border-right: 0px;'>#</td>
+		<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Interface</td>
+		<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>IP Address</td>
+		<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>MAC Address</td>
+		<td style='font-weight: bold; border-left: 0px;'>Flags</td>
+      		</tr>
+		</thead>
+		<tbody style='font-weight: bold;'>
+	";
+	$_dev=mybox_list_devname($db_id);
+	foreach($row_Recordset as $row) {
+		$row=trim($row);
+		if($row=='') continue;
+		if(preg_match("/^Address/",$row)) continue;
+		if(preg_match("/\(incomplete\)/",$row)) continue;
+		list($ip,$hw,$mac,$flag,$dev)=preg_split("/\s+/",$row);
+		if(!mybox_check_mac($mac)) continue;
+		$ip=trim($ip);
+		//$_intf=mybox_get_ip_match_name($ip,$db_id);
+		$_intf=$_dev[$dev];
+		if($_intf=='') $_intf="any";
+		$_intf=mybox_get_defname($_intf,2,'def1',$db_id);
+		$mac=strtoupper(trim($mac));
+		$flagx="Dynamic";
+		if($flag=="CM") {
+			$flagx="Static";
+			$_ed="$mac";
+		} else {
+			$_ed="<a style='color: red;' href='#' onclick=\"self.location.href='/network_arp.exh?tab=1&&do_id=add&do_save=3&aaip=$ip&aamac=$mac';\"><b>$mac</b></a>";
+		}
+		echo "<tr>";
+		echo "<td style='text-align: right;'>$_cnum</td>";
+		echo "<td><font color=green>$_intf</font></td>";
+		echo "<td>$ip</td>";
+		echo "<td>$_ed</td>";
+		echo "<td>$flagx</td>";
+		echo "</tr>";
+		$_cnum++;
+	}
+	echo mybox_print_nextpage($pageNum_Recordset,$totalPages_Recordset,$totalRows_Recordset,$maxRows_Recordset,$queryString_Recordset,$currentPage,'5',$button1,$button2,$button3,$button4);
+	echo "</tbody></table>";
+} else {
+	echo "
+	<span class='notedef'>
+	There are no ARP cache available.
+	</span>
+	<br><br>
+	";$_error=1;
+}?>
+
+<?php if($_error!=1){?>
+<table align=right>
+<tbody>
+<tr>
+<td colspan=2>
+<a name="sini"><a class="btn" href="#sini" onclick="return do_clear_cache();return false;">Clear cache</a>
+</td>
+</tr>
+</tbody>
+</table>
+<?php }?>
+<?php  } //tab==2?>
+
+<!-- end tab container -->
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?php echo $tab;?>>
+</form>
+<script type='text/javascript'>page_kill();</script>
+</body>
+</html>
+
+<?php mybox_db_close($db_id);?>

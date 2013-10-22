@@ -1,0 +1,3 @@
+virtual                    /                    tmpfs   defaults        1 1
+virtual                    /dev                	devfs  	defaults	0 0
+virtual                    /proc		proc    defaults        0 0

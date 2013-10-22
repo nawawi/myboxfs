@@ -1,0 +1,862 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="network_shaper";
+include_once('page.exl');
+mybox_chk_session();
+mybox_send_nocache();
+
+function _get_qos_status() {
+	if(file_exists("/etc/htb/qos_status")) {
+		mybox_exec_cmd("/etc/htb/qos_status");
+	}
+	$_data=array();
+	$buff=mybox_dir2array("/etc/htb/*.status");
+	$_config='';
+	if(count($buff)!=0) {
+		foreach($buff as $fl) {
+			$fl_n=basename($fl);
+			$fl_n=trim($fl_n,".status");
+			$fx_a=file($fl);
+			if(count($fx_a)==0) continue;
+			foreach($fx_a as $line) {
+				$line=trim($line,"\33[H\33[J");
+				$line=trim($line,"\n");
+				if($line=='') continue;
+				$line=str_replace("_DEFAULT_","default",$line);
+				$mm=preg_split("/\s+/",$line);
+				if($mm[0]=="") {
+					for($x=1, $c=0;$x < count($mm); $x++, $c++) {
+						$mm[$c]=$mm[$x];
+					}
+					$bg='background-color: #E9E9E9; ';
+					$mm[0]="<td style='{$bg}padding-left: 20px; font-weight: bold;'>{$mm[0]}</td>";
+				} else {
+					$bg="background-color: #D7D7FF; ";
+					$mm[0]="<td style='{$bg}font-weight: bold;'>{$mm[0]}</td>";
+				}
+				$_config .="<tr>{$mm[0]}<td style='{$bg}font-weight: bold; text-align: right;'>{$mm[1]}</td><td style='{$bg}font-weight: bold; text-align: right;'>{$mm[2]}</td><td style='{$bg}font-weight: bold; text-align: right;'>{$mm[3]}</td><td style='{$bg}font-weight: bold; text-align: right;'>{$mm[4]}</td></tr>";
+				unset($mm);
+			}
+		}
+	}
+	if($_config!='') {
+		echo "$_config";
+	} else {
+		echo "<tr><td>There are no Traffic available</td></tr>";
+	}
+}
+
+if(isset($_GET['rtstatus'])&& time() >= $_GET['rtstatus']) {
+	_get_qos_status();
+	exit;
+}
+
+$_error=0;
+$db_id=mybox_db_connect($_DB_NAME);
+
+function clean_file_cache() {
+	@unlink("/var/sys/shaperclass.cache");
+	@unlink("/etc/htb/config_done");
+}
+
+if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+	if(isset($do_id)&&$do_id=='apply_chg') {
+		$msg='<script>waitcount();</script>';
+		mybox_echo_query("shaper-restart");
+	}
+	if($tab==1) {
+		if($do_save==1) {
+			$note=mybox_escape_str($note);
+			if($do_id!='edit') {
+				mybox_db_query("insert into htb_class (dev,bandwidth,climit,priority,stat,note) values ('$dev','$bandwidth','$climit','$priority','$stat','$note');",$db_id);
+				$msg='Configuration saved';
+				clean_file_cache();
+			} else {
+				mybox_db_query("update htb_class set dev='$dev',bandwidth='$bandwidth',climit='$climit',priority='$priority',stat='$stat',note='$note' where id='$id';",$db_id);				
+				$msg='Configuration saved';
+				$col=1;$do_id='';
+				clean_file_cache();
+			}
+		}
+	}
+	if($tab==2) {
+		if($do_save==1) {
+			$name=trim($name);
+			$note=mybox_escape_str($note);
+			if($do_id!='edit') {
+				$result=mybox_db_query("select name from htb_client where name='$name'",$db_id);
+				if(mybox_db_num_rows($result)==0) {
+					mybox_db_query("insert into htb_client (name,dev,bandwidth,climit,priority,src,service,dst,stat,note) values ('$name','$dev','$bandwidth','$climit','$priority','$src','$service','$dst','$stat','$note');",$db_id);
+					$msg='Configuration saved';
+					clean_file_cache();
+				} else {
+					$msg="Traffic name '$name' already exist";
+				}
+
+			} else {
+				$nameold=trim($nameold);
+				if($name!=$nameold) {
+					$result=mybox_db_query("select name from htb_client where name='$name'",$db_id);
+					if(mybox_db_num_rows($result)!=0) {
+						$msg="Traffic name '$name' already exist";
+					} else {
+						mybox_db_query("update htb_client set name='$name',dev='$dev',bandwidth='$bandwidth',climit='$climit',priority='$priority',src='$src',service='$service',dst='$dst',stat='$stat',note='$note' where id='$id';",$db_id);				
+						$msg='Configuration saved';$col=1;$do_id='';
+						clean_file_cache();
+					}
+				} else {
+					mybox_db_query("update htb_client set name='$name',dev='$dev',bandwidth='$bandwidth',climit='$climit',priority='$priority',src='$src',service='$service',dst='$dst',stat='$stat',note='$note' where id='$id';",$db_id);				
+					$msg='Configuration saved';$col=1;$do_id='';
+					clean_file_cache();
+				}
+			}
+		}
+	}
+
+	if($col==1) {
+		if($tab==2) { $_table='htb_client'; } else { $_table='htb_class'; }
+		if($do_id=='stat') {
+			if($stat==1) { $stat=0; } else { $stat=1; }
+			mybox_db_query("update $_table set stat='$stat' where id='$id'",$db_id);
+			clean_file_cache();
+		}
+		if($do_id=='del') {
+			mybox_db_query("delete from $_table where id='$id'",$db_id);
+			clean_file_cache();
+		}
+		if(isset($do_save)&&$do_save==2) {
+			if(count($del)!=0) {
+				foreach($del as $x) {
+					mybox_db_query("delete from $_table where id='$x'",$db_id);
+				}
+				clean_file_cache();
+			}
+		}
+		if(isset($do_save)&&$do_save==4) {
+			if(count($del)!=0) {
+				foreach($del as $x) {
+					mybox_db_query("update $_table set stat='1' where id='$x'",$db_id);
+				}
+				clean_file_cache();
+			}
+		}
+		if(isset($do_save)&&$do_save==5) {
+			if(count($del)!=0) {
+				foreach($del as $x) {
+					mybox_db_query("update $_table set stat='0' where id='$x'",$db_id);
+				}
+				clean_file_cache();
+			}
+		}
+	}
+
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied";
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+if(!isset($col)||$col=='') $col=1;
+
+?>
+<html>
+<head>
+<title>MyAdmin</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<LINK REL=StyleSheet HREF="/c/calendar.css" TYPE="text/css">
+<script type='text/javascript' src="/j/mybox_func.js"></script>
+<script type='text/javascript' src="/j/mybox_ajax.js"></script>
+<script type='text/javascript' src="/j/mybox_overlib.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?php echo $_LOGIN['auth_id'];?>";
+	page_load();
+</script>
+<script type='text/javascript'>
+	function do_changes() {
+		self.location.href='<?php echo "/network_shaper.exh?tab=$tab&col=1&do_id=apply_chg";?>';	
+	}
+	function do_submit() {
+		<?php if($tab==1) {?>
+			<?php if($col==2) {?>
+				var dev=document.f.dev.value;
+				if(dev=='') {
+					pop_msg("No interface available");
+					return false;
+				}
+				var bandwidth=Trim(document.f.bandwidth.value);
+				var climit=Trim(document.f.climit.value);
+				if(!isnum(bandwidth)) {
+					pop_msg('Invalid minimum bandwidth value'+ bandwidth);
+					return false;
+				}
+				if(!isnum(climit)) {
+					pop_msg('Invalid maximum bandwidth value'+ climit);
+					return false;
+				}				
+			<?php  } ?>
+		<?php  } ?>
+		<?php if($tab==2) {?>
+			<?php if($col==2) {?>
+				var name=Trim(document.f.name.value);
+				var dev=document.f.dev.value;
+				var bandwidth=Trim(document.f.bandwidth.value);
+				var climit=Trim(document.f.climit.value);
+				var src=document.f.src.value;
+				var dst=document.f.dst.value;
+				var service=document.f.service.value;
+				if(name=='') {
+					pop_msg("Traffic name not defined");
+					document.f.name.focus();
+					return false;
+				}
+				if(dev=='') {
+					pop_msg("No interface available");
+					return false;
+				}
+				if(src==dst) {
+					pop_msg("Source and destination cannot be same");
+					return false;	
+				}
+				if(!isnum(bandwidth)) {
+					pop_msg('Invalid minimum bandwidth value'+ bandwidth);
+					return false;
+				}
+				if(!isnum(climit)) {
+					pop_msg('Invalid maximum bandwidth value'+ climit);
+					return false;
+				}
+
+			<?php  } // col==2 ?>
+		<?php  } // tab==1 ?>
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	}
+</script>
+<script type='text/javascript'>
+function waitcount() {
+	page_reload('200','<?php echo "/network_shaper.exh?tab=$tab&col=$col";?>');
+};
+</script>
+</head>
+<body onload="load_menu('sub4','t4d7','s4i7');" scroll="auto">
+<form name=f method=post action="/network_shaper.exh">
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 0px;'>
+<tr>
+<td>
+<?php mybox_page_section("Network / Quality of Service (QoS)");?>
+<br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="/network_shaper.exh?tab=1" <?php if($tab==1){?>class="tabact"<?php }?>>Interface</a></li>
+<li><a href="/network_shaper.exh?tab=2" <?php if($tab==2){?>class="tabact"<?php }?>>Traffic selector</a></li>
+<li><a href="/network_shaper.exh?tab=3" <?php if($tab==3){?>class="tabact"<?php }?>>Realtime traffic</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td>
+<?php mybox_page_msg($msg);?>
+<br>
+
+<!-- tab container -->
+<?php if($tab==1) { ?>
+<table width="100%" border="0" cellpadding="0" cellspacing="0">
+<tr><td>
+<ul id="tabnav">
+<li class="<?php if($col==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=1) { echo "<a href=\"/network_shaper.exh?tab=$tab&col=1\">"; }?>Interface<?php if($col!=1) { echo "</a>"; }?></li>
+<li class="<?php if($col==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=2) { echo "<a href=\"/network_shaper.exh?tab=$tab&col=2\">"; }?><?php if($do_id=='edit') { echo "Edit"; } else { echo "Add new"; }?> interface<?php if($col!=2) { echo "</a>"; }?></li>
+</ul>
+</td></tr>
+<tr> 
+<td class="tabcont">
+
+<?php if($col==1) {
+$list_array=mybox_list_devname($db_id);
+$result=mybox_db_query("select * from htb_class order by id ASC",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	echo "
+		<table width='100%' class=data>
+		<thead class='blue'>
+ 		<tr>
+		<td style='font-weight: bold; width: 2%; border-right: 0px;'>#</td>
+		<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Name</td>
+		<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Bandwidth</td>
+		<td style='font-weight: bold; text-align: center; width: 2%; border-right: 0px;border-left: 0px;'>Active</td>
+		<td style='width: 5%;table-layout: fixed; white-space: nowrap; border-left: 0px;'></td>
+		</tr>
+		</thead>
+		<tbody>
+	";
+	$_cnt=1;
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_id=$row['id'];
+		$_dev=mybox_get_defname(trim($row['dev']),2,0,$db_id);
+		$_bandwidth=$row['bandwidth'];
+		$_climit=$row['climit'];
+		$_priority=$row['priority'];
+		$_stat=$row['stat'];
+		$_note=mybox_unescape_str($row['note']);
+		if($_note!='') {
+			$_note=mybox_print_note($_note);
+		}
+		$_priority +=1;
+		if($stat!='') { $stat='1'; } else { $stat='0'; }
+		$lo="onclick=\"self.location.href='/network_shaper.exh?tab=$tab&col=2&id=$_id&do_id=edit';\" ";
+		$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff;  cursor: pointer;'";
+		echo "
+      			<tr $lt>
+        		<td valign=top $lo>$_cnt</td>
+        		<td valign=top $lo><font color=green><b>$_dev</b></font></td>
+        		<td valign=top $lo>
+			<table style='margin: 0px; padding: 0px; border: 0px;'>
+			<tr>
+			<td style='margin: 0px; padding: 0px; border: 0px; font-weight: bold;'>Minimum bandwidth</td>
+			<td style='margin: 0px; padding: 0px; border: 0px;'>: $_bandwidth kbits/sec</td>
+			</tr>
+			<tr>
+			<td style='margin: 0px; padding: 0px; border: 0px; font-weight: bold;'>Maximum bandwidth</td>
+			<td style='margin: 0px; padding: 0px; border: 0px;'>: $_climit kbits/sec</td>
+			</tr>
+			<tr>
+			<td style='margin: 0px; padding: 0px; border: 0px; font-weight: bold;'>Priority</td>
+			<td style='margin: 0px; padding: 0px; border: 0px;'>: $_priority</td></tr>
+			</table>
+			$_note
+			</td>
+			<td style='text-align: center;' align=center valign=middle><a href='/network_shaper.exh?tab=$tab&col=1&id=$_id&stat=$_stat&do_id=stat'><img src='{$_PNG_YESNO[$_stat]}' border=0 alt='' title=''></a></td>
+			<td style='text-align: right; width: 5%; table-layout: fixed; white-space: nowrap;' align=right valign=middle><a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='/network_shaper.exh?tab=$tab&col=1&id=$_id&stat=$_stat&do_id=del';return false;\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a><input type=checkbox name=del[] value=$_id></td>
+      			</tr>
+		";
+		$_cnt++;
+	}
+	if($_cnt > 0) {
+		echo "<tr>
+		<td style='text-align: right; background: #ffffff;' colspan=5>[ <a href='#' onclick='pf_do_delete(5); return false;'>Disable</a> / <a href='#' onclick='pf_do_delete(4); return false;'>Enable</a> ] <a href='#' onclick='pf_do_delete(2); return false;'>Delete</a> / <a href='#' onclick='dotoggle(); return false;'>Toggle</a> <img src='{$_PNG['arrow_rtr']}' border=0 alt='' title=''></td>
+		</tr>";
+	}
+	echo "</tbody></table>";
+} else {
+	echo "
+	<br>
+	<span class='notedef'>
+	There are no Interface defined.
+	</span>
+	<br><br>
+	";$_error=1;
+}
+?>
+
+<?php  } //col==1 ?>
+<?php if($col==2) {
+if($do_id=='edit') {
+	$result=mybox_db_query("select * from htb_class where id='$id'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_id=$row['id'];
+			$_dev=$row['dev'];
+			$_bandwidth=$row['bandwidth'];
+			$_climit=$row['climit'];
+			$_priority=$row['priority'];
+			$_stat=$row['stat'];
+			$_note=mybox_unescape_str($row['note']);
+		}
+	}
+} else {
+	$_edev=array();
+	$_class_array=mybox_shaperclass_array($db_id);
+	if(count($_class_array)!=0) {
+		foreach($_class_array as $dd) {
+			$_edev[$dd]=1;
+		}
+	}
+	unset($dd,$_class_array);
+	$_priority=0;
+	$_bandwidth='192';
+	$_climit='102400';
+}
+
+$list_array=mybox_list_devname($db_id);
+?>
+
+<table width="100%" class="data">
+<tbody>
+<!------------- interface ------------------->
+<tr> 
+<td width="30%" valign="middle" class="tdname">Name</td>
+<td width="70%" valign="middle" class="tdvalue">
+<?php 
+$th='';
+$data_a=array();
+foreach($list_array as $cdev => $_name) {
+	if($do_id!='edit') {
+		if($_edev[$_name]==1) continue;
+	}
+	if(!isset($_dev)||$_dev=='') $_dev=$_name;
+	$data_a[$cdev]=$_name;
+}
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($data_a,'dev',"$_dev",'ns1','ns1a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+echo mybox_defwin('ns1','200px','#ffffff','#999999','#336699','#ffffff','Target Interface','#ffffff','100px','hidden','auto',$txt);
+?>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Minimum Bandwidth</td>
+<td width="70%" valign="middle" class="tdvalue">
+<input name="bandwidth" type="text" class="valbox" size="30" style='width: 200px;' value="<?php echo $_bandwidth;?>"> kbits/sec
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdname">Maximum Bandwidth</td>
+<td width="70%" valign="middle" class="tdvalue">
+<input name="climit" type="text" class="valbox" size="30" style='width: 200px;' value="<?php echo $_climit;?>"> kbits/sec
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdname">Interface Priority</td>
+<td width="70%" valign="middle" class="tdvalue">
+<?php 
+$data_a=array();
+for($x=0, $i=1;$x<8;$x++, $i++) {
+	$data_a[$i]=$x;
+}
+if(!isset($_priority)||$_priority=='') $_priority=0;
+echo mybox_select_box('nssel1',$data_a,$_priority,'priority');
+?>
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdname">Active this setting</td>
+<td width="70%" valign="middle" class="tdvalue">
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+if(!isset($_stat)||$_stat=='') $_stat=0;
+echo mybox_select_box('nssel2',$data_a,$_stat,'stat');
+?>
+</td>
+</tr>
+
+<tr> 
+<td width="30%" valign="middle" class="tdname">Comment</td>
+<td width="70%" valign="middle" class="tdvalue">
+<input name="note" type="text" class="valbox" size="30" style='width: 200px;' value="<?php echo $_note;?>">
+</td>
+</tr>
+<!------------- end description ------------------->
+</tbody>
+</table>
+<?php  } // col ?>
+
+</td>
+</tr>
+</table>
+
+<?php }//tab==1?>
+
+<?php if($tab==2) { ?>
+<table width="100%" border="0" cellpadding="0" cellspacing="0">
+<tr><td>
+<ul id="tabnav">
+<li class="<?php if($col==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=1) { echo "<a href=\"/network_shaper.exh?tab=$tab&col=1\">"; }?>Traffic<?php if($col!=1) { echo "</a>"; }?></li>
+<li class="<?php if($col==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=2) { echo "<a href=\"/network_shaper.exh?tab=$tab&col=2\">"; }?><?php if($do_id=='edit') { echo "Edit"; } else { echo "Add new"; }?> traffic<?php if($col!=2) { echo "</a>"; }?></li>
+</ul>
+</td></tr>
+<tr> 
+<td class="tabcont">
+
+<?php if($col==1) {
+// counting
+$currentPage = $HTTP_SERVER_VARS["PHP_SELF"];
+$maxRows_Recordset=50;
+if(!isset($pageNum_Recordset)) $pageNum_Recordset=0;
+$startRow_Recordset=@($pageNum_Recordset * $maxRows_Recordset);
+$query_Recordset="select * from htb_client order by id ASC";
+$query_limit_Recordset=sprintf("%s LIMIT %d, %d", $query_Recordset, $startRow_Recordset, $maxRows_Recordset);
+$Recordset=mybox_db_query($query_limit_Recordset, $db_id);
+if(!isset($totalRows_Recordset) || $totalRows_Recordset=='') {
+	$all_Recordset=mybox_db_query($query_Recordset,$db_id);
+	$totalRows_Recordset=mybox_db_num_rows($all_Recordset);
+}
+$totalPages_Recordset=@ceil($totalRows_Recordset/$maxRows_Recordset)-1;
+$queryString_Recordset=null;
+if(!empty($_SERVER['QUERY_STRING'])) {
+	$params=explode("&", $_SERVER['QUERY_STRING']);
+  	$newParams=array();
+  	foreach ($params as $param) {
+		if(strpos($param, "pageNum_Recordset")!==FALSE) continue;
+		if(strpos($param, "totalRows_Recordset")!==FALSE) continue;
+		if(strpos($param, "maxRows_Recordset")!==FALSE) continue;
+		if(strpos($param, "tab")!==FALSE) continue;
+		if(strpos($param, "col")!==FALSE) continue;
+		if(strpos($param, "do_id")!==FALSE) continue;
+		if(strpos($param, "stat")!==FALSE) continue;
+		array_push($newParams, $param);
+  	}
+  	if(count($newParams) != 0) {
+    		$queryString_Recordset="&" . implode("&", $newParams);
+  	}
+}
+$queryString_Recordset=sprintf("&totalRows_Recordset=%d%s&tab=$tab&col=$col&stat=$stat",$totalRows_Recordset,$queryString_Recordset);
+if($pageNum_Recordset > 0) { 
+	$pagefirst=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, 0, $queryString_Recordset);
+	$pageprev=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, max(0, $pageNum_Recordset - 1), $queryString_Recordset);
+	$button1="<a href='$pagefirst'><img src='{$_PNG['first']}' border=0 alt='' title=''></a>\n";
+	$button2="<a href='$pageprev'><img src='{$_PNG['prev']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button1="<img src='{$_PNG['first']}' border=0 alt='' title=''>\n";
+	$button2="<img src='{$_PNG['prev']}' border=0 alt='' title=''>\n";
+}
+if($pageNum_Recordset < $totalPages_Recordset) {
+	$pagenext=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, min($totalPages_Recordset, $pageNum_Recordset + 1), $queryString_Recordset);
+	$pagelast=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, $totalPages_Recordset, $queryString_Recordset);
+	$button3="<a href='$pagenext'><img src='{$_PNG['next']}' border=0 alt='' title=''></a>\n";
+	$button4="<a href='$pagelast'><img src='{$_PNG['last']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button3="<img src='{$_PNG['next']}' border=0 alt='' title=''>\n";
+	$button4="<img src='{$_PNG['last']}' border=0 alt='' title=''>\n";
+}
+unset($pagefirst,$pageprev,$pagenext,$pagelast);
+$x=1;
+if(!isset($pageNum_Recordset)||$pageNum_Recordset==''||$pageNum_Recordset=='0') {
+	$_cnum=1;
+} else {
+	$_cnum=($pageNum_Recordset * $maxRows_Recordset);
+	if($_cnum <= 0) {
+		$_cnum=1;
+	} else {
+		$_cnum +=1;
+	}
+}
+if($totalRows_Recordset >0 && mybox_db_num_rows($Recordset)!=0) {
+	echo "
+	<table width='100%' class=data>
+	<thead class='blue'>
+	<tr>
+	<td style='font-weight: bold; width: 2%; border-right: 0px;'>#</td>
+	<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Name</td>
+	<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Interface</td>
+	<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Bandwidth</td>
+	<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Networks</td>
+	<td style='font-weight: bold; text-align: center; width: 2%; border-right: 0px;border-left: 0px;'>Active</td>
+	<td style='width: 5%;table-layout: fixed; white-space: nowrap; border-left: 0px;'></td>
+	</tr>
+	</thead>
+	<tbody>";
+	do {
+		$_id=$row['id'];
+		if($_id=='') continue;
+		$_name=$row['name'];
+		$_dev=mybox_get_defname($row['dev'],2,0,$db_id);
+		$_bandwidth=$row['bandwidth'];
+		$_climit=$row['climit'];
+		$_priority=$row['priority'];
+		$_src=mybox_get_defname($row['src'],2,0,$db_id);
+		$_service=mybox_get_defname($row['service'],2,0,$db_id);
+		$_dst=mybox_get_defname($row['dst'],2,0,$db_id);
+		$_stat=$row['stat'];
+		$_note=trim($row['note']);
+		if($_note!='') {
+			$_note=mybox_print_note($_note);
+		}
+		$_priority +=1;
+		if($stat!='') { $stat='1'; } else { $stat='0'; }
+		$lo="onclick=\"self.location.href='/network_shaper.exh?tab=$tab&col=2&id=$_id&do_id=edit';\" ";
+		$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff; cursor hand;cursor: pointer;'";
+		echo "
+      			<tr $lt>
+        		<td valign=top $lo>$_cnum</td>
+        		<td valign=top $lo>$_name</td>
+        		<td valign=top $lo><font color=green><b>$_dev</b></font></td>
+        		<td valign=top $lo>
+			<table style='margin: 0px; padding: 0px; border: 0px;'>
+			<tr>
+			<td style='margin: 0px; padding: 0px; border: 0px;'><b>Minimum bandwidth</b></td>
+			<td style='margin: 0px; padding: 0px; border: 0px;'>: $_bandwidth kbits/sec</td>
+			</tr>
+			<tr> 
+			<td style='margin: 0px; padding: 0px; border: 0px;'><b>Maximum bandwidth</b></td>
+			<td style='margin: 0px; padding: 0px; border: 0px;'>: $_climit kbits/sec</td>
+			</tr>
+			<tr>
+			<td style='margin: 0px; padding: 0px; border: 0px;'><b>Priority</b></td>
+			<td style='margin: 0px; padding: 0px; border: 0px;'>: $_priority</td>
+			</tr></table>
+			$_note
+			</td>
+        		<td valign=top $lo>
+			<b>$_src <img src='{$_PNG['arrow_right_s']}' border=0 alt='' title=''> $_dst <img src='{$_PNG['rmarrow']}' border=0 alt='' title=''> $_service</b>
+			</td>
+			<td style='text-align: center;' align=center valign=middle><a href='/network_shaper.exh?tab=$tab&col=1&id=$_id&stat=$_stat&do_id=stat'><img src='{$_PNG_YESNO[$_stat]}' border=0 alt='' title=''></a></td>
+			<td style='text-align: right; width: 5%; table-layout: fixed; white-space: nowrap;' align=right valign=middle><a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='/network_shaper.exh?tab=$tab&col=1&id=$_id&stat=$_stat&do_id=del'; return false;\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a><input type=checkbox name=del[] value=$_id></td>
+      			</tr>
+		";
+		$_cnum++;$x++;
+	} while($row=mybox_db_fetch_assoc($Recordset));
+	if($_cnum >= 1) {
+		echo "<tr>
+		<td style='text-align: right; background: #ffffff;' align=right valign=top colspan=7>[ <a href='#' onclick='pf_do_delete(5); return false;'>Disable</a> / <a href='#' onclick='pf_do_delete(4); return false;'>Enable</a> ] <a href='#' onclick='pf_do_delete(2); return false;'>Delete</a> / <a href='#' onclick='dotoggle(); return false;'>Toggle</a> <img src='{$_PNG['arrow_rtr']}' border=0 alt='' title=''></td>
+		</tr>";
+	}
+	echo mybox_print_nextpage($pageNum_Recordset,$totalPages_Recordset,$totalRows_Recordset,$maxRows_Recordset,$queryString_Recordset,$currentPage,'5',$button1,$button2,$button3,$button4);
+	echo "</tbody></table>";
+} else {
+	echo "
+	<br>
+	<span class='notedef'>
+	There are no Traffic selector defined.
+	</span>
+	<br><br>
+	";$_error=1;
+}?>
+
+</td></tr></table>
+
+<?php  } //col==1 ?>
+<?php if($col==2) {
+
+if($do_id=='edit') {
+	$result=mybox_db_query("select * from htb_client where id='$id'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_id=$row['id'];
+			$_name=trim($row['name']);
+			$_dev=trim($row['dev']);
+			$_bandwidth=trim($row['bandwidth']);
+			$_climit=trim($row['climit']);
+			$_priority=trim($row['priority']);
+			$_src=trim($row['src']);
+			$_service=trim($row['service']);
+			$_dst=trim($row['dst']);
+			$_stat=trim($row['stat']);
+			$_note=trim($row['note']);
+		}
+	}
+} else {
+	$_priority=0;
+	$_bandwidth='48';
+	$_climit='64';
+}
+
+$list_array=array();
+$list_array1=mybox_ipname_array($db_id);
+$list_array3=mybox_defnetwork_array($db_id);
+if(count($list_array1)!=0) {
+	foreach($list_array1 as $a) {
+		if(strpos($a,"(Broadcast)")!==FALSE) continue;
+		$list_array[]="$a";	
+	}
+}
+unset($a);
+if(count($list_array3)!=0) {
+	foreach($list_array3 as $a => $b) {
+		if(is_array($b)) {
+			if($b['type'] <= 2) $list_array[]="$a";
+		} 
+	}
+}
+$_class_array=mybox_shaperclass_array($db_id);
+$list_array2=array();
+$list_array2=mybox_defservices_4qos_array($db_id);
+if(count($list_array2)!=0) {
+	foreach($list_array2 as $a => $b) $list_defservice[]="$a";
+}
+sort($list_defservice);
+unset($a,$b);
+?>
+
+<table width="100%" class="data">
+<tbody>
+<tr> 
+<td valign="middle" class="tdname">Name</td>
+<td valign="middle" class="tdvalue">
+<input name="name" type="text" class="valbox2" value="<?php echo $_name;?>">
+<?php if($do_id=='edit') {?>
+<input name="nameold" type="hidden" value="<?php echo $_name;?>">
+<?php }?>
+</td>
+</tr>
+
+<tr> 
+<td valign="middle" class="tdname">Interface</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array();
+if(count($_class_array)!=0) {
+	foreach($_class_array as $gg) {
+		if(!isset($_dev)||$_dev=='') $_dev=$gg;
+		$data_a[$gg]=$gg;
+	}
+}
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($data_a,'dev',"$_dev",'ns2','ns2a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+echo mybox_defwin('ns2','200px','#ffffff','#999999','#336699','#ffffff','Interface','#ffffff','100px','hidden','auto',$txt);
+?>
+</td>
+</tr>
+
+<tr> 
+<td valign="middle" class="tdname">Source Network</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if(!isset($_src)||$_src=='') $_src='any';
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($list_array,'src',"$_src",'ns3','ns3a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+echo mybox_defwin('ns3','200px','#ffffff','#999999','#336699','#ffffff','Source Network','#ffffff','100px','hidden','auto',$txt);
+?>
+</td>
+</tr>
+
+<tr> 
+<td valign="middle" class="tdname">Service</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if(!isset($_service)||$_service=='') $_service='any';
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($list_defservice,'service',"$_service",'ns4','ns4a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+echo mybox_defwin('ns4','200px','#ffffff','#999999','#336699','#ffffff','Service','#ffffff','100px','hidden','auto',$txt);
+?>
+</td>
+</tr>
+
+<tr> 
+<td valign="middle" class="tdname">Destination network</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if(!isset($_dst)||$_dst=='') $_dst='any';
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($list_array,'dst',"$_dst",'ns5','ns5a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+echo mybox_defwin('ns5','200px','#ffffff','#999999','#336699','#ffffff','Destination network','#ffffff','100px','hidden','auto',$txt);
+?>
+</td>
+</tr>
+
+<tr> 
+<td valign="middle" class="tdname">Minimum Bandwidth</td>
+<td valign="middle" class="tdvalue">
+<input name="bandwidth" type="text" class="valbox2" value="<?php echo $_bandwidth;?>"> kbits/sec
+</td>
+</tr>
+
+<tr> 
+<td valign="middle" class="tdname">Maximum Bandwidth</td>
+<td valign="middle" class="tdvalue">
+<input name="climit" type="text" class="valbox2" value="<?php echo $_climit;?>"> kbits/sec
+</td>
+</tr>
+
+<tr> 
+<td valign="middle" class="tdname">Priority</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array();
+for($x=0, $i=1;$x<8;$x++, $i++) {
+	$data_a[$i]=$x;
+}
+if(!isset($_priority)||$_priority=='') $_priority=0;
+echo mybox_select_box('nssel3',$data_a,$_priority,'priority');
+?>
+
+</td>
+</tr>
+
+<tr> 
+<td valign="middle" class="tdname">Active this setting</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+if(!isset($_stat)||$_stat=='') $_stat=0;
+echo mybox_select_box('nssel4',$data_a,$_stat,'stat');
+?>
+</td>
+</tr>
+
+<tr> 
+<td valign="middle" class="tdname">Comment</td>
+<td valign="middle" class="tdvalue">
+<input name="note" type="text" class="valbox2" value="<?php echo $_note;?>">
+</td>
+</tr>
+
+</tbody>
+</table>
+
+<?php  } // col ?>
+
+</td>
+</tr>
+</table>
+
+<?php }//tab==2?>
+
+<?php if($tab==3) {?>
+<table id='rtstatus' class="data" width="100%">
+<?php _get_qos_status();?>
+</table>
+<script type='text/javascript'>
+function update_rtstatus() {
+	rtstatus_task('<?php echo "/network_shaper.exh?_NOLOGIN=1&rtstatus=".time()."";?>');
+}
+window.setInterval(update_rtstatus, '10000');
+</script>
+<?php } // tab==3?>
+
+<?php if($tab!=3){?>
+<table align=right>
+<tbody>
+<tr>
+<?php if($col==1){?><td><a name="sini"><a class="btn" href="#sini" onclick="return do_changes();return false;">Reload</a></td><?php }?>
+<?php if($_error!=1 && $col==2){?><td><a name="sini"><a class="btn" href="#sini" onclick="return do_submit();return false;"><?php if($do_id=='edit') { echo "Update"; } else { echo "Save";}?></a></td><?php }?>
+</tr> 
+</tbody>
+</table>
+<?php }?>
+<!-- end tab container -->
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?php echo $tab;?>>
+<input type=hidden name=col value=<?php echo $col;?>>
+<input type=hidden name=do_id value='<?php echo $do_id;?>'>
+<input type=hidden name=id value='<?php echo $id;?>'>
+</form><br><br>
+<script type='text/javascript'>page_kill();</script>
+</body>
+</html>
+
+<?php mybox_db_close($db_id);?>

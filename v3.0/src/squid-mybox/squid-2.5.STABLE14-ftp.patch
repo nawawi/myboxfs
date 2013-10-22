@@ -1,0 +1,40 @@
+---------------------
+PatchSet 11144 
+Date: 2007/01/01 21:38:39
+Author: hno
+Branch: HEAD
+Tag: (none) 
+Log:
+Bug #1857: Segmentation fault on certain types of ftp:// requests
+
+Members: 
+	src/ftp.c:1.340->1.341 
+
+Index: squid/src/ftp.c
+===================================================================
+RCS file: /cvsroot/squid/squid/src/ftp.c,v
+retrieving revision 1.340
+retrieving revision 1.341
+diff -u -r1.340 -r1.341
+--- squid/src/ftp.c	18 Sep 2006 23:03:36 -0000	1.340
++++ squid/src/ftp.c	1 Jan 2007 21:38:39 -0000	1.341
+@@ -434,7 +434,7 @@
+ 	    ftpState->flags.dir_slash ? rfc1738_escape_part(ftpState->old_filepath) : ".");
+     } else if (ftpState->typecode == 'D') {
+ 	const char *path = ftpState->flags.dir_slash ? ftpState->filepath : ".";
+-	storeAppendPrintf(e, "<A HREF=\"%s/\">[As extended directory]</A>\n", html_quote(path));
++	storeAppendPrintf(e, "<A HREF=\"%s/\">[As extended directory]</A>\n", rfc1738_escape_part(path));
+     }
+     storeAppendPrintf(e, "<HR noshade size=\"1px\">\n");
+     storeAppendPrintf(e, "<ADDRESS>\n");
+@@ -682,8 +682,8 @@
+ 	snprintf(html, 8192, "%s\n", line);
+ 	return html;
+     }
+-    if (ftpState->flags.dir_slash)
+-	snprintf(prefix, sizeof(prefix), "%s/", rfc1738_escape_part(ftpState->dirpath));
++    if (ftpState->flags.dir_slash && ftpState->dirpath && ftpState->typecode != 'D')
++	snprintf(prefix, 2048, "%s/", rfc1738_escape_part(ftpState->dirpath));
+     else
+ 	prefix[0] = '\0';
+     /* Handle builtin <dirup> */

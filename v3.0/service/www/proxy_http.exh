@@ -1,0 +1,2340 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="fw_cf";
+include_once('page.exl');
+mybox_chk_session();
+mybox_send_nocache();
+
+$db_id=mybox_db_connect($_DB_NAME);
+
+
+if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+	if(isset($do_id)&&$do_id=='apply_chg') {
+		$msg="<script>waitcount();</script>";
+		mybox_echo_query("http_proxy-restart");
+	}
+	if(isset($do_save)&&$do_save==12) {
+		if(is_dir("$_ROOT_DIR/cache")) {
+			@mybox_unlink("$_ROOT_DIR/cache/*");
+			$msg="Deleting cache done";
+		}
+	}
+	if(isset($do_save)&&$do_save==1) {
+		if($tab==1) {
+			if($cf_http_download=='') $cf_http_download="2";
+			if($cf_http_upload=='') $cf_http_upload="2";
+			mybox_db_query("update cf set val='$cf_http_stat' where name='cf_http_stat'",$db_id);
+			mybox_db_query("update cf set val='$cf_http_port' where name='cf_http_port'",$db_id);
+			mybox_db_query("update cf set val='$cf_http_download' where name='cf_http_download'",$db_id);
+			mybox_db_query("update cf set val='$cf_http_upload' where name='cf_http_upload'",$db_id);
+			mybox_db_query("update cf set val='$cf_http_networks' where name='cf_http_networks'",$db_id);
+			mybox_db_query("update cf set val='$cf_http_auth' where name='cf_http_auth'",$db_id);
+			mybox_db_query("update cf set val='$cf_http_cache_stat' where name='cf_http_cache_stat'",$db_id);
+			mybox_db_query("update cf set val='$cf_http_cache_size' where name='cf_http_cache_size'",$db_id);
+			mybox_db_query("update cf set val='$cf_http_cache_mem_size' where name='cf_http_cache_mem_size'",$db_id);
+			mybox_db_query("update cf set val='$cf_http_proxy_stat' where name='cf_http_proxy_stat'",$db_id);
+			mybox_db_query("update cf set val='$cf_http_proxy_host' where name='cf_http_proxy_host'",$db_id);
+			mybox_db_query("update cf set val='$cf_http_proxy_port' where name='cf_http_proxy_port'",$db_id);
+			mybox_db_query("update cf set val='$cf_http_proxy_user_stat' where name='cf_http_proxy_user_stat'",$db_id);
+			mybox_db_query("update cf set val='$cf_http_proxy_user' where name='cf_http_proxy_user'",$db_id);
+			if($cf_http_proxy_pass!=$cf_http_proxy_pass_old) {
+				$passx=mybox_str_encrypt($cf_http_proxy_pass);			
+				mybox_db_query("update cf set val='$passx' where name='cf_http_proxy_pass'",$db_id);
+				unset($passx);
+			}
+			mybox_db_query("delete from cf_user",$db_id);
+			if($cf_users!='') {
+				$lx=explode(",",$cf_users);
+				if(count($lx)!=0) {
+					foreach($lx as $n) {
+						$n=trim($n);
+						if($n=='') continue;
+						mybox_db_query("insert into cf_user (name) values ('$n')",$db_id); 
+					}
+				}
+				unset($n,$lx);
+			}
+			$msg="Configuration saved";
+		}
+		if($tab==2) {
+			mybox_db_query("update cf set val='$cf_http_av_stat' where name='cf_http_av_stat'",$db_id);
+			//mybox_db_query("update cf set val='$cf_http_av_min_size' where name='cf_http_av_min_size'",$db_id);
+			//mybox_db_query("update cf set val='$cf_http_av_max_size' where name='cf_http_av_max_size'",$db_id);
+			mybox_db_query("update cf set val='$cf_http_ext_block_stat' where name='cf_http_ext_block_stat'",$db_id);
+			$txt='';			
+			if(count($ext)!=0) {
+				$c=0;
+				foreach($ext as $ln) {
+					$ln=trim($ln);
+					$ln=ltrim($ln,'#');
+					if($ln=='') continue;
+					$ln=ltrim($ln,".");
+					if($ln=='') continue;
+					if(!isset($eopt[$c])) $ln="#$ln";
+					$txt .="$ln\n";
+					$c++;	
+				}
+				unset($c);
+			}
+			mybox_save_to_file("$_PAT_PATH/blacklist/EXT_BLOCK","$txt");
+			unset($txt,$ln);
+			$txt='';			
+			if(count($eext)!=0) {
+				$c=0;
+				foreach($eext as $ln) {
+					$ln=trim($ln);
+					$ln=ltrim($ln,'#');
+					if($ln=='') continue;
+					$ln=ltrim($ln,".");
+					if($ln=='') continue;
+					if(!isset($eeopt[$c])) $ln="#$ln";
+					$txt .="$ln\n";
+					$c++;	
+				}
+				unset($c);
+			}
+			mybox_save_to_file("$_PAT_PATH/blacklist/EXT_AV","$txt");
+			unset($txt,$ln);
+			$txt='';			
+			if(count($eext2)!=0) {
+				$c=0;
+				foreach($eext2 as $ln) {
+					$ln=trim($ln);
+					$ln=ltrim($ln,'#');
+					if($ln=='') continue;
+					$ln=ltrim($ln,".");
+					if($ln=='') continue;
+					if(!isset($eeopt2[$c])) $ln="#$ln";
+					$txt .="$ln\n";
+					$c++;	
+				}
+				unset($c);
+			}
+			mybox_save_to_file("$_PAT_PATH/blacklist/EXT_AV_MIME","$txt");
+			unset($txt,$ln);
+			$txt='';			
+			if(count($eext3)!=0) {
+				$c=0;
+				foreach($eext3 as $ln) {
+					$ln=trim($ln);
+					$ln=ltrim($ln,'#');
+					if($ln=='') continue;
+					$ln=ltrim($ln,".");
+					if($ln=='') continue;
+					if(!isset($eeopt3[$c])) $ln="#$ln";
+					$txt .="$ln\n";
+					$c++;	
+				}
+				unset($c);
+			}
+			mybox_save_to_file("$_PAT_PATH/blacklist/EXT_URL_MIME","$txt");
+			unset($txt,$ln);
+			$msg="Configuration saved";
+		}
+		if($tab==3) {
+			mybox_db_query("update cf set val='$cf_http_filter' where name='cf_http_filter'",$db_id);
+			mybox_db_query("update cf set val='$cf_http_js' where name='cf_http_js'",$db_id);
+			mybox_db_query("update cf set val='$cf_http_object' where name='cf_http_object'",$db_id);
+			mybox_db_query("update cf set val='$cf_http_image' where name='cf_http_image'",$db_id);
+			mybox_db_query("update cf set val='$cf_http_redirect' where name='cf_http_redirect'",$db_id);
+			$txt='';			
+			if(count($url)!=0) {
+				$c=0;
+				foreach($url as $ln) {
+					$ln=trim($ln);
+					$ln=ltrim($ln,"#");
+					if($ln=='') continue;
+					if(!isset($ourl[$c])) $ln="#$ln";
+					$txt .="$ln\n";
+					$c++;	
+				}
+				unset($c);
+			}
+			if(!isset($cf_http_filter_c)||$cf_http_filter_c=='') $cf_http_filter_c=0;
+			if(!is_dir("$_PAT_PATH/blacklist/url_block")) mybox_mkdirr("$_PAT_PATH/blacklist/url_block");
+			mybox_save_to_file("$_PAT_PATH/blacklist/url_block/ACL","dest url_block {\n\turllist url_block/urls\nredirect http://mybox.internal.proxy:6062/?c=ERR_URL&t=3&a=%a&i=%i&u=%u\n}\n");
+			mybox_save_to_file("$_PAT_PATH/blacklist/url_block/urls","$txt");
+			mybox_save_to_file("$_PAT_PATH/blacklist/url_block/stat","$cf_http_filter_c\n");
+			unset($txt,$ln);
+			if(count($del)!=0) {
+				$stat_array=mybox_dir2array("$_PAT_PATH/blacklist/*");
+				if(count($stat_array)!=0) {
+					foreach($stat_array as $ln) {
+						if(!is_dir($ln)) continue;
+						// reset
+						if(basename($ln)!="url_block") mybox_save_to_file("$ln/stat","0\n");
+						$lnx=basename($ln);
+						if($del[$lnx]!='') {
+							mybox_save_to_file("$ln/stat","1\n");
+						}
+					}
+				}
+			}
+			unset($del,$ln,$lnx);
+
+			$txt='';			
+			if(count($sitea)!=0 && count($siteb)!=0) {
+				$c=0;
+				for($x=0;$x<count($sitea);$x++) {
+					$a='';$b='';
+					$a=$sitea[$x];
+					$b=$siteb[$x];
+					$a=trim($a);$b=trim($b);
+					$a=ltrim($a,'http://');$b=ltrim($b,'http://');
+					if($a=='' || $b=='') continue;
+					if(!isset($osite[$c])) {
+						$txt .="#$a|$b\n";
+					} else {
+						$txt .="$a|$b\n";
+					}
+					$c++;
+				}
+				unset($c);
+			}
+			mybox_save_to_file("$_PAT_PATH/blacklist/SITE_REDIRECT","$txt");
+			unset($txt,$a,$b,$sitea,$siteb);
+
+			$msg="Configuration saved";
+		}
+		if($tab==4) {
+			if($col==2) {
+				if(isset($do_save)&&$do_save==1) {
+					$domains='';			
+					if(count($exc)!=0) {
+						foreach($exc as $ln) {
+							$ln=trim($ln);
+							if($ln=='') continue;
+							$ln=ltrim($ln,".");
+							if($ln=='') continue;
+							$domains .="$ln ";	
+						}
+					}
+					unset($ln);
+					if($do_id!='edit') {
+						$name=trim($name);
+						if($auth=='') $auth=0;
+						if($auth!='') $auth=1;
+						if($av=='') $av=0;
+						if($av!='') $av=1;
+						if($ext=='') $ext=0;
+						if($ext!='') $ext=1;
+						if($urlf=='') $urlf=0;
+						if($urlf!='') $urlf=1;
+						if($urlc=='') $urlc=0;
+						if($urlc!='') $urlc=1;
+						if($urls=='') $urls=0;
+						if($urls!='') $urls=1;
+						if($src=='any' || $src=="<< Not set >>") $src='';
+						if($dst=='any' || $dst=="<< Not set >>") $dst='';
+						if($hd=='') $hd=0;
+						if($hd!='') $hd=1;
+						if($hdc=='') $hd=0;
+						if($trans!='') $trans=1;
+						if($trans=='') $trans=0;
+						$result=mybox_db_query("select name from cf_exclude where name='$name'",$db_id);
+						if(mybox_db_num_rows($result)==0) {
+							mybox_db_query("insert into cf_exclude (name,src,dst,user,user_stat,auth,av,ext,urlf,urlc,urls,hd,hdc,trans,domains) values ('$name','$src','$dst','$user','$user_stat','$auth','$av','$ext','$urlf','$urlc','$urls','$hd','$hdc','$trans','$domains')",$db_id);
+							$msg='Exception saved';
+							mybox_db_query("delete from cf_ad_user where name='$name'",$db_id);
+							if($trans==0 && $auth==0) mybox_db_query("insert into cf_ad_user (name,user) values ('$name','$ad_user')",$db_id);
+						} else {
+							$msg="Exception name '$name' already exist";
+						}
+					}
+					if($do_id=='edit') {
+						$name=trim($name);
+						$nameold=trim($nameold);
+						if($auth=='') $auth=0;
+						if($auth!='') $auth=1;
+						if($av=='') $av=0;
+						if($av!='') $av=1;
+						if($ext=='') $ext=0;
+						if($ext!='') $ext=1;
+						if($urlf=='') $urlf=0;
+						if($urlf!='') $urlf=1;
+						if($urlc=='') $urlc=0;
+						if($urlc!='') $urlc=1;
+						if($urls=='') $urls=0;
+						if($urls!='') $urls=1;
+						if($src=='any' || $src=="<< Not set >>") $src='';
+						if($dst=='any' || $dst=="<< Not set >>") $dst='';
+						if($hd=='') $hd=0;
+						if($hd!='') $hd=1;
+						if($hdc=='') $hd=0;
+						if($trans!='') $trans=1;
+						if($trans=='') $trans=0;
+						if($name!=$nameold) {
+							$result=mybox_db_query("select name from cf_exclude where name='$name'",$db_id);
+							if(mybox_db_num_rows($result)!=0) {
+								$msg="Exception name '$name' already exist";
+							} else {
+								mybox_db_query("update cf_exclude set name='$name',src='$src',dst='$dst',user='$user',user_stat='$user_stat',auth='$auth',av='$av',ext='$ext',urlf='$urlf',urlc='$urlc',urls='$urls',hd='$hd',hdc='$hdc',trans='$trans',domains='$domains' where id='$id'",$db_id);
+								$msg='Exception list updated';$col=1;$do_id='';
+								mybox_db_query("delete from cf_ad_user where name='$name'",$db_id);
+								if($trans==0 && $auth==0) mybox_db_query("insert into cf_ad_user (name,user) values ('$name','$ad_user')",$db_id);
+							}
+						} else {
+							mybox_db_query("update cf_exclude set name='$name',src='$src',dst='$dst',user='$user',user_stat='$user_stat',auth='$auth',av='$av',ext='$ext',urlf='$urlf',urlc='$urlc',urls='$urls',hd='$hd',hdc='$hdc',trans='$trans',domains='$domains' where id='$id'",$db_id);
+							$msg='Exception list updated';$col=1;$do_id='';
+							mybox_db_query("delete from cf_ad_user where name='$name'",$db_id);
+							if($trans==0 && $auth==0) mybox_db_query("insert into cf_ad_user (name,user) values ('$name','$ad_user')",$db_id);
+						}
+					}
+				}
+			}
+		}
+	}
+	if($tab==4 && $col==1) {
+		if(isset($do_save)&&$do_save==2) {
+			if(is_array($del) && count($del)!=0) {
+				foreach($del as $x) {
+					if($x!='') mybox_db_query("delete from cf_exclude where id='$x'",$db_id);
+				}
+			} else {
+				if($del!='') mybox_db_query("delete from cf_exclude where id='$del'",$db_id);
+			}
+		}
+	}
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied";
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+if((!isset($col)||$col=='')&&($tab==4)) $col=1;
+$_error=0;
+
+if($tab!='') {
+	$list_array=array();
+	$list_array1=mybox_ipname_array($db_id);
+	$list_array2=mybox_defnetwork_array($db_id);
+	$list_array3=array();
+	$list_array4=array();
+	$list_array=$list_array1;
+	if(count($list_array1)!=0) {
+		foreach($list_array1 as $a) {
+			if(strpos($a,"(Network)")!==FALSE || strpos($a,"(Broadcast)")!==FALSE) continue;
+			$list_array3[]="$a";	
+		}
+	}
+	unset($a);
+	$list_array4=$list_array3;
+	if(count($list_array2)!=0) {
+		foreach($list_array2 as $a => $b) {
+			if($tab==1 && $a=='any') continue;
+			if(is_array($b)) {
+				if($b['type'] <= 2) $list_array[]="$a";
+				if($b['type'] == 2) {
+					$list_array3[]="$a";
+					$list_array4[]="$a";
+				}
+				if($b['group']!='') {
+					$list_array3[]=$b['group'];
+				}
+			} 
+		}
+	}
+
+	$_tl=array();
+	$_cf_http_stat=0;
+	$_cf_http_port="8080";
+	$_cf_http_cache_stat=1;
+	$_cf_http_cache_size="1024";
+	$_cf_http_cache_mem_size="10";
+	$_cf_http_proxy_port="8080";
+	$_cf_http_proxy_user_stat=0;
+	$_cf_http_ext_block_stat=0;
+	$_cf_http_filter=0;
+	$_cf_http_filter_c=0;
+	$_cf_http_filter_c=mybox_fget_contents("$_PAT_PATH/blacklist/url_block/stat");
+	$_cf_http_redirect=0;
+	$_cf_http_download="2";
+	$_cf_http_upload="40";
+	$result=mybox_db_query("select * from cf",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			if(trim($row['name'])=="cf_http_stat") $_cf_http_stat=trim($row['val']);
+			if(trim($row['name'])=="cf_http_port") $_cf_http_port=trim($row['val']);
+			if(trim($row['name'])=="cf_http_auth") $_cf_http_auth=trim($row['val']);
+			if(trim($row['name'])=="cf_http_cache_stat") $_cf_http_cache_stat=trim($row['val']);
+			if(trim($row['name'])=="cf_http_cache_size") $_cf_http_cache_size=trim($row['val']);
+			if(trim($row['name'])=="cf_http_cache_mem_size") $_cf_http_cache_mem_size=trim($row['val']);
+			if(trim($row['name'])=="cf_http_networks") $_cf_http_networks=trim($row['val']);
+			if(trim($row['name'])=="cf_http_ext_block_stat") $_cf_http_ext_block_stat=trim($row['val']);
+			if(trim($row['name'])=="cf_http_ext_block") $_cf_http_ext_block=trim($row['val']);
+			if(trim($row['name'])=="cf_http_filter") $_cf_http_filter=trim($row['val']);
+			//if(trim($row['name'])=="cf_http_filter_c") $_cf_http_filter_c=trim($row['val']);
+			if(trim($row['name'])=="cf_http_js") $_cf_http_js=trim($row['val']);
+			if(trim($row['name'])=="cf_http_image") $_cf_http_image=trim($row['val']);
+			if(trim($row['name'])=="cf_http_object") $_cf_http_object=trim($row['val']);
+			if(trim($row['name'])=="cf_http_download") $_cf_http_download=trim($row['val']);
+			if(trim($row['name'])=="cf_http_upload") $_cf_http_upload=trim($row['val']);
+			if(trim($row['name'])=="cf_http_av_stat") $_cf_http_av_stat=trim($row['val']);
+			//if(trim($row['name'])=="cf_http_av_min_size") $_cf_http_av_min_size=trim($row['val']);
+			//if(trim($row['name'])=="cf_http_av_max_size") $_cf_http_av_max_size=trim($row['val']);
+			if(trim($row['name'])=="cf_http_redirect") $_cf_http_redirect=trim($row['val']);
+			if(trim($row['name'])=="cf_http_proxy_stat") $_cf_http_proxy_stat=trim($row['val']);
+			if(trim($row['name'])=="cf_http_proxy_host") $_cf_http_proxy_host=trim($row['val']);
+			if(trim($row['name'])=="cf_http_proxy_port") $_cf_http_proxy_port=trim($row['val']);
+			if(trim($row['name'])=="cf_http_proxy_user_stat") $_cf_http_proxy_user_stat=trim($row['val']);
+			if(trim($row['name'])=="cf_http_proxy_user") $_cf_http_proxy_user=trim($row['val']);
+			if(trim($row['name'])=="cf_http_proxy_pass") $_cf_http_proxy_pass=trim($row['val']);
+		}
+		if(count($list_array)!=0) {
+			foreach($list_array as $x) {
+				if($x=='') continue;
+				$_tl[$x]=$x;
+			}
+		}
+		unset($x);
+		if($_cf_http_networks!='') {
+			$_nml=preg_split("/,/",$_cf_http_networks);
+			if(count($_nml)!=0) {
+				foreach($_nml as $a) {
+					if($a=='') continue;
+					if($_tl[$a]==$a) unset($_tl[$a]);
+				}
+			} else {
+				$_nml[]="$_cf_net";
+			}
+			unset($a);
+		} else {
+			$_tl=$list_array;
+		}
+	}
+}
+
+?>
+<html>
+<head>
+<title>MyAdmin</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<script type='text/javascript' src="/j/mybox_func.js"></script>
+<script type='text/javascript' src="/j/mybox_overlib.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?php echo $_LOGIN['auth_id'];?>";
+	page_load();
+</script>
+<script type='text/javascript'>
+	function do_changes() {
+		self.location.href='<?php echo "/proxy_http.exh?tab=$tab&col=$col&f=$f&do_id=apply_chg";?>';	
+	};
+function waitcount() {
+	page_reload('700','<?php echo "/proxy_http.exh?tab=$tab&do_tab=$do_tab&col=$col&col2=$col2&f=$f";?>');
+};
+</script>
+</head>
+<body onload="load_menu('sub6','t6d1','s6i1');" scroll="auto">
+<form name=f method=post action="/proxy_http.exh">
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 0px;'>
+<tr>
+<td>
+<?php mybox_page_section("Proxy / HTTP");?>
+<br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="/proxy_http.exh?tab=1" <?php if($tab==1){?>class="tabact"<?php }?>>Global</a></li>
+<li><a href="/proxy_http.exh?tab=2" <?php if($tab==2){?>class="tabact"<?php }?>>Anti-Virus</a></li>
+<li><a href="/proxy_http.exh?tab=3" <?php if($tab==3){?>class="tabact"<?php }?>>Content filter</a></li>
+<li><a href="/proxy_http.exh?tab=4" <?php if($tab==4){?>class="tabact"<?php }?>>Exceptions</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td> 
+<?php mybox_page_msg($msg);?>
+<br>
+
+<!-- tab container -->
+<?php if($tab==1) {
+	$_tlx=array();$_mlx=array();
+	$result=mybox_db_query("select name from auth_user where stat='1'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$x=$row['name'];
+			$_tlx[$x]=$x;
+		}
+	}
+	unset($x,$result);
+	$result=mybox_db_query("select name from group_user",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$x=$row['name'];
+			$_tlx[$x]=$x;
+		}
+	}
+	unset($x,$result);
+	$result=mybox_db_query("select name from cf_user",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$a=$row['name'];
+			if($_tlx[$a]==$a) unset($_tlx[$a]);
+			$_nmlx[]="$a";
+		}
+	}
+	unset($a);
+?>
+<script type='text/javascript'>
+	function do_submit() {
+		var pport=Trim(document.f.cf_http_port.value);
+		if(!isnum(pport)) {
+			pop_msg("Invalid HTTP Proxy port");
+			return false;
+		}
+		var dsize=Trim(document.f.cf_http_download.value);
+		if(!isnum(dsize)) {
+			pop_msg("Invalid Maximum HTTP download size");
+			return false;
+		}
+		var usize=Trim(document.f.cf_http_upload.value);
+		if(!isnum(usize)) {
+			pop_msg("Invalid Maximum HTTP upload size");
+			return false;
+		}
+		if(document.f.cf_http_cache_stat.value==1) {
+			var cs=Trim(document.f.cf_http_cache_size.value);
+			if(!isnum(cs)) {
+				pop_msg("Invalid cache disk size");
+				return false;
+			}
+			var cm=Trim(document.f.cf_http_cache_mem_size.value);
+			if(!isnum(cm)) {
+				pop_msg("Invalid cache memory size");
+				return false;
+			}
+			if(document.f.cf_http_proxy_stat.value==1) {
+				var cpp=Trim(document.f.cf_http_proxy_port.value);
+				if(!isnum(cpp)) {
+					pop_msg("Invalid Parent Proxy Port");
+					return false;
+				}
+				if(document.f.cf_http_proxy_user_stat.value==1) {
+					var cu=Trim(document.f.cf_http_proxy_user.value);
+					if(cu=='') {
+						pop_msg("Invalid Parent Proxy User");
+						return false;
+					}
+					var cup=Trim(document.f.cf_http_proxy_pass.value);
+					if(cup=='') {
+						pop_msg("Invalid Parent Proxy Password");
+						return false;
+					}
+				}
+			}
+		}
+		var list=document.f.mr;
+		var lr='';
+		var ti=0;
+		for(var i=0;i<list.length;i++) {
+			if(list.options[i]!=null && list.options[i].value!='') {
+				ti++;
+				lr +=list.options[i].value;
+				lr +=',';
+			}
+		}
+		if(lr=='') {
+			pop_msg("No Allowed Network defined");
+			return false;
+		}
+		document.f.cf_http_networks.value=lr;
+		if(document.f.cf_http_auth.value==3) {
+			var list=document.f.mr2;
+			var lr2='';
+			for(var i=0;i<list.length;i++) {
+				if(list.options[i]!=null && list.options[i].value!='') {
+					lr2 +=list.options[i].value;
+					lr2 +=',';
+				}
+			}
+			if(lr2=='') {
+				pop_msg("No local users defined");
+				return false;
+			}
+			document.f.cf_users.value=lr2;
+		}
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	};
+	function clear_cache() {
+		var cm=Trim(document.f.cf_http_cache_mem_size.value);
+		if(!isnum(cm)) {
+			pop_msg("Invalid cache memory size");
+			return false;
+		}
+		error("Deleting cache, please wait..");
+		document.f.do_save.value='12';
+		document.f.submit();	
+	};
+	function inmoveto(a) {
+		if(a=="right") {
+			var p=document.f.mr.length;
+			var lstlenght=document.f.ml.length;
+			var list=document.f.ml;
+			for(var i=0;i<lstlenght;i++) {
+				if(list[i]!=null && list[i].value!='') {
+					if(list.options[i].selected==true) {
+						document.f.mr[p]=new Option(list.options[i].text,list.options[i].value);
+						list[i]=null;
+						p++;
+					}
+				}
+			}
+		}
+
+		if(a=="left") {
+			var p=document.f.ml.length;
+			var lstlenght=document.f.mr.length;
+			var list=document.f.mr;
+			for(var i='0';i<lstlenght;i++) {
+				if(list[i]!=null && list[i].value!='') {
+					if(list.options[i].selected==true) {
+						document.f.ml[p]=new Option(list.options[i].text,list.options[i].value);
+						list[i]=null;
+						p++;
+					}
+				}
+			}
+		}
+	};
+	function inmoveto2(a) {
+		if(a=="right") {
+			var p=document.f.mr2.length;
+			var lstlenght=document.f.ml2.length;
+			var list=document.f.ml2;
+			for(var i=0;i<lstlenght;i++) {
+				if(list[i]!=null && list[i].value!='') {
+					if(list.options[i].selected==true) {
+						document.f.mr2[p]=new Option(list.options[i].text,list.options[i].value);
+						list[i]=null;
+						p++;
+					}
+				}
+			}
+		}
+
+		if(a=="left") {
+			var p=document.f.ml2.length;
+			var lstlenght=document.f.mr2.length;
+			var list=document.f.mr2;
+			for(var i='0';i<lstlenght;i++) {
+				if(list[i]!=null && list[i].value!='') {
+					if(list.options[i].selected==true) {
+						document.f.ml2[p]=new Option(list.options[i].text,list.options[i].value);
+						list[i]=null;
+						p++;
+					}
+				}
+			}
+		}
+	};
+	function enab_c(val,sid) {
+		if(val==1) {
+			do_show(sid);
+			if(sid=="s3") {
+				do_show('s4');
+			}
+		} else {
+			do_hide(sid);
+			if(sid=="s3") {
+				do_hide('s4');
+			}
+		}
+	};
+	function enab_uc(val) {
+		if(val==3) {
+			do_show('uc1');
+		} else {
+			do_hide('uc1');
+			if(val==4) {
+			<?php if(!file_exists("/var/sys/ad_join_ok")) {?>
+			pop_msg("Active directory authentication not enable");
+			insert_value('namehpsel2','<?php echo $_HTTP_CF['1'];?>');insert_value('cf_http_auth','1');
+			return false;
+			<?php }?>
+			};
+		}
+	}
+</script>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td valign="middle" class="tdname">Enable HTTP Proxy</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("On"=>"1","Off"=>"0");
+if(!isset($_cf_http_stat)||$_cf_http_stat=='') $_cf_http_stat=0;
+echo mybox_select_box('hpsel1',$data_a,$_cf_http_stat,'cf_http_stat');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">HTTP Proxy Port</td>
+<td valign="middle" class="tdvalue"> 
+<input name="cf_http_port" type="text" class="valbox2" value="<?php echo $_cf_http_port;?>">
+</td>
+</tr>
+<tr> 
+<td valign="top" class="tdname">Allowed Network</td>
+<td valign="top" class="tdvalue"> 
+<table style='border: 0px; padding: 0px; margin: 0px;'>
+<tr>
+<td valign=top style='border: 0px; font-style: italic; font-weight: bold;' colspan=2>
+Available networks
+</td>
+<td valign=top style='border: 0px; font-style: italic; font-weight: bold;'>
+Selected networks
+</td>
+</tr>
+<tr>
+<td valign=top style='border: 0px; text-align: center;'>
+<select name=ml size=7 multiple class=selbox style='height: 105px; width: 200px;'>
+<?php 
+if(count($_tl)!=0) {
+	foreach($_tl as $n) {
+		$px=mybox_get_defname($n,1,'def1',$db_id);
+		echo "<option value='$n' $px>$n</option>";
+		unset($px);
+	}
+	unset($n);
+}
+?>
+</select>
+</td>
+<td valign=absmiddle style='border: 0px; text-align: center;'>
+
+<table class="data" style='border: 0px; padding: 0px; margin: 0px;'>
+<tr>
+<td valign=top style='border: 0px;'>
+<a name="sini"><a class="btns" href="#sini" onclick="return inmoveto('right');return false;"> >> </a>
+</td>
+</tr>
+<tr>
+<td valign=top style='border: 0px;'>
+<a name="sini"><a class="btns" href="#sini" onclick="return inmoveto('left');return false;"> << </a>
+</td>
+</tr>
+</table>
+
+</td>
+<td valign=top style='border: 0px; text-align: center;'>
+<select name=mr size=7 multiple class=selbox style='height: 105px; width: 200px;'>
+<?php 
+if(count($_nml)!=0) {
+	foreach($_nml as $a) {
+		$px=mybox_get_defname($a,1,'def1',$db_id);
+		echo "<option value='$a' $px>$a</option>";
+		unset($px);
+	}
+	unset($a);
+}
+?>
+</select>
+</td>
+</tr>
+</table>
+<span id='def1' class='def' style='display: none; position: absolute;'></span>
+</td>
+</tr>
+
+<tr> 
+<td valign="middle" class="tdname">Maximum HTTP download</td>
+<td valign="middle" class="tdvalue"> 
+<input name="cf_http_download" type="text" class="valbox" style='width: 100px;' value="<?php echo $_cf_http_download;?>"> MB (0=unlimited)
+</td>
+</tr>
+
+<tr> 
+<td valign="middle" class="tdname">Maximum HTTP upload</td>
+<td valign="middle" class="tdvalue"> 
+<input name="cf_http_upload" type="text" class="valbox" style='width: 100px;' value="<?php echo $_cf_http_upload;?>"> MB (0=unlimited)
+</td>
+</tr>
+
+<tr> 
+<td valign="top" class="tdname">Operation mode</td>
+<td valign="top" class="tdvalue">
+<?php 
+$data_a=array();
+foreach($_HTTP_CF as $a => $b) {
+	$data_a[$b]=$a;
+}
+if(!isset($_cf_http_auth)||$_cf_http_auth=='') $_cf_http_auth=1;
+$set_a=array("act"=>"enab_uc('b')");
+echo mybox_select_box('hpsel2',$data_a,$_cf_http_auth,'cf_http_auth',$set_a);
+?>
+
+<div id='uc1' style='margin-top: 2px; display: none;'>
+<table style='border: 0px; padding: 0px; margin: 0px;'>
+<tr>
+<td valign=top style='border: 0px; font-style: italic; font-weight: bold;' colspan=2>
+Available users/groups
+</td>
+<td valign=top style='border: 0px; font-style: italic; font-weight: bold;'>
+Selected users/groups
+</td>
+</tr>
+<tr>
+<td valign=top style='border: 0px; text-align: center;'>
+<select name=ml2 size=7 multiple class=selbox style='height: 105px; width: 150px;'>
+<?php 
+foreach($_tlx as $n) {
+	$px=mybox_get_defname($n,1,'def1',$db_id);
+	echo "<option value='$n' $px>$n</option>";
+}
+unset($n,$px);
+?>
+</select>
+</td>
+<td valign=absmiddle style='border: 0px; text-align: center;'>
+
+<table class="data" style='border: 0px; padding: 0px; margin: 0px;'>
+<tr>
+<td valign=top style='border: 0px;'>
+<a name="sini"><a class="btns" href="#sini" onclick="return inmoveto2('right');return false;"> >> </a>
+</td>
+</tr>
+<tr>
+<td valign=top style='border: 0px;'>
+<a name="sini"><a class="btns" href="#sini" onclick="return inmoveto2('left');return false;"> << </a>
+</td>
+</tr>
+</table>
+
+</td>
+<td valign=top style='border: 0px; text-align: center;'>
+<select name=mr2 size=7 multiple class=selbox style='height: 105px; width: 150px;'>
+<?php 
+foreach($_nmlx as $a) {
+	$px=mybox_get_defname($a,1,'def1',$db_id);
+	echo "<option value='$a' $px>$a</option>";
+}
+unset($a,$px);
+?>
+</select>
+</td>
+</tr>
+</table>
+</div>
+</td>
+</tr>
+
+<tr> 
+<td valign="top" class="tdname">Enable caching</td>
+<td valign="top" class="tdvalue"> 
+<?php 
+$data_a=array("On"=>"1","Off"=>"0");
+if(!isset($_cf_http_cache_stat)||$_cf_http_cache_stat=='') $_cf_http_cache_stat=0;
+$set_a=array("act"=>"enab_c('b','s1')");
+echo mybox_select_box('hpsel3',$data_a,$_cf_http_cache_stat,'cf_http_cache_stat',$set_a);
+?>
+
+<div id='s1' style='display: none;'>
+<table class="data" style='border: 0px; margin-bottom: 0em;'>
+<tr>
+<td valign=top style='border: 0px; width: 100px;'> 
+<b>Cache size</b>
+</td>
+<td valign=top style='border: 0px;'> 
+<input name="cf_http_cache_size" type="text" class="valbox" size="10" value="<?php echo $_cf_http_cache_size;?>"> MB
+</td></tr>
+<tr>
+<td valign=top style='border: 0px; width: 100px;'> 
+<b>Cache memory</b>
+</td>
+<td valign=top style='border: 0px;'> 
+<input name="cf_http_cache_mem_size" type="text" class="valbox" size="10" value="<?php echo $_cf_http_cache_mem_size;?>"> MB
+</td></tr>
+<tr>
+<td valign=top style='border: 0px; border-top: 1px solid #ccc' colspan=2>
+<a name="sini"><a class="btns" href="#sini" onclick="return clear_cache();return false;">Clear cache</a>
+</td>
+</tr>
+</table>
+</div>
+</td>
+</tr>
+
+<tr> 
+<td valign="top" class="tdname">Use Parent Proxy</td>
+<td valign="top" class="tdvalue"> 
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+if(!isset($_cf_http_proxy_stat)||$_cf_http_proxy_stat=='') $_cf_http_proxy_stat=0;
+$set_a=array("act"=>"enab_c('b','s2')");
+echo mybox_select_box('hpsel4',$data_a,$_cf_http_proxy_stat,'cf_http_proxy_stat',$set_a);
+?>
+<div id='s2' style='display: none;'>
+<table class="data" style='border: 0px; margin-bottom: 0em;'>
+<tr>
+<td valign=top style='border: 0px; width: 100px;'> 
+<b>Host</b>
+</td>
+<td valign=top style='border: 0px;'> 
+<?php 
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($list_array4,'cf_http_proxy_host',"$_cf_http_proxy_host",'hpsel5','hpsel5a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+echo mybox_defwin('hpsel5','200px','#ffffff','#999999','#336699','#ffffff','Host','#ffffff','100px','hidden','auto',$txt);
+?>
+</td></tr>
+<tr>
+<td valign=top style='border: 0px; width: 100px;'> 
+<b>Port</b>
+</td>
+<td valign=top style='border: 0px;'> 
+<input name="cf_http_proxy_port" type="text" class="valbox2" value="<?php echo $_cf_http_proxy_port;?>">
+</td></tr>
+<tr><td valign=top style='border: 0px;' colspan=2>
+<hr size=1 class=notehr>
+</td></tr>
+<tr>
+<td valign=top style='border: 0px; width: 100px;'> 
+<b>Authentication</b>
+</td>
+<td valign=top style='border: 0px;'>
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+if(!isset($_cf_http_proxy_user_stat)||$_cf_http_proxy_user_stat=='') $_cf_http_proxy_user_stat=0;
+$set_a=array("act"=>"enab_c('b','s3')");
+echo mybox_select_box('hpsel6',$data_a,$_cf_http_proxy_user_stat,'cf_http_proxy_user_stat',$set_a);
+?>
+</td></tr>
+<tr id='s3'>
+<td valign=top style='border: 0px; width: 100px;'> 
+<b>User</b>
+</td>
+<td valign=top style='border: 0px;'> 
+<input name="cf_http_proxy_user" type="text" class="valbox2" value="<?php echo $_cf_http_proxy_user;?>">
+</td></tr>
+<tr id='s4'>
+<td valign=top style='border: 0px; width: 100px;'> 
+<b>Password</b>
+</td>
+<td valign=top style='border: 0px;'> 
+<input name="cf_http_proxy_pass" type="password" class="valbox2" size="30" value="<?php echo $_cf_http_proxy_pass;?>">
+<input name="cf_http_proxy_pass_old" type="hidden" value="<?php echo $_cf_http_proxy_pass;?>">
+</td></tr>
+</table>
+</div>
+</td>
+</tr>
+
+</tbody>
+</table>
+<input type=hidden name=cf_http_networks value=''>
+<input type=hidden name=cf_users value=''>
+<script type='text/javascript'>
+enab_c('<?php echo $_cf_http_cache_stat;?>','s1');
+enab_c('<?php echo $_cf_http_proxy_stat;?>','s2');
+enab_c('<?php echo $_cf_http_proxy_user_stat;?>','s3');
+enab_uc('<?php echo $_cf_http_auth;?>');
+</script>
+<?php }//tab==1?>
+
+<?php if($tab==2) {?>
+<script type='text/javascript'>
+	function do_submit() {
+		if(document.f.cf_http_ext_block_stat.value!=0) {
+			if(chk_dup_val('ext','text')==true) {
+				return false;
+			};
+		};
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	};
+	function enab_ec(val) {
+		if(val!=0) {
+			do_show('e2');do_show('e22');
+			do_show('ee2222');do_show('eeee2');
+		} else {
+			do_hide('e2');do_hide('e22');
+			do_hide('ee2222');do_hide('eeee2');
+		}
+	};
+
+	function add_newext() {
+		if(chk_dup_val('ext','text')==true) {
+			return false;
+		};
+		var i=document.getElementById('exttab').rows.length;
+		var tab=document.getElementById('exttab').insertRow(0);
+		tab.insertCell(0).innerHTML="<input type=text name=ext[] value='' size=16 class='urlbox'>";
+		tab.insertCell(1).innerHTML="<input type=checkbox name=eopt["+i+"] value=''>";
+		tab.insertCell(2).innerHTML="<a href='#' id='t"+i+"' onclick=\"delete_row_a('t"+i+"','exttab');return false;\"><img src='<?php echo $_PNG['delete'];?>' border=0 alt='' title=''></a>";
+		i=null;tab=null;
+	};
+
+	function enab_ec2(val) {
+		if(val!=0) {
+			do_show('ee2');do_show('ee22');
+			do_show('eee2');do_show('ee222');
+			do_show('eeee2');
+		} else {
+			do_hide('ee2');do_hide('ee22');
+			do_hide('ee22');do_hide('ee222');
+			do_hide('eee22');
+		}
+	};
+
+
+	function add_newext2() {
+		if(chk_dup_val('eext','text')==true) {
+			return false;
+		};
+		var i=document.getElementById('eexttab').rows.length;
+		var tab=document.getElementById('eexttab').insertRow(0);
+		tab.insertCell(0).innerHTML="<input type=text name=eext[] value='' size=16 class='urlbox'>";
+		tab.insertCell(1).innerHTML="<input type=checkbox name=eeopt["+i+"] value=''>";
+		tab.insertCell(2).innerHTML="<a href='#' id='et"+i+"' onclick=\"delete_row_a('et"+i+"','eexttab');return false;\"><img src='<?php echo $_PNG['delete'];?>' border=0 alt='' title=''></a>";
+		i=null;tab=null;
+	};
+
+
+	function add_newext22() {
+		if(chk_dup_val('eext2','text')==true) {
+			return false;
+		};
+		var i=document.getElementById('eexttab2').rows.length;
+		var tab=document.getElementById('eexttab2').insertRow(0);
+		tab.insertCell(0).innerHTML="<input type=text name=eext2[] value='' size=16 class='urlbox'>";
+		tab.insertCell(1).innerHTML="<input type=checkbox name=eeopt2["+i+"] value=''>";
+		tab.insertCell(2).innerHTML="<a href='#' id='et2"+i+"' onclick=\"delete_row_a('et2"+i+"','eexttab2');return false;\"><img src='<?php echo $_PNG['delete'];?>' border=0 alt='' title=''></a>";
+		i=null;tab=null;
+	};
+
+
+	function add_newext222() {
+		if(chk_dup_val('eext3','text')==true) {
+			return false;
+		};
+		var i=document.getElementById('eexttab3').rows.length;
+		var tab=document.getElementById('eexttab3').insertRow(0);
+		tab.insertCell(0).innerHTML="<input type=text name=eext3[] value='' size=16 class='urlbox'>";
+		tab.insertCell(1).innerHTML="<input type=checkbox name=eeopt3["+i+"] value=''>";
+		tab.insertCell(2).innerHTML="<a href='#' id='et3"+i+"' onclick=\"delete_row_a('et3"+i+"','eexttab3');return false;\"><img src='<?php echo $_PNG['delete'];?>' border=0 alt='' title=''></a>";
+		i=null;tab=null;
+	};
+</script>
+<table width="100%">
+<tbody>
+<tr>
+<td>
+
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td valign="top" class="tdname">Enable Anti-Virus scanning</td>
+<td valign="top" class="tdvalue">
+<?php 
+$data_a=array("On"=>"1","Off"=>"0");
+if(!isset($_cf_http_av_stat)||$_cf_http_av_stat=='') $_cf_http_av_stat=0;
+$set_a=array("act"=>"enab_ec2('b')");
+echo mybox_select_box('hpsel7',$data_a,$_cf_http_av_stat,'cf_http_av_stat',$set_a);
+?>
+</td>
+</tr>
+<tr id='ee22' style='display: none;'> 
+<td valign="top" class="tdname">Extension type to check</td>
+<td valign="top" class="tdvalue">
+<div style='margin-top: 2px;'>
+<a name="sini"><a class="btns" href="#sini" onclick="return add_newext2();return false;">Add new</a>
+</div>
+<div id='ee2' style='background: #ffffff; display: none; table-layout: fixed; white-space: nowrap; border: 1px solid #ccc; padding: 0px; margin-top: 5px; margin-bottom: 5px; overflow-x: hidden; overflow-y: auto; width: 200px; height: 100px;'>
+<table id='eexttab' class='datanb' style='background: #ffffff; border: 0px; margin-top: 0em; margin-bottom: 0em; padding: 0px; width: 100%;'>
+<col width="*">
+<col style='border: 0px; width: 5px; text-align: right;'>
+<col style='border: 0px; width: 5px; text-align: right;'>
+<?php 
+$f_array=array();
+$f_array=mybox_file2array("$_PAT_PATH/blacklist/EXT_AV");
+if(count($f_array)!=0) {
+	$i=0;
+	foreach($f_array as $i => $n) {
+		$st='checked';
+		if($n{0}=="#") {
+			$st="";
+			$n=ltrim($n,'#');
+		}
+		echo "
+			<tr>
+			<td><input type=text name=eext[] value='$n' size=16 class='urlbox'></td>
+			<td><input type=checkbox name=eeopt[$i] $st></td>
+			<td><a href='#' id='et$i' onclick=\"delete_row_a('et$i','eexttab');return false;\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a></td>
+			</tr>
+		";
+		$i++;
+	}
+}
+?>
+</table>
+</div>
+
+</td>
+</tr>
+
+<?php ####### MIMIE ####?>
+<tr id='ee222' style='display: none;'> 
+<td valign="top" class="tdname">MIME type to check</td>
+<td valign="top" class="tdvalue">
+<div style='margin-top: 2px;'>
+<a name="sini"><a class="btns" href="#sini" onclick="return add_newext22();return false;">Add new</a>
+</div>
+<div id='eee2' style='background: #ffffff; display: none; table-layout: fixed; white-space: nowrap; border: 1px solid #ccc; padding: 0px; margin-top: 5px; margin-bottom: 5px; overflow-x: hidden; overflow-y: auto; width: 200px; height: 100px;'>
+<table id='eexttab2' class='datanb' style='background: #ffffff; border: 0px; margin-top: 0em; margin-bottom: 0em; padding: 0px; width: 100%;'>
+<col width="*">
+<col style='border: 0px; width: 5px; text-align: right;'>
+<col style='border: 0px; width: 5px; text-align: right;'>
+<?php 
+$f_array=array();
+$f_array=mybox_file2array("$_PAT_PATH/blacklist/EXT_AV_MIME");
+if(count($f_array)!=0) {
+	$i=0;
+	foreach($f_array as $i => $n) {
+		$st='checked';
+		if($n{0}=="#") {
+			$st="";
+			$n=ltrim($n,'#');
+		}
+		echo "
+			<tr>
+			<td><input type=text name=eext2[] value='$n' size=16 class='urlbox'></td>
+			<td><input type=checkbox name=eeopt2[$i] $st></td>
+			<td><a href='#' id='et2$i' onclick=\"delete_row_a('et2$i','eexttab2');return false;\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a></td>
+			</tr>
+		";
+		$i++;
+	}
+}
+?>
+</table>
+</div>
+
+</td>
+</tr>
+
+<?php /*
+<tr> 
+<td valign="middle" class="tdname">Minimum file size</td>
+<td valign="middle" class="tdvalue"> 
+<input name="cf_http_av_min_size" type="text" class="valbox2" value="<?php echo $_cf_http_av_min_size;?>"> KB
+</td>
+</tr>
+
+<tr> 
+<td valign="middle" class="tdname">Maximum file size</td>
+<td valign="middle" class="tdvalue"> 
+<input name="cf_http_av_max_size" type="text" class="valbox2" value="<?php echo $_cf_http_av_max_size;?>"> KB
+</td>
+</tr>
+*/?>
+
+</table>
+
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td valign="top" class="tdname">Extension blocking</td>
+<td valign="top" class="tdvalue">
+<?php 
+$data_a=array("On"=>"1","Off"=>"0");
+$set_a=array("act"=>"enab_ec('b')");
+if(!isset($_cf_http_ext_block_stat)||$_cf_http_ext_block_stat=='') $_cf_http_ext_block_stat=0;
+echo mybox_select_box('hpsel8',$data_a,$_cf_http_ext_block_stat,'cf_http_ext_block_stat',$set_a);
+?>
+</td>
+</tr>
+<tr id='e22' style='display: none;'> 
+<td valign="top" class="tdname">Extension type to check</td>
+<td valign="top" class="tdvalue">
+<div style='margin-top: 2px;'>
+<a name="sini"><a class="btns" href="#sini" onclick="return add_newext();return false;">Add new</a>
+</div>
+<div id='e2' style='background: #ffffff; display: none; table-layout: fixed; white-space: nowrap; border: 1px solid #ccc; padding: 0px; margin-top: 5px; margin-bottom: 5px; overflow-x: hidden; overflow-y: auto; width: 200px; height: 100px;'>
+<table id='exttab' class='datanb' style='background: #ffffff; border: 0px; margin-top: 0em; margin-bottom: 0em; padding: 0px; width: 100%;'>
+<col width="*">
+<col style='border: 0px; width: 5px; text-align: right;'>
+<col style='border: 0px; width: 5px; text-align: right;'>
+<?php 
+$f_array=array();
+$f_array=mybox_file2array("$_PAT_PATH/blacklist/EXT_BLOCK");
+if(count($f_array)!=0) {
+	$i=0;
+	foreach($f_array as $i => $n) {
+		$st='checked';
+		if($n{0}=="#") {
+			$st="";
+			$n=ltrim($n,'#');
+		}
+		echo "
+			<tr>
+			<td><input type=text name=ext[] value='$n' size=16 class='urlbox'></td>
+			<td><input type=checkbox name=eopt[$i] $st></td>
+			<td><a href='#' id='t$i' onclick=\"delete_row_a('t$i','exttab');return false;\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a></td>
+			</tr>
+		";
+		$i++;
+	}
+}
+?>
+</table>
+</div>
+</td>
+</tr>
+<?php ####### MIMIE ####?>
+<tr id='ee2222' style='display: none;'> 
+<td valign="top" class="tdname">MIME type to check</td>
+<td valign="top" class="tdvalue">
+<div style='margin-top: 2px;'>
+<a name="sini"><a class="btns" href="#sini" onclick="return add_newext222();return false;">Add new</a>
+</div>
+<div id='eeee2' style='background: #ffffff; display: none; table-layout: fixed; white-space: nowrap; border: 1px solid #ccc; padding: 0px; margin-top: 5px; margin-bottom: 5px; overflow-x: hidden; overflow-y: auto; width: 200px; height: 100px;'>
+<table id='eexttab3' class='datanb' style='background: #ffffff; border: 0px; margin-top: 0em; margin-bottom: 0em; padding: 0px; width: 100%;'>
+<col width="*">
+<col style='border: 0px; width: 5px; text-align: right;'>
+<col style='border: 0px; width: 5px; text-align: right;'>
+<?php 
+$f_array=array();
+$f_array=mybox_file2array("$_PAT_PATH/blacklist/EXT_URL_MIME");
+if(count($f_array)!=0) {
+	$i=0;
+	foreach($f_array as $i => $n) {
+		$st='checked';
+		if($n{0}=="#") {
+			$st="";
+			$n=ltrim($n,'#');
+		}
+		echo "
+			<tr>
+			<td><input type=text name=eext3[] value='$n' size=16 class='urlbox'></td>
+			<td><input type=checkbox name=eeopt3[$i] $st></td>
+			<td><a href='#' id='et3$i' onclick=\"delete_row_a('et3$i','eexttab3');return false;\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a></td>
+			</tr>
+		";
+		$i++;
+	}
+}
+?>
+</table>
+</div>
+
+</td>
+</tr>
+</tbody>
+</table>
+
+</td>
+</tr>
+</table>
+<script type="text/javascript">
+enab_ec('<?php echo $_cf_http_ext_block_stat;?>');
+enab_ec2('<?php echo $_cf_http_av_stat;?>');
+</script>
+<?php }// tab==2?>
+
+<?php if($tab==3) {?>
+<script type='text/javascript'>
+	function do_submit() {
+		if(document.f.cf_http_filter.value!=0) {
+			if(chkf()==false) {
+				pop_msg("Please select website categories");
+				return false;
+			};
+		};
+		if(document.f.cf_http_filter_c.value!=0) {
+			if(chk_dup_val('url','text')==true) {
+				return false;
+			};
+		};
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	};
+	function chkf() {
+		var x='0';
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					if(document.f.elements[i].checked) x++;
+    				}	
+			}
+  		};
+		if(x==0) {
+			return false;
+		};
+		return true;
+	};
+
+	function add_newurl() {
+		if(chk_dup_val('url','text')==true) {
+			return false;
+		};
+		var i=document.getElementById('urltab').rows.length;
+		var tab=document.getElementById('urltab').insertRow(0);
+		tab.insertCell(0).innerHTML="<input type=text name=url[] value='' size=30 class='urlbox'>";
+		tab.insertCell(1).innerHTML="<input type=checkbox name=ourl["+i+"]>";
+		tab.insertCell(2).innerHTML="<a href='#' id='t"+i+"' onclick=\"delete_row_a('t"+i+"','urltab');return false;\"><img src='<?php echo $_PNG['delete'];?>' border=0 alt='' title=''></a>";
+		i=null;tab=null;
+	};
+
+	function add_newsite() {
+		var i=document.getElementById('sitetab').rows.length;
+		var tab=document.getElementById('sitetab').insertRow(0);
+		tab.insertCell(0).innerHTML="<input type=text name=sitea[] value='' size=25 class='urlbox'>";
+		tab.insertCell(1).innerHTML="<img src='<?php echo $_PNG['arrow_right_s'];?>' border=0 alt='' title=''>";
+		tab.insertCell(2).innerHTML="<input type=text name=siteb[] value='' size=25 class='urlbox'>";
+		tab.insertCell(3).innerHTML="<input type=checkbox name=osite["+i+"]>";
+		tab.insertCell(4).innerHTML="<a href='#' id='t"+i+"' onclick=\"delete_row_a('t"+i+"','sitetab');return false;\"><img src='<?php echo $_PNG['delete'];?>' border=0 alt='' title=''></a>";
+		i=null;tab=null;
+	};
+
+	function ccolor(id,color) {
+		var xid1="ff1"+id;
+		var xid2="ff2"+id;
+		document.getElementById(xid1).style.color=color;
+		document.getElementById(xid2).style.color=color;
+	};
+	function enab_f(id) {
+		if(document.getElementById(id).checked==true) {
+			document.getElementById(id).checked=false;
+			ccolor(id,'black');
+		} else {
+			document.getElementById(id).checked=true;
+			ccolor(id,'red');
+		}
+	};
+	function enab_fcc(x,id) {
+		if(x.checked==true) {
+			ccolor(id,'red');
+		} else {
+			ccolor(id,'black');
+		}
+	}
+</script>
+<table class="datanb" width="100%">
+<tbody>
+<tr>
+<td>
+<p class="subtitle" style='width: 98%; font-weight: bold;'><img src='/i/menu/sub_sep.gif'> URL Filter</p>
+<table class="data" width="100%">
+<tbody>
+<tr style='border: 1px solid #ccc;'> 
+<td valign="top" class="tdname">Block website based on categories</td>
+<td valign="top" class="tdvalue">
+<?php 
+$data_a=array("Disable"=>"0","Allow everything except selection below"=>"1","Block everything except selection below"=>"2");
+if(!isset($_cf_http_filter)||$_cf_http_filter=='') $_cf_http_filter=0;
+$set_a=array("width"=>"300");
+echo mybox_select_box('hpsel9',$data_a,$_cf_http_filter,'cf_http_filter',$set_a);
+?>
+
+<?php 
+$buff_array=array();
+$buff_array=mybox_dir2array("$_PAT_PATH/blacklist/*");
+if(count($buff_array)!=0) {
+	echo "
+		<div style='table-layout: fixed; white-space: nowrap; border: 1px solid #ccc; padding: 0px; margin-top: 5px; margin-bottom: 5px; overflow-x: hidden; overflow-y: auto; width: 300px; height: 150px;'>
+		<table class='data' style='background: #ffffff; border: 0px; margin-top: 0em; margin-bottom: 0em; padding: 0px; width: 285px;'>
+	";
+	$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff; cursor: pointer;'";
+	$x=0;	
+	foreach($buff_array as $ln) {
+		if(!is_dir($ln)) continue;
+		$_nm=basename($ln);
+		if($_nm=="spyware" || $_nm=="url_block") continue;
+		$_stat=0;$_info='';$_statx='';
+		if(file_exists("$ln/info")) $_info=mybox_fget_contents("$ln/info");
+		if(file_exists("$ln/stat")) $_stat=mybox_fget_contents("$ln/stat");
+		$st='';		
+		if($_stat==1) {
+			$_statx="checked";
+			$st='color: red;';
+		}
+		$xid="cfh$x";
+		echo "
+			<tr $lt>
+			<td id='ff1$xid' valign=top style='$st border: 0px;' onclick=\"enab_f('$xid');\">
+			<b>$_nm</b><br><i>$_info</i>
+			</td>
+			<td id='ff2$xid' valign=top style='$st border: 0px; width: 5px;'>
+			<input id='$xid' type=checkbox name=del[$_nm] value='$_nm' $_statx onclick=\"enab_fcc(this,'$xid');\">
+			</td>
+			</tr>
+		";
+		$x++;
+	}
+	echo "
+		</table>
+		</div>
+	";
+	unset($xid);
+}	
+?>
+</td>
+</tr>
+<tr> 
+<td valign="top" class="tdname">Block uncategorized websites</td>
+<td valign="top" class="tdvalue">
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+if(!isset($_cf_http_filter_c)||$_cf_http_filter_c=='') $_cf_http_filter_c=0;
+$set_a=array("width"=>"300");
+echo mybox_select_box('hpsel10',$data_a,$_cf_http_filter_c,'cf_http_filter_c',$set_a);
+?>
+<div style='margin-top: 2px; padding-top: 2px;'>
+<a name="sini"><a class="btns" href="#sini" onclick="return add_newurl();return false;">Add new</a>
+</div>
+<div style='background: #ffffff; table-layout: fixed; white-space: nowrap; border: 1px solid #ccc; padding: 0px; margin-top: 5px; margin-bottom: 5px; overflow-x: hidden; overflow-y: auto; width: 300px; height: 150px;'>
+<table id='urltab' class='data' style='background: #ffffff; border: 0px; margin-top: 0em; margin-bottom: 0em; padding: 0px; width: 285px;'>
+<col width="*">
+<col style='width: 5px; background: #ffffff;'>
+<col style='width: 5px; background: #ffffff;'>
+<?php 
+$f_array=array();
+$f_array=mybox_file2array("$_PAT_PATH/blacklist/url_block/urls");
+if(count($f_array)!=0) {
+	foreach($f_array as $i => $n) {
+		$n=trim($n);
+		if($n=='') continue;
+		$st="checked";
+		if($n{0}=="#") $st="";
+		$n=ltrim($n,"#");
+		echo "
+			<tr>
+			<td><input type=text name=url[] value='$n' size=30 class='urlbox'></td>
+			<td><input type=checkbox name=ourl[$i] $st></td>
+			<td><a href='#' id='t$i' onclick=\"delete_row_a('t$i','urltab');return false;\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a></td>
+			</tr>
+		";
+	}
+}
+unset($i,$n);
+?>
+</table>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<p class="subtitle" style='width: 98%; font-weight: bold;'><img src='/i/menu/sub_sep.gif'> Content Removal</p>
+<table class="data" width="100%">
+<tbody>
+<tr style='border: 1px solid #ccc;'> 
+<td valign="top" class="tdname">Remove embedded objects (ActiveX/Java/Flash)</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("On"=>"1","Off"=>"0");
+if(!isset($_cf_http_object)||$_cf_http_object=='') $_cf_http_object=0;
+echo mybox_select_box('hpsel12',$data_a,$_cf_http_object,'cf_http_object');
+?>
+</td>
+</tr>
+<tr style='border: 1px solid #ccc;'> 
+<td valign="top" class="tdname">Disable Javascript</td>
+<td valign="top" class="tdvalue">
+<?php 
+$data_a=array("On"=>"1","Off"=>"0");
+if(!isset($_cf_http_js)||$_cf_http_js=='') $_cf_http_js=0;
+echo mybox_select_box('hpsel13',$data_a,$_cf_http_js,'cf_http_js');
+?>
+</td>
+</tr>
+<tr style='border: 1px solid #ccc;'> 
+<td valign="top" class="tdname">Disable Image</td>
+<td valign="top" class="tdvalue">
+<?php 
+$data_a=array("On"=>"1","Off"=>"0");
+if(!isset($_cf_http_image)||$_cf_http_image=='') $_cf_http_image=0;
+echo mybox_select_box('hpsel14',$data_a,$_cf_http_image,'cf_http_image');
+?>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<p class="subtitle" style='width: 98%; font-weight: bold;'><img src='/i/menu/sub_sep.gif'> Site Redirection</p>
+<table class="data" width="100%">
+<tbody>
+<tr style='border: 1px solid #ccc;'> 
+<td valign="top" class="tdname">Enable Site Redirection</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("On"=>"1","Off"=>"0");
+if(!isset($_cf_http_redirect)||$_cf_http_redirect=='') $_cf_http_redirect=0;
+echo mybox_select_box('hpsel15',$data_a,$_cf_http_redirect,'cf_http_redirect');
+?>
+
+</td>
+</tr>
+<tr style='border: 1px solid #ccc;'> 
+<td valign="top" class="tdvalue" colspan=2>
+<div style='margin-top: 2px;'>
+<a name="sini"><a class="btns" href="#sini" onclick="return add_newsite();return false;">Add new</a>
+</div>
+<div style='background: #ffffff; table-layout: fixed; white-space: nowrap; border: 1px solid #ccc; padding: 0px; margin-top: 5px; margin-bottom: 5px; overflow-x: hidden; overflow-y: auto; width: 460px; height: 150px;'>
+<table id='sitetab' class='data' style='table-layout: fixed; white-space: nowrap; background: #ffffff; border: 0px; margin-top: 0em; margin-bottom: 0em; padding: 0px; width: 460px;'>
+<col style='width: 30px;'>
+<col align="center" style='width: 5px; background: #ffffff;'>
+<col style='width: 30px;'>
+<col style='width: 5px; background: #ffffff;'>
+<col style='width: 5px; background: #ffffff;'>
+<?php 
+$f_array=array();
+$f_array=mybox_file2array("$_PAT_PATH/blacklist/SITE_REDIRECT");
+if(count($f_array)!=0) {
+	$st="checked";
+	foreach($f_array as $i => $n) {
+		$n=trim($n);
+		if($n=='') continue;
+		if($n{0}=="#") $st="";
+		$n=ltrim($n,"#");
+		list($a,$b)=preg_split("/\|/",$n);
+		echo "
+			<tr>
+			<td><input type=text name=sitea[] value='$a' size=25 class='urlbox'></td>
+			<td><img src='{$_PNG['arrow_right_s']}' border=0 alt='' title=''></td>
+			<td><input type=text name=siteb[] value='$b' size=25 class='urlbox'></td>
+			<td><input type=checkbox name=osite[$i] $st></td>
+			<td><a href='#' id='t$i' onclick=\"delete_row_a('t$i','sitetab');return false;\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a></td>
+			</tr>
+		";
+	}
+}
+unset($i,$n,$a,$b);
+?>
+</table>
+</div>
+</td>
+</tr>
+
+</tbody>
+</table>
+
+</td>
+</tr>
+</tbody>
+</table>
+<?php }// tab==3?>
+
+<?php if($tab==4) {?>
+
+<table width="100%" border="0" cellpadding="0" cellspacing="0">
+<tr><td>
+<ul id="tabnav">
+<li class="<?php if($col==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=1) { echo "<a href=\"/proxy_http.exh?tab=$tab&col=1\">"; }?>Exception list<?php if($col!=1) { echo "</a>"; }?></li>
+<li class="<?php if($col==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=2) { echo "<a href=\"/proxy_http.exh?tab=$tab&col=2\">"; }?><?php if($do_id=='edit') { echo "Edit list"; } else { echo "New exception list"; }?><?php if($col!=2) { echo "</a>"; }?></li>
+</ul>
+</td></tr>
+<tr> 
+<td class="tabcont">
+<?php if($col==1) {
+// counting
+$currentPage = $HTTP_SERVER_VARS["PHP_SELF"];
+$maxRows_Recordset=50;
+if(!isset($pageNum_Recordset)) $pageNum_Recordset=0;
+$startRow_Recordset=@($pageNum_Recordset * $maxRows_Recordset);
+$query_Recordset="select * from cf_exclude order by id ASC";
+$query_limit_Recordset=sprintf("%s LIMIT %d, %d", $query_Recordset, $startRow_Recordset, $maxRows_Recordset);
+
+$Recordset=mybox_db_query($query_limit_Recordset, $db_id);
+if(!isset($totalRows_Recordset) || $totalRows_Recordset=='') {
+	$all_Recordset=mybox_db_query($query_Recordset,$db_id);
+	$totalRows_Recordset=mybox_db_num_rows($all_Recordset);
+}
+$totalPages_Recordset=@ceil($totalRows_Recordset/$maxRows_Recordset)-1;
+$queryString_Recordset=null;
+if(!empty($_SERVER['QUERY_STRING'])) {
+	$params=explode("&", $_SERVER['QUERY_STRING']);
+  	$newParams=array();
+  	foreach ($params as $param) {
+		if(stristr($param, "pageNum_Recordset")==true) continue;
+		if(stristr($param, "totalRows_Recordset")==true) continue;
+		if(stristr($param, "maxRows_Recordset")==true) continue;
+		if(stristr($param, "tab")==true) continue;
+		if(stristr($param, "col")==true) continue;
+		if(stristr($param, "do_id")==true) continue;
+		array_push($newParams, $param);
+  	}
+  	if(count($newParams) != 0) {
+    		$queryString_Recordset="&" . implode("&", $newParams);
+  	}
+}
+$queryString_Recordset=sprintf("&totalRows_Recordset=%d%s&tab=$tab&col=$col&do_id=$do_id",$totalRows_Recordset,$queryString_Recordset);
+if($pageNum_Recordset > 0) { 
+	$pagefirst=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, 0, $queryString_Recordset);
+	$pageprev=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, max(0, $pageNum_Recordset - 1), $queryString_Recordset);
+	$button1="<a href='$pagefirst'><img src='{$_PNG['first']}' border=0 alt='' title=''></a>\n";
+	$button2="<a href='$pageprev'><img src='{$_PNG['prev']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button1="<img src='{$_PNG['first']}' border=0 alt='' title=''>\n";
+	$button2="<img src='{$_PNG['prev']}' border=0 alt='' title=''>\n";
+}
+if($pageNum_Recordset < $totalPages_Recordset) {
+	$pagenext=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, min($totalPages_Recordset, $pageNum_Recordset + 1), $queryString_Recordset);
+	$pagelast=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, $totalPages_Recordset, $queryString_Recordset);
+	$button3="<a href='$pagenext'><img src='{$_PNG['next']}' border=0 alt='' title=''></a>\n";
+	$button4="<a href='$pagelast'><img src='{$_PNG['last']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button3="<img src='{$_PNG['next']}' border=0 alt='' title=''>\n";
+	$button4="<img src='{$_PNG['last']}' border=0 alt='' title=''>\n";
+}
+unset($pagefirst,$pageprev,$pagenext,$pagelast);
+$x=1;
+$_cnum=1;
+if(!isset($pageNum_Recordset)||$pageNum_Recordset==''||$pageNum_Recordset==0) {
+	$_cnum=1;
+} else {
+	$_cnum=($pageNum_Recordset * $maxRows_Recordset);
+	if($_cnum <= 0) {
+		$_cnum=1;
+	} else {
+		$_cnum +=1;
+	}
+}
+if($totalRows_Recordset > 0 && mybox_db_num_rows($Recordset)!=0) {
+	echo "
+		<table width='100%' class=data>
+		<thead class='blue'>
+      		<tr>
+        	<td style='font-weight: bold; width: 2%; border-right: 0px;'>#</td> 
+        	<td style='font-weight: bold; width: 100px; border-right: 0px;border-left: 0px;'>Name</td>
+		<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Exception</td>
+        	<td style='border-left: 0px;table-layout: fixed; white-space: nowrap; width: 5%; font-weight: bold; text-align: right;'>&nbsp;</td>
+      		</tr>
+		</thead>
+		<tbody>
+	";
+	do {
+		$_id=$row['id'];
+		if($_id=='') continue;
+		$_name=trim($row['name']);
+		$_src=mybox_get_defname(trim($row['src']),2,0,$db_id);
+		$_dst=$row['dst'];
+		$_user=trim($row['user']);
+		$_user_stat=trim($row['user_stat']);
+		$_auth=trim($row['auth']);
+		$_av=trim($row['av']);
+		$_ext=trim($row['ext']);
+		$_urlf=trim($row['urlf']);
+		$_urlc=trim($row['urlc']);
+		$_urls=trim($row['urls']);
+		//$_hd=trim($row['hd']);
+		//$_hdc=trim($row['hdc']);
+		$_trans=trim($row['trans']);
+		$_domains=trim($row['domains']);
+		$_dex='';
+		if($_auth==1) $_dex .="Authentication / ";
+		if($_trans==1) $_dex .="Transparent mode / ";
+		if($_av==1) $_dex .="Antivirus / ";
+		if($_ext==1) $_dex .="Extension blocking / ";
+		if($_urlf==1) $_dex .="URL Filter / ";
+		if($_urlc==1) $_dex .="Content Removal / ";
+		if($_urls==1) $_dex .="Site Redirection / ";
+		//if($_hd==1 && $_hdc!='') $_dex .="Maximum HTTP download (set to $_hdc MB) / ";
+		$_dex=trim($_dex);
+		$_dex=trim($_dex,'/');
+		$_ad_user='';
+		$result2=mybox_db_query("select user from cf_ad_user where name='$_name'",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			$_ad_user=mybox_db_fetch_single($result2);
+			$_ad_user=str_replace("\\\\\\\\",'\\',$_ad_user);
+			$_ad_user=str_replace("\\\\",'\\',$_ad_user);
+		}
+		unset($result2);
+		$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff; cursor: pointer;'";
+		$lo="onclick=\"self.location.href='/proxy_http.exh?tab=$tab&col=2&id=$_id&do_id=edit';\" ";
+		echo "
+			<tr $lt>
+        		<td $lo valign=top style='text-align: right; vertical-align: top;'>$_cnum</td>
+        		<td $lo valign=top style='vertical-align: top; width: 100px;'><b>$_name</b></td>
+			<td $lo valign=top style='vertical-align: top;'>
+			<table style='border: 0px; padding: 0px; margin: 0px;'>
+			<tr style='border: 0px;'>
+			<td style='vertical-align: top; border: 0px; font-weight: bold; text-align: right;'>Skipping:</td><td style='vertical-align: top; border: 0px; font-style: italic;'>$_dex</td>
+			</tr>
+			<tr style='border: 0px;'>
+			<td style='vertical-align: top; border: 0px; font-weight: bold; text-align: right'>For:</td>
+			<td style='vertical-align: top; border: 0px; font-style: italic;'>
+			<table style='vertical-align: top; border: 1px solid #cccccc; padding: 2px; margin: 0px;'>
+		";
+		if($_src!='') {
+			echo "
+				<tr style='border: 0px;'>
+				<td style='vertical-align: top; border: 0px; padding: 0px; margin: 0px; font-weight: bold; text-align: left;'>
+				source hosts/nets
+				</td>
+				<td style='vertical-align: top; border: 0px; padding: 0px; padding-left: 10px;'>
+				$_src
+				</td>
+				</tr>
+			";
+		}
+		if($_dst==1 && $_domains!='') {
+			$_domains_a=preg_split("/\s+/",$_domains);
+			if(count($_domains_a)!=0) {
+				echo "
+				<tr style='border: 0px;'>
+				<td style='vertical-align: top; border: 0px; padding: 0px; margin: 0px; font-weight: bold; text-align: left;'>
+				target domains
+				</td>
+				<td style='vertical-align: top; border: 0px; padding: 0px; padding-left: 10px;'>
+				";
+				foreach($_domains_a as $_dstt) {
+					echo "$_dstt <br>";
+				}
+				echo "
+				</td>
+				</tr>
+				";
+			}
+		}
+		if($_user_stat==1) {
+			$_usert_a=preg_split("/,/",$_user);
+			echo "
+				<tr style='border: 0px;'>
+				<td style='vertical-align: top; border: 0px; padding: 0px; margin: 0px; font-weight: bold; text-align: left;'>
+				users/group
+				</td>
+				<td style='vertical-align: top; border: 0px; padding: 0px; padding-left: 10px;'>
+			";
+			if(count($_usert_a)!=0) {
+				foreach($_usert_a as $_us) {
+					if($_us=='') continue;
+					$px=mybox_get_defname($_us,2,0,$db_id);
+					echo "$px <br>";
+					unset($px);
+				}
+			}
+			echo "
+				</td>
+				</tr>
+			";
+		}
+		if($_ad_user!='') {
+			$_ad_usert_a=preg_split("/,/",$_ad_user);
+			echo "
+				<tr style='border: 0px;'>
+				<td style='vertical-align: top; border: 0px; padding: 0px; margin: 0px; font-weight: bold; text-align: left;'>
+				AD users/group
+				</td>
+				<td style='vertical-align: top; border: 0px; padding: 0px; padding-left: 10px;'>
+			";
+			if(count($_ad_usert_a)!=0) {
+				foreach($_ad_usert_a as $_us) {
+					if($_us=='') continue;
+					$px=mybox_get_defname($_us,2,0,$db_id);
+					echo "$px <br>";
+					unset($px);
+				}
+			}
+			echo "
+				</td>
+				</tr>
+			";
+		}
+		echo "
+			</table>
+			</td>
+			</tr>
+			</table>
+			</td>
+			<td style='table-layout: fixed; white-space: nowrap; text-align: right; vertical-align: top;' align=right>
+			<a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='/proxy_http.exh?tab=$tab&col=$col&do_save=2&del=$_id&pageNum_Recordset=$pageNum_Recordset&totalPages_Recordset=$totalPages_Recordset';\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a>
+			<input type=checkbox name=del[] value=$_id>
+			</td>
+			</tr>
+		";
+		$_cnum++;
+		$x++;
+	} while($row=mybox_db_fetch_assoc($Recordset));
+	if($_cnum >= 1) {
+		echo "
+			<tr>
+			<td style='text-align: right; background: #ffffff;' align=right valign=top colspan=4>
+			<a href='#' onclick='do_delete(2);return false;'>Delete</a> / <a href='#' onclick='dotoggle();return false;'>Toggle</a> <img src='{$_PNG['arrow_rtr']}' border=0 alt='' title=''></td>
+			</tr>
+		";
+	}
+	echo mybox_print_nextpage($pageNum_Recordset,$totalPages_Recordset,$totalRows_Recordset,$maxRows_Recordset,$queryString_Recordset,$currentPage,'4',$button1,$button2,$button3,$button4);
+	echo "</tbody></table>";
+} else {
+	echo "
+	<br>
+	<span class='notedef'>
+	There are no exception list defined.
+	</span>
+	<br><br>
+	";$_error=1;
+}?>
+
+<?php }//col==1?>
+<?php if($col==2) {
+$_dst=0;$_user_stat=0;
+$_ad_mlx=array();
+$_ad_user_stat=0;
+$_ad_user_stat2=0;
+if(file_exists("/var/sys/ad_user")) {
+	$_ad_user_stat=1;
+	$_ad_user=unserialize(mybox_fget_contents("/var/sys/ad_user"));
+}
+if($do_id=='edit') {
+	$result=mybox_db_query("select * from cf_exclude where id='$id'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=trim($row['name']);
+			$_src=trim($row['src']);
+			$_dst=trim($row['dst']);
+			$_user=trim($row['user']);
+			$_user_stat=trim($row['user_stat']);
+			$_auth=trim($row['auth']);
+			$_av=trim($row['av']);
+			$_ext=trim($row['ext']);
+			$_urlf=trim($row['urlf']);
+			$_urlc=trim($row['urlc']);
+			$_urls=trim($row['urls']);
+			$_hd=trim($row['hd']);
+			$_hdc=trim($row['hdc']);
+			$_trans=trim($row['trans']);
+			$_domains=trim($row['domains']);
+		}
+	}
+	unset($result);
+	$result=mybox_db_query("select * from cf_ad_user where name='$_name'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=trim($row['name']);
+			$_userad=trim($row['user']);
+			$_userad=str_replace("\\\\\\\\",'\\',$_userad);
+			$_ad_user_stat2=1;
+		}
+	}
+}
+$_tlx=array();$_mlx=array();
+$result=mybox_db_query("select name from auth_user where stat='1'",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$x=$row['name'];
+		$_tlx[$x]=$x;
+	}
+}
+unset($x,$result);
+$result=mybox_db_query("select name from group_user",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$x=$row['name'];
+		$_tlx[$x]=$x;
+	}
+}
+unset($x,$result);
+
+$_nmlx=array();
+if($_user!='') {
+	$_nmlx=preg_split("/,/",$_user);
+	if(count($_nmlx)!=0) {
+		foreach($_nmlx as $a) {
+			if($a=='') continue;
+			if($_tlx[$a]==$a) unset($_tlx[$a]);
+		}
+	} else {
+		$_nmlx[]="$_user";
+	}
+	unset($a);
+}
+
+$_ad_tlx=array();
+if($_ad_user_stat==1) {
+	if(count($_ad_user)!=0) {
+		foreach($_ad_user as $ax) {
+			$ax=trim($ax);
+			$_ad_tlx[$ax]=$ax;
+		}
+	}
+	if($_userad!='') {
+		$_ad_nmlx=preg_split("/,/",$_userad);
+		if(count($_ad_nmlx)!=0) {
+			foreach($_ad_nmlx as $a) {
+				if($a=='') continue;
+				if($_ad_tlx[$a]==$a) unset($_ad_tlx[$a]);
+			}
+		} else {
+			$_ad_nmlx[]="$_user";
+		}
+		unset($a);
+	}
+}
+
+?>
+<script type="text/javascript">
+	function set_user() {
+		var list=document.f.mr;
+		var lr='';
+		var ti=0;
+		for(var i=0;i<list.length;i++) {
+			if(list.options[i]!=null && list.options[i].value!='') {
+				ti++;
+				lr +=list.options[i].value;
+				lr +=',';
+			}
+		}
+		document.f.user.value=lr;
+	};
+	function set_user_ad() {
+		var list=document.f.ad_mr;
+		var lr='';
+		var ti=0;
+		for(var i=0;i<list.length;i++) {
+			if(list.options[i]!=null && list.options[i].value!='') {
+				ti++;
+				lr +=list.options[i].value;
+				lr +=',';
+			}
+		}
+		document.f.ad_user.value=lr;
+	};
+	function do_submit() {
+		var name=Trim(document.f.name.value);
+		if(name=='') {
+			pop_msg("Exception name empty");
+			document.f.name.focus();
+			return false;
+		};
+		var ok='0';
+		if(document.f.auth.checked) ok++;
+		if(document.f.av.checked) ok++;
+		if(document.f.ext.checked) ok++;
+		if(document.f.urlf.checked) ok++;
+		if(document.f.urlc.checked) ok++;
+		if(document.f.urls.checked) ok++;
+		if(document.f.trans.checked) ok++;
+		if(ok==0) {
+			pop_msg("Please select at least one check to skip");
+			return false;
+		};
+		ok='0';
+		if(document.f.src.value!='' && document.f.src.value!='<< Not set >>') ok++;
+		if(document.f.dst.value!='' && document.f.dst.value!='<< Not set >>') ok++;
+		if(document.f.user_stat.value!=0) ok++;
+		if(ok==0) {
+			pop_msg("Please select at least one parameter to skip for");
+			return false;
+		};
+		set_user();
+		if(document.getElementById('t22')) {
+			set_user_ad();
+		}
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	};
+
+	function add_newexc() {
+		if(chk_dup_val('exc','text')==true) {
+			return false;
+		};
+		var i=document.getElementById('exctab').rows.length;
+		var tab=document.getElementById('exctab').insertRow(0);
+		tab.insertCell(0).innerHTML="<input type=text name=exc[] value='' size=30 class='urlbox'>";
+		tab.insertCell(1).innerHTML="<a href='#' id='t"+i+"' onclick=\"delete_row_a('t"+i+"','exctab');return false;\"><img src='<?php echo $_PNG['delete'];?>' border=0 alt='' title=''></a>";
+		i=null;tab=null;
+	};
+
+	function enab_fx(val) {
+		if(val!=0) {
+			do_show('f2');do_show('f22');
+		} else {
+			do_hide('f2');do_hide('f22');
+		}
+	};
+
+	function enab_fu(val) {
+		if(val!=0) {
+			do_show('f11');
+		} else {
+			do_hide('f11');
+		}
+	};
+	function enab_fu2(val) {
+		if(val!=0) {
+			do_show('f111');
+		} else {
+			do_hide('f111');
+		}
+	};
+
+	function enab_tc() {
+		if(document.f.trans.checked==true) {
+			do_hide('t1');do_hide('t2');do_hide('t22');
+		} else {
+			do_show('t1');
+			if(document.f.auth.checked==false) {
+				do_show('t2');do_show('t22');
+			}
+		};
+	};
+	function enab_uc() {
+		if(document.f.auth.checked==true) {
+			do_hide('t2');do_hide('t22');
+		} else {
+			if(document.f.trans.checked==false) {
+				do_show('t2');do_show('t22');
+			}
+		}
+	};
+	function inmoveto(a) {
+		if(a=="right") {
+			var p=document.f.mr.length;
+			var lstlenght=document.f.ml.length;
+			var list=document.f.ml;
+			for(var i=0;i<lstlenght;i++) {
+				if(list[i]!=null && list[i].value!='') {
+					if(list.options[i].selected==true) {
+						document.f.mr[p]=new Option(list.options[i].text,list.options[i].value);
+						list[i]=null;
+						p++;
+					}
+				}
+			}
+		}
+
+		if(a=="left") {
+			var p=document.f.ml.length;
+			var lstlenght=document.f.mr.length;
+			var list=document.f.mr;
+			for(var i='0';i<lstlenght;i++) {
+				if(list[i]!=null && list[i].value!='') {
+					if(list.options[i].selected==true) {
+						document.f.ml[p]=new Option(list.options[i].text,list.options[i].value);
+						list[i]=null;
+						p++;
+					}
+				}
+			}
+		}
+	};
+	function inmoveto3(a) {
+		if(a=="right") {
+			var p=document.f.ad_mr.length;
+			var lstlenght=document.f.ad_ml.length;
+			var list=document.f.ad_ml;
+			for(var i=0;i<lstlenght;i++) {
+				if(list[i]!=null && list[i].value!='') {
+					if(list.options[i].selected==true) {
+						document.f.ad_mr[p]=new Option(list.options[i].text,list.options[i].value);
+						list[i]=null;
+						p++;
+					}
+				}
+			}
+		}
+
+		if(a=="left") {
+			var p=document.f.ad_ml.length;
+			var lstlenght=document.f.ad_mr.length;
+			var list=document.f.ad_mr;
+			for(var i='0';i<lstlenght;i++) {
+				if(list[i]!=null && list[i].value!='') {
+					if(list.options[i].selected==true) {
+						document.f.ad_ml[p]=new Option(list.options[i].text,list.options[i].value);
+						list[i]=null;
+						p++;
+					}
+				}
+			}
+		}
+	};
+</script>
+<table class="datanb" width="100%">
+<tbody>
+<tr style='border: 1px solid #ccc;'> 
+<td valign="middle" class="tdname">Name</td>
+<td valign="middle" class="tdvalue">
+<input name="name" type="text" class="valbox2" value="<?php echo $_name;?>" onkeypress="return strip_defname(event);">
+<?php if($do_id=='edit'){?>
+<input name="nameold" type="hidden" value="<?php echo $_name;?>">
+<?php }?>
+</td>
+</tr>
+<tr style='border: 1px solid #ccc;'>
+<td valign="top" class="tdname">Skip these checks</td>
+<td valign="top" class="tdvalue">
+<input type=checkbox name=auth <?php if($_auth==1) echo "checked";?> onclick='enab_uc();'> Authentication<br>
+<input type=checkbox name=av <?php if($_av==1) echo "checked";?>> Antivirus<br>
+<input type=checkbox name=ext <?php if($_ext==1) echo "checked";?>> Extension blocking<br>
+<input type=checkbox name=urlf <?php if($_urlf==1) echo "checked";?>> URL Filter<br>
+<input type=checkbox name=urlc <?php if($_urlc==1) echo "checked";?>> Content Removal<br>
+<input type=checkbox name=urls <?php if($_urls==1) echo "checked";?>> Site redirection<br>
+<?php /*
+<input type=checkbox name=hd <?php if($_hd==1) echo "checked";?> onclick='enab_hc();'> Set maximum HTTP download<br>
+<div id='hc1' style='display: none;'>
+<input name="hdc" type="text" class="valbox" size="10" value="<?php echo $_hdc;?>"> MB
+</div>*/?>
+<input type=checkbox name=trans <?php if($_trans==1) echo "checked";?> onclick='enab_tc();'> Transparent mode host/nets<br>
+</td>
+</tr>
+<tr style='border: 1px solid #ccc;'>  
+<td valign="middle" class="tdname">For these source hosts/networks</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array();
+foreach($list_array as $a) {
+	if($a=='any') continue;
+	$data_a[$a]=$a;
+}
+if(!isset($_src)||$_src=='') $_src='<< Not set >>';
+$data_a["<< Not set >>"]="<< Not set >>";
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($data_a,'src',"$_src",'hpsel16','hpsel16a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+echo mybox_defwin('hpsel16','200px','#ffffff','#999999','#336699','#ffffff','Source hosts/networks','#ffffff','100px','hidden','auto',$txt);
+?>
+</td>
+</tr>
+<tr id='t1' style='border: 1px solid #ccc;'>  
+<td valign="top" class="tdname">OR For these target domains</td>
+<td valign="top" class="tdvalue">
+<?php 
+$data_a=array("<< Set to >>"=>"1","<< Not set >>"=>"0");
+if(!isset($_dst)||$_dst=='') $_dst=0;
+$set_a=array("act"=>"enab_fx('b')");
+echo mybox_select_box('hpsel17',$data_a,$_dst,'dst',$set_a);
+?>
+<div id='f22' style='margin-top: 2px; display: none;'>
+<a name="sini"><a class="btns" href="#sini" onclick="return add_newexc();return false;">Add new</a>
+</div>
+<div id='f2' style='background: #ffffff; display: none; table-layout: fixed; white-space: nowrap; border: 1px solid #ccc; padding: 0px; margin-top: 5px; margin-bottom: 5px; overflow-x: hidden; overflow-y: auto; width: 250px; height: 150px;'>
+<table id='exctab' class='data' style='background: #ffffff; border: 0px; margin-top: 0em; margin-bottom: 0em; padding: 0px; width: 100%;'>
+<col width="*">
+<col style='width: 5px;'>
+<?php 
+$f_array=array();
+$f_array=preg_split("/\s+/",$_domains);
+if(count($f_array)!=0) {
+	foreach($f_array as $i => $n) {
+		echo "
+			<tr>
+			<td><input type=text name=exc[] value='$n' size=30 class='urlbox'></td>
+			<td><a href='#' id='t_$i' onclick=\"delete_row_a('t_$i','exctab');return false;\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a></td>
+			</tr>
+		";
+	}
+}
+?>
+</table>
+
+</div>
+</td>
+</tr>
+
+<tr id='t2' style='border: 1px solid #ccc;'>  
+<td valign="top" class="tdname">OR For these Users/Groups</td>
+<td valign="top" class="tdvalue">
+<?php 
+$data_a=array("<< Set to >>"=>"1","<< Not set >>"=>"0");
+if(!isset($_user_stat)||$_user_stat=='')$_user_stat=0;
+$set_a=array("act"=>"enab_fu('b')");
+echo mybox_select_box('hpsel18',$data_a,$_user_stat,'user_stat',$set_a);
+?>
+<div id='f11' style='margin-top: 2px; display: none;'>
+<table style='border: 0px; padding: 0px; margin: 0px;'>
+<tr>
+<td valign=top style='border: 0px; font-style: italic; font-weight: bold;' colspan=2>
+Available users/groups
+</td>
+<td valign=top style='border: 0px; font-style: italic; font-weight: bold;'>
+Selected users/groups
+</td>
+</tr>
+<tr>
+<td valign=top style='border: 0px; text-align: center;'>
+<select name=ml size=7 multiple class=selbox style='height: 105px; width: 150px;'>
+<?php 
+foreach($_tlx as $n) {
+	$px=mybox_get_defname($n,1,'def1',$db_id);
+	echo "<option value='$n' $px>$n</option>";
+}
+unset($n);
+?>
+</select>
+</td>
+<td valign=absmiddle style='border: 0px; text-align: center;'>
+
+<table class="data" style='border: 0px; padding: 0px; margin: 0px;'>
+<tr>
+<td valign=top style='border: 0px;'>
+<input type=button value=" >> " class="button-small" style='font-weight: bold; font-family: terminal;' onclick="inmoveto('right');">
+</td>
+</tr>
+<tr>
+<td valign=top style='border: 0px;'>
+<input type=button value=" << " class="button-small" style='font-weight: bold; font-family: terminal;' onclick="inmoveto('left');">
+</td>
+</tr>
+</table>
+
+</td>
+<td valign=top style='border: 0px; text-align: center;'>
+<select name=mr size=7 multiple class=selbox style='height: 105px; width: 150px;'>
+<?php 
+foreach($_nmlx as $a) {
+	$px=mybox_get_defname($a,1,'def1',$db_id);
+	echo "<option value='$a' $px>$a</option>";
+}
+unset($a);
+?>
+</select>
+</td>
+</tr>
+</table>
+</div>
+
+</td>
+</tr>
+
+<?php if(file_exists("/var/sys/ad_join_ok")) {?>
+<tr id='t22' style='border: 1px solid #ccc;'>  
+<td valign="top" class="tdname">OR For these AD Users/Groups</td>
+<td valign="top" class="tdvalue">
+<?php 
+$data_a=array("<< Set to >>"=>"1","<< Not set >>"=>"0");
+$set_a=array("act"=>"enab_fu2('b')");
+echo mybox_select_box('hpsel19',$data_a,$_ad_user_stat2,'ad_user_stat2',$set_a);
+?>
+<div id='f111' style='margin-top: 2px; display: none;'>
+<table style='border: 0px; padding: 0px; margin: 0px;'>
+<tr>
+<td valign=top style='border: 0px; font-style: italic; font-weight: bold;' colspan=2>
+Available users/groups
+</td>
+<td valign=top style='border: 0px; font-style: italic; font-weight: bold;'>
+Selected users/groups
+</td>
+</tr>
+<tr>
+<td valign=top style='border: 0px; text-align: center;'>
+<select name=ad_ml size=7 multiple class=selbox style='height: 105px; width: 150px;'>
+<?php 
+foreach($_ad_tlx as $n) {
+	$px=mybox_get_defname($n,1,'def1',$db_id);
+	echo "<option value='$n' $px>$n</option>";
+}
+unset($n);
+?>
+</select>
+</td>
+<td valign=absmiddle style='border: 0px; text-align: center;'>
+
+<table class="data" style='border: 0px; padding: 0px; margin: 0px;'>
+<tr>
+<td valign=top style='border: 0px;'>
+<input type=button value=" >> " class="button-small" style='font-weight: bold; font-family: terminal;' onclick="inmoveto3('right');">
+</td>
+</tr>
+<tr>
+<td valign=top style='border: 0px;'>
+<input type=button value=" << " class="button-small" style='font-weight: bold; font-family: terminal;' onclick="inmoveto3('left');">
+</td>
+</tr>
+</table>
+
+</td>
+<td valign=top style='border: 0px; text-align: center;'>
+<select name=ad_mr size=7 multiple class=selbox style='height: 105px; width: 150px;'>
+<?php 
+foreach($_ad_nmlx as $a) {
+	$px=mybox_get_defname($a,1,'def1',$db_id);
+	echo "<option value='$a' $px>$a</option>";
+}
+unset($a);
+?>
+</select>
+</td>
+</tr>
+</table>
+</div>
+
+</td>
+</tr>
+<?php }?>
+
+</tbody>
+</table>
+<span id='def1' class='def' style='display: none; position: absolute;'></span>
+<input type='hidden' name='user' value=''>
+<input type='hidden' name='ad_user' value=''>
+<script type="text/javascript">
+<?php if($_auth==1) {?>
+enab_uc();
+<?php }?>
+<?php if($_trans==1) {?>
+enab_tc();
+<?php }?>
+enab_fx('<?php echo $_dst;?>');
+enab_fu('<?php echo $_user_stat;?>');
+enab_fu2('<?php echo $_ad_user_stat2;?>');
+//enab_hc('<?php echo $_hd;?>');
+</script>
+<?php }//col=2?>
+</td>
+</tr>
+</table>
+
+<?php }//tab==4?>
+<?php if($_error!=1){?>
+<table align=right>
+<tbody>
+<tr>
+<td><a name="sini"><a class="btn" href="#sini" onclick="return do_changes();return false;">Reload</a></td>
+<?php if($col!=1){?>
+<td>
+<a name="sini"><a class="btn" href="#sini" onclick="return do_submit();return false;"><?php if($do_id=='edit') { echo "Update"; } else { echo "Save";}?></a>
+</td></tr> 
+<?php  } ?>
+</tbody>
+</table>
+<?php }?>
+<!-- end tab container -->
+
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value='<?php echo $tab;?>'>
+<input type=hidden name=col value='<?php echo $col;?>'>
+<?php if($tab==4 && $col==2) {?>
+<input type=hidden name=id value='<?php echo $id;?>'>
+<input type=hidden name=do_id value='<?php echo $do_id;?>'>
+<?php  } ?>
+</form>
+<script type='text/javascript'>page_kill();</script>
+</body>
+</html>
+
+<?php mybox_db_close($db_id);?>

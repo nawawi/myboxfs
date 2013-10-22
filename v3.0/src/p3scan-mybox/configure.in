@@ -1,0 +1,319 @@
+AC_INIT(configure.in)
+
+AM_CONFIG_HEADER(config.h)
+AM_INIT_AUTOMAKE(p3scan, 2.9.09d)
+AC_PREFIX_DEFAULT(/usr/local)
+
+AC_LANG_C
+AC_PROG_CC
+AC_PROG_LN_S
+AM_PROG_LIBTOOL
+
+AC_DEFINE(SCANBUFF, 131072, [scan buffer size])
+AC_DEFINE(FILEBUFF, 8192,   [file i/o buffer size])
+AC_DEFINE(MINSPACE, 10000, [minimum disk space needed])
+
+# From clamav :)
+# Check for broken snprintf (code by Phil Oleson <oz*nixil.net>)
+if test "x$ac_cv_func_snprintf" = "xyes" ; then
+        AC_MSG_CHECKING([whether snprintf correctly terminates long strings])
+        AC_TRY_RUN(
+                [
+#include <stdio.h>
+int main(void){char b[5];snprintf(b,5,"123456789");return(b[4]!='\0');}
+                ],
+                [AC_MSG_RESULT(yes)],
+                [
+                        AC_MSG_RESULT(no)
+                        AC_DEFINE(BROKEN_SNPRINTF,1,[Define if your snprintf is busted])
+                        AC_MSG_WARN([****** Your snprintf() function is broken, complain to your vendor!])
+                ]
+        )
+fi
+
+# check for the SA_NOCLDWAIT flag for signal
+
+##AC_MSG_CHECKING(for SA_NOCLDWAIT flag)
+#AC_TRY_COMPILE( [
+##include <signal.h>
+##include <string.h>
+##include <stdio.h>
+#],[
+#struct sigaction sa;
+
+#memset(&sa, 0, sizeof(sa));
+#sa.sa_handler=SIG_IGN;
+#sa.sa_flags=SA_NOCLDWAIT;
+#sigaction(SIGCHLD, &sa, NULL);
+#], AC_DEFINE_UNQUOTED(HAVE_NOCLDWAIT,1, [ Whether to use SA_NOCLDWAIT ]))
+
+# Checks for libraries.
+
+AC_CHECK_LIB(pthread, pthread_create,  [], [AC_MSG_ERROR([library 'pthread' is required!])])
+LDFLAGS="$LDFLAGS -L/usr/lib/pthread"
+CPPFLAGS="$CPPFLAGS -I/usr/include/pthread"
+
+# Checks for header files.
+AC_HEADER_DIRENT
+AC_HEADER_STDC
+AC_HEADER_SYS_WAIT
+AC_CHECK_HEADERS([arpa/inet.h fcntl.h malloc.h netdb.h netinet/in.h stdlib.h string.h strings.h sys/param.h sys/socket.h sys/statvfs.h sys/time.h syslog.h unistd.h])
+
+# Checks for typedefs, structures, and compiler characteristics.
+AC_C_CONST
+AC_TYPE_OFF_T
+AC_TYPE_PID_T
+AC_TYPE_SIZE_T
+AC_HEADER_TIME
+AC_STRUCT_TM
+
+# Checks for library functions.
+AC_FUNC_CLOSEDIR_VOID
+AC_FUNC_FORK
+AC_FUNC_LSTAT
+AC_FUNC_LSTAT_FOLLOWS_SLASHED_SYMLINK
+AC_FUNC_MALLOC
+AC_FUNC_REALLOC
+AC_FUNC_SELECT_ARGTYPES
+AC_FUNC_STAT
+AC_FUNC_STRFTIME
+AC_FUNC_CHOWN
+AC_FUNC_SETPGRP
+AC_TYPE_SIGNAL
+AC_CHECK_FUNCS([bzero gethostname inet_ntoa memmove memset mkdir rmdir select setsockopt socket strcasecmp strchr strcspn strdup strerror strncasecmp strndup strspn strstr strtol strtoul])
+
+# libclamav
+#
+AM_CONDITIONAL(CLAMAV, false)
+AC_MSG_CHECKING([for disable clamav])
+AC_ARG_ENABLE(clamav,
+[  --disable-clamav        disable if you want to compile without internal clamav support.
+                          default=enable],
+[case "${disableval}" in
+  yes) clamav=yes clamav=yes;;
+  no)  clamav=no clamav=no;;
+  *) clamav=yes ;;
+esac])
+
+if test "$clamav" != yes
+then
+  AC_MSG_RESULT([no])
+# Check for ClamAV
+  AH_TEMPLATE(HAVE_CLAMAV, [clamav executable path])
+
+  AC_MSG_CHECKING(for clamav)
+  AC_ARG_WITH(clamav, AC_HELP_STRING(--with-clamav=DIR,    use clamav in DIR),
+  [
+    if test -f $withval/include/clamav.h; then
+      CLAMAVINC="-I$withval/include"
+      CLAMAVLIB="-L$withval/lib -lclamav"
+      AC_DEFINE(CLAMAV, 1, [Defined if clamav is wanted])
+      AC_MSG_RESULT($withval)
+      AC_DEFINE(HAVE_CLAMAV, 1)
+      AM_CONDITIONAL(CLAMAV, true)
+    elif test -f $withval/include/clamav/clamav.h; then
+      AC_DEFINE(CLAMAV, 1, [Defined if clamav is wanted])
+      SSLINC="-I$withval/clamav/include"
+      SSLLIB="-L$withval/clamav/lib -lclamav"
+      AC_DEFINE(HAVE_CLAMAV, 1)
+      AM_CONDITIONAL(CLAMAV, true)
+      AC_MSG_RESULT($withval)
+    else
+      AC_MSG_RESULT(no)
+      AC_MSG_ERROR([clamav.h not found in $withval])
+    fi
+  ],
+  [
+    if test -f /usr/include/clamav.h; then
+      CLAMAVLIB="-lclamav"
+      AC_DEFINE(CLAMAV, 1, [Defined if clamav is wanted])
+      AC_DEFINE(HAVE_CLAMAV, 1)
+      AM_CONDITIONAL(CLAMAV, true)
+      AC_MSG_RESULT(yes)
+    else
+      AC_MSG_RESULT(no)
+      AC_MSG_ERROR([clamav.h not found in $withval])
+    fi]
+  )
+  LDFLAGS="$LDFLAGS $CLAMAVLIB"
+  CPPFLAGS="$CPPFLAGS $CLAMAVINC"
+else
+  AC_MSG_RESULT([$clamav])
+fi
+AC_SUBST(CLAMAV)
+
+#   pcre
+#
+AC_MSG_CHECKING([for disable pcre])
+AC_ARG_ENABLE(pcre,
+[  --disable-pcre          disable if you want to compile without pcre support.
+                          default=enable (needed for basic and bash scanners).],
+[case "${disableval}" in
+  yes) pcre=yes pcre=yes;;
+  no)  pcre=no pcre=no;;
+  *) pcre=yes ;;
+esac])
+#PCRE="$pcre"
+#AC_SUBST(PCRE)
+
+if test "$pcre" != yes
+then
+  AC_MSG_RESULT([no])
+# Check for pcre
+#  AC_MSG_CHECKING(for pcre path)
+# Verify that we have the development headers
+# Some systems have pcre as "pcre.h", others as "pcre/pcre.h"
+  pcre=no
+  AC_CHECK_HEADER([pcre.h],[AC_DEFINE([PCRE_HEADER],[<pcre.h>],[location of header for pcre parser]) pcre=pcre])
+  if test $pcre = no; then
+    AC_CHECK_HEADER([pcre/pcre.h],[AC_DEFINE([PCRE_DIR_HEADER],[<pcre/pcre.h>],[location of header for dir/pcre parser]) pcre=pcredir])
+  fi
+
+  if test $pcre = no; then
+    echo
+    echo "   ERROR!  Libpcre header not found, go get it from"
+    echo "   http://www.pcre.org"
+    exit
+  fi
+  LDFLAGS="$LDFLAGS -lpcre"
+  AC_DEFINE(PCRE, 1, [Defined for PCRE use])
+  AC_SUBST(PCRE_HEADER)
+  AC_SUBST(PCRE_DIR_HEADER)
+else
+   AC_MSG_RESULT([$pcre])
+fi
+
+AC_ARG_WITH(p3docs,
+[  --with-doc=DIR          path for documentation (default=/usr/doc)],
+p3docs="$withval", p3docs="/doc")
+#AC_DEFINE_UNQUOTED(P3DOCS,"$p3docs",[path for documentation])
+AC_MSG_CHECKING([for documentation path])
+if test $prefix = 'NONE'; then
+  p3docs="$ac_default_prefix$p3docs"
+else
+  p3docs="${prefix}$p3docs"
+fi
+AC_DEFINE_UNQUOTED(P3DOCS,"$p3docs",[path for documentation])
+AC_MSG_RESULT($p3docs)
+P3DOCS="$p3docs"
+AC_SUBST(P3DOCS)
+
+AC_ARG_WITH(lang,
+[  --with-lang=CODE        language code of default virus template (default=en)],
+p3lang="$withval", p3lang="en")
+AC_DEFINE_UNQUOTED(P3LANG,"$p3lang",[language code])
+AC_MSG_CHECKING([for p3scan language code])
+AC_MSG_RESULT([$p3lang])
+P3LANG="$p3lang"
+AC_SUBST(P3LANG)
+
+AC_MSG_CHECKING([for init type])
+p3init="rc.d"
+if test -f "/etc/sysconfig/init"
+then
+  p3init="init.d"
+fi
+AC_MSG_RESULT([$p3init])
+P3INIT="$p3init"
+AC_SUBST(P3INIT)
+
+# allow users to override $localstatedir, but retain old default (/var)
+# if not specified
+if test $localstatedir = '${prefix}/var'; then
+  localstatedir="/var"
+fi
+
+# PID_FILE
+pid_file="$localstatedir/run/p3scan/p3scan.pid"
+AC_DEFINE_UNQUOTED(PID_FILE,"$pid_file",[Running State File])
+AC_SUBST(PID_FILE)
+
+# VIRUS_DIR
+virus_dir="$localstatedir/spool/p3scan"
+AC_DEFINE_UNQUOTED(VIRUS_DIR,"$virus_dir",[Infected File storage area])
+AC_SUBST(VIRUS_DIR)
+
+# NOTIFY_MAIL_DIR
+notify_mail_dir="$virus_dir/notify"
+AC_DEFINE_UNQUOTED(NOTIFY_MAIL_DIR,"$notify_mail_dir",[Notification message creation area])
+AC_SUBST(NOTIFY_MAIL_DIR)
+
+# allow users to override $sysconfdir, but retain old default (/etc)
+# if not specified
+if test $sysconfdir = '${prefix}/etc'; then
+  sysconfdir="/etc"
+fi
+AC_DEFINE_UNQUOTED(SYSCONFDIR,"$sysconfdir",[Config File prefix])
+AC_SUBST(SYSCONFDIR)
+
+# CONFIGBASE
+configbase="$sysconfdir/p3scan"
+AC_DEFINE_UNQUOTED(CONFIGBASE,"$configbase",[Config File Base])
+AC_SUBST(CONFIGBASE)
+
+# CONFIGFILE
+configfile="$configbase/p3scan.conf"
+AC_DEFINE_UNQUOTED(CONFIGFILE,"$configfile",[Config File Location])
+AC_SUBST(CONFIGFILE)
+
+# VIRUS_TEMPLATE
+virus_template="$configbase/p3scan-$p3lang.mail"
+AC_DEFINE_UNQUOTED(VIRUS_TEMPLATE,"$virus_template",[Virus Template Location])
+AC_SUBST(VIRUS_TEMPLATE)
+
+# EXTRA
+extra="$sysconfdir/p3scan/p3scan.extra"
+AC_DEFINE_UNQUOTED(EXTRA,"$extra",[Extra file])
+AC_SUBST(EXTRA)
+
+# Define to the address where bug reports for this package should be sent.
+# PACKAGE_BUGREPORT
+package_bugreport="http://sourceforge.net/mail/?group_id=96801"
+AC_DEFINE_UNQUOTED(PACKAGE_BUGREPORT,"$package_bugreport",[Bug Reports])
+AC_SUBST(PACKAGE_BUGREPORT)
+
+# Define to the full name of this package.
+# PACKAGE_NAME
+package_name="P3Scan"
+AC_DEFINE_UNQUOTED(PACKAGE_NAME,"$package_name",[Package Name])
+AC_SUBST(PACKAGE_NAME)
+
+# Define to the full name and version of this package.
+#define PACKAGE_STRING ""
+package_string="p3scan-$VERSION"
+AC_DEFINE_UNQUOTED(PACKAGE_STRING,"$package_string",[Long Package Name])
+AC_SUBST(PACKAGE_STRING)
+
+# Define to the one symbol short name of this package.
+#define PACKAGE_TARNAME ""
+
+# Define to the version of this package.
+#define PACKAGE_VERSION ""
+package_version="$VERSION"
+AC_DEFINE_UNQUOTED(PACKAGE_VERSION,"$package_version",[Package Version])
+AC_SUBST(PACKAGE_VERSION)
+
+AC_OUTPUT(Makefile src/Makefile)
+
+#cat << EOF
+echo
+echo "P3Scan will be created with"
+echo
+if test "$clamav" != yes; then
+  echo "ClamAV enabled."
+else
+  echo "ClamAV disabled. Please install clamav before compiling p3scan if wanted."
+fi
+if test "$pcre" != yes; then
+  echo "PCRE enabled."
+else
+  echo "PCRE disabled."
+fi
+echo "default user = $p3user"
+echo "default language code = $p3lang"
+echo
+echo "You can now run 'make'."
+echo "Please consider donating to this project at http://p3scan.sourceforge.net"
+echo "Mahalo Nui Loa and Enjoy!"
+echo
+#EOF

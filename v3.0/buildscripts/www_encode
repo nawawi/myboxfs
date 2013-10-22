@@ -1,0 +1,33 @@
+#!/mfs-gcc/bin/php -q
+<?
+        function splitByNewline($string, $length) {
+                while (strlen($string)>0) {
+                        $newstring.=substr($string, 0, $length) . "\n";
+                        $string=substr($string, $length);
+                }
+                return $newstring;
+        }
+
+        function do_encode($b64_input) {
+                //$b64_input=stripslashes($b64_input);
+                $output=$b64_input;
+                //$output=preg_replace("/\n|\r|\t/", "",$output);
+                $output=gzdeflate("?>".$output."<?php ",9);
+                $output=base64_encode($output);
+                //$output=splitByNewline($output,40);
+                $output="<?php eval(gzinflate(base64_decode('$output')));?>";
+                echo "$output\n";
+        }
+        $file=$argv[1];
+        if($file=='') {
+                echo "$file not found\n";
+                exit;
+        }
+        if(file_exists($file)) {
+                $handle = fopen($file,'rb');
+                $file_content = fread($handle,filesize($file));
+                fclose($handle);
+                do_encode("$file_content");
+        }
+
+?>

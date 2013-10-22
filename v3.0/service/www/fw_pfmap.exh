@@ -1,0 +1,581 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="fw_pfnat";
+include_once('page.exl');
+
+mybox_chk_session();
+mybox_send_nocache();
+
+$_error=0;
+$db_id=mybox_db_connect($_DB_NAME);
+
+if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+	if(isset($do_id)&&$do_id=='apply_chg') {
+		$msg='<script>waitcount();</script>';
+		mybox_echo_query("policy-restart");
+	}
+	if($col==1) {
+		// shift
+		if(isset($do_save)&&$do_save==6) {
+			if(count($del)!=0) {
+				foreach($del as $_zid) {
+					//$_zid=$del[0];
+					mybox_db_query("update pf_map set id='-1' where id='$_zid'",$db_id);
+					mybox_db_query("update pf_map set id='$_zid' where id='$shift_id'",$db_id);
+					mybox_db_query("update pf_map set id='$shift_id' where id='-1'",$db_id);
+				}
+			}
+		}
+		// duplicate
+		if(isset($do_save)&&($do_save==5)) {
+			if(count($del)!=0) {
+				$_nid='';
+				$_res=mybox_db_query("select COUNT(*)+1 as id from pf_map",$db_id);
+				if(mybox_db_num_rows($_res)!=0) { 
+					$_nid=mybox_db_fetch_single($_res);
+				}
+				trim($_nid);
+				unset($_res);
+				if($_nid=='') $_nid=1;
+				foreach($del as $x) {
+					$result=mybox_db_query("select * from pf_map where id='$x'",$db_id);
+					if(mybox_db_num_rows($result)!=0) {
+						while($row=mybox_db_fetch_assoc($result)) {
+							$_type=$row['type'];
+							$_src=$row['src'];
+							$_dst=$row['dst'];
+							$_fwd=$row['fwd'];
+							$_event=$row['event'];
+							$_stat=$row['stat'];
+							$_note=$row['note'];
+							mybox_db_query("insert into pf_map (id,type,src,dst,fwd,event,stat,note) values ('$_nid','$_type','$_src','$_dst','$_fwd','$_event','$_stat','$_note')",$db_id);
+							$_nid++;						
+						}
+					}
+					unset($result,$_src,$_dst,$_fwd,$_event,$_type,$_stat,$_note);
+				}
+			}
+		}
+		if(isset($do_save)&&$do_save==3) {
+			if($stat==1) { $stat=0; } else { $stat=1; }
+			if(is_array($del) && count($del)!=0) {
+				foreach($del as $x) {
+					if($x!='') mybox_db_query("update pf_map set stat='$stat' where id='$x'",$db_id);
+				}
+			} else {
+				if($del!='') mybox_db_query("update pf_map set stat='$stat' where id='$del'",$db_id);
+			}
+		}
+		if(isset($do_save)&&$do_save==2) {
+			if(is_array($del) && count($del)!=0) {
+				foreach($del as $x) {
+					if($x!='') mybox_db_query("delete from pf_map where id='$x'",$db_id);
+				}
+			} else {
+				if($del!='') mybox_db_query("delete from pf_map where id='$del'",$db_id);
+			}
+			mybox_reorder_policy($db_id,"pf_map");
+		}
+		if(isset($do_save)&&$do_save==1) {
+			if(!isset($do_list)||$do_list=='') $do_list=1;
+			if(is_array($del) && count($del)!=0 && $do_list==1) {
+				foreach($del as $x) {
+					if($x!='') {
+						if($stat!='') mybox_db_query("update pf_map set stat='$stat' where id='$x'",$db_id);
+					}
+				}
+			} else {
+				if($del!='') {
+					if($stat==1) { $stat=0; } else { $stat=1; }
+					if($stat!='') mybox_db_query("update pf_map set stat='$stat' where id='$del'",$db_id);
+				}
+			}
+			if($do_list==0) {
+				if($stat!='') mybox_db_query("update pf_map set stat='$stat'",$db_id);
+			}
+		}
+	}
+	if($col==2) {
+		if($do_id!='edit') {
+			if(isset($do_save)&&$do_save==1) {
+				$note=mybox_escape_str($note);
+				$_nid=1;
+				if($position=='TOP') {
+					mybox_db_query("update pf_map set id = id+1 where 1 > 0",$db_id);
+					$_nid=1;
+				} else {
+					$_res=mybox_db_query("select COUNT(*)+1 as id from pf_map",$db_id);
+					if(mybox_db_num_rows($_res)!=0) { 
+						$_nid=sqlite_fetch_single($_res);
+					}
+				}
+				mybox_db_query("insert into pf_map (id,type,src,dst,fwd,event,stat,note) values ('$_nid','$ntype','$src','$dst','$fwd','$event','$stat','$note')",$db_id);
+				$msg='Configuration saved';
+			}
+		} else {
+			if(isset($do_save)&&$do_save==1) {
+				$note=mybox_escape_str($note);
+				mybox_db_query("update pf_map set type='$ntype',src='$src',dst='$dst',fwd='$fwd',event='$event',stat='$stat',note='$note' where id='$id'",$db_id);
+				$msg='Configuration saved';
+				$col=1;$do_id='';
+			}
+		}
+	}
+
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied";
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+if(!isset($col)||$col=='') $col=1;
+
+?>
+<html>
+<head>
+<title>MyAdmin</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<script type='text/javascript' src="/j/mybox_func.js"></script>
+<script type='text/javascript' src="/j/mybox_overlib.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?php echo $_LOGIN['auth_id'];?>";
+	page_load();
+</script>
+<script type='text/javascript'>
+	function do_changes() {
+		self.location.href='<?php echo "/fw_pfmap.exh?tab=$tab&col=$col&do_id=apply_chg";?>';	
+	};
+	function do_submit() {
+		var dst=Trim(document.f.dst.value);
+		var fwd=Trim(document.f.fwd.value);
+		if(dst==fwd) {
+			pop_msg("Traffic Destination and Traffic Mapping cannot be same");
+			return false;
+		}
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	};
+	<?php if($col==1) {?>
+	function do_shift(id) {
+		if(chkdel()!=false) {
+			document.f.do_save.value='6';
+			document.f.shift_id.value=id;
+			document.f.submit();
+		}
+	};
+	<?php }//col==1?>
+
+function waitcount() {
+	page_reload('600','<?php echo "/fw_pfmap.exh?tab=$tab&col=$col";?>');
+}
+</script>
+</head>
+<body onload="load_menu('sub5','t5d3','s5i3');" scroll="auto">
+<form name=f method=post action="/fw_pfmap.exh">
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 0px;'>
+<tr>
+<td>
+<?php mybox_page_section("Firewall / NAT rules");?>
+<br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="/fw_pfnat.exh?tab=1" <?php if($tab==1){?>class="tabact"<?php }?>>DNAT</a></li>
+<li><a href="/fw_pfnat.exh?tab=2" <?php if($tab==2){?>class="tabact"<?php }?>>SNAT</a></li>
+<li><a href="/fw_pfmap.exh?tab=3" <?php if($tab==3){?>class="tabact"<?php }?>>1:1</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td> 
+<?php mybox_page_msg($msg);?>
+<br>
+
+<!-- tab container -->
+<table width="100%" border="0" cellpadding="0" cellspacing="0">
+<tr><td>
+<ul id="tabnav">
+<li class="<?php if($col==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=1) { echo "<a href=\"/fw_pfmap.exh?tab=$tab&col=1\">"; }?>Rules list<?php if($col!=1) { echo "</a>"; }?></li>
+<li class="<?php if($col==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=2) { echo "<a href=\"/fw_pfmap.exh?tab=$tab&col=2\">"; }?><?php if($do_id=='edit') { echo "Edit"; } else { echo "Add new"; }?><?php if($col!=2) { echo "</a>"; }?></li>
+</ul>
+</td></tr>
+<tr> 
+<td class="tabcont">
+<?php if($col==1) {
+// reorder
+mybox_reorder_policy($db_id,"pf_map");
+// counting
+$currentPage = $HTTP_SERVER_VARS["PHP_SELF"];
+$maxRows_Recordset=50;
+if(!isset($pageNum_Recordset)) $pageNum_Recordset=0;
+$startRow_Recordset=@($pageNum_Recordset * $maxRows_Recordset);
+$query_Recordset="select * from pf_map order by id ASC";
+$query_limit_Recordset=sprintf("%s LIMIT %d, %d", $query_Recordset, $startRow_Recordset, $maxRows_Recordset);
+$Recordset=mybox_db_query($query_limit_Recordset, $db_id);
+if(!isset($totalRows_Recordset) || $totalRows_Recordset=='') {
+	$all_Recordset=mybox_db_query($query_Recordset,$db_id);
+	$totalRows_Recordset=mybox_db_num_rows($all_Recordset);
+}
+$totalPages_Recordset=@ceil($totalRows_Recordset/$maxRows_Recordset)-1;
+$queryString_Recordset=null;
+if(!empty($_SERVER['QUERY_STRING'])) {
+	$params=explode("&", $_SERVER['QUERY_STRING']);
+  	$newParams=array();
+  	foreach ($params as $param) {
+		if(strpos($param, "pageNum_Recordset")!==FALSE) continue;
+		if(strpos($param, "totalRows_Recordset")!==FALSE) continue;
+		if(strpos($param, "maxRows_Recordset")!==FALSE) continue;
+		if(strpos($param, "tab")!==FALSE) continue;
+		if(strpos($param, "col")!==FALSE) continue;
+		if(strpos($param, "do_id")!==FALSE) continue;
+		array_push($newParams, $param);
+  	}
+  	if(count($newParams) != 0) {
+    		$queryString_Recordset="&" . implode("&", $newParams);
+  	}
+}
+$queryString_Recordset=sprintf("&totalRows_Recordset=%d%s&tab=$tab&col=$col",$totalRows_Recordset,$queryString_Recordset);
+if($pageNum_Recordset > 0) { 
+	$pagefirst=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, 0, $queryString_Recordset);
+	$pageprev=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, max(0, $pageNum_Recordset - 1), $queryString_Recordset);
+	$button1="<a href='$pagefirst'><img src='{$_PNG['first']}' border=0 alt='' title=''></a>\n";
+	$button2="<a href='$pageprev'><img src='{$_PNG['prev']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button1="<img src='{$_PNG['first']}' border=0 alt='' title=''>\n";
+	$button2="<img src='{$_PNG['prev']}' border=0 alt='' title=''>\n";
+}
+if($pageNum_Recordset < $totalPages_Recordset) {
+	$pagenext=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, min($totalPages_Recordset, $pageNum_Recordset + 1), $queryString_Recordset);
+	$pagelast=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, $totalPages_Recordset, $queryString_Recordset);
+	$button3="<a href='$pagenext'><img src='{$_PNG['next']}' border=0 alt='' title=''></a>\n";
+	$button4="<a href='$pagelast'><img src='{$_PNG['last']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button3="<img src='{$_PNG['next']}' border=0 alt='' title=''>\n";
+	$button4="<img src='{$_PNG['last']}' border=0 alt='' title=''>\n";
+}
+unset($pagefirst,$pageprev,$pagenext,$pagelast);
+$x=1;
+if(!isset($pageNum_Recordset)||$pageNum_Recordset==''||$pageNum_Recordset=='0') {
+	$_cnum=1;
+} else {
+	$_cnum=($pageNum_Recordset * $maxRows_Recordset);
+	if($_cnum <= 0) {
+		$_cnum=1;
+	} else {
+		$_cnum +=1;
+	}
+}
+if($totalRows_Recordset >0 && mybox_db_num_rows($Recordset)!=0) {
+	echo "
+	<table width='100%' class=data>
+	<thead class='blue'>
+	<tr>
+        <td style='font-weight: bold; width: 2%; border-right: 0px;'>#</td>
+        <td style='font-weight: bold; width: 20%; border-right: 0px;border-left: 0px;'>Type</td>
+        <td style='font-weight: bold; width: 35%; border-right: 0px;border-left: 0px;' colspan=2>Traffic</td>
+        <td style='font-weight: bold; width: 35%; border-right: 0px;border-left: 0px;' colspan=2>Mapping</td>
+	<td style='font-weight: bold; text-align: center; width: 2%; border-right: 0px;border-left: 0px;'>Active</td>
+	<td style='text-align: center; width: 7%; border-left: 0px;' colspan=2>&nbsp;</td>
+      	</tr>
+	</thead>
+	<tbody style='font-weight: bold;'>";
+
+	do {
+		$_id=$row['id'];
+		if($_id=='') continue;
+		$_type=$row['type'];
+		$_src=mybox_get_defname($row['src'],2,0,$db_id);
+		$_dst=mybox_get_defname($row['dst'],2,0,$db_id);
+		$_service=mybox_get_defname($row['service'],2,0,$db_id);
+		$_fwd=mybox_get_defname($row['fwd'],2,0,$db_id);
+		$_fwdp=mybox_get_defname($row['fwdp'],2,0,$db_id);
+		$_event=mybox_get_defname(trim($row['event']),2,0,$db_id);
+		$_stat=$row['stat'];
+		$_note=mybox_unescape_str($row['note']);
+		if($_note!='') $_note=mybox_print_note($_note);
+		$_eventl='';
+		if($_event!='' && $_event!='any') $_eventl="($_event)";
+		$_ttype="Source network";
+		if($_type==0) $_ttype="Destination network";
+		$lo="onclick=\"self.location.href='/fw_pfmap.exh?tab=$tab&col=2&id=$_id&do_id=edit';\" ";
+		$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff;'";
+
+		echo "
+			<tr style='background-color: #ffffff;' $lt>
+        		<td style='vertical-align: top;' $lo>$_cnum</td>
+        		<td style='vertical-align: top;' $lo>$_ttype</td>
+        		<td style='vertical-align: top;' $lo colspan=2>
+			$_src <img src='{$_PNG['arrow_right_s']}' border=0 alt='' title=''> $_dst  $_eventl
+			$_note
+			</td>
+        		<td style='vertical-align: top;' $lo colspan=2>
+			$_fwd 
+			</td>
+			<td style='text-align: center;'><a href='/fw_pfmap.exh?tab=$tab&col=1&del=$_id&do_save=3&stat=$_stat&pageNum_Recordset=$pageNum_Recordset&totalRows_Recordset=$totalRows_Recordset'><img src='{$_PNG_YESNO[$_stat]}' border=0 alt='' title=''></a></td>
+			<td style='text-align: right; table-layout: fixed; white-space: nowrap;'><a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='/fw_pfmap.exh?tab=$tab&col=1&del=$_id&do_save=2&pageNum_Recordset=$pageNum_Recordset&totalRows_Recordset=$totalRows_Recordset';return false;\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a><input type=checkbox name=del[] value=$_id></td>
+			<td  style='text-align: right; width: 2%; border-bottom: 0px;' valign=middle align=right><a href='#' onclick='do_shift($_id);return false;'><img src='{$_PNG['arrow_left']}' border=0 alt='' title=''></a></td>
+			</tr>
+		";
+		$_cnum++;$x++;
+	} while($row=mybox_db_fetch_assoc($Recordset));
+	if($_cnum >= 1) {
+		$set_a=array("width"=>"100px");
+		echo "<tr>";
+		echo "<td style='text-align: right; border-right: 0px; background: #ffffff;' valign=top colspan=8>";
+		echo "<table align=right style='text-align: right; margin: 0px; padding: 0px; border: 0px;'>";
+		echo "<tr>";
+		$data_a=array("<< Select >>"=>"","Enable"=>"1","Disable"=>"0");
+		echo "<td style='margin: 0px; padding: 0px; border: 0px; vertical-align: bottom;'>".mybox_select_box('pfsel2',$data_a,'','stat',$set_a)."</td>";
+		$set_a=array("width"=>"150","act"=>"pf_do_delete('b')");		
+		$data_a=array("<< Select >>"=>"","Duplicate"=>"5","Delete"=>"2");
+		echo "<td style='margin: 0px; padding: 0px; border: 0px; vertical-align: bottom;'>".mybox_select_box('pfsel3',$data_a,'','dupdel',$set_a)."</td>";
+		echo "<td style='margin: 0px; padding: 0px; border: 0px; vertical-align: bottom;'>&nbsp;&nbsp;<a href='#' onclick='dotoggle();return false;'>Toggle</a><img src='{$_PNG['arrow_rtr']}' border=0 alt='' title=''></td>";
+		echo "</tr></table>";
+		echo "</td>";
+		echo "<td style='text-align: right; border-left: 0px; border-top: 0px; background: #ffffff;' valign=top></td>";
+		echo "</tr>";
+	}
+	echo mybox_print_nextpage($pageNum_Recordset,$totalPages_Recordset,$totalRows_Recordset,$maxRows_Recordset,$queryString_Recordset,$currentPage,'9',$button1,$button2,$button3,$button4);
+	echo "</tbody></table>";
+} else {
+	echo "
+	<br>
+	<span class='notedef'>
+	There are no 1:1 NAT defined.
+	</span>
+	<br><br>
+	";$_error=1;
+}
+?>
+
+</td></tr></table>
+<?php  } //col==1 ?>
+<?php if($col==2) {
+
+if($do_id=='edit') {
+	$result=mybox_db_query("select * from pf_map where id='$id'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_type=$row['type'];
+			$_src=$row['src'];
+			$_dst=$row['dst'];
+			$_fwd=$row['fwd'];
+			$_event=$row['event'];
+			$_stat=$row['stat'];
+			$_note=mybox_unescape_str($row['note']);
+		}
+	}
+	$_timeday_array=preg_split("/,/",$_timeday);
+}
+$list_array=array();
+$list_array2=array();
+$list_arraynat=array();
+$list_defevent=array();
+$list_array=mybox_ipname_array($db_id);
+if(count($list_array)!=0) {
+	foreach($list_array as $x) {
+		if(strpos($x,"(Network)")!==FALSE) {
+			$list_arraynat[]="$x";
+		}
+	}
+}
+unset($x);
+$list_array2=mybox_defnetwork_array($db_id);
+if(count($list_array2)!=0) {
+	foreach($list_array2 as $a => $b) {
+		if($b['type']!=4) {	
+			$list_array[]="$a";
+		} elseif($b['type']==2) {
+			$list_arraynat[]="$a";
+		}
+	}
+}
+
+unset($a,$b);
+$list_array2=array();
+$list_array2=mybox_deftimes_array($db_id);
+if(count($list_array2)!=0) {
+	foreach($list_array2 as $a => $b) $list_defevent[]="$a";
+}
+
+unset($a,$b,$list_array2);
+?>
+<table width="100%" class="data">
+<!------------- type ------------------->
+<tr> 
+<td valign="top" class="tdname">Type</td>
+<td valign="top" class="tdvalue">
+<?php 
+$data_a=array("Destination Network"=>"0","Source Network"=>"1");
+if(!isset($_type)||$_type=='') $_type=0;
+echo mybox_select_box('pfmmsel1',$data_a,$_type,'ntype');
+?>
+</td>
+</tr>
+<!------------- end src ------------------->
+<!------------- src ------------------->
+<tr> 
+<td valign="top" class="tdname">Traffic Source</td>
+<td valign="top" class="tdvalue">
+<?php 
+if(!isset($_src)||$_src=='') $_src='any';
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($list_array,'src',"$_src",'pfmm1','pfmm1a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+echo mybox_defwin('pfmm1','200px','#ffffff','#999999','#336699','#ffffff','Traffic Source','#ffffff','100px','hidden','auto',$txt);
+?>
+</td>
+</tr>
+<!------------- end src ------------------->
+<!------------- dst ------------------->
+<tr> 
+<td valign="top" class="tdname">Traffic Destination</td>
+<td valign="top" class="tdvalue">
+<?php 
+$data_a=array();
+foreach($list_arraynat as $_list) {
+	if(!isset($_dst)||$_dst=='') $_dst=$_list;
+	$data_a[$_list]=$_list;	
+}
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($data_a,'dst',"$_dst",'pfmm2','pfmm2a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+echo mybox_defwin('pfmm2','200px','#ffffff','#999999','#336699','#ffffff','Traffic Destination','#ffffff','100px','hidden','auto',$txt);
+?>
+</td>
+</tr>
+<!------------- end dst ------------------->
+<!------------- fwd ------------------->
+<tr> 
+<td valign="top" class="tdname">Traffic mapping</td>
+<td valign="top" class="tdvalue">
+<?php 
+$data_a=array();
+foreach($list_arraynat as $_list) {
+	if($_list=='any') continue;
+	if(!isset($_fwd)||$_fwd=='') $_fwd=$_list;
+	$data_a[$_list]=$_list;	
+}
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($data_a,'fwd',"$_fwd",'pfmm3','pfmm3a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+echo mybox_defwin('pfmm3','200px','#ffffff','#999999','#336699','#ffffff','Traffic Destination','#ffffff','100px','hidden','auto',$txt);
+?>
+</td>
+</tr>
+<!------------- end fwd ------------------->
+<!------------- time ------------------->
+<tr> 
+<td valign="top" class="tdname">Time Event</td>
+<td valign="top" class="tdvalue">
+<?php 
+$data_a=array();
+$data_a["Always"]="";
+foreach($list_defevent as $p) {
+	$data_a[$p]=$p;
+}
+if(!isset($_event)) $_event='';
+echo mybox_select_box('pfmmsel2',$data_a,$_event,'event');
+?>
+</td>
+</tr>
+<!------------- end time ------------------->
+<!------------- active ------------------->
+<tr> 
+<td valign="middle" class="tdname">Active this rule</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+if(!isset($_stat)||$_stat=='') $_stat=0;
+echo mybox_select_box('pfmmsel3',$data_a,$_stat,'stat');
+?>
+</td>
+</tr>
+<!------------- end active ------------------->
+<?php if($do_id!='edit') {?>
+<!------------- position ------------------->
+<tr> 
+<td valign="middle" class="tdname">Rule position</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("Bottom"=>"BOTTOM","Top"=>"TOP");
+echo mybox_select_box('pfsel4',$data_a,"BOTTOM",'position');
+?>
+</td>
+</tr>
+<!------------- end position ------------------->
+<?php  } ?>
+<!------------- description ------------------->
+<tr> 
+<td valign="middle" class="tdname">Comment</td>
+<td valign="middle" class="tdvalue">
+<input name="note" type="text" class="valbox2" value="<?php echo $_note;?>">
+</td>
+</tr>
+<!------------- end description ------------------->
+
+</table>
+</td>
+</tr>
+</table>
+
+<?php  } //col=2 ?>
+
+<table align=right>
+<tbody>
+<tr>
+<?php if($col==1){?><td><a name="sini"><a class="btn" href="#sini" onclick="return do_changes();return false;">Reload</a></td><?php }?>
+<?php if($_error!=1){?>
+<td>
+<a name="sini"><a class="btn" href="#sini" onclick="return do_submit();return false;"><?php if($do_id=='edit') { echo "Update"; } else { echo "Save";}?></a>
+</td>
+<?php }?>
+</tr> 
+</tbody>
+</table>
+
+
+<!-- end tab container -->
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?php echo $tab;?>>
+<input type=hidden name=col value=<?php echo $col;?>>
+<input type=hidden name=shift_id value=''>
+<?php if($col==1) {?>
+<input type=hidden name=pageNum_Recordset value='<?php echo $pageNum_Recordset;?>'>
+<input type=hidden name=totalRows_Recordset value='<?php echo $totalRows_Recordset;?>'>
+<?php  } ?>
+<?php if($do_id=='edit' && $col==2) {?>
+<input type=hidden name=do_id value=edit>
+<input type=hidden name=id value='<?php echo $id;?>'>
+<?php  } ?>
+</form>
+<script type='text/javascript'>page_kill();</script>
+</body>
+</html>
+
+<?php mybox_db_close($db_id);?>

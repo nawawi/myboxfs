@@ -1,0 +1,35 @@
+# This is an example on how to configure the redirect.so module.
+# Each line consists of either one field, or two fields separated by TAB.
+# One field means: redirect to the default replacement pattern.
+# First field being a single "!" means: define the default replacement
+# pattern. Two fields means: replace with second field.
+# Patterns with a - in front are case-insensitive.
+
+### This shows how to reject ad banners:
+# Define the replacement. In my case this is a 1x1 GIF.
+# Put this line first.
+!	http://127.0.0.1/dummy.gif
+
+# Ad banner patterns we don't want to see.
+-http://ad\.doubleclick\.net(:80)?(/.*)?$
+-http://adforce\.imgis\.com(:80)?(/.*)?$
+-/advert(i[sz](e(ments?)?|ing))?/
+-/banners?/
+
+### The replacement URL below returns error 404 on my server.
+# This is to guard against special Netscape stupidities.
+/netscape-related.html$		http://127.0.0.1/404
+http://javascript-of-unknown-origin\.netscape\.com	http://127.0.0.1/404
+# ...and Microsoft stupidities.
+/favicon.ico$			http://127.0.0.1/404
+
+### This example shows how to redirect requests to a nearer mirror.
+-http://www.xfree86.org(:80)?(/.*)?$	http://www.uni-paderborn.de/mirrors/xfree86\2
+
+# Note the common pattern
+# (:80)?(/.*)?$
+# at the end of the URLs. This should catch all combinations of URLs with
+# or without default port number, and with or without the trailing slash
+# if the path is null. \2 is the whole path component, including
+# leading slash.
+

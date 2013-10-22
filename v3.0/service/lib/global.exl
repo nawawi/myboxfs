@@ -1,0 +1,157 @@
+<?php 
+// leave this here.
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+
+// variables setting
+// please check rc.bootup rc.init rc.start before change this setting
+$_HTDOCS_PATH="/service/www";
+$_ROOT_DIR="/strg/mybox";
+$_DB_PATH="$_ROOT_DIR/db";
+$_RRA_PATH="$_ROOT_DIR/rra";
+$_GRAPH_PATH="$_HTDOCS_PATH/g";
+$_LOG_PATH="$_ROOT_DIR/logs";
+$_DOWNLOAD_PATH="$_ROOT_DIR/download";
+$_BACKUP_PATH="$_ROOT_DIR/backup";
+$_UPDATE_PATH="$_ROOT_DIR/update";
+$_RTMP_PATH="$_ROOT_DIR/tmp";
+$_LICENSE_PATH="$_ROOT_DIR/mfs-license.exc";
+$_SQLITE_BINARY="/bin/sqlite";
+$_INIT_DIR="/service/init";
+$_ZONELIST="/usr/share/zoneinfo/ZONELIST.TXT";
+$_DB_DEBUG=0; // 0 = disable 1 = enable
+$_DB_NAME="system.db";
+$_DB_BLACKLIST="blacklist.db";
+$_DB_SPYWARE="spyware.db";
+$_PAT_PATH="$_ROOT_DIR/patterns";
+
+// 28-Nov-2006
+function mybox_fget_contents($file) {
+	if(file_exists($file)) return trim(@file_get_contents($file));
+}
+function mybox_mkdirr($pathname, $mode = 0700) {
+	if(is_dir($pathname) || empty($pathname)) return true;
+	if(is_file($pathname)) return false;
+	$next_pathname = substr($pathname, 0, strrpos($pathname, DIRECTORY_SEPARATOR));
+	if(mybox_mkdirr($next_pathname, $mode)) {
+        	if(!file_exists($pathname)) {
+			return mkdir($pathname, $mode);
+        	}
+    	}
+    	return false;
+}
+// 21-Jun-2007
+function mybox_unlink_f($dirname) {
+	if($dirHandle = opendir($dirname)) {
+		chdir($dirname);
+        	while($file = readdir($dirHandle)) {
+			if($file == '.' || $file == '..') continue;
+			if(is_dir($file)) {
+				mybox_unlink_f($file);
+			} else {
+				unlink($file);
+			}
+		}
+		chdir('..');
+ 		rmdir($dirname);
+		closedir($dirHandle);
+	}
+	return true;
+}
+
+function mybox_unlink($fileglob) {
+	if(is_string($fileglob)) {
+		if(is_file($fileglob)) {
+			return unlink($fileglob);
+        	} elseif(is_dir($fileglob)) {
+			if(mybox_unlink("$fileglob/*")==false) {
+				return false;
+			}
+ 			return mybox_unlink_f($fileglob);
+		} else {
+			$matching=glob($fileglob);
+			if($matching===false) return false;  
+ 			$rcs=array_map('mybox_unlink', $matching);
+			if(@in_array(false, $rcs)) return false;
+		}      
+	} elseif(is_array($fileglob)) {
+		$rcs=array_map('mybox_unlink', $fileglob);
+		if(@in_array(false, $rcs)) return false;
+	} else {
+		return false;
+	}
+	return true;
+}
+function mybox_str_encrypt($string, $epad='!5047a88a7963275e43790ee796dcb7ec!') {
+	$pad=base64_decode($epad);
+	$encrypted='';
+	for($i=0;$i<strlen($string);$i++) {
+		$encrypted .= chr(ord($string[$i]) ^ ord($pad[$i]));
+	}
+	return base64_encode($encrypted);
+}
+function mybox_str_decrypt($string, $epad='!5047a88a7963275e43790ee796dcb7ec!') {
+	$pad=base64_decode($epad);
+	$encrypted=base64_decode($string);
+	$decrypted='';
+	for($i=0;$i<strlen($encrypted);$i++) {
+		$decrypted .= chr(ord($encrypted[$i]) ^ ord($pad[$i]));
+	}
+	return $decrypted;
+}
+// mybox_license
+function mybox_license($id='') {
+	global $_LICENSE_PATH, $_AWIE_CODE;
+	global $_UPDATE;
+
+	if(!file_exists($_LICENSE_PATH)) return -1;
+	$_LICENSE_FILE=$_LICENSE_PATH;
+	if(!file_exists("/etc/license.dat")) {
+		if(copy($_LICENSE_PATH,"/etc/license.dat")) {
+			$_LICENSE_FILE="/etc/license.dat";
+		}
+	}
+	$data=mybox_fget_contents($_LICENSE_FILE);
+	if($data=='') return -1;
+
+	$_MYBOX_LICENSE=array();
+	$key0=mybox_str_decrypt($data,"!#$5047a88a7963275e43790ee796dcb7ec#$!");
+	$key1=unserialize($key0);
+	if(!is_array($key1)) return -1;
+	$hash1=$key1['hash1'];
+	$hash2=$key1['hash2'];
+	$hash3=mybox_str_decrypt($hash2,$hash1);
+	$hash4=unserialize($hash3);
+	if(!is_array($hash4)) return -2;
+	$_MYBOX_LICENSE=$hash4;
+	if(isset($_MYBOX_LICENSE['url']) && $_MYBOX_LICENSE['url']!='') {
+		$_UPDATE['url']=$_MYBOX_LICENSE['url'];
+	}
+	if(isset($_MYBOX_LICENSE['name']) && $_MYBOX_LICENSE['name']!='') {
+		$_UPDATE['name']=$_MYBOX_LICENSE['name'];
+	}
+	if(isset($_MYBOX_LICENSE['expired']) && $_MYBOX_LICENSE['expired']!='none') {
+		$_expired=strtotime($_MYBOX_LICENSE['expired']);
+		if(strlen($_expired) > 8) {
+			if(time() > $_expired) {
+				$_time=date('d/m/Y',$_expired);
+				return -3;
+			} 
+		}
+		unset($_time,$_expired);
+	}
+	if($_MYBOX_LICENSE[$id]!='') {
+		return $_MYBOX_LICENSE[$id];
+	}
+}
+if(!file_exists("/etc/version")) file_put_contents("/etc/version",mybox_license("pkg"));
+if(!is_dir("/tmp/sessions")) @mybox_mkdirr("/tmp/sessions");
+if(!is_dir("/tmp/console.session")) @mybox_mkdirr("/tmp/console.session");
+if(!is_dir($_DOWNLOAD_PATH)) @mybox_mkdirr("$_DOWNLOAD_PATH");
+if(!is_dir($_LOG_PATH)) @mybox_mkdirr("$_LOG_PATH");
+if(!is_dir($_RTMP_PATH)) @mybox_mkdirr("$_RTMP_PATH");
+if(!is_dir($_GRAPH_PATH)) @mybox_mkdirr("$_GRAPH_PATH");
+if(!is_dir($_PAT_PATH)) @mybox_mkdirr("$_PAT_PATH");
+if(!is_dir($_BACKUP_PATH)) @mybox_mkdirr("$_BACKUP_PATH");
+if(!is_dir($_RRA_PATH)) @mybox_mkdirr("$_RRA_PATH");
+if(!is_dir("$_UPDATE_PATH/files")) @mybox_mkdirr("$_UPDATE_PATH/files");
+?>

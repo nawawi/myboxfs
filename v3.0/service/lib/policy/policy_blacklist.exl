@@ -1,0 +1,188 @@
+<?php 
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+
+function policy_blacklist(&$_KMSG_BL,$_blacklist_block) {
+	global $_DB_BLACKLIST, $_QUIET;
+
+	// 1 = inbound
+	// 2 = outbound
+	// 3 = both
+
+	$_drop="DROP";
+	if($_blacklist_block==2) $_drop="REJECT";
+	$db_id=mybox_db_connect($_DB_BLACKLIST);
+	$result=mybox_db_query("select * from blacklist where stat='1' order by id ASC",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_id=$row['id'];
+			$_ip=$row['ip'];
+			$_log=$row['log'];
+			$_cid="$_id";
+			$_note=mybox_unescape_str($row['note']);
+			if($_note=='') $_note='none';
+			if($_log==1) $_KMSG_BL['B'][$_cid]="$_note";
+
+			if($_blacklist_block==3) {
+				if(mybox_check_mac($_ip)) {
+					if($_log==1) do_iptable("-A ACL1000-05 -m mac --mac-source $_ip -m limit --limit 5/sec --limit-burst 10 -j NFLOG --nflog-prefix \"F:B:$_drop:$_cid \"");
+					do_iptable("-A ACL1000-05 -m mac --mac-source $_ip -j $_drop");
+				} else {
+					// 0.0.0.0/0 0.0.0.0 0.0.0.0/0.0.0.0
+					if(preg_match("/(^\d+\.\d+\.\d+\.\d+\/\d+$|^\d+\.\d+\.\d+\.\d+$|^\d+\.\d+\.\d+\.\d+\/\d+\.\d+\.\d+\.\d+$)/",$_ip)) {
+						if($_log==1) do_iptable("-A ACL1000-05 -s $_ip -m limit --limit 5/sec --limit-burst 10 -j NFLOG --nflog-prefix \"F:B:DROP:$_cid \"");
+						do_iptable("-A ACL1000-05 -s $_ip -j $_drop");
+						if($_log==1) do_iptable("-A ACL1000-05 -d $_ip -m limit --limit 5/sec --limit-burst 10 -j NFLOG --nflog-prefix \"F:B:DROP:$_cid \"");
+						do_iptable("-A ACL1000-05 -d $_ip -j $_drop");
+					} else {
+						if($_log==1) do_iptable("-A ACL1000-05 -m string --algo bm --to 65535 --string \"$_ip\" -m state --state NEW,RELATED,ESTABLISHED -m limit --limit 6/minute --limit-burst 1 -j NFLOG --nflog-prefix \"F:B:$_drop:$_cid \"");
+						do_iptable("-A ACL1000-05 -m string --algo bm --to 65535 --string \"$_ip\" -j $_drop");
+					}
+				}
+			}
+			if($_blacklist_block==2) {
+				if(!mybox_check_mac($_ip)) {
+					// 0.0.0.0/0 0.0.0.0 0.0.0.0/0.0.0.0
+					if(preg_match("/(^\d+\.\d+\.\d+\.\d+\/\d+$|^\d+\.\d+\.\d+\.\d+$|^\d+\.\d+\.\d+\.\d+\/\d+\.\d+\.\d+\.\d+$)/",$_ip)) {
+						if($_log==1) do_iptable("-A ACL1000-05 -d $_ip -j NFLOG --nflog-prefix \"F:B:$_drop:$_cid \"");
+						do_iptable("-A ACL1000-05 -d $_ip -j $_drop");
+					} else {
+						if($_log==1) do_iptable("-A ACL1000-05 -m string --algo bm --to 65535 --string \"$_ip\" -m state --state NEW,RELATED,ESTABLISHED -m limit --limit 6/minute --limit-burst 1 -j NFLOG --nflog-prefix \"F:B:$_drop:$_cid \"");
+						do_iptable("-A ACL1000-05 -m string --algo bm --to 65535 --string \"$_ip\" -j $_drop");
+					}
+				}
+			}
+			if($_blacklist_block==1) {
+				if(mybox_check_mac($_ip)) {
+					if($_log==1) do_iptable("-A ACL1000-05 -m mac --mac-source $_ip -j NFLOG --nflog-prefix \"F:B:$_drop:$_cid \"");
+					do_iptable("-A ACL1000-05 -m mac --mac-source $_ip -j $_drop");
+				} else {
+					// 0.0.0.0/0 0.0.0.0 0.0.0.0/0.0.0.0
+					if(preg_match("/(^\d+\.\d+\.\d+\.\d+\/\d+$|^\d+\.\d+\.\d+\.\d+$|^\d+\.\d+\.\d+\.\d+\/\d+\.\d+\.\d+\.\d+$)/",$_ip)) {
+						if($_log==1) do_iptable("-A ACL1000-05 -s $_ip -j NFLOG --nflog-prefix \"F:B:DROP:$_cid \"");
+						do_iptable("-A ACL1000-05 -s $_ip -j $_drop");
+					} else {
+						if($_log==1) do_iptable("-A ACL1000-05 -m string --algo bm --to 65535 --string \"$_ip\" -m state --state NEW,RELATED,ESTABLISHED -m limit --limit 6/minute --limit-burst 1 -j NFLOG --nflog-prefix \"F:B:$_drop:$_cid \"");
+						do_iptable("-A ACL1000-05 -m string --algo bm --to 65535 --string \"$_ip\" -j $_drop");
+					}
+				}
+			}			
+		}
+	}
+	mybox_db_close($db_id);
+}
+
+function policy_spyware_log($_blacklist_spyware_log,$_xpt,$_xid,$_drop) {
+	if($_blacklist_spyware_log==1) {
+		do_iptable("-A ACL1000-04 $_xpt -m limit --limit 5/sec --limit-burst 10 -j NFLOG --nflog-prefix \"SPYWARE:$_xid:$_drop \"");
+	}
+}
+function policy_spyware($_blacklist_spyware_block,$_blacklist_spyware_log,$_blacklist_spyware_drop) {
+	global $_DB_SPYWARE, $_QUIET;
+
+	// 1 = inbound
+	// 2 = outbound
+	// 3 = both
+
+	$_drop="DROP";
+	if($_blacklist_spyware_drop==2) $_drop="REJECT";
+	$db_id=mybox_db_connect($_DB_SPYWARE);
+	$result=mybox_db_query("select * from spyware order by id ASC",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_id=$row['id'];
+			$_ip=$row['ip'];
+
+			if($_blacklist_spyware_block==3) {
+				// 0.0.0.0/0 0.0.0.0 0.0.0.0/0.0.0.0
+				if(preg_match("/(^\d+\.\d+\.\d+\.\d+\/\d+$|^\d+\.\d+\.\d+\.\d+$|^\d+\.\d+\.\d+\.\d+\/\d+\.\d+\.\d+\.\d+$)/",$_ip)) {
+					policy_spyware_log($_blacklist_spyware_log,"-s $_ip",$_id,$_blacklist_spyware_drop);
+					do_iptable("-A ACL1000-04 -s $_ip -j $_drop");
+					policy_spyware_log($_blacklist_spyware_log,"-d $_ip",$_id,$_blacklist_spyware_drop);
+					do_iptable("-A ACL1000-04 -d $_ip -j $_drop");
+				} 
+			}
+			if($_blacklist_spyware_block==2) {
+				// 0.0.0.0/0 0.0.0.0 0.0.0.0/0.0.0.0
+				if(preg_match("/(^\d+\.\d+\.\d+\.\d+\/\d+$|^\d+\.\d+\.\d+\.\d+$|^\d+\.\d+\.\d+\.\d+\/\d+\.\d+\.\d+\.\d+$)/",$_ip)) {
+					policy_spyware_log($_blacklist_spyware_log,"-d $_ip",$_id,$_blacklist_spyware_drop);
+					do_iptable("-A ACL1000-04 -d $_ip -j $_drop");
+				} 
+			}
+			if($_blacklist_spyware_block==1) {
+				// 0.0.0.0/0 0.0.0.0 0.0.0.0/0.0.0.0
+				if(preg_match("/(^\d+\.\d+\.\d+\.\d+\/\d+$|^\d+\.\d+\.\d+\.\d+$|^\d+\.\d+\.\d+\.\d+\/\d+\.\d+\.\d+\.\d+$)/",$_ip)) {
+					policy_spyware_log($_blacklist_spyware_log,"-s $_ip",$_id,$_blacklist_spyware_drop);
+					do_iptable("-A ACL1000-04 -s $_ip -j $_drop");
+				} 
+			}			
+		}
+	}
+	mybox_db_close($db_id);
+}
+
+function do_policy_blacklist($db_id='') {
+	global $_DB_NAME, $_QUIET;
+
+	if(file_exists("/var/sys/init_no_restart")) return;
+
+	$close_db=0;
+	if($db_id=='') {
+		$db_id=mybox_db_connect($_DB_NAME);
+		$close_db=1;
+	}
+	$_KMSG_BL=unserialize(mybox_fget_contents("/var/sys/fwmsg"));
+	unset($_KMSG_BL['B']);
+	$_KMSG_BL['B']=array();
+	unset($_KMSG_BL['S']);
+	$_KMSG_BL['S']=array();
+	iptables_open(1);
+       	do_iptable("*filter");
+	do_iptable(":ACL1000-04 - [0:0]");
+	do_iptable(":ACL1000-05 - [0:0]");
+
+	$result=mybox_db_query("select * from misc where name like \"blacklist_%\" ",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=trim($row['name']);
+			$_val=trim($row['val']);
+			$_name="_$_name";
+			$$_name="$_val";
+		}
+	}
+
+	if($_blacklist_stat==1 || $_blacklist_spyware_stat==1) {
+		$_gw_ip=mybox_fget_contents("/var/sys/gw_ip");
+		policy_get_data(&$_dev,&$_local,&$_masqip,&$_ping,$db_id);
+		$_local['127.0.0.1']='127.0.0.1';
+		if($_gw_ip!='') $_local[$_gw_ip]=$_gw_ip;
+		if(count($_local)!=0) {
+			foreach($_local as $_ip => $a) {
+				if($_ip=='') continue;
+				do_iptable("-A ACL1000-04 -p all -s $_ip -j RETURN");
+				do_iptable("-A ACL1000-05 -p all -s $_ip -j RETURN");
+			}
+		}
+		unset($_gw_ip,$_ip);
+	}
+
+	if($_blacklist_stat==1) {
+		mybox_init_echo($_QUIET,"INFO","Loading Blacklist rules");
+		policy_blacklist(&$_KMSG_BL,$_blacklist_block);
+	}
+
+	if($_blacklist_spyware_stat==1) {
+		if($_blacklist_spyware_drop=='' || $_blacklist_spyware_drop <= 0) $_blacklist_spyware_drop=1;
+		mybox_init_echo($_QUIET,"INFO","Loading Spyware rules");
+		policy_spyware($_blacklist_spyware_block,$_blacklist_spyware_log,$_blacklist_spyware_drop);
+	}
+
+	policy_close();
+	if($close_db==1) {
+		mybox_db_close($db_id);	
+	}
+	mybox_save_to_file("/var/sys/fwmsg",serialize($_KMSG_BL));
+}
+
+?>

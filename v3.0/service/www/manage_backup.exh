@@ -1,0 +1,364 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="manage_backup";
+include_once('page.exl');
+mybox_chk_session();
+mybox_send_nocache();
+
+function _print_backup($msg='') {
+	global $_BACKUP_PATH;
+	$buff=mybox_dir2array("$_BACKUP_PATH/*.mbf");
+	$ok=0;$ret='';
+        if(count($buff)!=0) {
+		$buff=array_reverse($buff);
+		foreach($buff as $lx1) {
+			$lx=basename($lx1);
+			if(preg_match("/(\S+)\_(\S+)\_(\S+)\_(\S+)\_(\S+)\.mbf/",$lx,$mm)) {
+				$ok=1;
+				$h=$mm[1];
+				$v=$mm[2];
+				$s=$mm[3];
+				$d=$mm[4];
+				$t=$mm[5];
+				list($y,$m,$dd)=explode("-",$d);
+				list($h,$i)=explode("-",$t);
+				$da=strtotime("$m/$dd/$y $h:$i");
+				$dt=date('d-M-Y h:i A',$da);
+				$note='';$note_a=array();$ret1=1;			
+				@exec("tar -O -zxf $lx1 NOTE",$note_a,$ret1);
+				if($ret1==0 && count($note_a)!=0) {
+					$note=trim($note_a[0]);
+					if($note!='') {
+						$note=mybox_print_note($note);
+					}
+				}
+				$ret .="<tr style='background-color: #ffffff;'>";
+				$ret .="<td>";
+				$ret .="<a href='#' onclick=\"do_backup_restore(1,'$lx');\"><img src='/i/bak_restore.gif' border=0></a>&nbsp;";
+				$ret .="<a href='#' onclick=\"do_backup_restore(2,'$lx');\"><img src='/i/bak_download.gif' border=0></a>&nbsp;";
+				$ret .="<a href='#' onclick=\"do_backup_restore(3,'$lx');\"><img src='/i/bak_delete.gif' border=0></a>";
+				$ret .="</td>";
+				$ret .="<td valign=top>";
+				$ret .="<b>$dt</b>";
+				$ret .=$note;
+				$ret .="</td>";
+				$ret .="<td valign=top>";
+				$ret .="<b>$v $s</b>";
+				$ret .="</td>";
+				$ret .="</tr>";
+			}
+			unset($h,$v,$s,$d,$t,$y,$m,$dd,$da,$dt,$note,$note_a,$ret1);
+		}
+	}
+	if($ok==0) {
+		$ret="<tr style='background-color: #ffffff;'>";
+		$ret .="<td colspan=3 align=center>No backups available</td></tr>";
+	} else {
+		if($msg!='') {
+			$ret .="<tr style='background-color: #ffffff;'>";
+			$ret .="<td colspan=3 align=center><font color=green>$msg</font></td></tr>";
+		}
+	}
+	echo $ret;
+}
+
+if(isset($_GET['d'])&&$_GET['d']==1 && isset($_GET['f'])&&$_GET['f']!='') {
+	$msgx="Permission denied";
+	if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+		mybox_backup_delete(&$msgx,$_GET['f']);
+	}
+	_print_backup($msgx);
+	exit;
+}
+
+if(isset($_GET['d'])&&$_GET['d']==3 && isset($_GET['f'])&&$_GET['f']!='') {
+	$msgx="Permission denied";
+	if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+		mybox_backup_restore(&$msgx,2,$_GET['f']);
+	}
+	_print_backup($msgx);
+	exit;
+}
+
+if(isset($_GET['d'])&&$_GET['d']==2 && isset($_GET['f'])&& time() >= $_GET['f']!='') {
+	$msgx="Permission denied";
+	if(mybox_chk_level($_LOGIN['auth_id'],2)==1) {
+		mybox_backup_restore(&$msgx,1,'',$_GET['n']);
+	}
+	_print_backup($msgx);
+	exit;
+}
+
+if($tab==1) {
+	if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+		if(isset($do_save)&&$do_save==1) {
+			if(move_uploaded_file("$filename","$_BACKUP_PATH/$filename_name")) {
+				$msg="File uploaded successfully.";
+			}
+		}
+	} else {
+		if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+			$msg="Permission denied.";
+		}
+	}
+}
+
+if($tab==2) {
+	$db_id=mybox_db_connect($_DB_NAME);
+	if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+		if(isset($do_save)&&$do_save==1) {
+			mybox_db_query("update misc set val='$bstat' where name='backup_stat'",$db_id);
+			mybox_db_query("update misc set val='$bint' where name='backup_int'",$db_id);
+			mybox_db_query("update misc set val='$bmax' where name='backup_max'",$db_id);
+			$msg="Configuration saved";
+			mybox_echo_query("cron-restart-quiet");
+		}
+	} else {
+		if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+			$msg="Permission denied.";
+		}
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+?>
+<html>
+<head>
+<title>MyAdmin</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<script type='text/javascript' src="/j/mybox_func.js"></script>
+<script type='text/javascript' src="/j/mybox_ajax.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?php echo $_LOGIN['auth_id'];?>";
+</script>
+<script type='text/javascript'>
+function do_upload() {
+	<?php if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {?>
+	if(!chk_filename(document.f.filename.value)) { return false; }
+	document.f.do_save.value='1';
+	document.f.submit();
+	return true;
+	<?php } else {?>
+	pop_msg("Permission denied");
+	return false;
+	<?php }?>
+	
+};
+function chk_filename(file) {                                                                   
+        var m=/(\S+)\.mbf$/;
+	var ff=basename(file);
+	if(ff==false) {
+		ff=file;
+	};                                                                             
+        if(file.match(m)==null) { pop_msg("Invalid file '"+ff+"'"); return false; }                       
+        return true;                                                                                                                
+};
+
+function do_backup_delete(file) {
+	<?php if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {?>
+	backup_task('<?php echo "/manage_backup.exh?_NOLOGIN=1&d=1&f=";?>'+file);
+	<?php } else {?>
+	pop_msg("Permission denied");
+	return false;
+	<?php }?>
+};
+
+function do_backup_now() {
+	var note='';
+	if(document.f.note) {
+		note=Trim(document.f.note.value);
+	}
+	error("Saving data. Please wait..");
+	backup_task('<?php echo "/manage_backup.exh?_NOLOGIN=1&d=2&f=".time()."";?>&n='+note);
+	do_hide('notebck');
+	return false;
+};
+
+function do_restore_now(file) {
+	<?php if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {?>
+	if(confirm("This action will restore previous backup file "+file+" Are you sure want to proceed?")) {
+		error("Writing data. Please wait..");
+		backup_task('/manage_backup.exh?_NOLOGIN=1&d=3&f='+file);
+	}
+	<?php } else {?>
+	pop_msg("Permission denied");
+	return false;
+	<?php }?>
+};
+
+function do_backup_restore(opt,file) {
+	if(opt==1) {
+		do_restore_now(file);
+		return false;	
+	};
+	if(opt==2) {
+		self.location.href='/b/'+file;
+		return false;
+	};
+	if(opt==3) {
+		error("Removing data. Please wait..");
+		do_backup_delete(file);
+		return false;	
+	};
+	return false;
+}
+
+</script>
+</head>
+<body scroll="auto" onload="load_menu('sub3','t3d4','s3i4');">
+<form name=f method=post action="/manage_backup.exh" enctype="multipart/form-data">
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 0px;'>
+<tr>
+<td>
+<?php mybox_page_section("Management / Backup/Restore");?>
+<br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="/manage_backup.exh?tab=1" <?php if($tab==1){?>class="tabact"<?php }?>>Backup/Restore</a></li>
+<li><a href="/manage_backup.exh?tab=2" <?php if($tab==2){?>class="tabact"<?php }?>>Automatic backups</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td> 
+<?php mybox_page_msg($msg);?>
+<br>
+<!-- tab container -->
+<?php if($tab==1) {?>
+<table width='100%' class=data>
+<thead class='blue'>
+<tr>
+<td style='font-weight: bold; width: 30%;border-right: 0px;'>Available backups</td>
+<td style='font-weight: bold; width: 50%;border-right: 0px;border-left: 0px;'>Date/Time of creation</td>
+<td style='font-weight: bold; width: 20%;border-left: 0px;'>Version</td>
+</tr>
+</thead>
+<tbody id='backup'>
+<?php _print_backup();?>
+</tbody>
+</table>
+
+<table width='100%' class=datanb>
+<tbody>
+<tr>
+<td style='vertical-align: top;  margin: 0px; padding: 0px;'>
+<?php 
+$txt="
+<table style='margin: 0px; padding: 0px;'>
+<tr><td><input type=file class='filebox' size='35' name=filename></td></tr>
+<tr><td><a class='btns' href='#' onclick='return do_upload();return false;'>Upload</a></td></tr>
+</table>";
+echo mybox_defwin('dbck','330px','#ebebeb','#999999','#336699','#ffffff','Upload File','#ebebeb','70px','hidden','hidden',$txt);
+$txt="
+<table style='margin: 0px; padding: 0px;'>
+<tr><td><input type=text name='note' class='valbox2' value=''></td></tr>
+<tr><td>
+<a class='btns' href='#' onclick='return do_backup_now();return false;'>Create backup</a></td></tr>
+</table>";
+echo mybox_defwin('notebck','250px','#ebebeb','#999999','#336699','#ffffff','Comment (optional)','#ebebeb','70px','hidden','hidden',$txt);
+?>
+<a name="sini"><a class="btns" href="#sini" onclick="document.f.filename.value='';dohide_show_def('dbck');return false;">Import backup</a>&nbsp;
+<a name="sini"><a class="btns" href="#sini" onclick="document.f.note.value='';dohide_show_def('notebck');return false;">Create backup</a>
+</td></tr>
+</tbody>
+</table>
+
+<?php  } // tab==1 ?>
+<?php if($tab==2) {
+$_bint=1;
+$_bmax=5;
+$_bstat=0;
+$result=mybox_db_query("select * from misc where name like \"backup_%\"",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		if(trim($row['name'])=='backup_int') $_bint=trim($row['val']);
+		if(trim($row['name'])=='backup_max') $_bmax=trim($row['val']);
+		if(trim($row['name'])=='backup_stat') $_bstat=trim($row['val']);
+	}
+}
+
+?>
+<script type='text/javascript'>
+function do_submit() {
+	<?php if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {?>
+	var bmax=Trim(document.f.bmax.value);
+	if(!isnum(bmax) || bmax=='') {
+		pop_msg("Invalid value for maximum backup");
+		return false;
+	}
+	document.f.do_save.value='1';
+	document.f.submit();
+	return true;
+	<?php } else {?>
+	pop_msg("Permission denied");
+	return false;
+	<?php }?>
+	
+};
+</script>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td valign="middle" class="tdname">Enable</td>
+<td valign="middle" class="tdvalue"> 
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+echo mybox_select_box('mbsel1',$data_a,$_bstat,'bstat');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Backup interval</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("Monthly"=>"1","Weekly"=>"2","Daily"=>"3");
+echo mybox_select_box('mbsel2',$data_a,$_bint,'bint');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Keep a maximum of</td>
+<td valign="middle" class="tdvalue">
+<input type=text name='bmax' size='10' class='valbox' value='<?php echo $_bmax;?>'> backups.
+</td>
+</tr>
+</tbody>
+</table>
+<table width='100%' class=datanb style='text-align: right;'>
+<tbody>
+<tr>
+<td style='text-align: right;'>
+<a name="sini"><a class="btn" href="#sini" onclick="return do_submit();return false;">Save</a>
+</td>
+</tbody>
+</table>
+<?php }// tab==2?>
+
+<!-- end tab container -->
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value='<?php echo $tab;?>'>
+</form>
+</body>
+</html>
+
+<?php if($tab==2) {mybox_db_close($db_id);};?>
+

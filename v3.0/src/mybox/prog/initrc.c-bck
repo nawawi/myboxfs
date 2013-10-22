@@ -1,0 +1,128 @@
+#include "libmybox.h"
+
+int initrc_main(int argc, char **argv) {
+	DIR *dp;FILE *fp;
+	struct dirent *dt;
+	signal(SIGINT,SIG_IGN);
+	putenv("PATH=/bin");
+	putenv("TERM=linux");
+	umask(0770);
+	chdir("/");
+	save_to_file("/proc/sys/kernel/printk","0 0 0 0\n");
+	//clean rc.bootup stuff
+	umount("/initrd/sys");
+	umount("/initrd");
+	xsystem("rm -rf /initrd /bootup");
+	xsystem("blockdev --flushbufs /dev/ram0 >/dev/null 2>&1");
+	save_to_file("/bin/groups","#!/bin/sh\necho \"mfs\"\n");
+	chmod("/bin/groups",S_IREAD | S_IWRITE | S_IEXEC);
+
+	if(file_exists("/etc/init.boot/rc.hwdetect")) {
+		xsystem("/etc/init.boot/rc.hwdetect");
+		sleep(1);
+	}
+	// just load
+	if(file_exists("/etc/microcode.dat")) {
+		xsystem("/bin/microcode_ctl -Qf /etc/microcode.dat");
+	}
+
+	if(file_exists("/etc/init.boot/rc.mount")) {
+		xsystem("/etc/init.boot/rc.mount");
+		if(file_exists("/tmp/mount_failed")) goto ERROR;
+	} else {
+		goto ERROR;
+	}
+
+	if(is_dir("/strg/mybox/pkg")) {
+		if((dp=opendir("/strg/mybox/pkg")) == NULL) {
+			perror("opendir");
+			exit(1);
+        	}
+		while((dt=readdir(dp))!=NULL) {
+			if(!strcmp(dt->d_name,".") || !strcmp(dt->d_name,"..")) continue;
+			if(strstr(dt->d_name,".mpk")) {
+				fprintf_stdout("-> Extracting packages: %s %s\r",dt->d_name,SPACE);
+				xsystem("tar -C / -axf /strg/mybox/pkg/%s",dt->d_name);
+				usleep(10000);
+			}
+		}
+		free(dt);
+		closedir(dp);
+		fprintf_stdout("\r* Extracting packages. Done.%s\n",SPACE);
+	}
+
+	//default domain
+	save_to_file("/proc/sys/kernel/hostname","MYBOX-FIREWALL-SYSTEM\n");
+	xsystem("chmod 700 /service/www/*.exh");
+	xsystem("chmod 700 /service/tools/*.exc");
+
+	// pre-init
+	if(file_exists("/strg/mybox/scripts/pre-init")) {
+		chmod("/strg/mybox/scripts/pre-init",S_IREAD | S_IWRITE | S_IEXEC);
+		fprintf_stdout("* Executing pre-init: /strg/mybox/scripts/pre-init\n");
+		xsystem("/strg/mybox/scripts/pre-init >/dev/null 2>&1");
+	}
+
+	// service start
+	if(file_exists("/etc/init.boot/rc.start")) {
+		xsystem("/etc/init.boot/rc.start");
+	}
+
+	// post-init
+	if(file_exists("/strg/mybox/scripts/post-init")) {
+		chmod("/strg/mybox/scripts/post-init",S_IREAD | S_IWRITE | S_IEXEC);
+		fprintf_stdout("* Executing post-init: /strg/mybox/scripts/post-init\n");
+		xsystem("/strg/mybox/scripts/post-init >/dev/null 2>&1");
+	}
+
+	// post-boot
+	if(file_exists("/strg/mybox/scripts/post-boot")) {
+		chmod("/strg/mybox/scripts/post-boot",S_IREAD | S_IWRITE | S_IEXEC);
+		fprintf_stdout("* Executing post-boot: /strg/mybox/scripts/post-boot\n");
+		xsystem("/strg/mybox/scripts/post-boot >/dev/null 2>&1");
+	}
+
+	if(file_exists("/etc/init.boot/rc.sysctl")) {
+		fprintf_stdout("* Setting kernel parameters. Done.\n");
+		xsystem("/etc/init.boot/rc.sysctl >/dev/null 2>&1 &");
+	}
+
+	if(is_dir("/strg/mybox/")) {
+		xsystem("dmesg -c > /strg/mybox/boot.msg");
+	}
+
+	xsystem("mount --bind /strg/mybox/backup /config/backup");
+	xsystem("mount --bind /strg/mybox/logs /config/logs");
+	xsystem("mount --bind /strg/mybox/update/files /config/update");
+
+	if(file_exists("/dev/lcd") && file_exists("/var/sys/lcd_com") && file_exists("/bin/lcdd")) {
+		xsystem("/bin/lcdd");
+		xtouch("/var/sys/chk_lcdd");
+	}
+	unlink("/var/sys/lcd_msg");
+	if(is_dir("/boot/grub/")) {
+		xsystem("/bin/grub-set-default 0");
+	}
+	ERROR:
+	xflush_stdout();
+
+	// remove tag
+	unlink("/var/sys/init_no_restart");	
+	unlink("/var/sys/init_start");
+	// clean space
+	xsystem("rm -rf /etc/inittab");
+	xsystem("rm -rf /etc/microcode.dat");
+	xsystem("rm -rf /bin/microcode_ctl");
+	xsystem("rm -rf /strg/mybox/download/*");
+	xsystem("rm -rf /bin/initrc");
+	xsystem("rm -rf /tmp/*");
+	xsystem("rm -rf /etc/init.boot/rc.start");
+	xsystem("rm -rf /etc/init.boot/rc.sysctl");
+	xsystem("rm -rf /usr/share/fonts");
+
+	save_to_file("/proc/sys/kernel/printk","0 0 0 0\n");
+	xsystem("chmod 700 /*");
+
+	xsystem("/bin/bootupsound");
+	exit(0);
+}

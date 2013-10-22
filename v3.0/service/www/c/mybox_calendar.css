@@ -1,0 +1,43 @@
+/* DHTML Calendar, version 0.9.6  Copyright Mihai Bazon, 2002, 2003
+   http://dynarch.com/mishoo/calendar.epl
+*/
+div.calendar{position:relative}
+.calendar{font-size:11px;color:#4B718A;cursor:default;font-family:tahoma,verdana,sans-serif;}
+.calendar table{border:1px solid #C6D3DE;background:#FFF;}
+.calendar .button{text-align:center;padding:2px;background:#FAFAFA}
+.calendar .nav{}
+.calendar thead .title{font-weight:bold;text-align:center;padding:2px;background:#E2E7ED;color:#4B718A;border-bottom:1px solid #C6D3DE;border-left:1px solid #C6D3DE;border-right:1px solid #C6D3DE;}
+.calendar thead .headrow{}
+.calendar thead .name{border-bottom:1px solid #C6D3DE;padding:2px;text-align:center;color:#4B718A;}
+.calendar thead .weekend{color:#aaa;}
+.calendar thead .hilite{background-color:#E2E7ED;color:#000;border:1px solid #fafafa;padding:1px;}
+.calendar thead .active{background-color:#FFF;padding:2px 0px 0px 2px;}
+.calendar thead .daynames{background:#E2E7ED;}
+.calendar tbody .day{width:2em;color:#4B718A;text-align:right;padding:2px 4px 2px 2px;}
+.calendar table .wn{padding:2px 3px 2px 2px;border-right:1px solid #C6D3DE;background:#FAFAFA;color:#4B718A}
+.calendar tbody .rowhilite td{background:#F4F7FA}
+.calendar tbody .rowhilite td.wn{background:#F4F7FA}
+.calendar tbody td.hilite{background:#FAFAFA;padding:1px 3px 1px 1px;border:1px solid #C6D3DE;}
+.calendar tbody td.active{background:#FFF;padding:2px 2px 0px 2px;}
+.calendar tbody td.selected{font-weight:bold;border:1px solid #4B718A;padding:1px 3px 1px 1px;background:#F4F7FA}
+.calendar tbody td.weekend{color:#aaa;}
+.calendar tbody td.today{font-weight:bold}
+.calendar tbody .disabled{color:#999}
+.calendar tbody .emptycell{visibility:hidden;}
+.calendar tbody .emptyrow{display:none;}
+.calendar tfoot .footrow{text-align:center;background:#565;color:#fff;}
+.calendar tfoot .ttip{padding:2px;background:#FAFAFA;color:#4B718A;}
+.calendar tfoot .hilite{background:#afa;border:1px solid #084;color:#000;padding:1px;}
+.calendar tfoot .active{background:#FFF;padding:2px 0px 0px 2px;}
+.combo{position:absolute;display:none;top:0px;left:0px;width:4em;cursor:default;border:1px solid #C6D3DE;background-color:#F4F7FA;color:#4B718A;font-size:smaller;}
+.combo .label,.combo .label-IEfix{text-align:center;padding:1px;}
+.combo .label-IEfix{width:4em;}
+.combo .hilite{background-color:#E2E7ED;}
+.combo .active{border-top:1px solid #C6D3DE;border-bottom:1px solid #C6D3DE;background:#FFF;font-weight:bold;}
+.calendar td.time{border-top:1px solid #8a8;padding:1px 0px;text-align:center;background-color:#dfb;}
+.calendar td.time .hour,.calendar td.time .minute,.calendar td.time .ampm{padding:0px 3px 0px 4px;border:1px solid #898;font-weight:bold;background-color:#fff;}
+.calendar td.time .ampm{text-align:center;}
+.calendar td.time .colon{padding:0px 2px 0px 3px;font-weight:bold;}
+.calendar td.time span.hilite{border-color:#000;background-color:#686;color:#fff;}
+.calendar td.time span.active{border-color:#f00;background-color:#000;color:#0f0;}
+

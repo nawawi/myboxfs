@@ -1,0 +1,1227 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="network_dhcp";
+include_once('page.exl');
+mybox_chk_session();
+mybox_send_nocache();
+
+
+$_error=0;
+$db_id=mybox_db_connect($_DB_NAME);
+
+if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+	if(isset($do_id)&&$do_id=='apply_chg') {
+		if($tab==2) {
+			mybox_echo_query("dhcp-restart-quiet");
+			sleep(1);
+			mybox_echo_query("dhcp_relay-restart");
+		} else {
+			mybox_echo_query("dhcp_relay-restart-quiet");
+			sleep(1);
+			mybox_echo_query("dhcp-restart");
+		}
+		$msg="<script>waitcount();</script>";
+	}
+	if($tab==1) {
+		if($col==2) {
+			if($do_save==1) {
+				$note=mybox_escape_str($note);
+				$range_start=trim($range_start);
+				$range_end=trim($range_end);
+				$dns1=trim($dns1);
+				$dns2=trim($dns2);
+				$gateway=trim($gateway);
+				$domain=trim($domain);
+				
+				$deny=0;
+				if($do_id!='edit') {
+					mybox_db_query("insert into dhcp_servers (dev,range_start,range_end,dns1,dns2,gateway,domain,wins,wins_node,deny,stat,note) values ('$dev','$range_start','$range_end','$dns1','$dns2','$gateway','$domain','$wins','$wins_node','$deny','$stat','$note')",$db_id);
+					$msg='Configuration saved';
+				} else {
+					if($wins_node==0) $wins='';
+					mybox_db_query("update dhcp_servers set range_start='$range_start',range_end='$range_end',dns1='$dns1',dns2='$dns2',gateway='$gateway',domain='$domain',wins='$wins',wins_node='$wins_node',deny='$deny',stat='$stat',note='$note' where id='$id'",$db_id);
+					$msg='Configuration saved';
+					$col=1;$do_id='';
+				}
+			}
+		}
+	}
+	if($tab==2) {
+		if($do_save==1) {
+			mybox_db_query("update misc set val='$dhcp_relay_server' where name='dhcp_relay_server'",$db_id);
+			mybox_db_query("update misc set val='$dhcp_relay_dev' where name='dhcp_relay_dev'",$db_id);
+			mybox_db_query("update misc set val='$dhcp_relay_stat' where name='dhcp_relay_stat'",$db_id);
+			$msg='Configuration saved';
+		}
+	}
+	if($tab==3) {
+		if($do_save==1) {
+			$note=mybox_escape_str($note);
+			if($do_id!='edit') {
+				$result=mybox_db_query("select * from dhcp_hosts where ip='$ip'",$db_id);
+				if(mybox_db_num_rows($result)==0) {
+					$result1=mybox_db_query("select * from dhcp_hosts where mac='$mac'",$db_id);
+					if(mybox_db_num_rows($result1)!=0) {
+						$msg="MAC Address already exist";
+					} else {
+						mybox_db_query("insert into dhcp_hosts (dev,ip,mac,stat,note) values ('$dev','$ip','$mac','$stat','$note')",$db_id);
+						$msg='Configuration saved';
+					}
+				} else {
+					$msg="IP Address already exist";
+				}
+			} else {
+				$result=mybox_db_query("select * from dhcp_hosts where ip='$ip' and id!='$id'",$db_id);
+				if(mybox_db_num_rows($result)==0) {
+					$result1=mybox_db_query("select * from dhcp_hosts where mac='$mac' and id!='$id'",$db_id);
+					if(mybox_db_num_rows($result1)!=0) {
+						$msg="MAC Address already exist";
+					} else {
+						mybox_db_query("update dhcp_hosts set dev='$dev',ip='$ip',mac='$mac',stat='$stat',note='$note' where id='$id'",$db_id);
+						$msg='Configuration saved';$col=1;$do_id='';
+					}
+				} else {
+					$msg="IP Address already exist";
+				}
+			}
+		}
+	}
+	if($col==1 && ($tab==1 || $tab==3)) {
+		if($tab==1) {
+			$table="dhcp_servers";
+		} else {
+			$table="dhcp_hosts";
+		}
+		if(isset($do_save)&&$do_save==2) {
+			if(is_array($del) && count($del)!=0) {
+				foreach($del as $x) {
+					if($x!='') mybox_db_query("delete from $table where id='$x'",$db_id);
+				}
+			} else {
+				if($del!='') mybox_db_query("delete from $table where id='$del'",$db_id);
+			}
+		}
+		if(isset($do_save)&&$do_save==3) {
+			if($stat==1) { $stat=0; } else { $stat=1; }
+			if($del!='') mybox_db_query("update $table set stat='$stat' where id='$del'",$db_id);
+		}
+		if(isset($do_save)&&$do_save==4) {
+			$stat=1;
+			if(is_array($del) && count($del)!=0) {
+				foreach($del as $x) {
+					if($x!='') mybox_db_query("update $table set stat='$stat' where id='$x'",$db_id);
+				}
+			} else {
+				if($del!='') mybox_db_query("update $table set stat='$stat' where id='$del'",$db_id);
+			}
+		}
+		if(isset($do_save)&&$do_save==5) {
+			$stat=0;
+			if(is_array($del) && count($del)!=0) {
+				foreach($del as $x) {
+					if($x!='') mybox_db_query("update $table set stat='$stat' where id='$x'",$db_id);
+				}
+			} else {
+				if($del!='') mybox_db_query("update $table set stat='$stat' where id='$del'",$db_id);
+			}
+		}
+	}
+	if($tab==4) {
+		if($do_save==1) {
+			function add_static($del,$db_id) {
+				list($mac,$ip,$note,$dev)=preg_split("/,/",$del);
+				$stat=1;
+				$note=mybox_escape_str($note);
+				$result=mybox_db_query("select * from dhcp_hosts where ip='$ip'",$db_id);
+				if(mybox_db_num_rows($result)==0) {
+					$result1=mybox_db_query("select * from dhcp_hosts where mac='$mac'",$db_id);
+					if(mybox_db_num_rows($result1)==0) {
+						mybox_db_query("insert into dhcp_hosts (dev,ip,mac,stat,note) values ('$dev','$ip','$mac','$stat','$note')",$db_id);
+					}
+				}
+			}
+
+			if(is_array($del) && count($del)!=0) {
+				foreach($del as $x) {
+					if($x!='') add_static($x,$db_id);
+				}
+			} else {
+				if($del!='') add_static($del,$db_id);
+			}
+			$tab=3;$col=1;
+		}
+	}
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied";
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+if(!isset($col)||$col=='') $col=1;
+
+if($tab==1 || $tab==2 || $tab==3) {
+	$namedev_array=mybox_name2dev_array($db_id);
+	$list_array1=mybox_list_devname($db_id);
+	$list_array2=mybox_defnetwork_array($db_id);
+	$list_array3=array();
+	if(count($list_array2)!=0) {
+		foreach($list_array2 as $a => $b) {
+			if($a=='any') continue;
+			if(is_array($b)) {
+				if($b['type'] == 2) $list_array3[]="$a";
+			} 
+		}
+	}
+	unset($a,$b,$list_array2);
+}
+?>
+<html>
+<head>
+<title>MyAdmin</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<script type='text/javascript' src="/j/mybox_func.js"></script>
+<script type='text/javascript' src="/j/mybox_overlib.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?php echo $_LOGIN['auth_id'];?>";
+	page_load();
+</script>
+<script type='text/javascript'>
+	function do_changes() {
+		self.location.href='<?php echo "/network_dhcp.exh?tab=$tab&col=$col&do_id=apply_chg";?>';	
+	};
+function waitcount() {
+	page_reload('600','<?php echo "/network_dhcp.exh?tab=$tab&col=$col";?>');
+};
+</script>
+</head>
+<body onload="load_menu('sub4','t4d5','s4i5');" scroll="auto">
+<form name=f method=post action="/network_dhcp.exh">
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 0px;'>
+<tr>
+<td>
+<?php mybox_page_section("Network / DHCP");?>
+<br><br>
+<?php if($col==1 && ($tab==3 || $tab==4)) { mybox_page_search($str); }?>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="/network_dhcp.exh?tab=1" <?php if($tab==1){?>class="tabact"<?php }?>>Servers</a></li>
+<li><a href="/network_dhcp.exh?tab=2" <?php if($tab==2){?>class="tabact"<?php }?>>Relay</a></li>
+<li><a href="/network_dhcp.exh?tab=3" <?php if($tab==3){?>class="tabact"<?php }?>>Static MAC/IP mappings</a></li>
+<li><a href="/network_dhcp.exh?tab=4" <?php if($tab==4){?>class="tabact"<?php }?>>Lease Table</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td> 
+<?php mybox_page_msg($msg);?>
+<br>
+
+<!-- tab container -->
+<?php if($tab=='1') {?>
+<table width="100%" border="0" cellpadding="0" cellspacing="0">
+<tr><td>
+<ul id="tabnav">
+<li class="<?php if($col==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=1) { echo "<a href=\"/network_dhcp.exh?tab=$tab&col=1\">"; }?>Servers<?php if($col!=1) { echo "</a>"; }?></li>
+<li class="<?php if($col==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=2) { echo "<a href=\"/network_dhcp.exh?tab=$tab&col=2\">"; }?><?php if($do_id=='edit') { echo "Edit"; } else { echo "Add new"; }?> DHCP Server<?php if($col!=2) { echo "</a>"; }?></li>
+</ul>
+</td></tr>
+<tr> 
+<td class="tabcont">
+<?php if($col==1) {
+
+// counting
+$currentPage = $HTTP_SERVER_VARS["PHP_SELF"];
+$maxRows_Recordset=50;
+if(!isset($pageNum_Recordset)) $pageNum_Recordset=0;
+$startRow_Recordset=@($pageNum_Recordset * $maxRows_Recordset);
+$query_Recordset="select * from dhcp_servers order by id ASC";
+$query_limit_Recordset=sprintf("%s LIMIT %d, %d", $query_Recordset, $startRow_Recordset, $maxRows_Recordset);
+$Recordset=mybox_db_query($query_limit_Recordset, $db_id);
+if(!isset($totalRows_Recordset) || $totalRows_Recordset=='') {
+	$all_Recordset=mybox_db_query($query_Recordset,$db_id);
+	$totalRows_Recordset=mybox_db_num_rows($all_Recordset);
+}
+
+$totalPages_Recordset=@ceil($totalRows_Recordset/$maxRows_Recordset)-1;
+$queryString_Recordset=null;
+if(!empty($_SERVER['QUERY_STRING'])) {
+	$params=explode("&", $_SERVER['QUERY_STRING']);
+  	$newParams=array();
+  	foreach ($params as $param) {
+		if(stristr($param, "pageNum_Recordset")==true) continue;
+		if(stristr($param, "totalRows_Recordset")==true) continue;
+		if(stristr($param, "maxRows_Recordset")==true) continue;
+		if(stristr($param, "tab")==true) continue;
+		if(stristr($param, "col")==true) continue;
+		if(stristr($param, "do_id")==true) continue;
+		array_push($newParams, $param);
+  	}
+  	if(count($newParams) != 0) {
+    		$queryString_Recordset="&" . implode("&", $newParams);
+  	}
+}
+$queryString_Recordset=sprintf("&totalRows_Recordset=%d%s&tab=$tab&col=$col&do_id=$do_id",$totalRows_Recordset,$queryString_Recordset);
+if($pageNum_Recordset > 0) { 
+	$pagefirst=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, 0, $queryString_Recordset);
+	$pageprev=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, max(0, $pageNum_Recordset - 1), $queryString_Recordset);
+	$button1="<a href='$pagefirst'><img src='{$_PNG['first']}' border=0 alt='' title=''></a>\n";
+	$button2="<a href='$pageprev'><img src='{$_PNG['prev']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button1="<img src='{$_PNG['first']}' border=0 alt='' title=''>\n";
+	$button2="<img src='{$_PNG['prev']}' border=0 alt='' title=''>\n";
+}
+if($pageNum_Recordset < $totalPages_Recordset) {
+	$pagenext=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, min($totalPages_Recordset, $pageNum_Recordset + 1), $queryString_Recordset);
+	$pagelast=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, $totalPages_Recordset, $queryString_Recordset);
+	$button3="<a href='$pagenext'><img src='{$_PNG['next']}' border=0 alt='' title=''></a>\n";
+	$button4="<a href='$pagelast'><img src='{$_PNG['last']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button3="<img src='{$_PNG['next']}' border=0 alt='' title=''>\n";
+	$button4="<img src='{$_PNG['last']}' border=0 alt='' title=''>\n";
+}
+unset($pagefirst,$pageprev,$pagenext,$pagelast);
+$_cnum=1;
+if(!isset($pageNum_Recordset)||$pageNum_Recordset==''||$pageNum_Recordset==0) {
+	$_cnum=1;
+} else {
+	$_cnum=($pageNum_Recordset * $maxRows_Recordset);
+	if($_cnum <= 0) {
+		$_cnum=1;
+	} else {
+		$_cnum +=1;
+	}
+}
+if($totalRows_Recordset >0 && mybox_db_num_rows($Recordset)!=0) {
+	echo "<table width='100%' class=data>
+	<thead class='blue'>
+      	<tr>
+        <td style='font-weight: bold; width: 2%; border-right: 0px;'>#</td> 
+        <td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Interface</td>
+	<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Setting</td>
+	<td style='font-weight: bold; text-align: center; border-right: 0px;border-left: 0px;'>Active</td>
+        <td style='width: 5%; font-weight: bold; text-align: right; border-left: 0px;'>&nbsp;</td>
+      	</tr>
+	</thead>
+	<tbody>";
+	do {
+		$_id=$row['id'];
+		if($_id=='') continue;
+		$_dev=trim($row['dev']);
+		$_dev1=mybox_get_defname($_dev,2,0,$db_id);
+		$_range_start=trim($row['range_start']);
+		$_range_end=trim($row['range_end']);
+		$_dns1=trim($row['dns1']);
+		$_dns2=trim($row['dns2']);
+		$_gateway=trim($row['gateway']);
+		$_domain=trim($row['domain']);
+		$_wins=trim($row['wins']);
+		$_wins_node=trim($row['wins_node']);
+		$_stat=trim($row['stat']);
+		$_note=mybox_unescape_str($row['note']);
+		$_name_ip='';$_name_net='';$_name_bro='';
+		$_name_ip=$namedev_array["$_dev (Address)"];
+		$_name_net=$namedev_array["$_dev (Network)"];
+		$_name_bro=$namedev_array["$_dev (Broadcast)"];
+		$dns='';$wins='';$domain='';
+		$_WINS_NODE['1']='&nbsp;';
+		if($_domain!='') $domain="<tr><td style='margin: 0px;padding: 0px; border: 0px;'><b>Domain</b></td><td style='margin: 0px;padding: 0px; border: 0px;' colspan=5>: $_domain</td></tr>";
+		if($_dns1!='' || $_dns2!='') $dns="<tr><td style='margin: 0px;padding: 0px; border: 0px;'><b>DNS</b></td><td style='margin: 0px;padding: 0px; border: 0px;' colspan=5>: $_dns1 $_dns2</td></tr>";
+		if($_wins_node!=0 && $_wins!='') $wins="<tr><td style='margin: 0px;padding: 0px; border: 0px;'><b>WINS Server</b></td><td style='margin: 0px;padding: 0px; border: 0px;' colspan=5>: $_wins {$_WINS_NODE[$_wins_node]}</td></tr>";
+		if($_note!='') $_note=mybox_print_note($_note);
+		$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff;  cursor: pointer;'";
+		$lo="onclick=\"self.location.href='/network_dhcp.exh?tab=$tab&col=2&id=$_id&do_id=edit';\" ";
+		echo "
+			<tr $lt>
+        		<td $lo style='text-align: right; vertical-align: top;'>$_cnum</td>
+        		<td $lo style='vertical-align: top;'><font style='color: green; font-weight: bold;'>$_dev1</font></td>
+			<td $lo style='vertical-align: top;'>
+			<table style='margin: 0px;padding: 0px; border: 0px;'>
+			<tr>
+			<td style='margin: 0px;padding: 0px; border: 0px;'>
+			<b>IP Address</b> 
+			</td>
+			<td style='margin: 0px;padding: 0px; border: 0px;'>
+			: $_name_ip
+			</td>
+			<td style='margin: 0px;padding: 0px; border: 0px;'>
+			&nbsp;<b>Network</b>
+			</td>
+			<td style='margin: 0px;padding: 0px; border: 0px;'>
+			: $_name_net
+			</td>
+			<td style='margin: 0px;padding: 0px; border: 0px;'>
+			&nbsp;<b>Broadcast</b>
+			</td>
+			<td style='margin: 0px;padding: 0px; border: 0px;'>
+			: $_name_bro
+			</td></tr>
+			<tr>
+			<td style='margin: 0px;padding: 0px; border: 0px;'>
+			<b>Range start</b> 
+			</td>
+			<td style='margin: 0px;padding: 0px; border: 0px;'>
+			: $_range_start
+			</td>
+			<td style='margin: 0px;padding: 0px; border: 0px;'>
+			&nbsp;<b>Range end</b> 
+			</td>
+			<td style='margin: 0px;padding: 0px; border: 0px;' colspan=3>
+			: $_range_end
+			</td></tr>
+			$dns
+			$wins
+			<tr><td style='margin: 0px;padding: 0px; border: 0px;'><b>Gateway</b></td><td style='margin: 0px;padding: 0px; border: 0px;' colspan=5>: $_gateway</td></tr>
+			$domain
+			</table>
+			$_note
+			</td>
+			<td style='text-align: center;' align=center valign=middle><a href='/network_dhcp.exh?tab=$tab&col=1&del=$_id&stat=$_stat&do_save=3'><img src='{$_PNG_YESNO[$_stat]}' border=0 alt='' title=''></a></td>
+			<td style='text-align: right; table-layout: fixed; white-space: nowrap; vertical-align: middle;' align=right>
+			<a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='/network_dhcp.exh?tab=$tab&col=$col&do_save=2&del=$_id&pageNum_Recordset=$pageNum_Recordset&totalPages_Recordset=$totalPages_Recordset'; return false;\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a>
+			<input type=checkbox name=del[] value=$_id>
+			</td>
+			</tr>
+		";
+		$_cnum++;
+	} while($row=mybox_db_fetch_assoc($Recordset));
+
+	if($_cnum >= 1) {
+		echo "
+			<tr>
+			<td style='text-align: right; background: #ffffff;' align=right valign=top colspan=5>
+			<a href='#' onclick='do_delete(5);return false;'>Disable</a> / <a href='#' onclick='do_delete(4);return false;'>Enable</a> / <a href='#' onclick='do_delete(2);return false;'>Delete</a> / <a href='#' onclick='dotoggle();return false;'>Toggle</a> <img src='{$_PNG['arrow_rtr']}' border=0 alt='' title=''></td>
+			</tr>
+		";
+	}
+	echo mybox_print_nextpage($pageNum_Recordset,$totalPages_Recordset,$totalRows_Recordset,$maxRows_Recordset,$queryString_Recordset,$currentPage,'5',$button1,$button2,$button3,$button4);
+	echo "</tbody></table>";
+} else {
+	echo "
+	<br>
+	<span class='notedef'>
+	There are no DHCP servers defined.
+	</span>
+	<br><br>
+	";$_error=1;
+}?>
+
+<?php }//col=1?>
+
+<?php if($col==2){
+$dhdv=array();
+$result=mybox_db_query("select dev from dhcp_servers",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_xdev=trim($row['dev']);
+		$dhdv[$_xdev]=1;
+	}
+}
+unset($result,$_xdev);
+
+if($do_id=='edit') {
+	$result=mybox_db_query("select * from dhcp_servers where id='$id'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_dev=trim($row['dev']);
+			$_range_start=trim($row['range_start']);
+			$_range_end=trim($row['range_end']);
+			$_dns1=trim($row['dns1']);
+			$_dns2=trim($row['dns2']);
+			$_gateway=trim($row['gateway']);
+			$_domain=trim($row['domain']);
+			$_wins=trim($row['wins']);
+			$_wins_node=trim($row['wins_node']);
+			$_stat=trim($row['stat']);
+			$_note=mybox_unescape_str($row['note']);
+		}
+	}
+} 
+
+if(!isset($_wins_node) || $_wins_node=='') $_wins_node=0;
+?>
+<script type="text/javascript">
+	function do_submit() {
+		if(document.f.dev.value=='') return false;
+		var range_start=Trim(document.f.range_start.value);
+		if(range_start=='' || !mip1(range_start)) {
+			pop_msg("Invalid value for range start "+range_start+"");
+			return false;
+		};
+		var range_end=Trim(document.f.range_end.value);
+		if(range_end=='' || !mip1(range_end)) {
+			pop_msg("Invalid value for range end "+range_end+"");
+			return false;
+		};
+		var dns1=Trim(document.f.dns1.value);
+		if(dns1!='' && !mip1(dns1)) {
+			pop_msg("Invalid value for DNS1 "+dns1+"");
+			return false;
+		};
+		var dns2=Trim(document.f.dns2.value);
+		if(dns2!='' && !mip1(dns2)) {
+			pop_msg("Invalid value for DNS2 "+dns2+"");
+			return false;
+		};
+		var gateway=Trim(document.f.gateway.value);
+		if(gateway=='' || !mip1(gateway)) {
+			pop_msg("Invalid value for gateway "+gateway+"");
+			return false;
+		};
+		if(document.f.wins_node.value!=0) {
+			var wins=Trim(document.f.wins.value);
+			if(wins=='' || !mip1(wins)) {
+				pop_msg("Invalid value for WINS server "+wins+"");
+				return false;
+			}
+		};
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	};
+	function chk_node(val) {
+		if(val=='0' || val=='') {
+			do_hide('h1');
+			var nodedef='<?php echo $_WINS_NODE['0'];?>';
+			var nodedef2=0;
+			insert_value('namendsel2',nodedef);
+			insert_value('wins_node',nodedef2);
+		} else {
+			do_show('h1');
+		}
+	}
+	function chk_dev(dv) {
+		<?php 
+		if($do_id!='edit') {
+			if(count($list_array1)!=0) {
+				foreach($list_array1 as $dv) {
+					if($dhdv[$dv]==1) continue;
+					$_name_ip=$namedev_array["$dv (Address)"];
+					$_name_net=$namedev_array["$dv (Network)"];
+					$_name_bro=$namedev_array["$dv (Broadcast)"];
+					$_name_bro=preg_replace("/\.255$/",".254",$_name_bro);
+					echo "if(dv=='$dv') {";
+					echo "var wnode='0';";
+					echo "var ip='$_name_ip';";
+					echo "var net='$_name_net';";
+					echo "var bro='$_name_bro';";
+					echo "document.f.range_start.value=ip;";
+					echo "document.f.range_end.value=bro;";
+					echo "document.f.dns1.value=ip;";
+					echo "document.f.gateway.value=ip;";
+					echo "document.f.stat.checked=false;";
+					echo "chk_node(wnode);";
+					echo "}";
+					unset($_name_ip,$_name_net,$_name_bro);
+				}
+			}
+		} else {
+			echo "chk_node('$_wins_node');";
+		}?>
+	}
+</script>
+<table width="100%" class="data">
+<tr> 
+<td valign="middle" class="tdname">Interface</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array();
+foreach($list_array1 as $a) {
+	if($do_id!='edit') {
+		if($dhdv[$a]==1) continue;
+		if(!isset($_dev)||$_dev=='') $_dev=$a;
+		$data_a[$a]=$a;
+	} else {
+		$data_a[$_dev]=$_dev;
+	}
+	unset($px);
+}
+$set_a=array("act"=>"chk_dev(''b'')");
+echo mybox_select_box('ndsel1',$data_a,$_dev,'dev',$set_a);
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Range start</td>
+<td valign="middle" class="tdvalue"><input name="range_start" type="text" class="valbox2" value="<?php echo $_range_start;?>"></td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Range end</td>
+<td valign="middle" class="tdvalue"><input name="range_end" type="text" class="valbox2" value="<?php echo "$_range_end";?>"></td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">DNS 1</td>
+<td valign="middle" class="tdvalue"><input name="dns1" type="text" class="valbox2" value="<?php echo $_dns1;?>"></td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">DNS 2</td>
+<td valign="middle" class="tdvalue"><input name="dns2" type="text" class="valbox2" value="<?php echo $_dns2;?>"></td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Default gateway</td>
+<td valign="middle" class="tdvalue"><input name="gateway" type="text" class="valbox2" value="<?php echo $_gateway;?>"></td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Domain</td>
+<td valign="middle" class="tdvalue"><input name="domain" type="text" class="valbox2" value="<?php echo $_domain;?>"></td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">WINS Node type</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array();
+foreach($_WINS_NODE as $a => $b) {
+	$data_a[$b]=$a;
+}
+if(!isset($_wins_node)||$_wins_node=='') $_wins_node=$_WINS_NODE[0];
+$set_a=array("act"=>"chk_node('b')");
+echo mybox_select_box('ndsel2',$data_a,$_wins_node,'wins_node',$set_a);
+?>
+</td>
+</tr>
+<tr id='h1'> 
+<td valign="middle" class="tdname">WINS Server</td>
+<td valign="middle" class="tdvalue"><input name="wins" type="text" class="valbox2" value="<?php echo $_wins;?>"></td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Active this setting</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+if(!isset($_stat)||$_stat=='') $_stat=0;
+echo mybox_select_box('ndsel3',$data_a,$_stat,'stat');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Comment</td>
+<td valign="middle" class="tdvalue"><input name="note" type="text" class="valbox2" value="<?php echo $_note;?>"></td>
+</tr>
+</table>
+<script type='text/javascript'>
+	chk_dev('<?php echo $_dev;?>');
+</script>
+<?php }//col=2?>
+
+
+<?php }//tab=1?>
+
+<?php if($tab==2){
+$_sok=0;
+$result=mybox_db_query("select stat from dhcp_servers where stat='1'",$db_id);
+if(mybox_db_num_rows($result)!=0) $_sok=1;
+unset($result);
+$_tl=array();$_dhcp_relay_dev='';$_nml=array();
+$result=mybox_db_query("select * from misc where name like \"dhcp_relay_%\"",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		if(trim($row['name'])=='dhcp_relay_server') $_dhcp_relay_server=trim($row['val']);
+		if(trim($row['name'])=='dhcp_relay_dev') $_dhcp_relay_dev=trim($row['val']);
+		if(trim($row['name'])=='dhcp_relay_stat') $_dhcp_relay_stat=trim($row['val']);
+	}
+	if(count($list_array1)!=0) {
+		foreach($list_array1 as $x) {
+			if($x=='') continue;
+			$_tl[$x]=$x;
+		}
+	}
+	unset($x);
+
+	if($_dhcp_relay_dev!='') {
+		$_nml=preg_split("/,/",$_dhcp_relay_dev);
+		if(count($_nml)!=0) {
+			foreach($_nml as $a) {
+				if($a=='') continue;
+				if($_tl[$a]==$a) unset($_tl[$a]);
+			}
+		} else {
+			$_nml[]="$_dhcp_relay_dev";
+		}
+		unset($a);
+	} else {
+		$_tl=$list_array1;
+	}
+} 
+?>
+<script type="text/javascript">
+	function do_submit() {
+		<?php if($_sok==1){?>
+		pop_msg("DHCP Relay cannot use while DHCP server enabled.");
+		return false;
+		<?php }else{?>
+		var list=document.f.mr;
+		var lr='';
+		var ti=0;
+		for(var i=0;i<list.length;i++) {
+			if(list.options[i]!=null && list.options[i].value!='') {
+				ti++;
+				lr +=list.options[i].value;
+				lr +=',';
+			}
+		}
+		if(document.f.dhcp_relay_stat.value!=0) {
+			var server=Trim(document.f.dhcp_relay_server.value);
+			if(server=='') {
+				pop_msg("No DHCP Server defined.");
+				return false;
+			}
+			if(lr=='') {
+				pop_msg("No interface defined");
+				return false;
+			}
+			if(list.length==1) {
+				pop_msg("DHCP relay need two or more interface");
+				return false;	
+			}
+		}
+		document.f.dhcp_relay_dev.value=lr;
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+		<?php }?>
+	}
+	function inmoveto(a) {
+		if(a=="right") {
+			var p=document.f.mr.length;
+			var lstlenght=document.f.ml.length;
+			var list=document.f.ml;
+			for(var i=0;i<lstlenght;i++) {
+				if(list[i]!=null && list[i].value!='') {
+					if(list.options[i].selected==true) {
+						document.f.mr[p]=new Option(list.options[i].text,list.options[i].value);
+						list[i]=null;
+						p++;
+					}
+				}
+			}
+		}
+
+		if(a=="left") {
+			var p=document.f.ml.length;
+			var lstlenght=document.f.mr.length;
+			var list=document.f.mr;
+			for(var i='0';i<lstlenght;i++) {
+				if(list[i]!=null && list[i].value!='') {
+					if(list.options[i].selected==true) {
+						document.f.ml[p]=new Option(list.options[i].text,list.options[i].value);
+						list[i]=null;
+						p++;
+					}
+				}
+			}
+		}
+	}
+</script>
+<table width="100%" class="data">
+<tr> 
+<td valign="middle" class="tdname">DHCP Server</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($list_array3,'dhcp_relay_server',"$_dhcp_relay_server",'drsel1','drsel1a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+echo mybox_defwin('drsel1','200px','#ffffff','#999999','#336699','#ffffff','DHCP Server','#ffffff','100px','hidden','auto',$txt);
+?>
+</td>
+</tr>
+<tr> 
+<td valign="top" class="tdname">Interfaces</td>
+<td valign="top" class="tdvalue">
+
+<table style='border: 0px; padding: 0px; margin: 0px;'>
+<tr>
+<td valign=top style='border: 0px; font-style: italic; font-weight: bold;' colspan=2>
+Available interfaces
+</td>
+<td valign=top style='border: 0px; font-style: italic; font-weight: bold;'>
+Selected interfaces
+</td>
+</tr>
+<tr>
+<td valign=top style='border: 0px; text-align: center;'>
+<select name=ml size=7 multiple class=selbox style='height: 105px; width: 150px;'>
+<?php 
+foreach($_tl as $n) {
+	$px=mybox_get_defname($n,1,'def2',$db_id);
+	echo "<option value='$n' $px>$n</option>";
+	unset($px);
+}
+unset($n);
+?>
+</select>
+</td>
+<td valign=absmiddle style='border: 0px; text-align: center;'>
+
+<table class="data" style='border: 0px; padding: 0px; margin: 0px;'>
+<tr>
+<td valign=top style='border: 0px;'>
+<input type=button value=" >> " class="button-small" style='font-weight: bold; font-family: terminal;' onclick="inmoveto('right');">
+</td>
+</tr>
+<tr>
+<td valign=top style='border: 0px;'>
+<input type=button value=" << " class="button-small" style='font-weight: bold; font-family: terminal;' onclick="inmoveto('left');">
+</td>
+</tr>
+</table>
+
+</td>
+<td valign=top style='border: 0px; text-align: center;'>
+<select name=mr size=7 multiple class=selbox style='height: 105px; width: 150px;'>
+<?php 
+foreach($_nml as $a) {
+	$px=mybox_get_defname($a,1,'def2',$db_id);
+	echo "<option value='$a' $px>$a</option>";
+	unset($px);
+}
+unset($a);
+?>
+</select>
+</td>
+</tr>
+</table>
+<span id='def2' class='def' style='display: none; position: absolute;'></span>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Active this setting</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+if(!isset($_stat)||$_stat=='') $_stat=0;
+echo mybox_select_box('drsel2',$data_a,$_dhcp_relay_stat,'dhcp_relay_stat');
+?>
+</td>
+</tr>
+</table>
+<input type=hidden name=dhcp_relay_dev value=''>
+<?php }//tab=2?>
+
+<?php if($tab=='3') {?>
+<table width="100%" border="0" cellpadding="0" cellspacing="0">
+<tr><td>
+<ul id="tabnav">
+<li class="<?php if($col==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=1) { echo "<a href=\"/network_dhcp.exh?tab=$tab&col=1\">"; }?>Address<?php if($col!=1) { echo "</a>"; }?></li>
+<li class="<?php if($col==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=2) { echo "<a href=\"/network_dhcp.exh?tab=$tab&col=2\">"; }?><?php if($do_id=='edit') { echo "Edit"; } else { echo "Add new"; }?> mapping<?php if($col!=2) { echo "</a>"; }?></li>
+</ul>
+</td></tr>
+<tr> 
+<td class="tabcont">
+<?php if($col==1) {
+
+// counting
+$currentPage = $HTTP_SERVER_VARS["PHP_SELF"];
+$maxRows_Recordset=50;
+if(!isset($pageNum_Recordset)) $pageNum_Recordset=0;
+$startRow_Recordset=@($pageNum_Recordset * $maxRows_Recordset);
+if(isset($str)&&$str!='') {
+	$strn=mybox_escape_str($str);
+	$query_Recordset="select * from dhcp_hosts where ip like \"%$str%\" or dev like \"%$str%\" or mac like \"%$str%\" or note like \"%$strn%\" order by dev ASC";
+} else {
+	$query_Recordset="select * from dhcp_hosts order by dev ASC";
+}
+$query_limit_Recordset=sprintf("%s LIMIT %d, %d", $query_Recordset, $startRow_Recordset, $maxRows_Recordset);
+$Recordset=mybox_db_query($query_limit_Recordset, $db_id);
+if(!isset($totalRows_Recordset) || $totalRows_Recordset=='') {
+	$all_Recordset=mybox_db_query($query_Recordset,$db_id);
+	$totalRows_Recordset=mybox_db_num_rows($all_Recordset);
+}
+
+$totalPages_Recordset=@ceil($totalRows_Recordset/$maxRows_Recordset)-1;
+$queryString_Recordset=null;
+if(!empty($_SERVER['QUERY_STRING'])) {
+	$params=explode("&", $_SERVER['QUERY_STRING']);
+  	$newParams=array();
+  	foreach ($params as $param) {
+		if(stristr($param, "pageNum_Recordset")==true) continue;
+		if(stristr($param, "totalRows_Recordset")==true) continue;
+		if(stristr($param, "maxRows_Recordset")==true) continue;
+		if(stristr($param, "tab")==true) continue;
+		if(stristr($param, "col")==true) continue;
+		if(stristr($param, "do_id")==true) continue;
+		if(stristr($param, "str")==true) continue;
+		array_push($newParams, $param);
+  	}
+  	if(count($newParams) != 0) {
+    		$queryString_Recordset="&" . implode("&", $newParams);
+  	}
+}
+$queryString_Recordset=sprintf("&totalRows_Recordset=%d%s&tab=$tab&col=$col&do_id=$do_id&str=$str",$totalRows_Recordset,$queryString_Recordset);
+if($pageNum_Recordset > 0) { 
+	$pagefirst=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, 0, $queryString_Recordset);
+	$pageprev=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, max(0, $pageNum_Recordset - 1), $queryString_Recordset);
+	$button1="<a href='$pagefirst'><img src='{$_PNG['first']}' border=0 alt='' title=''></a>\n";
+	$button2="<a href='$pageprev'><img src='{$_PNG['prev']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button1="<img src='{$_PNG['first']}' border=0 alt='' title=''>\n";
+	$button2="<img src='{$_PNG['prev']}' border=0 alt='' title=''>\n";
+}
+if($pageNum_Recordset < $totalPages_Recordset) {
+	$pagenext=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, min($totalPages_Recordset, $pageNum_Recordset + 1), $queryString_Recordset);
+	$pagelast=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, $totalPages_Recordset, $queryString_Recordset);
+	$button3="<a href='$pagenext'><img src='{$_PNG['next']}' border=0 alt='' title=''></a>\n";
+	$button4="<a href='$pagelast'><img src='{$_PNG['last']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button3="<img src='{$_PNG['next']}' border=0 alt='' title=''>\n";
+	$button4="<img src='{$_PNG['last']}' border=0 alt='' title=''>\n";
+}
+unset($pagefirst,$pageprev,$pagenext,$pagelast);
+$_cnum=1;
+if(!isset($pageNum_Recordset)||$pageNum_Recordset==''||$pageNum_Recordset==0) {
+	$_cnum=1;
+} else {
+	$_cnum=($pageNum_Recordset * $maxRows_Recordset);
+	if($_cnum <= 0) {
+		$_cnum=1;
+	} else {
+		$_cnum +=1;
+	}
+}
+if($totalRows_Recordset >0) {
+	echo "<table width='100%' class=data>
+	<thead class='blue'>
+      	<tr>
+        <td style='font-weight: bold; width: 2%; border-right: 0px;'>#</td> 
+        <td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Interface</td>
+	<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Setting</td>
+	<td style='width: 5%; font-weight: bold; border-right: 0px;border-left: 0px;'>Active</td>
+        <td style='width: 5%; font-weight: bold; text-align: right; border-left: 0px;'>&nbsp;</td>
+      	</tr>
+	</thead>
+	<tbody>";
+	do {
+		$_id=$row['id'];
+		if($_id=='') continue;
+		$_dev=mybox_get_defname(trim($row['dev']),2,0,$db_id);
+		$_ip=trim($row['ip']);
+		$_mac=trim($row['mac']);
+		$_note=mybox_unescape_str($row['note']);
+		$_stat=trim($row['stat']);
+		if($_note!='') $_note=mybox_print_note($_note);
+		$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff;  cursor: pointer;'";
+		$lo="onclick=\"self.location.href='/network_dhcp.exh?tab=$tab&col=2&id=$_id&do_id=edit';\" ";
+		echo "
+			<tr $lt>
+        		<td $lo style='text-align: right; vertical-align: top;'>$_cnum</td>
+        		<td $lo style='vertical-align: top;'><font style='color: green;'><b>$_dev</b></font></td>
+			<td $lo style='vertical-align: top; font-weight: bold;'>
+			$_mac <img src='{$_PNG['arrow_right_s']}' border=0 alt='' title=''> $_ip
+			$_note
+			</td>
+			<td style='text-align: center;' align=center valign=middle><a href='/network_dhcp.exh?tab=$tab&col=1&del=$_id&stat=$_stat&do_save=3'><img src='{$_PNG_YESNO[$_stat]}' border=0 alt='' title=''></a></td>
+			<td style='text-align: right; vertical-align: bottom; table-layout: fixed; white-space: nowrap;' align=right>
+			<a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='/network_dhcp.exh?tab=$tab&col=$col&do_save=2&del=$_id&pageNum_Recordset=$pageNum_Recordset&totalPages_Recordset=$totalPages_Recordset';return false;\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a>
+			<input type=checkbox name=del[] value=$_id>
+			</td>
+			</tr>
+		";
+		$_cnum++;
+	} while($row=mybox_db_fetch_assoc($Recordset));
+
+	if($_cnum >= 1) {
+		echo "
+			<tr>
+			<td style='text-align: right; background: #ffffff;' align=right valign=top colspan=5>
+			<a href='#' onclick='do_delete(5);return false;'>Disable</a> / <a href='#' onclick='do_delete(4);return false;'>Enable</a> / <a href='#' onclick='do_delete(2);return false;'>Delete</a> / <a href='#' onclick='dotoggle();return false;'>Toggle</a> <img src='{$_PNG['arrow_rtr']}' border=0 alt='' title=''></td>
+			</tr>
+		";
+	}
+	echo mybox_print_nextpage($pageNum_Recordset,$totalPages_Recordset,$totalRows_Recordset,$maxRows_Recordset,$queryString_Recordset,$currentPage,'5',$button1,$button2,$button3,$button4);
+	echo "</tbody></table>";
+} else {
+	echo "
+	<br>
+	<span class='notedef'>
+	There are no static MAC/IP mappings defined.
+	</span>
+	<br><br>
+	";$_error=1;
+}?>
+
+<?php }//col=1?>
+
+<?php if($col==2){
+if($do_id=='edit') {
+	$result=mybox_db_query("select * from dhcp_hosts where id='$id'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_dev=trim($row['dev']);
+			$_ip=trim($row['ip']);
+			$_mac=trim($row['mac']);
+			$_stat=trim($row['stat']);
+			$_note=mybox_unescape_str($row['note']);
+		}
+	}
+} 
+?>
+<script type="text/javascript">
+	function do_submit() {
+		var dev=Trim(document.f.dev.value);
+		if(dev=='') {
+			return false;
+		};
+		var ip=Trim(document.f.ip.value);
+		var mac=Trim(document.f.mac.value);
+		if(ip=='' || !mip1(ip)) {
+			pop_msg("Invalid IP Address "+ip+"");
+			return false;
+		};
+		if(mac=='' || !mmac(mac)) {
+			pop_msg("Invalid MAC Address "+mac+"");
+			return false;
+		};
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	}
+</script>
+<table width="100%" class="data">
+<tr> 
+<td valign="middle" class="tdname">Interface</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array();
+if($do_id=='edit' || $do_id=='add') {
+	$data_a[$_dev]=$_dev;
+} else {
+	foreach($list_array1 as $a) {
+		if(!isset($_dev)||$_dev=='') $_dev=$a;
+		$data_a[$a]=$a;
+	}
+}
+echo mybox_select_box('drsel3',$data_a,$_dev,'dev');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">MAC Address</td>
+<td valign="middle" class="tdvalue"><input name="mac" type="text" class="valbox2" value="<?php echo $_mac;?>"></td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">IP Address</td>
+<td valign="middle" class="tdvalue"><input name="ip" type="text" class="valbox2" value="<?php echo $_ip;?>"></td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Active this mapping</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+if(!isset($_stat)||$_stat=='') $_stat=0;
+echo mybox_select_box('nrsel4',$data_a,$_stat,'stat');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Comment</td>
+<td valign="middle" class="tdvalue"><input name="note" type="text" class="valbox2" value="<?php echo $_note;?>"></td>
+</tr>
+</table>
+<?php }//col=2?>
+<?php }//tab=3?>
+
+<?php if($tab==4){
+// counting
+$currentPage = $HTTP_SERVER_VARS["PHP_SELF"];
+$maxRows_Recordset=50;
+if(!isset($pageNum_Recordset)||$pageNum_Recordset=='') $pageNum_Recordset=0;
+$startRow_Recordset=@($pageNum_Recordset * $maxRows_Recordset);
+if($startRow_Recordset < 0) $startRow_Recordset=0;
+$row_Recordset=array();
+$line=array();
+$line=mybox_get_dhcp_lease();
+if(count($line)!=0) {
+	$i=0;
+	for($x=$startRow_Recordset;$x < count($line);$x++) {
+		$buff=$line[$x];
+		$bskip=1;
+		if($str!='') {
+			if(is_array($buff)) {
+				foreach($buff as $a => $b) {
+					if(stripos($b,$str)!==FALSE) $bskip=0;
+				}
+				unset($a,$b);
+			}
+			if($bskip==1) continue;
+		}
+		unset($bskip);
+		if($i!=$maxRows_Recordset) {
+			array_push($row_Recordset,$buff);
+			$i++;
+		}
+	}
+}
+if(!isset($totalRows_Recordset)||$totalRows_Recordset=='') {
+	$totalRows_Recordset=count($line);
+}
+$totalPages_Recordset=@ceil($totalRows_Recordset/$maxRows_Recordset)-1;
+$queryString_Recordset=null;
+if(!empty($_SERVER['QUERY_STRING'])) {
+	$params=explode("&", $_SERVER['QUERY_STRING']);
+	$newParams=array();
+	foreach ($params as $param) {
+		if(stristr($param, "pageNum_Recordset")==true) continue;
+		if(stristr($param, "totalRows_Recordset")==true) continue;
+		if(stristr($param, "maxRows_Recordset")==true) continue;
+		if(stristr($param, "str")==true) continue;
+		array_push($newParams, $param);
+	}
+	if(count($newParams) != 0) {
+		$queryString_Recordset="&" . implode("&", $newParams);
+	}
+}
+
+$queryString_Recordset=sprintf("&totalRows_Recordset=%d%s&str=$str", 
+	$totalRows_Recordset, 
+	$queryString_Recordset);
+
+if($pageNum_Recordset > 0) { 
+	$pagefirst=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, 0, $queryString_Recordset);
+	$pageprev=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, max(0, $pageNum_Recordset - 1), $queryString_Recordset);
+	$button1="<a href='$pagefirst'><img src='{$_PNG['first']}' border=0 alt='' title=''></a>\n";
+	$button2="<a href='$pageprev'><img src='{$_PNG['prev']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button1="<img src='{$_PNG['first']}' border=0 alt='' title=''>\n";
+	$button2="<img src='{$_PNG['prev']}' border=0 alt='' title=''>\n";
+}
+if($pageNum_Recordset < $totalPages_Recordset) {
+	$pagenext=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, min($totalPages_Recordset, $pageNum_Recordset + 1), $queryString_Recordset);
+	$pagelast=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, $totalPages_Recordset, $queryString_Recordset);
+	$button3="<a href='$pagenext'><img src='{$_PNG['next']}' border=0 alt='' title=''></a>\n";
+	$button4="<a href='$pagelast'><img src='{$_PNG['last']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button3="<img src='{$_PNG['next']}' border=0 alt='' title=''>\n";
+	$button4="<img src='{$_PNG['last']}' border=0 alt='' title=''>\n";
+}
+unset($pagefirst,$pageprev,$pagenext,$pagelast);
+unset($x,$buff,$line);
+$_cnum=1;
+if(!isset($pageNum_Recordset)||$pageNum_Recordset==''||$pageNum_Recordset==0) {
+	$_cnum=1;
+} else {
+	$_cnum=($pageNum_Recordset * $maxRows_Recordset);
+	if($_cnum <= 0) {
+		$_cnum=1;
+	} else {
+		$_cnum +=1;
+	}
+}
+$_header='';
+$_body='';
+if($totalRows_Recordset > 0 && count($row_Recordset)!=0) {
+	$_header ="<table width='100%' class=data>
+	<thead class='blue'>
+      	<tr>
+        <td style='font-weight: bold; width: 2%; border-right: 0px;'>#</td>
+	<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Interface</td>
+	<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>MAC address</td>
+	<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>IP address</td>
+	<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Hostname</td>
+	<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Lease start</td>
+	<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Lease expiry</td>
+	<td style='font-weight: bold; border-left: 0px;width: 5%; text-align: right; table-layout: fixed;'></td>
+      	</tr>
+	</thead>
+	<tbody>";
+	$_cok=0;
+	foreach($row_Recordset as $row) {
+		$_fst='';
+		$_act=$row['act'];
+		if($_act!="active") continue;
+		$_ip=$row['ip'];
+		$_mac=strtoupper($row['mac']);
+		$_hostname=$row['hostname'];
+		$_dates=strtotime($row['start']);
+		$_datee=strtotime($row['end']);
+		if($_mac=='') $_mac="(none)";
+		if($_hostname=='') $_hostname="(unknown)";
+		$_intf=$row['dev'];
+		$px=mybox_get_defname($_intf,2,0,$db_id);
+		$date_start='';$date_end='';
+		$date_start=date('d/m/Y h:i:s A',mybox_utc2local($_dates));
+		$date_end=date('d/m/Y h:i:s A',mybox_utc2local($_datee));
+		$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff;'";
+		$lo="onclick=\"self.location.href='/network_dhcp.exh?tab=3&col=2&_mac=$_mac&_ip=$_ip&_note=$_hostname&_stat1=checked&do_id=add&_dev=$_intf';\" ";
+		$_body .="
+			<tr $lt>
+        		<td $lo style='text-align: right; vertical-align: middle;'>$_cnum</td>
+			<td $lo style='vertical-align: middle;'><font color=green>$px</font></td>
+			<td $lo style='vertical-align: middle;'>$_mac</td>
+			<td $lo style='vertical-align: middle;'>$_ip</td>
+			<td $lo style='vertical-align: middle;'>$_hostname</td>
+			<td $lo style='vertical-align: middle;'>$date_start</td>
+			<td $lo style='vertical-align: middle;'>$date_end</td>
+			<td style='text-align: right; vertical-align: top; table-layout: fixed; white-space: nowrap;' align=right>
+			<input type=checkbox name=del[] value='$_mac,$_ip,$_hostname,$_intf'>
+			</td>
+			</tr>
+		";
+		$_cnum++;$_cok=1;
+	}
+}
+if($_cnum >= 1 && $_cok==1) {
+	$_body .="
+		<tr>
+		<td style='text-align: right; background: #ffffff;' align=right valign=top colspan=8>
+		<a href='#' onclick='do_delete(1);return false;'>Add to Static MAC/IP mappings</a> / <a href='#' onclick='dotoggle();return false;'>Toggle</a> <img src='{$_PNG['arrow_rtr']}' border=0 alt='' title=''></td>
+		</tr>
+	";
+	$_body .=mybox_print_nextpage($pageNum_Recordset,$totalPages_Recordset,$totalRows_Recordset,$maxRows_Recordset,$queryString_Recordset,$currentPage,'8',$button1,$button2,$button3,$button4);
+	$_body .="</tbody></table>";
+	echo "$_header$_body";
+} else {
+	echo "
+	<span class='notedef'>
+	There are no DHCP Lease record available.
+	</span>
+	<br><br>
+	";$_error=1;
+}?>
+
+<?php }//tab=4
+?>
+
+<table align=right>
+<tbody>
+<tr>
+<?php if($col==1){?><td><a name="sini"><a class="btn" href="#sini" onclick="return do_changes();return false;">Reload</a></td><?php }?>
+<?php if($_error!=1 && ($col==2 || $tab==2)){?><td><a name="sini"><a class="btn" href="#sini" onclick="return do_submit();return false;"><?php if($do_id=='edit') { echo "Update"; } else { echo "Save";}?></a></td><?php }?>
+</tr> 
+</tbody>
+</table>
+
+
+<!-- end tab container -->
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value='<?php echo $tab;?>'>
+<input type=hidden name=col value='<?php echo $col;?>'>
+<?php if($col==2){?>
+<input type=hidden name=do_id value='<?php echo $do_id;?>'>
+<input type=hidden name=id value='<?php echo $id;?>'>
+<?php }?>
+</form>
+<script type='text/javascript'>page_kill();</script>
+</body>
+</html>
+
+<?php mybox_db_close($db_id);?>

@@ -1,0 +1,434 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="index_left";
+include_once('page.exl');
+
+mybox_chk_session();
+//mybox_send_nocache();
+$_IMG[0]="i/menu/menu_left_top.gif";
+$_IMG[1]="i/menu/menu_left_hdr_bg.gif";
+$_IMG[2]="i/menu/menu_left_bottom.gif";
+$_IMG[3]="i/menu/menu_left_bottom_sb.gif";
+$_IMG[4]="i/menu/img_arrow_white.gif";
+$_IMG[5]="i/menu/img_arrow_yellow.gif";
+$im='';foreach($_IMG as $lx) {$i.="'/$lx',";}; $im=trim("$i",",");
+function __do_link($sid,$iid,$link) {
+	echo "onmouseover=\"link_on('$sid','$iid');\" onmouseout=\"link_off('$sid','$iid');\" onclick=\"link_href('$sid','$iid','$link');\"";
+}
+?>
+<html>
+<head>
+<title></title>
+<script type='text/javascript'>
+defaultStatus="MyBox Firewall - Logged on as admin";
+function switchmenu(obj) {
+	for(var x=1; x < 10; x++) {
+		var p="sub"+x;
+		if(document.getElementById(p)) {
+			var el=document.getElementById(p);
+			el.style.display = "none";
+		}
+	}
+	if(document.getElementById('t9')) {
+		document.getElementById('t9').style.background='url(<?php echo $_IMG[2];?>)';
+	};
+	if(document.getElementById(obj)) {
+		document.getElementById(obj).style.display='';
+	};
+	if(obj=="sub9") {
+		if(document.getElementById('t9')) {
+			document.getElementById('t9').style.background='url(<?php echo $_IMG[1];?>)';
+		}
+	};
+};
+var imgoff='<?php echo $_IMG[4];?>';
+var imgon='<?php echo $_IMG[5];?>';
+var cstate=0;var istate=0;
+function link_on(sid,iid) {
+	if(document.getElementById(sid)) {
+		document.getElementById(sid).style.color='#FF6600';
+	};
+	if(document.getElementById(iid)) {
+		document.getElementById(iid).src=imgon;
+	}
+};
+function link_off(sid,iid) {
+	if(cstate==sid) return;
+	if(document.getElementById(sid)) {
+		document.getElementById(sid).style.color='white';
+	};
+	if(document.getElementById(iid)) {
+		document.getElementById(iid).src=imgoff;
+	}
+};
+function link_href(sid,iid,link) {
+	link_on(sid,iid);
+	osid=cstate;oiid=istate;
+	cstate=sid;istate=iid;
+	if(osid!=0 && oiid!=0) {
+		link_off(osid,oiid);
+	}
+	if(link!="none") {
+		parent.right_frame.location.href=link;
+	};
+};
+</script>
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<script type='text/javascript' src="/j/mybox_func.js"></script>
+<style type="text/css">
+html {overflow-x: hidden;}
+body {
+overflow-x: hidden; overflow-y: auto;
+}
+
+.left_sec_top {
+	background: url(<?php echo $_IMG[0];?>);
+	border-bottom: 1px solid #000000;
+}
+.left_sec_mid {
+	background: url(<?php echo $_IMG[1];?>);
+	border-bottom: 1px solid #000000;
+}
+.left_sec_bottom {
+	background: url(<?php echo $_IMG[2];?>);
+}
+.left_sec_bottom_s {
+	background: url(<?php echo $_IMG[3];?>);
+	padding-left:20px;
+	height: 1px;
+	background-color:#FFFFFF;
+	cursor: pointer;
+}
+.left_sec, .left_sec_top,.left_sec_mid, .left_sec_bottom {
+	padding-left:20px; 
+	font-weight:bold; 
+	font-size:11px; 
+	color:#FFFFFF;
+	height: 19px;
+	width: 166px;
+	cursor: pointer;
+}
+.left_sub {
+	height:21px;
+	font-size:11px;
+	color:#FFFFFF;
+	cursor: pointer;
+}
+.left_sep {
+	height:1px;
+	background:#000000;
+	font-size: 1px;
+	margin: 0px;
+	padding: 0px;
+	border: 0px;
+}
+a,a:hover,a:link,a:visited,a:active,a:hover {text-decoration: none;}
+
+</style>
+</head>
+<body bgcolor='#FFFFCC' style='margin: 0px; padding: 0px;' <?php if($im!=''){?>onload="loadimages(<?php echo "$im";?>);"<?php }?>>
+<table style='margin-left: 2px; margin-top: 2px;' width="166" border="0" cellpadding="0" cellspacing="0" align="center">
+
+<tr>
+<td class="left_sec_top" onclick="switchmenu('sub1');">
+SYSTEM
+</td>
+</tr>
+
+<tr id='sub1' style='display: none;'>
+<td>
+	<table bgcolor="#000000" width="166" border="0" cellpadding="0" cellspacing="0" align="center">
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s1i1' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t1d1' class="left_sub" <?php __do_link('t1d1','s1i1','index_main.exh?show_status=1');?>>Overview</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s1i2' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t1d2' class="left_sub" <?php __do_link('t1d2','s1i2','system_services.exh');?>>Local Services</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s1i3' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t1d3' class="left_sub" <?php __do_link('t1d3','s1i3','system_nettools.exh');?>>IP Tools</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s1i4' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t1d4' class="left_sub" <?php __do_link('t1d4','s1i4','index_main.exh?show_status=2');?>>Reboot / Shutdown</td>
+	</tr>
+	<tr>
+	<td colspan="2" height="2" style="font-size:1px; color:#FFFFFF;">&nbsp;</td>
+	</tr>
+	</table>
+</td>
+</tr>
+
+<tr>
+<td class="left_sec_mid" onclick="switchmenu('sub2');">
+DEFINITIONS
+</td>
+</tr>
+
+<tr id='sub2' style='display: none;'>
+<td>
+	<table bgcolor="#000000" width="166" border="0" cellpadding="0" cellspacing="0" align="center">
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s2i1' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t2d1' class="left_sub" <?php __do_link('t2d1','s2i1','system_definitions_n.exh');?>>Networks</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s2i2' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t2d2' class="left_sub" <?php __do_link('t2d2','s2i2','system_definitions_s.exh');?>>Services</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s2i3' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t2d3' class="left_sub" <?php __do_link('t2d3','s2i3','system_definitions_t.exh');?>>Time Events</td>
+	</tr>
+	<tr>
+	<td colspan="2" height="2" style="font-size:1px; color:#FFFFFF;">&nbsp;</td>
+	</tr>
+	</table>
+</td>
+</tr>
+
+<tr>
+<td class="left_sec_mid" onclick="switchmenu('sub3');">
+MANAGEMENT
+</td>
+</tr>
+
+<tr id='sub3' style='display: none;'>
+<td>
+	<table bgcolor="#000000" width="166" border="0" cellpadding="0" cellspacing="0" align="center">
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s3i1' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t3d1' class="left_sub" <?php __do_link('t3d1','s3i1','manage_general.exh');?>>Preference</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s3i2' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t3d2' class="left_sub" <?php __do_link('t3d2','s3i2','manage_acl.exh');?>>Access control</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s3i3' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t3d3' class="left_sub" <?php __do_link('t3d3','s3i3','manage_auth.exh');?>>Authentication</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s3i4' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t3d4' class="left_sub" <?php __do_link('t3d4','s3i4','manage_backup.exh');?>>Backup / Restore</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s3i5' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t3d5' class="left_sub" <?php __do_link('t3d5','s3i5','manage_update.exh');?>>System Update</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s3i6' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t3d6' class="left_sub" <?php __do_link('t3d6','s3i6','manage_alert.exh');?>>Notification</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s3i7' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t3d7' class="left_sub" <?php __do_link('t3d7','s3i7','manage_av.exh');?>>AntiVirus</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s3i8' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t3d8' class="left_sub" <?php __do_link('t3d8','s3i8','manage_spam.exh');?>>AntiSpam</td>
+	</tr>
+	<tr>
+	<td colspan="2" height="2" style="font-size:1px; color:#FFFFFF;">&nbsp;</td>
+	</tr>
+	</table>
+</td>
+</tr>
+
+<tr>
+<td class="left_sec_mid" onclick="switchmenu('sub4');">
+NETWORK
+</td>
+</tr>
+
+<tr id='sub4' style='display: none;'>
+<td>
+	<table bgcolor="#000000" width="166" border="0" cellpadding="0" cellspacing="0" align="center">
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s4i1' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t4d1' class="left_sub" <?php __do_link('t4d1','s4i1','network_int.exh');?>>Interfaces</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s4i2' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t4d2' class="left_sub" <?php __do_link('t4d2','s4i2','network_route.exh');?>>Routing</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s4i3' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t4d3' class="left_sub" <?php __do_link('t4d3','s4i3','network_arp.exh');?>>Static ARP</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s4i4' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t4d4' class="left_sub" <?php __do_link('t4d4','s4i4','network_dns.exh');?>>DNS Service</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s4i5' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t4d5' class="left_sub" <?php __do_link('t4d5','s4i5','network_dhcp.exh');?>>DHCP Service</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s4i6' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t4d6' class="left_sub" <?php __do_link('t4d6','s4i6','network_lb.exh');?>>Server Load Balancing</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s4i7' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t4d7' class="left_sub" <?php __do_link('t4d7','s4i7','network_shaper.exh');?>>Quality of Service</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s4i8' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t4d8' class="left_sub" <?php __do_link('t4d8','s4i8','network_captive.exh');?>>Captive Portal</td>
+	</tr>
+	<tr>
+	<td colspan="2" height="2" style="font-size:1px; color:#FFFFFF;">&nbsp;</td>
+	</tr>
+	</table>
+</td>
+</tr>
+
+<tr>
+<td class="left_sec_mid" onclick="switchmenu('sub5');">
+FIREWALL
+</td>
+</tr>
+
+<tr id='sub5' style='display: none;'>
+<td>
+	<table bgcolor="#000000" width="166" border="0" cellpadding="0" cellspacing="0" align="center">
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s5i1' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t5d1' class="left_sub" <?php __do_link('t5d1','s5i1','fw_pf.exh');?>>Packet Filter</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s5i2' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t5d2' class="left_sub" <?php __do_link('t5d2','s5i2','fw_blacklist.exh');?>>Blacklist</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s5i3' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t5d3' class="left_sub" <?php __do_link('t5d3','s5i3','fw_pfnat.exh');?>>NAT Rules</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s5i4' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t5d4' class="left_sub" <?php __do_link('t5d4','s5i4','fw_ips.exh');?>>Intrusion Protection</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s5i5' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t5d5' class="left_sub" <?php __do_link('t5d5','s5i5','fw_imp2p.exh');?>>IM/P2P Control</td>
+	</tr>
+	<tr>
+	<td colspan="2" height="2" style="font-size:1px; color:#FFFFFF;">&nbsp;</td>
+	</tr>
+	</table>
+</td>
+</tr>
+
+<tr>
+<td class="left_sec_mid" onclick="switchmenu('sub6');">
+PROXY
+</td>
+</tr>
+
+<tr id='sub6' style='display: none;'>
+<td>
+	<table bgcolor="#000000" width="166" border="0" cellpadding="0" cellspacing="0" align="center">
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s6i1' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t6d1' class="left_sub" <?php __do_link('t6d1','s6i1','proxy_http.exh');?>>HTTP Proxy</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s6i2' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t6d2' class="left_sub" <?php __do_link('t6d2','s6i2','proxy_ftp.exh');?>>FTP Proxy</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s6i3' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t6d3' class="left_sub" <?php __do_link('t6d3','s6i3','proxy_mail.exh');?>>Mail Proxy</td>
+	</tr>
+	<tr>
+	<td colspan="2" height="2" style="font-size:1px; color:#FFFFFF;">&nbsp;</td>
+	</tr>
+	</table>
+</td>
+</tr>
+
+<tr>
+<td class="left_sec_mid" onclick="switchmenu('sub7');">
+VPN ACCESS
+</td>
+</tr>
+
+<tr id='sub7' style='display: none;'>
+<td>
+	<table bgcolor="#000000" width="166" border="0" cellpadding="0" cellspacing="0" align="center">
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s7i1' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t7d1' class="left_sub" <?php __do_link('t7d1','s7i1','vpn_pptp.exh');?>>PPTP</td>
+	</tr>
+	<tr>
+	<td colspan="2" height="2" style="font-size:1px; color:#FFFFFF;">&nbsp;</td>
+	</tr>
+	</table>
+</td>
+</tr>
+
+<tr>
+<td class="left_sec_mid" onclick="switchmenu('sub8');">
+REPORTING
+</td>
+</tr>
+
+<tr id='sub8' style='display: none;'>
+<td>
+	<table bgcolor="#000000" width="166" border="0" cellpadding="0" cellspacing="0" align="center">
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s8i1' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t8d1' class="left_sub" <?php __do_link('t8d1','s8i1','report_hw.exh');?>>Hardware</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s8i2' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t8d2' class="left_sub" <?php __do_link('t8d2','s8i2','report_network.exh');?>>Network</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s8i3' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t8d3' class="left_sub" <?php __do_link('t8d3','s8i3','report_ips.exh');?>>Intrusion Protection</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s8i4' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t8d4' class="left_sub" <?php __do_link('t8d4','s8i4','report_portscan.exh');?>>Portscan Protection</td>
+	</tr>
+	<tr>
+	<td colspan="2" height="2" style="font-size:1px; color:#FFFFFF;">&nbsp;</td>
+	</tr>
+	</table>
+</td>
+</tr>
+
+<tr>
+<td id='t9' class="left_sec_bottom" onclick="switchmenu('sub9');">
+LOGGING
+</td>
+</tr>
+<tr id='sub9' style='display: none;'>
+<td>
+	<table bgcolor="#000000" width="166" border="0" cellpadding="0" cellspacing="0" align="center">
+	<tr>
+	<td colspan="2" height="2" style="font-size:1px; color:#FFFFFF;">&nbsp;</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s9i1' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t9d1' class="left_sub" <?php __do_link('t9d1','s9i1','diag_logsetting.exh');?>>Settings</td>
+	</tr>
+	<tr>
+	<td width="21" height="13"><img alt='' title='' id='s9i2' src="<?php echo $_IMG[4];?>" width="21" height="13"></td>
+	<td id='t9d2' class="left_sub" <?php __do_link('t9d2','s9i2','diag_logs.exh');?>>View log files</td>
+	</tr>
+	<tr>
+	<td colspan="2" height="1" class="left_sec_bottom_s">&nbsp;</td>
+	</tr>
+	</table>
+</td>
+</tr>
+
+</table>
+</body>
+</html>
+

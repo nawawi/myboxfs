@@ -1,0 +1,403 @@
+#!/bin/php -Cq
+<?php 
+// dns.init - last update 11-Jan-2007
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="dns";
+include_once('clib.exl');
+include_once('policy.exl');
+putenv("PATH=/bin:/service/tools:/service/init");
+
+$_QUIET=0;
+mybox_init_set_alarm(30);
+
+if(!file_exists("/bin/named")) {
+	mybox_init_echo($_QUIET,"ERROR","Cannot execute dns.init. Internal error!");
+	exit(1);
+}
+
+function dns_status() {
+	global $_QUIET;
+	$pid=mybox_get_progpid("named");
+	if($pid!='') {
+		if($_QUIET==0) echo "* named (pid $pid) is running...\n";
+		return 0;
+	}
+	return 1;
+}
+
+function dns_static_zone($_hostname,$_ip,$_serial) {
+	$_config .="@\t\t\t1D IN SOA\t$_hostname. do-not-reply.mybox-notify.net. (\n";
+	$_config .="\t\t\t\t\t$_serial\t; serial\n";
+	$_config .="\t\t\t\t\t3H\t; refresh\n";
+	$_config .="\t\t\t\t\t15M\t; retry\n";
+	$_config .="\t\t\t\t\t1W\t; expiry\n";
+	$_config .="\t\t\t\t\t1D )\t; minimum\n";
+	$_config .="\t\t\t1D IN NS\t$_hostname.\n";
+	$_config .="@\t\t\t1D IN A\t\t$_ip\n";
+	if(!is_dir("/etc/dns_resolver/static")) @mybox_mkdirr("/etc/dns_resolver/static");
+	$fname="/etc/dns_resolver/static/$_hostname.zone";
+	mybox_save_to_file($fname,"$_config");
+	if(file_exists($fname)) return 1;
+	return 0;
+}
+
+function write_internal_cache() {
+	$ok=0;
+	$_serial=time();
+	$ipconfig=mybox_get_ipconfig_cache();
+	if(count($ipconfig)==0) return 0;
+	$_config .="@\t\t\t1D IN SOA\tmybox.internal.proxy. do-not-reply.mybox-notify.net. (\n";
+	$_config .="\t\t\t\t\t$_serial\t; serial\n";
+	$_config .="\t\t\t\t\t3H\t; refresh\n";
+	$_config .="\t\t\t\t\t15M\t; retry\n";
+	$_config .="\t\t\t\t\t1W\t; expiry\n";
+	$_config .="\t\t\t\t\t1D )\t; minimum\n";
+	$_config .="\t\t\t1D IN NS\tmybox.internal.proxy.\n";
+	foreach($ipconfig as $eth => $val) {
+		if(!preg_match("/^eth/",$eth)) continue;
+		list($mac,$ip,$bcast,$mask)=preg_split("/,/",$val);
+		if($ip=='') continue;
+		$_config .="@\t\t\t1D IN A\t\t$ip\n";
+	}
+	if(!is_dir("/etc/dns_resolver/static")) @mybox_mkdirr("/etc/dns_resolver/static");
+	$fname="/etc/dns_resolver/static/mybox.internal.proxy.zone";
+	mybox_save_to_file($fname,"$_config");
+	if(file_exists($fname)) $ok=1;
+	
+	$_config='';$fname='';
+	$_config .="@\t\t\t1D IN SOA\tmybox.captive.portal. do-not-reply.mybox-notify.net. (\n";
+	$_config .="\t\t\t\t\t$_serial\t; serial\n";
+	$_config .="\t\t\t\t\t3H\t; refresh\n";
+	$_config .="\t\t\t\t\t15M\t; retry\n";
+	$_config .="\t\t\t\t\t1W\t; expiry\n";
+	$_config .="\t\t\t\t\t1D )\t; minimum\n";
+	$_config .="\t\t\t1D IN NS\tmybox.captive.portal.\n";
+	foreach($ipconfig as $eth => $val) {
+		if(!preg_match("/^eth/",$eth)) continue;
+		list($mac,$ip,$bcast,$mask)=preg_split("/,/",$val);
+		if($ip=='') continue;
+		$_config .="@\t\t\t1D IN A\t\t$ip\n";
+	}
+	if(!is_dir("/etc/dns_resolver/static")) @mybox_mkdirr("/etc/dns_resolver/static");
+	$fname="/etc/dns_resolver/static/mybox.captive.portal.zone";
+	mybox_save_to_file($fname,"$_config");
+	if(file_exists($fname)) $ok=2;
+
+	if($ok==2) return 1;
+	return 0;
+}
+
+function dns_forwarder($_defnet_array,$_list_array) {
+	$_forwarder='';
+	$_nml=preg_split("/,/",$_list_array);
+	if(count($_nml)!=0) {
+		foreach($_nml as $_a) {
+			if($_a=='') continue;
+			if(isset($_defnet_array[$_a]['name']) && $_defnet_array[$_a]['name']!='') {
+				if($_defnet_array[$_a]['type']==2) {
+					$_forwarder .="{$_defnet_array[$_a]['ip']}; ";
+				}
+			} elseif(isset($_defnet_array[$_a]['group']) && $_defnet_array[$_a]['group']!='') {
+				foreach($_defnet_array[$_a] as $a1 => $_b) {
+					if(!is_array($_b)) continue;
+					if($_b['type']==2) {
+						$_forwarder .="{$_b['ip']}; ";
+					}
+				}
+			}
+		}
+	} else {
+		if(isset($_defnet_array[$_list_array]['name']) && $_defnet_array[$_list_array]['name']!='') {
+			if($_defnet_array[$_list_array]['type']==2) {
+				$_forwarder .="{$_defnet_array[$_list_array]['ip']}; ";
+			}
+		} elseif(isset($_defnet_array[$_list_array]['group']) && $_defnet_array[$_list_array]['group']!='') {
+			foreach($_defnet_array[$_list_array] as $a1 => $_b) {
+				if(!is_array($_b)) continue;
+				if($_b['type']==2) {
+					$_forwarder .="{$_b['ip']}; ";
+				}
+			}
+		}
+	}
+	unset($a);
+	$_forwarder=trim($_forwarder);
+	return $_forwarder;
+}
+
+function dns_config() {
+	global $_QUIET, $_DB_NAME;
+
+	if(!is_dir("/etc/dns_resolver")) @mybox_mkdirr("/etc/dns_resolver");
+	$db_id=mybox_db_connect($_DB_NAME);
+	$_defnet_array=mybox_defnetwork_array($db_id);
+	$namedev_array=mybox_name2dev_array($db_id);
+
+	$_dns_acl='';$_dns_forward='';
+	$_acl='';$_forwarder='';$_routing='';$_static='';
+	$result=mybox_db_query("select * from misc where name like \"dns_%\" ",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			if(trim($row['name'])=="dns_acl") $_dns_acl=trim($row['val']);
+			if(trim($row['name'])=="dns_forward") $_dns_forward=trim($row['val']);
+		}
+	}
+	unset($result);
+	$result=mybox_db_query("select domain,server from dns_routing where stat='1'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_domain=trim($row['domain']);
+			$_server=trim($row['server']);
+			if($_domain=='' && $_server=='') continue;
+			$_ip_list=dns_forwarder($_defnet_array,$_server);
+			if($_ip_list=='') continue;
+			$_routing .="zone \"$_domain\" IN {";
+ 			$_routing .="type forward;\n";
+			$_routing .="forwarders {\n";
+			$_routing .="$_ip_list\n";
+			$_routing .="};\n";
+			$_routing .="check-names fail;};\n";
+			unset($_ip_list);
+		}
+	}
+	unset($_ip_list);
+	unset($result);
+	$result=mybox_db_query("select ip,hostname,serial from dns_static where stat='1'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_ip=trim($row['ip']);
+			$_hostname=trim($row['hostname']);
+			$_serial=trim($row['serial']);
+			if(dns_static_zone($_hostname,$_ip,$_serial)==1) {
+				$_static .="zone \"$_hostname\" IN {";
+				$_static .="type master;\n";
+				$_static .="file \"static/$_hostname.zone\";\n";
+				$_static .="check-names fail;\n";
+				$_static .="allow-update { none; };\n";
+				$_static .="};\n";
+			}
+		}
+	}
+	if(write_internal_cache()==1) {
+		$_static .="zone \"mybox.internal.proxy\" IN {";
+		$_static .="type master;\n";
+		$_static .="file \"static/mybox.internal.proxy.zone\";\n";
+		$_static .="check-names fail;\n";
+		$_static .="allow-update { none; };\n";
+		$_static .="};\n";
+		$_static .="zone \"mybox.captive.portal\" IN {";
+		$_static .="type master;\n";
+		$_static .="file \"static/mybox.captive.portal.zone\";\n";
+		$_static .="check-names fail;\n";
+		$_static .="allow-update { none; };\n";
+		$_static .="};\n";
+	}
+	$_nml=array();
+	if($_dns_acl!='') {
+		$_nml=preg_split("/,/",$_dns_acl);
+		if(count($_nml)!=0) {
+			foreach($_nml as $_a) {
+				if($_a=='') continue;
+				if(isset($namedev_array[$_a])&&$namedev_array[$_a]!='') {
+					$_acl .="{$namedev_array[$_a]}; ";
+				}
+				if(isset($_defnet_array[$_a]['name']) && $_defnet_array[$_a]['name']!='') {
+					if($_defnet_array[$_a]['type']==1) {
+						$_acl .="{$_defnet_array[$_a]['ip']}; ";
+					}
+				} elseif(isset($_defnet_array[$_a]['group']) && $_defnet_array[$_a]['group']!='') {
+					foreach($_defnet_array[$_a] as $a1 => $_b) {
+						if(!is_array($_b)) continue;
+						if($_b['type']==1) {
+							$_acl .="{$_b['ip']}; ";
+						}
+					}
+				}
+			}
+		} else {
+			if(isset($namedev_array[$_dns_acl])&&$namedev_array[$_dns_acl]!='') {
+				$_acl="{$namedev_array[$_dns_acl]};\n";
+			}
+			if(isset($_defnet_array[$_dns_acl]['name']) && $_defnet_array[$_dns_acl]['name']!='') {
+				if($_defnet_array[$_dns_acl]['type']==1) {
+					$_acl .="{$_defnet_array[$_dns_acl]['ip']}; ";
+				}
+			} elseif(isset($_defnet_array[$_dns_acl]['group']) && $_defnet_array[$_dns_acl]['group']!='') {
+				foreach($_defnet_array[$_dns_acl] as $a1 => $_b) {
+					if(!is_array($_b)) continue;
+					if($_b['type']==1) {
+						$_acl .="{$_b['ip']}; ";
+					}
+				}
+			}
+		}
+		unset($_a);
+		$_acl=trim($_acl);
+	}
+	unset($_nml);
+	if($_dns_forward!='') {
+		$_forwarder=dns_forwarder($_defnet_array,$_dns_forward);
+	}
+	
+	$_config='';
+	$_config .="acl bogon {0.0.0.0/8;1.0.0.0/8;2.0.0.0/8;5.0.0.0/8;7.0.0.0/8;10.0.0.0/8;23.0.0.0/8;27.0.0.0/8;31.0.0.0/8;36.0.0.0/8;37.0.0.0/8;39.0.0.0/8;41.0.0.0/8;42.0.0.0/8;49.0.0.0/8;50.0.0.0/8;58.0.0.0/8;59.0.0.0/8;70.0.0.0/8;71.0.0.0/8;72.0.0.0/8;73.0.0.0/8;74.0.0.0/8;75.0.0.0/8;76.0.0.0/8;77.0.0.0/8;78.0.0.0/8;79.0.0.0/8;83.0.0.0/8;84.0.0.0/8;85.0.0.0/8;86.0.0.0/8;87.0.0.0/8;88.0.0.0/8;89.0.0.0/8;90.0.0.0/8;91.0.0.0/8;92.0.0.0/8;93.0.0.0/8;94.0.0.0/8;95.0.0.0/8;96.0.0.0/8;97.0.0.0/8;98.0.0.0/8;99.0.0.0/8;100.0.0.0/8;101.0.0.0/8;102.0.0.0/8;103.0.0.0/8;104.0.0.0/8;105.0.0.0/8;106.0.0.0/8;107.0.0.0/8;108.0.0.0/8;109.0.0.0/8;110.0.0.0/8;111.0.0.0/8;112.0.0.0/8;113.0.0.0/8;114.0.0.0/8;115.0.0.0/8;116.0.0.0/8;117.0.0.0/8;118.0.0.0/8;119.0.0.0/8;120.0.0.0/8;121.0.0.0/8;122.0.0.0/8;123.0.0.0/8;124.0.0.0/8;125.0.0.0/8;126.0.0.0/8;169.254.0.0/16;172.16.0.0/12;173.0.0.0/8;174.0.0.0/8;175.0.0.0/8;176.0.0.0/8;177.0.0.0/8;178.0.0.0/8;179.0.0.0/8;180.0.0.0/8;181.0.0.0/8;182.0.0.0/8;183.0.0.0/8;184.0.0.0/8;185.0.0.0/8;186.0.0.0/8;187.0.0.0/8;189.0.0.0/8;190.0.0.0/8;192.0.2.0/24;197.0.0.0/8;223.0.0.0/8;224.0.0.0/3;};\n";
+	$_config .="acl local_acl {\n";
+	$_config .="127.0.0.1;\n";
+	if($_acl!='') $_config .="$_acl\n";
+	$_config .="};\n";
+	$_config .="options {\n";
+	$_config .="directory \"/etc/dns_resolver\";\n";
+	$_config .="listen-on port 53 { any; };\n";
+	$_config .="version \"MyBox Internet Security DNS\";\n";
+	$_config .="check-names master warn;\n";
+	$_config .="pid-file \"/var/run/named.pid\";\n";
+	$_config .="dump-file \"/etc/dns_resolver/cache_dump.db\";\n";
+	$_config .="statistics-file \"/etc/dns_resolver/named_stats.txt\";\n";
+	$_config .="datasize default;\n";
+	$_config .="stacksize default;\n";
+	$_config .="coresize default;\n";
+	$_config .="files unlimited;\n";
+	$_config .="recursion yes;\n";
+	$_config .="allow-recursion { local_acl; };\n";
+	$_config .="allow-query { local_acl; };\n";
+	$_config .="blackhole {bogon;};\n";
+	$_config .="allow-transfer { none; };\n";
+	$_config .="interface-interval 0;\n";
+	$_config .="notify no;\n";
+	if($_forwarder!='') {
+		$_config .="forwarders {";
+                $_config .="$_forwarder";
+                $_config .="};\n";
+	}
+	$_config .="};\n"; // options end
+
+	$_config .="logging {";
+	//$_config .="category notify {null;};\n";
+	//$_config .="category lame-servers {null;};\n";
+	$_config .="category xfer-in {default_syslog;};\n";
+	$_config .="category xfer-out {default_syslog;};\n";
+	$_config .="category security {default_syslog;};\n";
+	$_config .="category default {null;};\n";
+	$_config .="};\n";
+
+	$_config .="zone \".\" IN {";
+	$_config .="type hint;\n";
+	$_config .="file \"root.hint\";\n";
+	$_config .="};\n";
+	$_config .="zone \"localhost\" IN {";
+	$_config .="type master;\n";
+	$_config .="file \"localhost.zone\";\n";
+	$_config .="check-names fail;\n";
+	$_config .="allow-update { none; };\n";
+	$_config .="};\n";
+
+	$_config .="zone \"0.0.127.in-addr.arpa\" IN {";
+	$_config .="type master;\n";
+	$_config .="file \"127.0.0.zone\";\n";
+	$_config .="check-names fail;\n";
+ 	$_config .="allow-update { none; };\n";
+	$_config .="};\n";
+
+	// request routing
+	if($_routing!='') $_config .="$_routing";
+
+	// static DNS
+	if($_static!='') $_config .="$_static";
+	mybox_save_to_file("/etc/dns_resolver/named.conf","$_config\n");
+	@mybox_save_to_file("/etc/resolv.conf","nameserver 127.0.0.1\n");
+	if(file_exists("/var/sys/ad_ip")) {
+		$_ad_ip=mybox_fget_contents("/var/sys/ad_ip");
+		if($_ad_ip!='') @mybox_save_to_file("/etc/resolv.conf","nameserver $_ad_ip\n");
+	}
+	if(file_exists("/etc/dns_resolver/named.conf")) {
+		@mybox_append_to_file("/etc/resolv.conf","nameserver 127.0.0.1\n");
+		return 1;
+	}
+	return 0;
+}
+
+
+function dns_start() {
+	global $_QUIET, $_ROOT_DIR;
+
+	@unlink("/var/sys/chk_named");
+
+	if(file_exists("$_ROOT_DIR/scripts/dns/start")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/dns/start");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/dns/pre-start")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/dns/pre-start");
+	}
+
+	if(@dns_config()==1 && @dns_status()==1) {
+		if(mybox_exec_cmd("named")==0) {
+			mybox_init_echo($_QUIET,"INFO","Starting DNS Resolver service");
+			@touch("/var/sys/chk_named");
+			if(!file_exists("/var/sys/init_no_restart")) {
+				do_policy_admin();
+				do_policy_nat();
+			}
+			if(file_exists("$_ROOT_DIR/scripts/dns/post-start")) {
+				mybox_execq_cmd("$_ROOT_DIR/scripts/dns/post-start");
+			}
+			return 0;
+		}
+	}
+	mybox_init_echo($_QUIET,"ERROR","Starting DNS Resolver service failed");
+	return 1;
+}
+
+function dns_stop() {
+	global $_QUIET, $_ROOT_DIR;
+
+	@unlink("/var/sys/chk_named");
+	@unlink("/var/sys/dns_proxy.set");
+	do_policy_dns_nat_clear();
+
+	if(file_exists("$_ROOT_DIR/scripts/dns/stop")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/dns/stop");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/dns/pre-stop")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/dns/pre-stop");
+	}
+
+	@mybox_save_to_file("/etc/resolv.conf","");
+	if(mybox_killall("named")==0) {
+		mybox_init_echo($_QUIET,"INFO","Shutting down DNS Resolver service");
+		if(file_exists("$_ROOT_DIR/scripts/dns/post-stop")) {
+			mybox_execq_cmd("$_ROOT_DIR/scripts/dns/post-stop");
+		}
+		return 0;
+	}
+	mybox_init_echo($_QUIET,"ERROR","Shutting down DNS Resolver service failed");
+	return 1;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=dns_start();
+		break;
+	case 'stop':
+		$ret=dns_stop();
+		break;
+	case 'restart':
+		$ret=dns_stop();
+		sleep(2);
+		$ret=dns_start();
+		break;
+	case 'status':
+		$ret=dns_status();
+		break;
+	case 'config':
+		$ret=dns_config();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/status]\n";
+		break;
+}
+exit($ret);
+?>

@@ -1,0 +1,432 @@
+#!/bin/php -Cq
+<?php 
+// mail_proxy.init - last update 04-Dec-2007
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="mail_proxy";
+include_once('clib.exl');
+include_once('policy.exl');
+putenv("PATH=/bin:/service/tools:/service/init");
+
+$_QUIET=0;
+$_AV_STAT=0;$_SPAM_STAT=0;
+mybox_init_set_alarm(30);
+
+if(!file_exists("/bin/p3scan")) {
+	mybox_init_echo($_QUIET,"ERROR","Cannot execute mail_proxy.init. Internal error!");
+	exit(1);
+}
+
+function do_clean_file() {
+	@unlink("/var/sys/ftp_proxy_networks");
+	@unlink("/var/sys/mail_proxy_port");
+	@unlink("/var/sys/mail_proxy_trans.set");
+}
+
+function p3scan_networks($db_id,$name) {
+	$_defnet_array=mybox_defnetwork_array($db_id);
+	$namedev_array=mybox_name2dev_array($db_id);
+	$_networks='';
+	if(stripos($name,",")===FALSE) $name="$name,";
+
+	$_nml=preg_split("/,/",$name);
+	if(count($_nml)!=0) {
+		foreach($_nml as $_a) {
+			if($_a=='') continue;
+			if(isset($namedev_array[$_a])&&$namedev_array[$_a]!='') {
+				if(strpos($namedev_array[$_a],"/")===FALSE) {
+					$_networks .="{$namedev_array[$_a]}/32 ";
+				} else {
+					$_networks .="{$namedev_array[$_a]} ";
+				}
+			} else {
+				if(isset($_defnet_array[$_a]['name']) && $_defnet_array[$_a]['name']!='') {
+					if($_defnet_array[$_a]['type']==2) {
+						$_networks .="{$_defnet_array[$_a]['ip']} ";
+					}
+				} elseif(isset($_defnet_array[$_a]['group']) && $_defnet_array[$_a]['group']!='') {
+					foreach($_defnet_array[$_a] as $a1 => $_b) {
+						if(!is_array($_b)) continue;
+						if($_b['type']==1) {
+							$_networks .="{$_b['ip']} ";
+						} elseif($_b['type']==2) {
+							$_networks .="{$_b['ip']}/32 ";
+						}
+					}
+				}
+			}
+		}
+	} else {
+		if(isset($namedev_array[$_a])&&$namedev_array[$_a]!='') {
+			if(strpos($namedev_array[$_a],"/")===FALSE) {
+				$_networks .="{$namedev_array[$_a]}/32 ";
+			} else {
+				$_networks .="{$namedev_array[$_a]} ";
+			}
+		} else {
+			if(isset($_defnet_array[$_list_array]['name']) && $_defnet_array[$_list_array]['name']!='') {
+				if($_defnet_array[$_list_array]['type']==2) {
+					$_networks .="{$_defnet_array[$_list_array]['ip']} ";
+				}
+			} elseif(isset($_defnet_array[$_list_array]['group']) && $_defnet_array[$_list_array]['group']!='') {
+				foreach($_defnet_array[$_list_array] as $a1 => $_b) {
+					if(!is_array($_b)) continue;
+					if($_b['type']==1) {
+						$_networks .="{$_b['ip']} ";
+					} elseif($_b['type']==2) {
+						$_networks .="{$_b['ip']}/32 ";
+					}
+				}
+			}
+		}
+	}
+	unset($a);
+	$_networks=trim($_networks);
+	return $_networks;
+}
+
+function p3scan_exception(&$_trans_src,&$_trans_dst,$_networks,$db_id) {
+	$result=mybox_db_query("select * from cf_mail_exclude",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=trim($row['name']);
+			$_src=$row['src'];
+			$_dst=$row['dst'];
+			$_pop3=trim($row['pop3']);
+			$_smtp=trim($row['smtp']);
+			$_imap=trim($row['imap']);
+
+			$_src_a='';
+			if($_src!='any' && $_src!='') {
+				$_src_a=p3scan_networks($db_id,$_src);
+				if($_src_a!='') {
+					$_src_b=preg_split("/\s+/",$_src_a);
+					if(count($_src_b)!=0) {
+						foreach($_src_b as $ln) {
+							if($_pop3==1) $_trans_src[]="pop3:$ln";
+							if($_smtp==1) $_trans_src[]="smtp:$ln";
+							if($_imap==1) $_trans_src[]="imap:$ln";
+						}
+					}
+				}
+			}
+			unset($_src_a,$_src_b,$ln);
+			$_dst_a='';
+			if($_dst!='any' && $_dst!='') {
+				$_dst_a=p3scan_networks($db_id,$_dst);
+				if($_dst_a!='') {
+					$_dst_b=preg_split("/\s+/",$_dst_a);
+					if(count($_dst_b)!=0) {
+						foreach($_dst_b as $ln) {
+							if($_pop3==1) $_trans_dst[]="pop3:$ln";
+							if($_smtp==1) $_trans_dst[]="smtp:$ln";
+							if($_imap==1) $_trans_dst[]="imap:$ln";
+						}
+					}
+				}
+			}
+	
+		}
+	}
+}
+
+function p3scan_trans($_networks,$_trans_src,$_trans_dst,$_cf_mail_pop3_stat,$_cf_mail_mail_stat,$_cf_mail_imap_stat) {
+	$_networks=trim($_networks);
+	if($_networks=='') return;
+	$_networks="$_networks ";
+	$_trans_a=preg_split("/\s+/",$_networks);
+	$txt='';
+	$_skp=array();$_skp1=array();
+	if(count($_trans_src)!=0) {
+		foreach($_trans_src as $ln) {
+			if($ln=='') continue;
+			list($p,$r)=preg_split("/:/",$ln);
+			if($_skp[$r]==1) continue;
+			$_skp[$r]=1;
+			if($_cf_mail_pop3_stat==1 && $p=="pop3") {
+				$txt .="-s $r -p tcp -m tcp --sport 1:65535 --dport 110 -j RETURN\n";
+			}
+			if($_cf_mail_mail_stat==1 && $p=="smtp") {
+				$txt .="-s $r -p tcp -m tcp --sport 1:65535 --dport 25 -j RETURN\n";
+			}
+			if($_cf_mail_imap_stat==1 && $p=="imap") {
+				$txt .="-s $r -p tcp -m tcp --sport 1:65535 --dport 143 -j RETURN\n";
+			}
+			unset($p,$r);
+		}
+	}
+	unset($ln);
+	if(count($_trans_dst)!=0) {
+		foreach($_trans_dst as $ln) {
+			if($ln=='') continue;
+			list($p,$r)=preg_split("/:/",$ln);
+			if($_skp1[$r]==1) continue;
+			$_skp1[$r]=1;
+			if($_cf_mail_pop3_stat==1 && $p=="pop3") {
+				$txt .="-d $r -p tcp -m tcp --sport 1:65535 --dport 110 -j RETURN\n";
+			}
+			if($_cf_mail_mail_stat==1 && $p=="smtp") {
+				$txt .="-d $r -p tcp -m tcp --sport 1:65535 --dport 25 -j RETURN\n";
+			}
+			if($_cf_mail_imap_stat==1 && $p=="imap") {
+				$txt .="-d $r -p tcp -m tcp --sport 1:65535 --dport 143 -j RETURN\n";
+			}
+			unset($p,$r);
+		}
+	}
+	unset($ln);
+	foreach($_trans_a as $ln) {
+		if($ln=='') continue;
+		if($_skp[$ln]==1) continue;
+		$_skp[$ln]=1;
+		if($_cf_mail_pop3_stat==1) {
+			$txt .="-s $ln -p tcp -m tcp --sport 1:65535 --dport 110 -j REDIRECT --to-port 8110\n";
+		}
+		if($_cf_mail_mail_stat==1) {
+			$txt .="-s $ln -p tcp -m tcp --sport 1:65535 --dport 25 -j REDIRECT --to-port 8110\n";
+		}
+		if($_cf_mail_imap_stat==1) {
+			$txt .="-s $ln -p tcp -m tcp --sport 1:65535 --dport 143 -j REDIRECT --to-port 8110\n";
+		}
+		unset($p,$r);
+		
+	}
+	if($txt!='') mybox_save_to_file("/var/sys/mail_proxy_trans.set",$txt);
+}
+
+function p3scan_mail_template($_fw_admin) {
+	$_version=mybox_show_firmware();
+	//$_uptime=mybox_uptime();
+	$_footer='';
+	$_footer .="\n\n-- \n";
+	$_footer .="Mybox Firewall System\n";
+	$_footer .="Firmware Version     : $_version\n";
+	//$_footer .="System Uptime        : $_uptime";
+
+	$_config='';
+	$_config .="MIME-Version: 1.0\n";
+	$_config .="Content-Transfer-Encoding: 8bit\n";
+	$_config .="Content-Type: text/plain;\n";
+	$_config .="        charset=\"iso-8859-1\"\n\n";
+	$_config .="This message body was generated automatically by Mybox Firewall (on %HOSTNAME%).\n";
+	$_config .="It replaces a message that contained a virus.\n\n\n";
+	$_config .="This message includes the email headers of the infected message.\n\n";
+	$_config .="Virus name:\n";
+ 	$_config .="   %VIRUSNAME%\n\n";
+	$_config .="Sender:\n";
+	$_config .="    %MAILFROM%\n\n";
+	$_config .="Recipient:\n";
+	$_config .="    %MAILTO%\n\n";
+	$_config .="Date:\n";
+	$_config .="    %MAILDATE%\n\n";
+	$_config .="Subject:\n";
+	$_config .="    %SUBJECT%\n\n";
+	$_config .="Connection data:\n";
+	$_config .="    %PROTOCOL% from %CLIENTIP% to %SERVERIP%\n";
+	$_config .="\n";
+	$_config .="If you have any questions please email to $_fw_admin\n";
+	$_config .="$_footer\n";
+	mybox_save_to_file("/etc/p3scan/p3scan.mail","$_config");
+
+}
+
+function p3scan_config() {
+	global $_DB_NAME, $_QUIET, $_ROOT_DIR, $_AV_STAT, $_SPAM_STAT;
+
+	@unlink("/var/sys/mail_proxy_networks");
+	@unlink("/etc/p3scan/p3scan.conf");
+
+	$db_id=mybox_db_connect($_DB_NAME);
+	$result=mybox_db_query("select * from cf where name like \"cf_mail_%\" or name like \"cf_spamsa_%\" or name like \"cf_sophos%\"",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=trim($row['name']);
+			$_val=trim($row['val']);
+			$_name="_$_name";
+			$$_name="$_val";
+		}
+		unset($_name,$_val);
+	}
+	unset($result);
+	if($_cf_mail_pop3_stat=='') $_cf_mail_pop3_stat=0;
+	if($_cf_mail_mail_stat=='') $_cf_mail_mail_stat=0;
+	if($_cf_mail_imap_stat=='') $_cf_mail_imap_stat=0;
+	if($_cf_mail_blk_stat=='') $_cf_mail_blk_stat=0;
+
+	if($_cf_mail_pop3_network=='') {
+		$_cf_mail_pop3_stat=0;
+		$_cf_mail_mail_stat=0;
+		$_cf_mail_imap_stat=0;
+	}
+
+	if($_cf_mail_mail_size=='') $_cf_mail_mail_size=1024;
+	$_AV_STAT=$_cf_mail_av_stat;
+	$_SPAM_STAT=$_cf_mail_spam_stat;
+
+	if($_cf_sophos_stat=='' || $_cf_sophos_stat==0) $_AV_STAT=0;
+	if($_cf_spamsa_stat=='' || $_cf_spamsa_stat==0) $_SPAM_STAT=0;
+
+	if($_cf_mail_pop3_stat==0 && $_cf_mail_mail_stat==0 && $_cf_mail_imap_stat==0) {
+		mybox_init_echo($_QUIET,"INFO","Mail Proxy service disabled");
+		mail_proxy_clear();
+		mybox_db_close($db_id);
+		exit(1);
+	}
+
+	$_trans_src=array(); $_trans_dst=array();
+	$_networks=p3scan_networks($db_id,$_cf_mail_pop3_network);
+
+	p3scan_exception(&$_trans_src,&$_trans_dst,$_networks,$db_id);
+	p3scan_trans($_networks,$_trans_src,$_trans_dst,$_cf_mail_pop3_stat,$_cf_mail_mail_stat,$_cf_mail_imap_stat);
+	mybox_save_to_file("/var/sys/mail_proxy_networks","$_networks");
+	mybox_db_close($db_id);
+
+	$_fw_admin=mybox_fget_contents("/var/sys/fw_admin");
+	if($_fw_admin=='') $_fw_admin="admin@mybox";
+
+	if(!is_dir("/etc/p3scan")) @mybox_mkdirr("/etc/p3scan");
+	if(!is_dir("$_ROOT_DIR/avscan/children")) @mybox_mkdirr("$_ROOT_DIR/avscan/children");
+
+	$_config='';
+	$_config .="pidfile = /var/run/p3scan.pid\n";
+	if($_AV_STAT==1) {
+		$_config .="scannertype = sophie\n";
+		p3scan_mail_template($_fw_admin);
+	} else {
+		$_config .="scannertype = bash\n";
+		$_config .="scannertype = /bin/true\n";
+		$_config .="virusregexp = = .*\n";
+	}
+	$_config .="smtpsize = $_cf_mail_mail_size\n";
+	$_config .="logopt = 35\n";
+	$_config .="notifydir = /strg/mybox/avscan\n";
+	$_config .="virusdir = /strg/mybox/avscan\n";
+	$_config .="delete\n";
+	$_config .="broken\n";
+	$_config .="template = /etc/p3scan/p3scan.mail\n";
+	$_config .="notify = The email has been removed.\n";
+	if($_cf_mail_av_subject!='') {
+		$_config .="subject = $_cf_mail_av_subject\n";
+	} else {
+		$_config .="subject = [ VIRUS-DETECTED ]\n";
+	}
+	if($_SPAM_STAT==1) {
+		if($_cf_spamsa_subject=='') $_cf_spamsa_subject="[ SPAM ]";
+		$_config .="checkspam = /bin/spamc\n";
+		$_config .="spamsubject = $_cf_spamsa_subject\n";
+		if($_cf_mail_spam_delete==1) $_config .="spamdelete\n";
+		if($_cf_mail_spam_isp_subject!='') {
+			$_config .="ispspam = $_cf_mail_spam_isp_subject\n";
+		}
+	}
+	if($_cf_mail_blk_stat==1 && file_exists("$_ROOT_DIR/sophos/BLACKLIST")) {
+		$_config .="blackshort\n";
+		$_config .="blacksubj [ BLACKLISTED ] \n";
+		@symlink("$_ROOT_DIR/sophos/BLACKLIST","/etc/p3scan/blacklist");
+		if(file_exists("$_ROOT_DIR/sophos/WHITELIST")) {
+			@symlink("$_ROOT_DIR/sophos/WHITELIST","/etc/p3scan/whitelist");
+		}
+	}
+	mybox_save_to_file("/etc/p3scan/p3scan.conf",$_config);
+	mybox_save_to_file("/var/sys/mail_proxy_port","8110");
+	if(file_exists("/etc/p3scan/p3scan.conf")) return 1;
+	if($_QUIET==0) echo "* Writing Mail Proxy config failed\n";
+	return 0;
+}
+
+function p3scan_status() {
+	global $_QUIET;
+	$pid=mybox_get_progpid("p3scan");
+	if($pid!='') {
+		if($_QUIET==0) echo "* p3scan (pid $pid) is running...\n";
+		return 0;
+	}
+	return 1;
+}
+
+function p3scan_start() {
+	global $_QUIET, $_ROOT_DIR, $_AV_STAT, $_SPAM_STAT;
+
+	mail_proxy_clear();
+	do_mail_acl_policy_clear();
+	@unlink("/var/sys/chk_p3scan");
+
+	if(file_exists("$_ROOT_DIR/scripts/mail_proxy/start")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/mail_proxy/start");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/mail_proxy/pre-start")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/mail_proxy/pre-start");
+	}
+
+	if(@p3scan_config()==1 && @p3scan_status()==1) {
+		if(mybox_exec_cmd("p3scan")==0) {
+			mybox_init_echo($_QUIET,"INFO","Starting Mail Proxy service");
+			if(!file_exists("/var/sys/init_no_restart")) {
+				do_mail_proxy_policy();
+				do_mail_acl_policy();
+			}
+			@touch("/var/sys/chk_p3scan");
+			if(file_exists("$_ROOT_DIR/scripts/mail_proxy/post-start")) {
+				mybox_execq_cmd("$_ROOT_DIR/scripts/mail_proxy/post-start");
+			}
+			return 0;
+		}
+	}
+	mybox_init_echo($_QUIET,"ERROR","Starting Mail Proxy service failed");
+	return 1;
+}
+
+function p3scan_stop() {
+	global $_QUIET, $_ROOT_DIR;
+
+	@unlink("/var/sys/chk_p3scan");
+	if(!file_exists("/var/sys/init_no_restart")) {
+		mail_proxy_clear();
+		do_mail_acl_policy_clear();
+	}
+	do_clean_file();
+	if(file_exists("$_ROOT_DIR/scripts/mail_proxy/stop")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/mail_proxy/stop");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/mail_proxy/pre-stop")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/mail_proxy/pre-stop");
+	}
+	if(mybox_killall("p3scan")==0) {
+		mybox_init_echo($_QUIET,"INFO","Shutting down Mail Proxy service");
+		if(file_exists("$_ROOT_DIR/scripts/mail_proxy/post-stop")) {
+			mybox_execq_cmd("$_ROOT_DIR/scripts/mail_proxy/post-stop");
+		}
+		@unlink("/var/run/p3scan.pid");
+		return 0;
+	}
+	mybox_init_echo($_QUIET,"ERROR","Shutting down Mail Proxy service failed");
+	return 1;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=p3scan_start();
+		break;
+	case 'stop':
+		$ret=p3scan_stop();
+		break;
+	case 'restart':
+		$ret=p3scan_stop();
+		sleep(2);
+		$ret=p3scan_start();
+		break;
+	case 'status':
+		$ret=p3scan_status();
+		break;
+	case 'config':
+		$ret=p3scan_config();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/status]\n";
+		break;
+}
+exit($ret);
+?>

@@ -1,0 +1,18 @@
+Installation Guide
+-----------------------------------------------------------
+- Untar lanbypass-0.0.1.tgz to suitable directory.
+    tar xzvf lanbypass-0.0.1.tgz -C /tmp
+
+- Build program
+    cd /tmp/lanbypass; make;
+
+- Run program
+    * LAN BYPASS
+    ./lanbypass on  
+
+    * LAN NOT BYPASS
+    ./lanbypass off  
+
+    * Show LAN BYPASS state
+    ./lanbypass
+  

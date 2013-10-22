@@ -1,0 +1,170 @@
+README file for SquidClamav Version 2.0
+
+SquidClamav - A Clamav Antivirus Redirector for Squid -
+		http://www.samse.fr/GPL/squidclamav/
+
+
+Please see INSTALL file file for installation instructions
+
+Configuration :
+---------------
+
+By default, the configuration file is located at:
+
+  /usr/local/squidclamv/etc/squidclamav.conf
+
+You need to create this file from scratch with the aids of
+the following instructions:
+
+Squidclamav Patterns:
+
+The syntax of lines in the squidclamav.conf file are of the form:
+
+	regex|regexi pattern
+or
+	abort|aborti pattern
+or
+	content|contenti pattern
+or
+	redirect cgi_url_redirection
+
+Full regex matching is made available by the use of the GNU Regex libary.
+It also supports pattern buffers.
+
+Let's say you want to check against the ClamAv antivirus files with
+case insensitive extension .exe, .com and .zip. Then here are the line
+you may include:
+
+	regexi  ^.*\.exe$
+	regexi  ^.*\.com$
+	regexi  ^.*\.zip$
+
+Now let's say you want don't want to check image and HTML files, then you
+should include the following lines in the configuration file:
+
+	aborti ^.*\..gif$
+	aborti ^.*\..png$
+	aborti ^.*\..jpg$
+	abort ^.*\..html$
+	abort ^.*\..htm$
+
+If you don't want to check directory listing or default index.html add
+the following line :
+
+	abort ^.*\/$
+
+You may want to allow virus scanning based on content type, for example
+for all 'application/*' file:
+
+	content ^application\/.*$
+
+will scan all files with this content-type.
+
+Here is the configuration I use:
+
+	abort ^.*\/cgi-bin\/.*$
+	abort ^.*\.gz$
+	abort ^.*\.pdf$
+	abort ^.*\.js$
+	abort ^.*\.html$
+	abort ^.*\.css$
+	abort ^.*\.xml$
+	abort ^.*\.xsl$
+	content ^.*application\/.*$
+
+When a virus is found the squidclamav program should redirect the request
+to a CGI program. You must specify the URL to this CGI with the redirect
+directive as follow:
+
+	redirect http://proxy.domain.com/cgi-bin/clwarn.cgi
+
+Squidclamav will pass to this CGI the following parameters:
+
+	url=ORIGNAL_HTTP_REQUEST
+	virus=NAME_OF_THE_VIRUS
+	source=DOWNLOADER_IP_ADDRESS
+	user=DOWNLOADER_IDENT
+
+Virus scanning can be stop on large files by configuring clamd (see clamd.conf).
+
+You can overwrite the URL/port to your Squid proxy as follow :
+
+	proxy http://127.0.0.1:3128
+
+This is the default value. To disable the use of proxy download in special
+case, set this option to 'none'. Note that you should always use localhost
+interface to prevent loop. See section Squid ACL in INSTALL file.
+
+The log file can be set with:
+
+	logfile /var/log/squidclamav.log
+
+Default is /usr/local/squidclamav/logs/squidclamav.log
+
+If you need to change the path to the configuration file edit
+file path.h change the default value and recompile+reinstall
+or give it at squid.conf call as program first parameter.
+
+You can specify a timeout on libcurl connection when squidclam
+try to download the file by using the 'timeout' configuration
+option.
+
+Some http servers send malformed header (especially for ads) and
+libcurl is not able to return valid content-type or other header
+information. I you want to force virus scan of these URL set the
+'force' option to 1.
+
+To show time statistics of URL processing you must set the 'stat' option
+to 1.
+
+Configuring connection Clamd :
+-----------------------------
+
+You have 3 configuration option to set the connection to clamd daemon.
+
+If you use unix local socket, just set clamd_local to the socket path
+as follow:
+
+	clamd_local /tmp/clamd
+
+If you use TCP socket set the clamd_ip and clamd_port as follow:
+
+	clamd_ip 192.168.1.5
+	clamd_port 3310
+
+DO NOT set the clamd_local if you want to use TCP socket !!!
+
+----
+
+If you find it useful, I'd like to know - please send email
+to gilles@darold.net
+
+
+This project is a modified version of the excellent Squirm Redirector for Squid
+Maintained by Chris Foote, and copyrighted as follow :
+
+        Copyright (C) 1998 Chris Foote & Wayne Piekarski
+
+The original Squirm version used was squirm-1.0betaB. Some other parts are
+cut and paste from the ex1.c program given in the ClamAv distribution and
+are copyrighted: Copyright (C) 2002 - 2004 Tomasz Kojm
+
+All other code: Copyright (C) 2005-2006 Gilles Darold - Groupe SAMSE
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+Please see the file GPL in this directory for full copyright
+information.
+

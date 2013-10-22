@@ -1,0 +1,67 @@
+2006-08-18 version 2.5
+	- Clean some code and definitivly removed regex from package.
+	Include Linux distro standard regex.h file instead.
+	- Add statistics for global url processing and virus scanning.
+
+2006-08-18 version 2.4
+	- Review documentation to match Squid 2.6 configuration change
+	- Squidclamav now break in debug mode to dump the HTTP error
+          coming during virus scan stage.
+	- Fix possible buffer overflow when reading squid input.
+
+2006-06-08 version 2.3
+	- Fix download abort when size exceed clamd scan max size.
+	- Add Ip address and ident of a user with an infected download
+
+2005-12-28 version 2.2
+	- Fix bug in clamd_local config option parsing
+	- Add option to force virus scan of URL with "no header".
+	
+2005-12-20 version 2.1
+	- Add Clamd local unix socket support
+	- Run automake -a -c in regex distribution
+	- Add use of proxy disabling by setting proxy option to none
+	
+2005-12-14 version 2.0
+	- Improve speed with the use of clamd daemon
+	- Remove support of libclamav: too slow.
+	- All option are now set in the configuration file (debug, etc.)
+	- Remove size limit check, let do this better by squid and clamd
+	- No more use of tmpfile
+	
+2005-03-31 version 1.5
+	- Add option -fno-builtin-log to prevent compilation warning
+	- Add more configuration options:
+		log_file => set up path to log file (default: /usr/local/squidclamav/logs/squidclamav.log)
+		proxy => set up proxy URL (default: http://127.0.0.1:3128)
+		debug => set up debug mode (default: 0)
+		clamd_ip => Ip addresse of the clamd daemon (default use libclamav)
+		clamd_port => port of the clamd daemon (default 3310)
+		timeout => libcurl transfer timeout (default 60 second)
+	- Add command line option to squidclamav to change default configuration
+	  file.
+
+2005-02-22 version 1.4
+	- Fix cache and display of http header.
+	- Improve speed: use the proxy for data, use only one curl handle, etc.
+	- Add ClamAv Virus database reload on demand.
+	- Modify documentation
+
+2005-02-22 version 1.3
+	- Add german translation for clwarn.cgi. Thanks to Michael Labuschke.
+	- Add logging of the pid of the squidclamav process
+	- Fix null content lenght that terminated abnormaly squidclamav
+	- Add logging of Ip source and ident when virus is detected.
+	- Add logging of Ip source and ident when size limit exceed.
+
+2005-02-11 version 1.2
+	- Add more installation instruction related to Squid configuration
+	- Add recquirement of libcurl >= 7.12.1
+
+2005-02-10 version 1.1
+	- Fix bug with curl.
+	- Add support for size limit redirection.
+
+2005-02-08 version 1.0
+
+	- Initial release

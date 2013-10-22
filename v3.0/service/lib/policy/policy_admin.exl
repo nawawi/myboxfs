@@ -1,0 +1,176 @@
+<?php 
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+
+function do_policy_admin($db_id='') {
+	global $_DB_NAME, $_QUIET;
+
+	@unlink("/var/sys/policy_admin.cache");
+	@unlink("/var/sys/policy_captive_acl.cache");
+	$_CAPTIVE=array();
+	$_CAPTIVE=unserialize(mybox_fget_contents("/var/sys/captive.cache"));
+	unset($_CAPTIVE['acl_list']);
+	$_IPSACL=array();
+	$_FTP_PORT=0;
+	$close_db=0;
+	if($db_id=='') {
+		$db_id=mybox_db_connect($_DB_NAME);
+		$close_db=1;
+	}
+	$_int=array();
+	policy_get_data(&$_dev,&$_int,&$_masqip,&$_ping,$db_id);
+	iptables_open(1);
+       	do_iptable("*filter");
+	do_iptable(":ACL1000-01 - [0:0]");
+	if(count($_int)==0) return;
+	mybox_init_echo($_QUIET,"INFO","Loading Access control rules");
+
+	foreach($_int as $_ip) {
+		if($_ip=='') continue;
+		$_IPSACL['F'][]="-s $_ip -j ACCEPT";
+		$_IPSACL['I'][]="-s $_ip -j ACCEPT";
+		$_IPSACL['O'][]="-s $_ip -j ACCEPT";
+	}
+
+	$_fdrop=array();
+	$_acl_port='';
+	$_https_port=5051;
+	$_ssh_port=5052;
+	$_ftp_port=5053;
+	$result=mybox_db_query("select port,stat from service_https",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_https_stat=$row['stat'];
+			$_https_port=$row['port'];
+			if($_https_stat==1) {
+				$_acl_port .="$_https_port,";
+				$_IPSACL['I'][]="-p tcp -m tcp --sport 1:65535 --dport $_https_port -j ACCEPT";
+				$_IPSACL['O'][]="-p tcp -m tcp --dport 1:65535 --sport $_https_port -j ACCEPT";
+			}
+		}
+	}
+	unset($result,$row);
+	$result=mybox_db_query("select port,stat from service_ssh",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_ssh_stat=$row['stat'];
+			$_ssh_port=$row['port'];
+			if($_ssh_stat==1) {
+				$_acl_port .="$_ssh_port,";
+				$_IPSACL['I'][]="-p tcp -m tcp --sport 1:65535 --dport $_ssh_port -j ACCEPT";
+				$_IPSACL['O'][]="-p tcp -m tcp --dport 1:65535 --sport $_ssh_port -j ACCEPT";
+			}
+		}
+	}
+	unset($result,$row);
+	$result=mybox_db_query("select port,stat from service_ftp",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_ftp_port=$row['port'];
+			$_ftp_stat=$row['stat'];
+			if($_ftp_stat==1) {
+				$_acl_port .="$_ftp_port";
+				$_IPSACL['I'][]="-p tcp -m tcp --sport 1:65535 --dport $_ftp_port -j ACCEPT";
+				$_IPSACL['O'][]="-p tcp -m tcp --dport 1:65535 --sport $_ftp_port -j ACCEPT";
+				$_FTP_PORT=$_ftp_port;
+			}
+		}
+	}
+	unset($result,$row);
+	$_acl_port=trim($_acl_port,",");
+	// enable access list to network gateway
+	$result=mybox_db_query("select * from accesslist where stat='1'",$db_id);
+	$_fodrop=array();
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_ipaddrip=$row['ip'];
+			if($_CAPTIVE['stat']==1 && $_CAPTIVE['port']!='') {
+				$_CAPTIVE['acl_list'][]="$_ipaddrip";
+			}
+			$_ssh=$row['ssh'];
+			$_https=$row['https'];
+			$_ftp=$row['ftp'];
+
+			$_aport='';
+			if($_https==1 && $_https_stat==1) $_aport="$_https_port,";
+			if($_ssh==1 && $_ssh_stat==1) $_aport .="$_ssh_port,";
+			if($_ftp==1 && $_ftp_stat==1) $_aport .="$_ftp_port";
+			$_aport=rtrim($_aport,",");
+			if($_aport=='') continue;
+
+			foreach($_int as $_ip) {
+				if($_ip=='') continue;
+				do_iptable("-A ACL1000-01 -s $_ipaddrip -d $_ip -p tcp -m tcp -m multiport --dports $_aport -j ACCEPT");
+				$_IPSACL['P'][]="-s $_ipaddrip -d $_ip -p tcp -m tcp -m multiport --dports $_aport -j RETURN";
+				$_IPSACL['FT'][]="-s $_ipaddrip -d $_ip -p tcp -m tcp -m multiport --dports $_aport -j ACL1011-07";
+				unset($dev,$_ip);
+			}
+		}
+	}
+	unset($result);
+
+	// snmp
+	do_policy_snmp(&$_IPSACL,$_int,$db_id);
+
+	// ntp
+	do_policy_ntp(&$_IPSACL,$_int,$db_id);
+
+	// dns
+	do_policy_dns(&$_IPSACL,$_int,$db_id);
+
+	// http proxy, service helper
+	if(file_exists("/var/sys/http_proxy_port")) {
+		$pport=mybox_fget_contents("/var/sys/http_proxy_port");
+		if($pport!='') $_acl_port .=",$pport";
+		$_acl_port=trim($_acl_port,",");
+	}
+
+	// ftp proxy
+	if(file_exists("/var/sys/ftp_proxy_port")) {
+		$fport=mybox_fget_contents("/var/sys/ftp_proxy_port");
+		if($fport!='') $_acl_port .=",$fport";
+		$_acl_port=trim($_acl_port,",");
+	}
+
+	// mail proxy
+	if(file_exists("/var/sys/mail_proxy_port")) {
+		$mport=mybox_fget_contents("/var/sys/mail_proxy_port");
+		if($mport!='') $_acl_port .=",$mport";
+		$_acl_port=trim($_acl_port,",");
+	}
+
+	// hook -> policy_conntrack
+	if($_FTP_PORT!=0) {
+		 set_conntrack($_FTP_PORT,$db_id);
+	}
+
+	// drop if not in acl
+	foreach($_int as $_ip) {
+		do_iptable("-A ACL1000-01 -d $_ip -p tcp -m tcp -m multiport --dports $_acl_port -j DROP");	
+	}
+	unset($_ip);
+
+	policy_close();
+
+	// hook -> policy_ips.exl, policy_dos.exl, policy_pscan.exl
+	foreach($_int as $_ip) {
+		$_IPSACL['F'][]="-d $_ip -p tcp -m tcp -m multiport --dports $_acl_port -j ACCEPT";	
+	}
+	mybox_save_to_file("/var/sys/policy_admin.cache",serialize($_IPSACL));
+	
+	// hook-> policy_ips
+	do_policy_ips($db_id);
+
+	if(is_array($_CAPTIVE)&& @count($_CAPTIVE)!=0) {
+		mybox_save_to_file("/var/sys/captive.cache",serialize($_CAPTIVE));
+	}
+
+	// hook-> policy_captive
+	do_policy_captive($db_id);
+
+	if($close_db==1) {
+		mybox_db_close($db_id);
+	}
+
+}
+
+?>

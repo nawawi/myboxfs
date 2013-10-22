@@ -1,0 +1,223 @@
+#!/bin/php -Cq
+<?php 
+// dhcp.init - last update 30-Jun-2006
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="dhcp";
+include_once('clib.exl');
+putenv("PATH=/bin:/service/tools:/service/init");
+
+$_QUIET=0;
+$_DEV='';
+mybox_init_set_alarm(30);
+
+if(!file_exists("/bin/dhcpd")) {
+	mybox_init_echo($_QUIET,"ERROR","Cannot execute dhcp.init. Internal error!");
+	exit(1);
+}
+
+function dhcp_config() {
+	global $_DEV, $_DB_NAME, $_QUIET;
+	if(!is_dir("/var/state/dhcp")) {
+		mybox_mkdirr("/var/state/dhcp");
+	}
+	if(!file_exists("/var/state/dhcp/dhcpd.leases")) {
+		@touch("/var/state/dhcp/dhcpd.leases");
+	}
+
+	$_DEV='';
+	$_config='';
+	$_dhcp_hosts='';
+	$db_id=mybox_db_connect($_DB_NAME);
+	$devname_array=mybox_list_namedev($db_id);
+	$namedev_array=mybox_name2dev_array($db_id);
+	$result=mybox_db_query("select * from dhcp_servers where stat='1'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_dev=trim($row['dev']);
+			$_range_start=trim($row['range_start']);
+			$_range_end=trim($row['range_end']);
+			$_dns1=trim($row['dns1']);
+			$_dns2=trim($row['dns2']);
+			$_gateway=trim($row['gateway']);
+			$_domain=trim($row['domain']);
+			$_wins=trim($row['wins']);
+			$_wins_node=trim($row['wins_node']);
+			$_stat=trim($row['stat']);
+			$_deny=trim($row['deny']);
+			if($_deny=='') $_deny=0;
+			$_dns='';
+			if($_dns1!='') $_dns .="$_dns1,";
+			if($_dns2!='') $_dns .="$_dns2";
+			$_dns=trim($_dns,",");
+			$ret=array();
+			$_name_ip=$namedev_array["$_dev (Address)"];
+			$_name_net=$namedev_array["$_dev (Network)"];
+			$_name_bro=$namedev_array["$_dev (Broadcast)"];
+			if(preg_match("/(\S+)\/(\d\d)$/",$_name_net,$_mm)) {
+				$_devname=$devname_array[$_dev];
+				$_DEV .="$_devname ";
+				$_network=$_mm[1];
+				$_prefix=$_mm[2];
+				$ret=mybox_ipcalc($_name_ip,$_prefix);
+				if(count($ret)==0) continue;
+				$_netmask=$ret['netmask'];
+				$_config .="group {\n";
+				$_config .="\tsubnet $_network netmask $_netmask {\n";
+				$_config .="\t\toption subnet-mask $_netmask;\n";
+ 				$_config .="\t\toption broadcast-address $_name_bro;\n";
+				if($_dns!='') $_config .="\t\toption domain-name-servers $_dns;\n";
+				$_config .="\t\toption routers $_gateway;\n";
+				
+				if($_wins_node!=0 && $_wins!='') {
+					$_config .="\t\toption netbios-name-servers $_wins;\n";
+					if($_wins_node!=1 && $_wins_node!='') {
+						$_config .="\t\toption netbios-node-type $_wins_node;\n";
+					}	
+				}
+				
+     				$_config .="\t\trange $_range_start $_range_end;\n";
+				if($_deny=='1') $_config .="\t\deny unknown-clients;\n";
+   				$_config .="\t}\n";
+				// start static
+				$result1=mybox_db_query("select * from dhcp_hosts where stat='1' and dev='$_dev'",$db_id);
+				if(mybox_db_num_rows($result1)!=0) {
+					while($row=mybox_db_fetch_assoc($result1)) {
+						$_id=$row['id'];
+						$_ip=$row['ip'];
+						$_mac=$row['mac'];
+						$_dhcp_hosts .="$_ip|$_mac|$_devname\n";
+   						$_config .="\thost awie_mfs_$_id {\n";
+						$_config .="\t\thardware ethernet $_mac;\n";
+						$_config .="\t\tfixed-address $_ip;\n";
+    						if($_dns!='') $_config .="\t\toption domain-name-servers $_dns;\n";
+   						$_config .="\t\toption routers $_gateway;\n";
+						$_config .="\t}\n"; // end host
+
+					}
+				}
+				unset($result1,$_mm,$_network,$_prefix,$_netmask,$_devname);
+   				$_config .="}\n"; // end group
+			}
+		}
+	}
+	if($_config=='') {
+		@unlink("/var/sys/chk_dhcpd");
+		mybox_init_echo($_QUIET,"INFO","DHCP service disabled");
+		exit(0);
+	}
+	if($_dhcp_hosts!='') {
+		mybox_save_to_file("/var/sys/dhcp.cache","$_dhcp_hosts");
+	}
+	if($fi=fopen("/etc/dhcpd.conf.tmp","w")) {
+		fwrite($fi,"deny bootp;\n");
+		fwrite($fi,"allow booting;\n");
+		fwrite($fi,"deny declines;\n");
+		fwrite($fi,"max-lease-time 172800; # 2d\n");
+		fwrite($fi,"default-lease-time 86400; # 1d\n");
+		fwrite($fi,"min-lease-time 600; # 5m\n");
+		fwrite($fi,"ddns-update-style ad-hoc;\n");
+		fwrite($fi,"local-port 67;\n");
+		fwrite($fi,"ping-checks;\n");
+		fwrite($fi,"one-lease-per-client on;\n");
+		fwrite($fi,"authoritative;\n");
+		fwrite($fi,"$_config");
+		if(rename("/etc/dhcpd.conf.tmp","/etc/dhcpd.conf")) return 1;
+	}
+	if($_QUIET==0) echo "* Writing dhcp config failed\n";
+	return 0;
+}
+
+function dhcp_status() {
+	global $_QUIET;
+	$pid=mybox_get_progpid("dhcpd");
+	if($pid!='') {
+		if($_QUIET==0) echo "* dhcpd (pid $pid) is running...\n";
+		return 0;
+	}
+	return 1;
+}
+
+function dhcp_start() {
+	global $_DEV, $_QUIET, $_ROOT_DIR;
+
+	if(file_exists("$_ROOT_DIR/scripts/dhcp/start")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/dhcp/start");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/dhcp/pre-start")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/dhcp/pre-start");
+	}
+
+	$_DEV=trim($_DEV);
+	$_cok=0;
+	$_cok=@dhcp_config();
+	if($_cok==1 && @dhcp_status()==1 && $_DEV!='') {
+		if(mybox_exec_cmd("dhcpd $_DEV")==0) {
+			mybox_init_echo($_QUIET,"INFO","Starting DHCP service");
+			@touch("/var/sys/chk_dhcpd");
+			if(!file_exists("/var/sys/init_no_restart")) @mybox_staticarp();
+			if(file_exists("$_ROOT_DIR/scripts/dhcp/post-start")) {
+				mybox_execq_cmd("$_ROOT_DIR/scripts/dhcp/post-start");
+			}
+			return 0;
+		}
+	} 
+	@unlink("/etc/dhcpd.conf");
+	mybox_init_echo($_QUIET,"ERROR","Starting DHCP service failed");
+	return 1;
+}
+
+function dhcp_stop() {
+	global $_QUIET, $_ROOT_DIR;
+
+	@unlink("/var/sys/chk_dhcpd");
+
+	if(file_exists("$_ROOT_DIR/scripts/dhcp/stop")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/dhcp/stop");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/dhcp/pre-stop")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/dhcp/pre-stop");
+	}
+
+	if(mybox_killall("dhcpd")==0) {
+		@unlink("/var/sys/dhcp.cache");
+		@unlink("/var/state/dhcp/dhcpd.leases");
+		@unlink("/var/state/dhcp/dhcpd.leases~");
+		mybox_init_echo($_QUIET,"INFO","Shutting down DHCP service");
+		if(!file_exists("/var/sys/init_no_restart")) @mybox_staticarp();
+		if(file_exists("$_ROOT_DIR/scripts/dhcp/post-stop")) {
+			mybox_execq_cmd("$_ROOT_DIR/scripts/dhcp/post-stop");
+		}
+		return 0;
+	}
+	mybox_init_echo($_QUIET,"ERROR","Shutting down DHCP service failed");
+	return 1;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=dhcp_start();
+		break;
+	case 'stop':
+		$ret=dhcp_stop();
+		break;
+	case 'restart':
+		$ret=dhcp_stop();
+		sleep(2);
+		$ret=dhcp_start();
+		break;
+	case 'status':
+		$ret=dhcp_status();
+		break;
+	case 'config':
+		$ret=dhcp_config();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/status]\n";
+		break;
+}
+exit($ret);
+?>

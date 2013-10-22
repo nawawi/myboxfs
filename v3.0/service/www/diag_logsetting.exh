@@ -1,0 +1,414 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="diag_logsetting";
+include_once('page.exl');
+mybox_chk_session();
+mybox_send_nocache();
+
+
+
+$db_id=mybox_db_connect($_DB_NAME);
+
+if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+	if($tab==1) {
+		if(isset($do_save)&&$do_save==1) {
+			@mybox_unlink("/var/sys/log_setting/*");
+			if(!is_dir("/var/sys/log_setting")) {
+				@mybox_mkdirr("/var/sys/log_setting");
+				clearstatcache();
+			}
+			if($local_logs_purge=='') {
+				$local_logs_purge=0;
+			} else {
+				@mybox_save_to_file("/var/sys/local_logs_purge","$local_logs_purge\n");
+			}
+			mybox_db_query("update misc set val='$local_logs' where name='local_logs'",$db_id);
+			mybox_db_query("update misc set val='$local_logs_purge' where name='local_logs_purge'",$db_id);
+			$log='';			
+			if(count($lg)!=0) {
+				foreach($lg as $n) {
+					$log .="$n,";
+					@touch("/var/sys/log_setting/$n");
+				}
+			}
+			$log=trim($log,",");
+			mybox_db_query("update misc set val='$log' where name='local_logs_log'",$db_id);
+			@unlink("/var/sys/nolog");
+			if($_local_logs==0) @touch("/var/sys/nolog");
+			unset($log,$lg);
+			$msg="Log setting updated";
+			@touch("/var/sys/httpnoclean");
+			mybox_echo_query("syslog-restart");
+		}
+	}
+	if($tab==2) {
+		if(isset($do_save)&&$do_save==1) {
+			@mybox_unlink("/var/sys/rlog_setting/*");
+			if(!is_dir("/var/sys/rlog_setting")) {
+				@mybox_mkdirr("/var/sys/rlog_setting");
+				clearstatcache();
+			}
+			mybox_db_query("update misc set val='$logger_stat' where name='logger_stat'",$db_id);
+			mybox_db_query("update misc set val='$logger_priority' where name='logger_priority'",$db_id);
+			mybox_db_query("update misc set val='$logger_facility' where name='logger_facility'",$db_id);
+			mybox_db_query("update misc set val='$logger_server' where name='logger_server'",$db_id);
+			mybox_db_query("update misc set val='$logger_port' where name='logger_port'",$db_id);
+			$log='';			
+			if(count($lg)!=0) {
+				foreach($lg as $n) {
+					$log .="$n,";
+					@touch("/var/sys/rlog_setting/$n");
+				}
+			}
+			$log=trim($log,",");
+			mybox_db_query("update misc set val='$log' where name='logger_log'",$db_id);
+			$msg="Configuration saved";
+			@touch("/var/sys/httpnoclean");
+			mybox_echo_query("syslog-restart");
+		}
+	} 
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied";
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+?>
+<html>
+<head>
+<title>MyAdmin</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<script type='text/javascript' src="/j/mybox_func.js"></script>
+<script type='text/javascript' src="/j/mybox_overlib.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?php echo $_LOGIN['auth_id'];?>";
+	page_load();
+</script>  
+<script type='text/javascript'>
+function do_submit() {
+	<?php if($tab==1){?>
+	var local_logs_purge=Trim(document.f.local_logs_purge.value);
+	if(local_logs_purge!='' && !isnum(local_logs_purge)) {
+		pop_msg("Invalid day value "+local_logs_purge+"");
+		return false;
+	}
+	<?php }?>
+	document.f.do_save.value=1;
+	document.f.submit();
+};
+function enab_lf(id) {
+	if(document.getElementById(id).checked==true) {
+		document.getElementById(id).checked=false;
+	} else {
+		document.getElementById(id).checked=true;
+	}
+}
+</script>
+
+</head>
+
+<body onload="load_menu('sub9','t9d1','s9i1');<?php if($tab==3) {?>do_dstat(0);setTimeout('timeUpdate()', 5000);<?php  } ?>" scroll="auto">
+<form name="f" method="post" action="/diag_logsetting.exh">
+
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 0px;'>
+<tr>
+<td>
+<?php mybox_page_section("Logging / VSetting");?>
+<br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="/diag_logsetting.exh?tab=1" <?php if($tab==1){?>class="tabact"<?php }?>>Local log</a></li>
+<li><a href="/diag_logsetting.exh?tab=2" <?php if($tab==2){?>class="tabact"<?php }?>>Remote Syslog Server</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td> 
+<?php mybox_page_msg($msg);?>
+<br>
+
+<!-- tab container -->
+<?php if($tab==1) {
+$_local_logs=0;$_local_logs_purge=0;
+$result=mybox_db_query("select * from misc where name like \"local_logs%\"",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		if(trim($row['name'])=='local_logs') $_local_logs=trim($row['val']);
+		if(trim($row['name'])=='local_logs_purge') $_local_logs_purge=trim($row['val']);
+		if(trim($row['name'])=='local_logs_log') $_local_logs_log=trim($row['val']);
+	}
+	$l_a=array();$l_log=array();
+	if($_local_logs_log!='') {
+		$l_a=explode(",",$_local_logs_log);
+		if(count($l_a)!=0) {
+			foreach($l_a as $n) {
+				$l_log[$n]=1;
+			}
+		}
+	}
+}
+?>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td width="30%" valign="top" class="tdname">Enable local logs</td>
+<td width="70%" valign="top" class="tdvalue">
+<?php 
+$data_a=array("On"=>"1","Off"=>"0");
+if(!isset($_local_logs)||$_local_logs=='') $_local_logs=0;
+$set_a=array("width"=>"300");
+echo mybox_select_box('logsel1',$data_a,$_local_logs,'local_logs',$set_a);
+?>
+
+<div style='background: #ffffff; table-layout: fixed; white-space: nowrap; border: 1px solid #ccc; padding: 0px; margin-top: 5px; margin-bottom: 5px; overflow-x: hidden; overflow-y: auto; width: 300px; height: 200px;''>
+<table class='datanb' style='background: #ffffff; border: 0px; margin-top: 0em; margin-bottom: 0em; padding: 0px; width: 285px;'>
+<col width="*">
+<col style='border: 0px; width: 5px;'>
+<?php 
+if(count($_LOG_NAME)!=0) {
+	$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff; cursor: pointer;'";
+	foreach($_LOG_NAME as $lnx) {
+		list($a,$b)=explode("|",$lnx);
+		$chk='';
+		if($l_log[$b]==1) $chk="checked";
+		$xid="x$b";
+		
+		echo "
+			<tr $lt>
+			<td onclick=\"enab_lf('$xid');\"><b>$a</b></td><td><input id='$xid' type=checkbox name=lg[] value='$b' $chk></td>
+			</tr>
+		";			
+	}
+}
+?>
+</table>
+</div>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Delete logs older than</td>
+<td width="70%" valign="middle" class="tdvalue"> <input name="local_logs_purge" type="text" value='<?php echo $_local_logs_purge;?>' size=5 class=valbox>  days. '0' to disable.
+</td>
+</tr>
+</tbody>
+</table>
+<?php  } //tab==1 ?>
+<?php if($tab==2){
+$_FACILITY=array();
+$_FACILITY['auth']=4;
+$_FACILITY['daemon']=3;
+$_FACILITY['kern']=0;
+$_FACILITY['security']=4;
+$_FACILITY['syslog']=5;
+$_FACILITY['user']=1;
+$_FACILITY['local0']=16;
+$_FACILITY['local1']=17;
+$_FACILITY['local2']=18;
+$_FACILITY['local3']=19;
+$_FACILITY['local4']=20;
+$_FACILITY['local5']=21;
+$_FACILITY['local6']=22;
+$_FACILITY['local7']=23;
+$_PRIORITY=array();
+$_PRIORITY['alert']=1;
+$_PRIORITY['crit']=2;
+$_PRIORITY['debug']=7;
+$_PRIORITY['emerg']=0;
+$_PRIORITY['err']=3;
+$_PRIORITY['info']=6;
+$_PRIORITY['notice']=5;
+$_PRIORITY['warning']=4;
+$logger_stat=0;
+$logger_facility=1;
+$logger_priority=5;
+$result=mybox_db_query("select * from misc where name like \"logger_%\"",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_name=$row['name'];
+		$_val=$row['val'];
+		if($_name=="logger_stat") $_logger_stat=$_val;
+		if($_name=="logger_facility") $_logger_facility=$_val;
+		if($_name=="logger_priority") $_logger_priority=$_val;
+		if($_name=="logger_log") $_logger_log=$_val;
+		if($_name=="logger_server") $_logger_server=$_val;
+		if($_name=="logger_port") $_logger_port=$_val;
+	}
+	$l_a=array();$l_log=array();
+	if($_logger_log!='') {
+		$l_a=explode(",",$_logger_log);
+		if(count($l_a)!=0) {
+			foreach($l_a as $n) {
+				$l_log[$n]=1;
+			}
+		}
+	}
+}
+$list_array=array();
+$list_array0=mybox_defnetwork_array($db_id);
+if(count($list_array0)!=0) {
+	foreach($list_array0 as $a => $b) {
+		if($a=='any') continue;
+		if(is_array($b)) {
+			if($b['type'] == 2) $list_array[]="$a";
+		}
+	}
+}
+$list_array2=array();
+$list_array1=mybox_defservices_array($db_id);
+if(count($list_array1)!=0) {
+	foreach($list_array1 as $a => $b) {
+		if($a=='any') continue;
+		if(is_array($b)) {
+			if($b['group']) continue;
+			if($b['proto'] <= 3) {
+				$list_array2[]="$a";
+			}
+		}
+	}
+}
+
+?>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td width="30%" valign="top" class="tdname">Enable logging</td>
+<td width="70%" valign="top" class="tdvalue">
+<?php 
+$data_a=array("On"=>"1","Off"=>"0");
+if(!isset($_logger_stat)||$_logger_stat=='') $_logger_stat=0;
+$set_a=array("width"=>"300");
+echo mybox_select_box('logsel2',$data_a,$_logger_stat,'logger_stat',$set_a);
+?>
+<div style='background: #ffffff; table-layout: fixed; white-space: nowrap; border: 1px solid #ccc; padding: 0px; margin-top: 5px; margin-bottom: 5px; overflow-x: hidden; overflow-y: auto; width: 300px; height: 200px;''>
+<table class='datanb' style='background: #ffffff; border: 0px; margin-top: 0em; margin-bottom: 0em; padding: 0px; width: 285px;'>
+<col width="*">
+<col style='border: 0px; width: 5px;'>
+<?php 
+if(count($_LOG_NAME)!=0) {
+	$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff; cursor: pointer;'";
+	foreach($_LOG_NAME as $lnx) {
+		list($a,$b)=explode("|",$lnx);
+		$chk='';
+		if($l_log[$b]==1) $chk="checked";
+		$xid="x$b";
+		
+		echo "
+			<tr $lt>
+			<td onclick=\"enab_lf('$xid');\"><b>$a</b></td><td><input id='$xid' type=checkbox name=lg[] value='$b' $chk></td>
+			</tr>
+		";			
+	}
+}
+?>
+</table>
+</div>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Facility/Severity</td>
+<td width="70%" valign="middle" class="tdvalue">
+<table style='margin: 0px; padding: 0px; border: 0px;'>
+<tr>
+<td style='margin: 0px; padding: 0px; border: 0px;'> 
+<?php 
+if(!isset($_logger_facility)||$_logger_facility=='') $_logger_facility=5;
+$set_a=array("width"=>"100");
+echo mybox_select_box('logsel3',$_FACILITY,$_logger_facility,'logger_facility',$set_a);
+?>
+</td>
+<td style='margin: 0px; padding: 0px; border: 0px;'>
+/
+</td>
+<td style='margin: 0px; padding: 0px; border: 0px;'>
+<?php 
+if(!isset($_logger_priority)||$_logger_priority=='') $_logger_priority=6;
+$set_a=array("width"=>"100");
+echo mybox_select_box('logsel4',$_PRIORITY,$_logger_priority,'logger_priority',$set_a);
+?>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr style='border: 1px solid #ccc;'>  
+<td valign="top" class="tdname">Syslog Server</td>
+<td valign="top" class="tdvalue">
+<table class="datanb" style='margin: 0px; padding: 0px; width: 100%;'>
+<tr>
+<td style='width: 15px; font-weight: bold;'>
+Host
+</td>
+<td>
+<?php 
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($list_array,'logger_server',"$_logger_server",'rs1','rs1a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+?>
+<?php echo mybox_defwin('rs1','200px','#ffffff','#999999','#336699','#ffffff','Host','#ffffff','100px','hidden','auto',$txt);?>
+</td>
+</tr>
+<tr>
+<td style='width: 15px; font-weight: bold;'>
+Service
+</td>
+<td>
+<?php 
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($list_array2,'logger_port',"$_logger_port",'rs2','rs2a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+?>
+<?php echo mybox_defwin('rs2','200px','#ffffff','#999999','#336699','#ffffff','Service','#ffffff','100px','hidden','auto',$txt);?>
+</td>
+</tr>
+</table>
+
+</td>
+</tr>
+
+</tbody>
+</table>
+<script type="text/javascript">
+enab_lc('<?php echo $_logger_stat;?>','l1');
+</script>
+<?php }//tab==2?>
+
+<table align=right>
+<tbody>
+<tr>
+<td><a name="sini"><a class="btn" href="#sini" onclick="return do_submit();return false;">Save</a></td></tr> 
+</tbody>
+</table>
+<input type=hidden name=do_save value=''>
+<input type=hidden name=tab value='<?php echo $tab;?>'>
+
+<!-- end tab container -->
+
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+
+</form>
+<script type='text/javascript'>page_kill();</script>
+</body>
+</html>
+<?php mybox_db_close($db_id);?>

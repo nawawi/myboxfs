@@ -1,0 +1,4 @@
+firmware: myboxOS.v2.1.yymmdd.bin
+blacklist: myboxOS.v2.1.blacklist.yymmdd.bin
+ips: myboxOS.v2.1.ips.yymmdd.bin
+

@@ -1,0 +1,860 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="fw_imp2p";
+include_once('page.exl');
+
+mybox_chk_session();
+mybox_send_nocache();
+
+$db_id=mybox_db_connect($_DB_NAME);
+
+if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+	if(isset($do_id)&&$do_id=='apply_chg') {
+		mybox_echo_query("ips-restart");
+		$msg="<script>waitcount();</script>";
+	}
+	if($tab==1) {
+		if(isset($do_save)&&$do_save==1) {
+			mybox_db_query("update misc set val='$im_stat' where name='im_stat'",$db_id);
+			mybox_db_query("update misc set val='$im_aim' where name='im_aim'",$db_id);
+			mybox_db_query("update misc set val='$im_icq' where name='im_icq'",$db_id);
+			mybox_db_query("update misc set val='$im_msn' where name='im_msn'",$db_id);
+			mybox_db_query("update misc set val='$im_yahoo' where name='im_yahoo'",$db_id);
+			mybox_db_query("update misc set val='$im_irc' where name='im_irc'",$db_id);
+			mybox_db_query("update misc set val='$im_jabber' where name='im_jabber'",$db_id);
+			mybox_db_query("update misc set val='$im_skype' where name='im_skype'",$db_id);
+			$msg="Configuration saved";
+		}
+	}
+	if($tab==2) {
+		if(isset($do_save)&&$do_save==1) {
+			mybox_db_query("update misc set val='$p2p_stat' where name='p2p_stat'",$db_id);
+			mybox_db_query("update misc set val='$p2p_ares' where name='p2p_ares'",$db_id);
+			mybox_db_query("update misc set val='$p2p_bittorrent' where name='p2p_bittorrent'",$db_id);
+			mybox_db_query("update misc set val='$p2p_direct' where name='p2p_direct'",$db_id);
+			mybox_db_query("update misc set val='$p2p_ed2k' where name='p2p_ed2k'",$db_id);
+			mybox_db_query("update misc set val='$p2p_edonkey' where name='p2p_edonkey'",$db_id);
+			mybox_db_query("update misc set val='$p2p_gnutella' where name='p2p_gnutella'",$db_id);
+			mybox_db_query("update misc set val='$p2p_kazaa' where name='p2p_kazaa'",$db_id);
+			mybox_db_query("update misc set val='$p2p_limewire' where name='p2p_limewire'",$db_id);
+			mybox_db_query("update misc set val='$p2p_manolito' where name='p2p_manolito'",$db_id);
+			mybox_db_query("update misc set val='$p2p_morpheus' where name='p2p_morpheus'",$db_id);
+			mybox_db_query("update misc set val='$p2p_napster' where name='p2p_napster'",$db_id);
+			mybox_db_query("update misc set val='$p2p_soulseek' where name='p2p_soulseek'",$db_id);
+			mybox_db_query("update misc set val='$p2p_winmx' where name='p2p_winmx'",$db_id);
+			mybox_db_query("update misc set val='$p2p_winny' where name='p2p_winny'",$db_id);
+			$msg="Configuration saved";
+		}
+	}
+
+	if($tab==3) {
+		if($col==1) {
+			if(isset($do_save)&&$do_save==2) {
+				if(is_array($del) && count($del)!=0) {
+					foreach($del as $x) {
+						if($x!='') mybox_db_query("delete from imp2p_exclude where id='$x'",$db_id);
+					}
+				} else {
+					if($del!='') mybox_db_query("delete from imp2p_exclude where id='$del'",$db_id);
+				}
+			}
+		}
+		if($col==2) {
+			if(isset($do_save)&&$do_save==1) {
+				if($do_id!='edit') {
+					$name=trim($name);
+					if($im=='') { $im=0; } else { $im=1; }
+					if($p2p=='') { $p2p=0; } else { $p2p=1; }
+					if($src=='any') $src='';
+					if($dst=='any') $dst='';
+					$result=mybox_db_query("select name from imp2p_exclude where name='$name'",$db_id);
+					if(mybox_db_num_rows($result)==0) {
+						mybox_db_query("insert into imp2p_exclude (name,src,dst,im,p2p) values ('$name','$src','$dst','$im','$p2p')",$db_id);
+						$msg='Exception saved';
+					} else {
+						$msg="Exception name '$name' already exist";
+					}
+				}
+				if($do_id=='edit') {
+					$name=trim($name);
+					$nameold=trim($nameold);
+					if($im=='') { $im=0; } else { $im=1; }
+					if($p2p=='') { $p2p=0; } else { $p2p=1; }
+					if($src=='any') $src='';
+					if($dst=='any') $dst='';
+					if($name!=$nameold) {
+						$result=mybox_db_query("select name from imp2p_exclude where name='$name'",$db_id);
+						if(mybox_db_num_rows($result)!=0) {
+							$msg="Exception name '$name' already exist";
+						} else {
+							mybox_db_query("update imp2p_exclude set name='$name',src='$src',dst='$dst',im='$im',p2p='$p2p' where id='$id'",$db_id);
+							$msg='Exception list updated';$col=1;$do_id='';
+						}
+					} else {
+						mybox_db_query("update imp2p_exclude set name='$name',src='$src',dst='$dst',im='$im',p2p='$p2p' where id='$id'",$db_id);
+						$msg='Exception list updated';$col=1;$do_id='';
+					}
+				}
+			}
+		}
+	}
+
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied";
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+if(!isset($col)||$col=='' && $tab==3) $col=1;
+$_error=0;
+?>
+<html>
+<head>
+<title>MyAdmin</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<script type='text/javascript' src="/j/mybox_func.js"></script>
+<script type='text/javascript' src="/j/mybox_overlib.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?php echo $_LOGIN['auth_id'];?>";
+	page_load();
+</script>
+<script type='text/javascript'>
+	<?php if($tab!=3){?>
+	function do_submit() {
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	}
+	<?php }?>
+	function do_changes() {
+		self.location.href='<?php echo "/fw_imp2p.exh?tab=$tab&do_id=apply_chg";?>';	
+	}
+
+function waitcount() {
+	page_reload('700','<?php echo "/fw_imp2p.exh?tab=$tab";?>');
+}
+
+</script>
+</head>
+<body onload="load_menu('sub5','t5d5','s5i5');" scroll="auto">
+<form name=f method=post action="/fw_imp2p.exh">
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 0px;'>
+<tr>
+<td>
+<?php mybox_page_section("Firewall / IM/P2P Control");?>
+<br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="/fw_imp2p.exh?tab=1" <?php if($tab==1){?>class="tabact"<?php }?>>Instant Messaging (IM)</a></li>
+<li><a href="/fw_imp2p.exh?tab=2" <?php if($tab==2){?>class="tabact"<?php }?>>Peer to Peer (P2P)</a></li>
+<li><a href="/fw_imp2p.exh?tab=3" <?php if($tab==3){?>class="tabact"<?php }?>>Exceptions</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td> 
+<?php mybox_page_msg($msg);?>
+<br>
+
+<!-- tab container -->
+<?php if($tab==1) {
+$_im_stat=0;$_im_aim=0;$_im_icq=0;$_im_msn=0;$_im_yahoo=0;
+$_im_irc=0;$_im_jabber=0;$_im_skype=0;
+$result=mybox_db_query("select * from misc where name like \"im_%\" ",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		if(trim($row['name'])=="im_stat") $_im_stat=trim($row['val']);
+		if(trim($row['name'])=="im_aim") $_im_aim=trim($row['val']);
+		if(trim($row['name'])=="im_icq") $_im_icq=trim($row['val']);
+		if(trim($row['name'])=="im_msn") $_im_msn=trim($row['val']);
+		if(trim($row['name'])=="im_yahoo") $_im_yahoo=trim($row['val']);
+		if(trim($row['name'])=="im_irc") $_im_irc=trim($row['val']);
+		if(trim($row['name'])=="im_jabber") $_im_jabber=trim($row['val']);
+		if(trim($row['name'])=="im_skype") $_im_skype=trim($row['val']);
+	}
+}
+?>
+
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td valign="middle" class="tdname">IM Control status</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("On"=>"1","Off"=>"0");
+if(!isset($_im_stat)||$_im_stat=='') $_im_stat=0;
+echo mybox_select_box('imcsel1',$data_a,$_im_stat,'im_stat');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="top" class="tdname">Protocol</td>
+<td valign="top" class="tdvalue">
+<table class="data2" style='border: 0px;'>
+<tr>
+<td valign=top style='border: 0px; font-weight: bold;'> 
+AOL Instant Messenger (AIM)
+</td>
+<td style="border: 0px;">
+<?php 
+$data_a=array("Do not block"=>"0","Block completely"=>"1","Block file transfers"=>"2","Alert"=>"3");
+if(!isset($_im_aim)||$_im_aim=='') $_im_aim=1;
+echo mybox_select_box('imcsel2',$data_a,$_im_aim,'im_aim');
+?>
+</td>
+</tr>
+
+<tr>
+<td valign=top style='border: 0px; font-weight: bold;'> 
+ICQ
+</td>
+<td style="border: 0px;">
+<?php 
+$data_a=array("Do not block"=>"0","Block completely"=>"1","Alert"=>"3");
+if(!isset($_im_icq)||$_im_icq=='') $_im_icq=1;
+echo mybox_select_box('imcsel3',$data_a,$_im_icq,'im_icq');
+?>
+</td>
+</tr>
+
+<tr>
+<td valign=top style='border: 0px; font-weight: bold;'> 
+MSN Messenger	
+</td>
+<td style="border: 0px;">
+<?php 
+$data_a=array("Do not block"=>"0","Block completely"=>"1","Block file transfers"=>"2","Alert"=>"3");
+if(!isset($_im_msn)||$_im_msn=='') $_im_msn=1;
+echo mybox_select_box('imcsel4',$data_a,$_im_msn,'im_msn');
+?>
+</td>
+</tr>
+
+<tr>
+<td valign=top style='border: 0px; font-weight: bold;'> 
+Yahoo! Messenger	
+</td>
+<td style="border: 0px;">
+<?php 
+$data_a=array("Do not block"=>"0","Block completely"=>"1","Block file transfers"=>"2","Alert"=>"3");
+if(!isset($_im_yahoo)||$_im_yahoo=='') $_im_yahoo=1;
+echo mybox_select_box('imcsel5',$data_a,$_im_yahoo,'im_yahoo');
+?>
+</td>
+</tr>
+
+<tr>
+<td valign=top style='border: 0px; font-weight: bold;'> 
+Internet Relay Chat (IRC)	
+</td>
+<td style="border: 0px;">
+<?php 
+$data_a=array("Do not block"=>"0","Block completely"=>"1","Block file transfers"=>"2","Alert"=>"3");
+if(!isset($_im_irc)||$_im_irc=='') $_im_irc=1;
+echo mybox_select_box('imcsel6',$data_a,$_im_irc,'im_irc');
+?>
+</td>
+</tr>
+
+<tr>
+<td valign=top style='border: 0px; font-weight: bold;'> 
+Google Talk / Jabber	
+</td>
+<td style="border: 0px;">
+<?php 
+$data_a=array("Do not block"=>"0","Block completely"=>"1","Block file transfers"=>"2","Alert"=>"3");
+if(!isset($_im_jabber)||$_im_jabber=='') $_im_jabber=1;
+echo mybox_select_box('imcsel7',$data_a,$_im_jabber,'im_jabber');
+?>
+</td>
+</tr>
+
+<tr>
+<td valign=top style='border: 0px; font-weight: bold;'> 
+Skype	
+</td>
+<td style="border: 0px;">
+<?php 
+$data_a=array("Do not block"=>"0","Block completely"=>"1","Alert"=>"3");
+if(!isset($_im_skype)||$_im_skype=='') $_im_skype=1;
+echo mybox_select_box('imcsel8',$data_a,$_im_skype,'im_skype');
+?>
+</td>
+</tr>
+
+</table>
+
+</td>
+</tr>
+
+</tbody>
+</table>
+<?php }//tab==1?>
+
+<?php if($tab==2) {
+$_p2p_stat=0;
+$_p2p_ares=0;
+$_p2p_bittorren=0;
+$_p2p_direct=0;
+$_p2p_ed2k=0;
+$_p2p_edonkey=0;
+$_p2p_gnutella=0;
+$_p2p_kazaa=0;
+$_p2p_limewire=0;
+$_p2p_manolito=0;
+$_p2p_morpheus=0;
+$_p2p_napster=0;
+$_p2p_soulseek=0;
+$_p2p_winmx=0;
+$_p2p_winny=0;
+
+$result=mybox_db_query("select * from misc where name like \"p2p_%\" ",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		if(trim($row['name'])=="p2p_stat") $_p2p_stat=trim($row['val']);
+		if(trim($row['name'])=="p2p_ares") $_p2p_ares=trim($row['val']);
+		if(trim($row['name'])=="p2p_bittorrent") $_p2p_bittorrent=trim($row['val']);
+		if(trim($row['name'])=="p2p_direct") $_p2p_direct=trim($row['val']);
+		if(trim($row['name'])=="p2p_ed2k") $_p2p_ed2k=trim($row['val']);
+		if(trim($row['name'])=="p2p_edonkey") $_p2p_edonkey=trim($row['val']);
+		if(trim($row['name'])=="p2p_gnutella") $_p2p_gnutella=trim($row['val']);
+		if(trim($row['name'])=="p2p_kazaa") $_p2p_kazaa=trim($row['val']);
+		if(trim($row['name'])=="p2p_limewire") $_p2p_limewire=trim($row['val']);
+		if(trim($row['name'])=="p2p_manolito") $_p2p_manolito=trim($row['val']);
+		if(trim($row['name'])=="p2p_morpheus") $_p2p_morpheus=trim($row['val']);
+		if(trim($row['name'])=="p2p_napster") $_p2p_napster=trim($row['val']);
+		if(trim($row['name'])=="p2p_soulseek") $_p2p_soulseek=trim($row['val']);
+		if(trim($row['name'])=="p2p_winmx") $_p2p_winmx=trim($row['val']);
+		if(trim($row['name'])=="p2p_winny") $_p2p_winny=trim($row['val']);
+	}
+}
+
+$_P2P_SET=array("Do not block"=>"0","Block"=>"1","Alert"=>"3");
+
+?>
+
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td valign="middle" class="tdname">P2P Control status</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("On"=>"1","Off"=>"0");
+if(!isset($_p2p_stat)||$_p2p_stat=='') $_p2p_stat=0;
+echo mybox_select_box('imcsel9',$data_a,$_p2p_stat,'p2p_stat');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="top" class="tdname">Protocols</td>
+<td valign="top" class="tdvalue">
+<table class="data2" style='border: 0px;'>
+
+<tr>
+<td valign=top style='border: 0px; font-weight: bold;'> 
+Bittorren
+</td>
+<td style="border: 0px;">
+<?php 
+$data_a=$_P2P_SET;
+if(!isset($_p2p_bittorrent)||$_p2p_bittorrent=='') $_p2p_bittorrent=1;
+echo mybox_select_box('imcsel10',$data_a,$_p2p_bittorrent,'p2p_bittorrent');
+?>
+</td>
+</tr>
+
+<tr>
+<td valign=top style='border: 0px; font-weight: bold;'> 
+Edonkey
+</td>
+<td style="border: 0px;">
+<?php 
+$data_a=$_P2P_SET;
+if(!isset($_p2p_edonkey)||$_p2p_edonkey=='') $_p2p_edonkey=1;
+echo mybox_select_box('imcsel11',$data_a,$_p2p_edonkey,'p2p_edonkey');
+?>
+</td>
+</tr>
+
+<tr>
+<td valign=top style='border: 0px; font-weight: bold;'> 
+Gnutella
+</td>
+<td style="border: 0px;">
+<?php 
+$data_a=$_P2P_SET;
+if(!isset($_p2p_gnutella)||$_p2p_gnutella=='') $_p2p_gnutella=1;
+echo mybox_select_box('imcsel12',$data_a,$_p2p_gnutella,'p2p_gnutella');
+?>
+</td>
+</tr>
+
+<tr>
+<td valign=top style='border: 0px; font-weight: bold;'> 
+WinMX
+</td>
+<td style="border: 0px;">
+<?php 
+$data_a=$_P2P_SET;
+if(!isset($_p2p_winmx)||$_p2p_winmx=='') $_p2p_winmx=1;
+echo mybox_select_box('imcsel13',$data_a,$_p2p_winmx,'p2p_winmx');
+?>
+</td>
+</tr>
+
+<tr>
+<td valign=top style='border: 0px; font-weight: bold;'> 
+Winny
+</td>
+<td style="border: 0px;">
+<?php 
+$data_a=$_P2P_SET;
+if(!isset($_p2p_winny)||$_p2p_winny=='') $_p2p_winny=1;
+echo mybox_select_box('imcsel14',$data_a,$_p2p_winny,'p2p_winny');
+?>
+</td>
+</tr>
+
+<tr>
+<td valign=top style='border: 0px; font-weight: bold;'> 
+Manolito
+</td>
+<td style="border: 0px;">
+<?php 
+$data_a=$_P2P_SET;
+if(!isset($_p2p_manolito)||$_p2p_manolito=='') $_p2p_manolito=1;
+echo mybox_select_box('imcsel15',$data_a,$_p2p_manolito,'p2p_manolito');
+?>
+</td>
+</tr>
+
+<tr>
+<td valign=top style='border: 0px; font-weight: bold;'> 
+Ares
+</td>
+<td style="border: 0px;">
+<?php 
+$data_a=$_P2P_SET;
+if(!isset($_p2p_ares)||$_p2p_ares=='') $_p2p_ares=1;
+echo mybox_select_box('imcsel16',$data_a,$_p2p_ares,'p2p_ares');
+?>
+</td>
+</tr>
+
+<tr>
+<td valign=top style='border: 0px; font-weight: bold;'> 
+Ed2k
+</td>
+<td style="border: 0px;">
+<?php 
+$data_a=$_P2P_SET;
+if(!isset($_p2p_ed2k)||$_p2p_ed2k=='') $_p2p_ed2k=1;
+echo mybox_select_box('imcsel17',$data_a,$_p2p_ed2k,'p2p_ed2k');
+?>
+</td>
+</tr>
+
+<tr>
+<td valign=top style='border: 0px; font-weight: bold;'> 
+Kazaa
+</td>
+<td style="border: 0px;">
+<?php 
+$data_a=$_P2P_SET;
+if(!isset($_p2p_kazaa)||$_p2p_kazaa=='') $_p2p_kazaa=1;
+echo mybox_select_box('imcsel18',$data_a,$_p2p_kazaa,'p2p_kazaa');
+?>
+</td>
+</tr>
+
+<tr>
+<td valign=top style='border: 0px; font-weight: bold;'> 
+Limewire
+</td>
+<td style="border: 0px;">
+<?php 
+$data_a=$_P2P_SET;
+if(!isset($_p2p_limewire)||$_p2p_limewire=='') $_p2p_limewire=1;
+echo mybox_select_box('imcsel19',$data_a,$_p2p_limewire,'p2p_limewire');
+?>
+</td>
+</tr>
+
+<tr>
+<td valign=top style='border: 0px; font-weight: bold;'> 
+Morpheus
+</td>
+<td style="border: 0px;">
+<?php 
+$data_a=$_P2P_SET;
+if(!isset($_p2p_morpheus)||$_p2p_morpheus=='') $_p2p_morpheus=1;
+echo mybox_select_box('imcsel20',$data_a,$_p2p_morpheus,'p2p_morpheus');
+?>
+</td>
+</tr>
+
+<tr>
+<td valign=top style='border: 0px; font-weight: bold;'> 
+Napster
+</td>
+<td style="border: 0px;">
+<?php 
+$data_a=$_P2P_SET;
+if(!isset($_p2p_napster)||$_p2p_napster=='') $_p2p_napster=1;
+echo mybox_select_box('imcsel21',$data_a,$_p2p_napster,'p2p_napster');
+?>
+</td>
+</tr>
+
+<tr>
+<td valign=top style='border: 0px; font-weight: bold;'> 
+Soulseek
+</td>
+<td style="border: 0px;">
+<?php 
+$data_a=$_P2P_SET;
+if(!isset($_p2p_soulseek)||$_p2p_soulseek=='') $_p2p_soulseek=1;
+echo mybox_select_box('imcsel22',$data_a,$_p2p_soulseek,'p2p_soulseek');
+?>
+</td>
+</tr>
+
+<tr>
+<td valign=top style='border: 0px; font-weight: bold;'> 
+Direct Connect	
+</td>
+<td style="border: 0px;">
+<?php 
+$data_a=$_P2P_SET;
+if(!isset($_p2p_direct)||$_p2p_direct=='') $_p2p_direct=1;
+echo mybox_select_box('imcsel23',$data_a,$_p2p_direct,'p2p_direct');
+?>
+</td>
+</tr>
+
+</table>
+
+</td>
+</tr>
+
+</tbody>
+</table>
+<?php }//tab==2?>
+
+<?php if($tab==3) {
+	$list_array=array();
+	$list_array1=mybox_ipname_array($db_id);
+	$list_array2=mybox_defnetwork_array($db_id);
+	$list_array3=array();
+	$list_array=$list_array1;
+	if(count($list_array1)!=0) {
+		foreach($list_array1 as $a) {
+			if(strpos($a,"(Network)")!==FALSE || strpos($a,"(Broadcast)")!==FALSE) continue;
+			$list_array3[]="$a";	
+		}
+	}
+	unset($a);
+	if(count($list_array2)!=0) {
+		foreach($list_array2 as $a => $b) {
+			if($tab==1 && $a=='any') continue;
+			if(is_array($b)) {
+				if($b['type'] <= 2) $list_array[]="$a";
+				if($b['type'] == 2) $list_array3[]="$a";
+				if($b['group']!='') {
+					$list_array3[]=$b['group'];
+				}
+			} 
+		}
+	}
+
+?>
+
+<table width="100%" border="0" cellpadding="0" cellspacing="0">
+<tr><td>
+<ul id="tabnav">
+<li class="<?php if($col==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=1) { echo "<a href=\"/fw_imp2p.exh?tab=$tab&col=1\">"; }?>Exception list<?php if($col!=1) { echo "</a>"; }?></li>
+<li class="<?php if($col==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=2) { echo "<a href=\"/fw_imp2p.exh?tab=$tab&col=2\">"; }?><?php if($do_id=='edit') { echo "Edit list"; } else { echo "New exception list"; }?><?php if($col!=2) { echo "</a>"; }?></li>
+</ul>
+</td></tr>
+<tr> 
+<td class="tabcont">
+<?php if($col==1) {?>
+<?php 
+// counting
+$currentPage = $HTTP_SERVER_VARS["PHP_SELF"];
+$maxRows_Recordset=50;
+if(!isset($pageNum_Recordset)) $pageNum_Recordset=0;
+$startRow_Recordset=@($pageNum_Recordset * $maxRows_Recordset);
+$query_Recordset="select * from imp2p_exclude order by id ASC";
+$query_limit_Recordset=sprintf("%s LIMIT %d, %d", $query_Recordset, $startRow_Recordset, $maxRows_Recordset);
+
+$Recordset=mybox_db_query($query_limit_Recordset, $db_id);
+if(!isset($totalRows_Recordset) || $totalRows_Recordset=='') {
+	$all_Recordset=mybox_db_query($query_Recordset,$db_id);
+	$totalRows_Recordset=mybox_db_num_rows($all_Recordset);
+}
+$totalPages_Recordset=@ceil($totalRows_Recordset/$maxRows_Recordset)-1;
+$queryString_Recordset=null;
+if(!empty($_SERVER['QUERY_STRING'])) {
+	$params=explode("&", $_SERVER['QUERY_STRING']);
+  	$newParams=array();
+  	foreach ($params as $param) {
+		if(stristr($param, "pageNum_Recordset")==true) continue;
+		if(stristr($param, "totalRows_Recordset")==true) continue;
+		if(stristr($param, "maxRows_Recordset")==true) continue;
+		if(stristr($param, "tab")==true) continue;
+		if(stristr($param, "col")==true) continue;
+		if(stristr($param, "do_id")==true) continue;
+		array_push($newParams, $param);
+  	}
+  	if(count($newParams) != 0) {
+    		$queryString_Recordset="&" . implode("&", $newParams);
+  	}
+}
+$queryString_Recordset=sprintf("&totalRows_Recordset=%d%s&tab=$tab&col=$col&do_id=$do_id",$totalRows_Recordset,$queryString_Recordset);
+if($pageNum_Recordset > 0) { 
+	$pagefirst=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, 0, $queryString_Recordset);
+	$pageprev=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, max(0, $pageNum_Recordset - 1), $queryString_Recordset);
+	$button1="<a href='$pagefirst'><img src='{$_PNG['first']}' border=0 alt='' title=''></a>\n";
+	$button2="<a href='$pageprev'><img src='{$_PNG['prev']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button1="<img src='{$_PNG['first']}' border=0 alt='' title=''>\n";
+	$button2="<img src='{$_PNG['prev']}' border=0 alt='' title=''>\n";
+}
+if($pageNum_Recordset < $totalPages_Recordset) {
+	$pagenext=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, min($totalPages_Recordset, $pageNum_Recordset + 1), $queryString_Recordset);
+	$pagelast=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, $totalPages_Recordset, $queryString_Recordset);
+	$button3="<a href='$pagenext'><img src='{$_PNG['next']}' border=0 alt='' title=''></a>\n";
+	$button4="<a href='$pagelast'><img src='{$_PNG['last']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button3="<img src='{$_PNG['next']}' border=0 alt='' title=''>\n";
+	$button4="<img src='{$_PNG['last']}' border=0 alt='' title=''>\n";
+}
+unset($pagefirst,$pageprev,$pagenext,$pagelast);
+$x=1;
+$_cnum=1;
+if(!isset($pageNum_Recordset)||$pageNum_Recordset==''||$pageNum_Recordset==0) {
+	$_cnum=1;
+} else {
+	$_cnum=($pageNum_Recordset * $maxRows_Recordset);
+	if($_cnum <= 0) {
+		$_cnum=1;
+	} else {
+		$_cnum +=1;
+	}
+}
+if($totalRows_Recordset >0 && mybox_db_num_rows($Recordset)!=0) {
+	echo "
+		<table width='100%' class=data>
+		<thead class='blue'>
+      		<tr>
+        	<td style='font-weight: bold; width: 2%; border-right: 0px;'>#</td> 
+        	<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Name</td>
+		<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Exception</td>
+        	<td style='width: 5%; font-weight: bold; text-align: right; border-left: 0px;'>&nbsp;</td>
+      		</tr>
+		</thead>
+		<tbody>
+	";
+	do {
+		$_id=$row['id'];
+		if($_id=='') continue;
+		$_name=trim($row['name']);
+		$_src=mybox_get_defname(trim($row['src']),2,0,$db_id);
+		$_dst=mybox_get_defname(trim($row['dst']),2,0,$db_id);
+		$_im=trim($row['im']);
+		$_p2p=trim($row['p2p']);
+
+		$_dex='';$_spx='';
+		if($_im==1) $_dex .="<i>- Instant Messaging (IM)</i><br>";
+		if($_p2p==1) $_dex .="<i>- Peer to Peer (P2P)</i><br>";
+
+		if($_src=='') $_src='any';
+		if($_dst=='') $_dst='any';
+		$_spx ="$_src <img src='{$_PNG['arrow_right_s']}' border=0 alt='' title=''> $_dst";
+	
+		$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff; cursor: pointer;'";
+		$lo="onclick=\"self.location.href='/fw_imp2p.exh?tab=$tab&col=2&id=$_id&do_id=edit';\" ";
+		echo "
+			<tr $lt>
+        		<td $lo style='vertical-align: top;'>$_cnum</td>
+        		<td $lo style='vertical-align: top;'><b>$_name</b></td>
+			<td $lo style='vertical-align: top;'>
+			<p style='font-weight: bold; margin: 0px;padding:0px;'>$_spx</p>
+			$_dex
+			</td>
+			<td style='text-align: right; vertical-align: top;' align=right>
+			<a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='/fw_imp2p.exh?tab=$tab&col=$col&do_save=2&del=$_id&pageNum_Recordset=$pageNum_Recordset&totalPages_Recordset=$totalPages_Recordset';\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a>
+			<input type=checkbox name=del[] value=$_id>
+			</td>
+			</tr>
+		";
+		$_cnum++;$x++;
+	} while($row=mybox_db_fetch_assoc($Recordset));
+	if($_cnum >= 1) {
+		echo "
+		<tr>
+		<td style='text-align: right; background: #ffffff;' align=right valign=top colspan=4>
+		<a href='#' onclick='do_delete(2);return false;'>Delete</a> / <a href='#' onclick='dotoggle();return false;'>Toggle</a> <img src='{$_PNG['arrow_rtr']}' border=0 alt='' title=''></td>
+		</tr>
+		";
+	}
+	echo mybox_print_nextpage($pageNum_Recordset,$totalPages_Recordset,$totalRows_Recordset,$maxRows_Recordset,$queryString_Recordset,$currentPage,'4',$button1,$button2,$button3,$button4);
+	echo "</tbody></table>";
+} else {
+	echo "
+	<br>
+	<span class='notedef'>
+	There are no exception list defined.
+	</span>
+	<br><br>
+	";$_error=1;
+}?>
+
+<?php }//col==1?>
+<?php if($col==2) {
+$_src='any';
+$_dst='any';
+if($do_id=='edit') {
+	$result=mybox_db_query("select * from imp2p_exclude where id='$id'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=trim($row['name']);
+			$_src=trim($row['src']);
+			$_dst=trim($row['dst']);
+			$_im=trim($row['im']);
+			$_p2p=trim($row['p2p']);
+		}
+		if($_src=='') $_src='any';
+		if($_dst=='') $_dst='any';
+	}
+}
+?>
+<script type="text/javascript">
+	function do_submit() {
+		var name=Trim(document.f.name.value);
+		if(name=='') {
+			pop_msg("Exception name empty");
+			document.f.name.focus();
+			return false;
+		}
+		var src=document.f.src.value;
+		var dst=document.f.dst.value;
+		if(src==dst) {
+			pop_msg("Source and destination cannot be same");
+			return false;	
+		}
+		var ok=0;
+		if(document.f.im.checked) ok++;
+		if(document.f.p2p.checked) ok++;
+		if(ok==0) {
+			pop_msg("Please choose which protections want to skip");
+			return false;
+		}
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	}
+</script>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td valign="middle" class="tdname">Name</td>
+<td valign="middle" class="tdvalue">
+<input name="name" type="text" class="valbox2" value="<?php echo $_name;?>" onkeypress="return strip_defname(event);">
+<?php if($do_id=='edit'){?>
+<input name="nameold" type="hidden" value="<?php echo $_name;?>">
+<?php }?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">For these source networks</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if(!isset($_src)||$_src=='') $_src='any';
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($list_array,'src',"$_src",'fwipsl5','fwipsl5a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+echo mybox_defwin('fwipsl5','200px','#ffffff','#999999','#336699','#ffffff','Source Networks','#ffffff','100px','hidden','auto',$txt);
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">OR For these destination networks</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if(!isset($_dst)||$_dst=='') $_dst='any';
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($list_array,'dst',"$_dst",'fwipsl6','fwipsl6a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+echo mybox_defwin('fwipsl6','200px','#ffffff','#999999','#336699','#ffffff','Destination Networks','#ffffff','100px','hidden','auto',$txt);
+?>
+</td>
+</tr>
+<tr> 
+<td valign="top" class="tdname">Skip these checks</td>
+<td valign="top" class="tdvalue">
+<input type=checkbox name=im <?php if($_im==1) echo "checked";?>> Instant Messaging (IM)<br>
+<input type=checkbox name=p2p <?php if($_p2p==1) echo "checked";?>> Peer to Peer (P2P)<br>
+</td>
+</tr>
+</tbody>
+</table>
+
+<?php }//col=2?>
+</td>
+</tr>
+</table>
+
+<?php }//tab==3?>
+
+<?php if($_error!=1){?>
+<table align=right>
+<tbody>
+<tr>
+<td><a name="sini"><a class="btn" href="#sini" onclick="return do_changes();return false;">Reload</a></td>
+<?php if($tab!=3 || $col!=1){?>
+<td><a name="sini"><a class="btn" href="#sini" onclick="return do_submit();return false;">Save</a></td> 
+<?php }?>
+</tr> 
+</tbody>
+</table>
+<?php }?>
+<!-- end tab container -->
+
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value='<?php echo $tab;?>'>
+<input type=hidden name=col value='<?php echo $col;?>'>
+<?php if($col==2) {?>
+<input type=hidden name=do_id value='<?php echo $do_id;?>'>
+<input type=hidden name=id value='<?php echo $id;?>'>
+<?php }?>
+</form>
+<script type='text/javascript'>page_kill();</script>
+</body>
+</html>
+
+<?php mybox_db_close($db_id);?>

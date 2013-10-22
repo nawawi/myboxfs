@@ -1,0 +1,23 @@
+#!/bin/sh
+# $Id: wall,v 1.1 2008/03/10 23:50:56 nawawi Exp $
+# Copyright (c) 2008 Tracenetwork Corporation Sdn. Bhd.
+# send msg to all device
+
+_ME=$(tty)
+
+msg() {
+	local txt="$@";
+	if [ ! -z "$txt" -a "x$txt" != "x" ]; then
+		[ -w "/dev/ttyS0" ] && echo -e "Message from $_ME:\n\n$txt\n\n" >> /dev/ttyS0 2>/dev/null
+		if [ -d "/dev/pts" ]; then
+			for f in /dev/pts/*;do
+				#[ "$f" = "$_ME" ] && continue;
+				[ -w "$f" ] && echo -e "Message from $_ME:\n\n$txt\n\n" >> $f 2>/dev/null
+			done
+		fi
+	fi
+}
+
+msg $@
+
+exit 0;

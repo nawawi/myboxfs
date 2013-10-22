@@ -1,0 +1,238 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="index.exh";
+include_once('page.exl');
+include_once('captive.exl');
+
+if(!file_exists("/var/sys/captive.cache")) {
+	exit("Internal Error");
+}
+
+$_CAPTIVE=array();
+$_CAPTIVE=unserialize(mybox_fget_contents("/var/sys/captive.cache"));
+if(count($_CAPTIVE)==0) {
+	exit("Internal Error");
+}
+$_intouch=0;
+if($_CAPTIVE['intouch']==1) $_intouch=1;
+$msg='';$_f4=0;
+
+if($_intouch==1) {
+	if(!extension_loaded('mysql')) {
+		if(!dl('mysql.so')) {
+        		exit("Internal Error: cannot load extension");
+		}
+	}
+	function db_connect() {
+		global $_CAPTIVE;
+		$db_id=@mysql_connect($_CAPTIVE['intouch_dbhost'],$_CAPTIVE['intouch_dbuser'],$_CAPTIVE['intouch_dbpass']);
+		$db_s=@mysql_select_db($_CAPTIVE['intouch_dbname'],$db_id);
+		if(!$db_id || !$db_s) die("Cannot connect to database");
+		return $db_id;
+	}
+
+	function db_query($sql,$db_id) {
+		return mysql_query($sql,$db_id);
+	}
+
+	function db_close($db_id) {
+		mysql_close($db_id);
+	}
+
+	function db_num_rows($result) {
+		return mysql_num_rows($result);
+	}
+
+	function db_fetch_array_assoc($result) {
+		return mysql_fetch_array($result,MYSQL_ASSOC);
+	}
+
+	if(isset($_POST['do_save'])&&$_POST['do_save']==1 && isset($_POST['serial'])&&time() > $_POST['serial']) {
+		if(isset($_POST['just_login'])&&$_POST['just_login']==1 && isset($_POST['mymac'])&&$_POST['mymac']!='' && isset($_POST['myip'])&&$_POST['myip']!='') {
+			$_htimeout=$_CAPTIVE['htimeout'];
+			if($_htimeout=='' || $_htimeout==0) $_htimeout='1440';
+			$_mymac=$_POST['mymac'];
+			$_myip=$_POST['myip'];
+			$_chk=array();
+			$_chk=chk_captive_user_islogin($_POST['wifikey'],$_myip,$_mymac);
+			if(($_chk[0]!='' && $_chk[1]!='') && (!isset($_POST['force_logout'])||$_POST['force_logout']=='0')) {
+				$msg="Wifi key {$_POST['wifikey']} already login with IP Address {$_chk[0]} ({$_chk[1]})";
+				$_f4=1;
+				captive_log(time(),$_myip,$_mymac,"Userid {$_POST['wifikey']} already login with IP Address {$_chk[0]} ({$_chk[1]})");
+			} else {
+				if($_myip==mybox_get_client_ip()) {
+					if(($_chk[0]!='' && $_chk[1]!='') && (isset($_POST['force_logout'])&&$_POST['force_logout']=='1')) {
+						do_access($_chk[0],$_chk[1],"D");
+						captive_log(time(),$_chk[0],$_chk[1],"Force login");
+						@unlink("/var/cache/captive/{$_chk[0]}.{$_chk[1]}");
+					}
+					
+					$db_id=db_connect();
+					$result=db_query("select * from wifi_mgr where wifi_key='{$_POST['wifikey']}' and stat='1'",$db_id);
+					//echo "db_query(\"select * from wifi_mgr where wifi_key='{$_POST['wifikey']}' and stat='1'\",$db_id);\n";
+					if(db_num_rows($result)!=0) {
+						while($row=db_fetch_array_assoc($result)) {
+							$_wifi_id=$row['id'];
+							$_wifi_key=$row['wifi_key'];
+							$_wifi_unit=$row['wifi_unit'];
+							$_wifi_qty=$row['wifi_qty'];
+							$_start_time=$row['start_time'];
+							$_end_time=$row['end_time'];
+						}
+						if($_wifi_id!='') {
+							$_timen=time();
+							$_time=time()+60*$_htimeout;
+							if($_start_time=="-1") {
+								$_time1=$_timen;
+								$_time2=strtotime("$_wifi_qty $_wifi_unit");
+								$_time2 +=300;
+								$_time=$_time2;
+								db_query("update wifi_mgr set start_time='$_time1',end_time='$_time2' where id='$_wifi_id'",$db_id);
+							}
+							if($_end_time!=-1) {
+								if(time() > $_end_time) {
+									db_query("update wifi_mgr set stat='0' where id='$_wifi_id'",$db_id);
+									do_access($_myip,$_mymac,"D");
+									$msg="Account expired";
+									captive_log(time(),$_myip,$_mymac,$msg);
+									$_wifi_key="";
+								}
+								$_time=$_end_time;
+							}
+							if($_wifi_key!='') {
+								do_access($_myip,$_mymac,"D");
+								if(do_access($_myip,$_mymac,"A")==0) {
+									captive_log($_timen,$_myip,$_mymac,"Login successful");
+									mybox_save_to_file("/var/cache/captive/$_myip.$_mymac",serialize(array("$_time","$_wifi_key","$_timen")));
+								} else {
+									$msg="Failed to allow your IP Address $_myip";
+									captive_log($_timen,$_myip,$_mymac,"Failed to allow IP Address");
+								}
+							}
+						} else {
+							$msg="Account not exist";
+							captive_log(time(),$_myip,$_mymac,$msg);
+						}
+					} else {
+						$msg="Wifi key incorrect";
+						captive_log(time(),$_myip,$_mymac,$msg);	
+					}
+					db_close($db_id);
+					unset($result,$_name,$_time,$_myip,$_mymac,$_passx);
+					mybox_db_close($db_id);
+					unset($db_id);
+				} else {
+					$msg="Failed to allow your IP Address $_myip";
+					captive_log(time(),$_myip,$_mymac,"Failed to allow IP Address");
+				}
+			}
+		}
+		if(isset($_POST['just_login'])&&$_POST['just_login']==2 && isset($_POST['mymac'])&&$_POST['mymac']!='' && isset($_POST['myip'])&&$_POST['myip']!='') {
+			$_mymac=$_POST['mymac'];
+			$_myip=$_POST['myip'];
+			if($_myip==mybox_get_client_ip()) {
+				do_access($_myip,$_mymac,"D");
+				captive_log(time(),$_myip,$_mymac,"Logout successful");
+				@unlink("/var/cache/captive/$_myip.$_mymac");
+			} else {
+				$msg="Failed to allow your IP Address $_myip";
+			}
+			unset($_myip,$_mymac);
+		}
+	}
+} else {
+	if(isset($_POST['do_save'])&&$_POST['do_save']==1 && isset($_POST['serial'])&&time() > $_POST['serial']) {
+		if(isset($_POST['just_login'])&&$_POST['just_login']==1 && isset($_POST['mymac'])&&$_POST['mymac']!='' && isset($_POST['myip'])&&$_POST['myip']!='') {
+			$db_id=mybox_db_connect($_DB_NAME);
+			$_htimeout=$_CAPTIVE['htimeout'];
+			if($_htimeout=='' || $_htimeout==0) $_htimeout='1440';
+			$_mymac=$_POST['mymac'];
+			$_myip=$_POST['myip'];
+			$_chk=array();
+			$_chk=chk_captive_user_islogin($_POST['username'],$_myip,$_mymac);
+			if(($_chk[0]!='' && $_chk[1]!='') && (!isset($_POST['force_logout'])||$_POST['force_logout']=='0')) {
+				$msg="Userid {$_POST['username']} already login with IP Address {$_chk[0]} ({$_chk[1]})";
+				$_f4=1;
+				captive_log(time(),$_myip,$_mymac,"Userid {$_POST['username']} already login with IP Address {$_chk[0]} ({$_chk[1]})");
+			} else {
+				if($_myip==mybox_get_client_ip()) {
+					if(($_chk[0]!='' && $_chk[1]!='') && (isset($_POST['force_logout'])&&$_POST['force_logout']=='1')) {
+						do_access($_chk[0],$_chk[1],"D");
+						captive_log(time(),$_chk[0],$_chk[1],"Force login");
+						@unlink("/var/cache/captive/{$_chk[0]}.{$_chk[1]}");
+					}
+					$_passx=mybox_str_encrypt($_POST['pass']);
+					$result=mybox_db_query("select name from auth_user where stat='1' and name='{$_POST['username']}' and passwd='$_passx'",$db_id);
+					if(mybox_db_num_rows($result)!=0) {
+						$_name=mybox_db_fetch_single($result);
+						$_timen=time();
+						$_time=time()+60*$_htimeout;
+						if($_name!='') {
+							do_access($_myip,$_mymac,"D");
+							if(do_access($_myip,$_mymac,"A")==0) {
+								captive_log($_timen,$_myip,$_mymac,"Login successful");
+								mybox_save_to_file("/var/cache/captive/$_myip.$_mymac",serialize(array("$_time","$_name","$_timen")));
+							} else {
+								$msg="Failed to allow your IP Address $_myip";
+								captive_log($_timen,$_myip,$_mymac,"Failed to allow IP Address");
+							}
+						}
+					} else {
+						$msg="Userid or Password incorrect";
+						captive_log(time(),$_myip,$_mymac,$msg);	
+					}
+					unset($result,$_name,$_time,$_myip,$_mymac,$_passx);
+					mybox_db_close($db_id);
+					unset($db_id);
+				} else {
+					$msg="Failed to allow your IP Address $_myip";
+					captive_log(time(),$_myip,$_mymac,"Failed to allow IP Address");
+				}
+			}
+		}
+		if(isset($_POST['just_login'])&&$_POST['just_login']==2 && isset($_POST['mymac'])&&$_POST['mymac']!='' && isset($_POST['myip'])&&$_POST['myip']!='') {
+			$_mymac=$_POST['mymac'];
+			$_myip=$_POST['myip'];
+			if($_myip==mybox_get_client_ip()) {
+				do_access($_myip,$_mymac,"D");
+				captive_log(time(),$_myip,$_mymac,"Logout successful");
+				@unlink("/var/cache/captive/$_myip.$_mymac");
+			} else {
+				$msg="Failed to allow your IP Address $_myip";
+			}
+			unset($_myip,$_mymac);
+		}
+	}
+}
+
+mybox_send_nocache();
+
+$_ok=0;
+$_uip='';$_uhost='';$_umac='';
+$_mytime='';$_myname='';
+$_uip=mybox_get_client_ip();
+if($_uip!='') {
+	$_umac=get_arp($_uip);
+	if($_umac!='') $_ok=1;
+}
+$_uhost=strtolower($_SERVER['HTTP_HOST']);
+if($_ok==1 && file_exists("/var/cache/captive/$_uip.$_umac")) {
+	$_ok=2;
+	$_data=unserialize(mybox_fget_contents("/var/cache/captive/$_uip.$_umac"));
+	$_mytime=$_data[0];
+	$_myname=$_data[1];
+	$_mytimen=$_data[2];
+	unset($_data);
+}
+
+if($_intouch==1) {
+	@include_once("intouch.exh");
+	exit;
+} else {
+	@include_once("default_portal.exh");
+	exit;
+}
+?>
+
+

@@ -1,0 +1,32 @@
+#!/bin/sh
+
+_VER="$(date +"%y.%m00%d")";
+_RVER="v$(cat ../../MYBOX_VERSION)";
+_DIR="update-$_VER";
+
+do_pack() {
+	./mypack --desc ./$_DIR/UPDATE.DESC $_DIR $_DIR.mpu "Mybox Firewall System $_RVER (Update $_VER)" ./install
+}
+
+while true; do
+	case "$1" in
+		file)
+			mkdir -p  $_DIR
+			cp ./tpl/* $_DIR
+			echo "$_RVER" > $_DIR/MYBOX.VERSION
+			echo "$_VER" > $_DIR/SYSTEM.VERSION
+			echo "Edit $_DIR/UPDATE.DESC"
+			echo "Edit $_DIR/config"
+			echo " and run $0 pack"
+			exit 0
+		;;
+		pack)
+			do_pack
+			exit 0
+		;;
+		*)
+			break;
+		;;
+	esac
+done
+exit 0

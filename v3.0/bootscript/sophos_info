@@ -1,0 +1,56 @@
+#!/bin/perl
+# $Id: sophos_info.pl,v 1.0 2008/03/05 17:09:01 nawawi Exp $
+# Copyright (c) 2008 Tracenetwork Corporation Sdn. Bhd.
+
+my $ide;
+my $eversion;
+my $iversion;
+my $ufile;
+my $virus;
+my $_PATH="/strg/mybox/sophos";
+sub write_file {
+        my $fi=shift;
+        my $txt=shift;
+        open(FO,"> $fi");
+        print FO "$txt\n";
+        close(FO);
+}
+
+sub get_info() {
+	open(SAV,"sweep -v |") || die("ERROR");
+	while(<SAV>) {
+		chomp;
+		if(/Engine version\s+\:\s+(.*)/) {
+			$eversion="$1";
+		}
+		if(/Virus data version\s+\:\s+(.*)/) {
+			$iversion="$1";
+		}
+		if(/Total viruses \(with IDEs\)\s+\:\s+(.*)/) {
+			$virus="$1";
+		}
+		s/\/usr\/local\/sav\///g;
+		if(/^Data file name\s+\:\s+(.*)/) {
+			$ide .="$1|";
+		}
+		if(/^Data file date\s+\:\s+(.*)/) {
+			$ide .="$1\n";
+		}
+	}
+	close(SAV);
+	$eversion="0" if($eversion eq '');
+	$iversion="0" if($iversion eq '');
+	$virus="0" if($virus eq '');
+	if($iversion ne '0') {
+		$ufile=$iversion;
+		$ufile =~s/\.//g;
+		$ufile .="_ides.zip";
+	}
+}
+get_info();
+write_file("$_PATH/EVERSION","$eversion");
+write_file("$_PATH/IVERSION","$iversion");
+write_file("$_PATH/VICNT","$virus");
+write_file("$_PATH/IDEINFO","$ide");
+write_file("$_PATH/IDEUPDATE","$ufile");
+exit 0;

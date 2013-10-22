@@ -1,0 +1,638 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="index_main";
+include_once('page.exl');
+include_once('av.exl');
+mybox_chk_session();
+mybox_send_nocache();
+
+function _get_resource_usage() {
+	$memtotal=0;$memfree=0;$memused=0;
+	$swaptotal=0;$swapfree=0;$swapused=0;
+	$memp=0;$swapp=0;
+	if(file_exists("/proc/meminfo")) {
+		$buff=file("/proc/meminfo");
+		if(count($buff)!=0) {
+			foreach($buff as $lx) {
+				$lx=trim($lx);
+				if($lx=='') continue;
+				if(preg_match("/^MemTotal\:\s+(\d+)\s+/",$lx,$mm)) {
+					$memtotal=$mm[1];
+				}
+				unset($mm);
+				if(preg_match("/^MemFree\:\s+(\d+)\s+/",$lx,$mm)) {
+					$memfree=$mm[1];
+				}
+				unset($mm);
+				if(preg_match("/^MemUsed\:\s+(\d+)\s+/",$lx,$mm)) {
+					$memused=$mm[1];
+				}
+				unset($mm);
+				if(preg_match("/^SwapTotal\:\s+(\d+)\s+/",$lx,$mm)) {
+					$swaptotal=$mm[1];
+				}
+				unset($mm);
+				if(preg_match("/^SwapFree\:\s+(\d+)\s+/",$lx,$mm)) {
+					$swapfree=$mm[1];
+				}
+				unset($mm);
+				if(preg_match("/^SwapUsed\:\s+(\d+)\s+/",$lx,$mm)) {
+					$swapused=$mm[1];
+				}
+			}
+			unset($buff,$lx);
+			$memp=@(($memused / $memtotal) * 100);
+			$swapp=@(($swapused / $swaptotal) * 100);
+			$memp=round($memp,0);
+			$swapp=round($swapp,0);
+		}
+	}
+	putenv("TERM=linux");
+	exec("procinfo",$buff,$ret);
+	$idle=0;
+        $str=trim($buff[10]);
+	if(preg_match("/\s+(\S+)\%\s+/",$str,$mm)) {
+		$idle=round($mm[1]);	
+	}
+	$cpu=(100 - $idle);
+	unset($buff,$mm);
+	exec("df -x rootfs",$buff,$ret);
+	$dtotal=0;$dfree=0;$dused=0;$dusedp=0;
+	$rtotal=0;$rfree=0;$rused=0;$rusedp=0;
+        if(count($buff)!=0) {
+		foreach($buff as $lx) {
+			$lx=trim($lx);
+			if($lx=='') continue;
+			if(preg_match("/^(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+\/strg/",$lx,$mm)) {
+				$dtotal=$mm[2];
+				$dused=$mm[3];
+				$dfree=$mm[4];
+				$dfusedp=$mm[5];
+				$b++;
+			}
+			if(preg_match("/^(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+\/$/",$lx,$mm)) {
+				$rtotal=$mm[2];
+				$rused=$mm[3];
+				$rfree=$mm[4];
+				$rfusedp=$mm[5];
+				$b++;
+			}
+			if($b==2) break;
+		}
+		$dfusedp=round($dfusedp,0);
+		$rfusedp=round($rfusedp,0);
+	}
+	unset($buff,$mm);
+	clearstatcache();
+	return array("$memp","$memtotal","$swapp","$swaptotal","$cpu","$dfusedp","$dtotal","$rfusedp","$rtotal");
+}
+
+function _draw_bar($size,$total='') {
+	if($total!='') $total="of $total";
+	$data='';
+	$data .="<table border=0 width='100%' style='padding: 0px; margin: 0px; border: 1px #ccc solid; background: #ffffff;'>";
+	$data .="<tr><td style='font-weight: bold; table-layout: fixed; white-space: nowrap; width: 50%; text-align: right;'>$size% $total</td>";
+	$data .="<td style='table-layout: fixed; white-space: nowrap; width: 50%;'>";
+	$data .="<table border=0 style='width: 150px; table-layout: fixed; padding: 0px; margin: 0px; border: 0px none; background: #ffffff;'>";
+	$data .="<tr>";
+
+	$cn="#ff6600";
+	if($size > 90) $cn="#FF0000";
+	for($i=0; $i<100; $i+=3) {
+		$color=($i<$size) ? "$cn" : "#fae5b0";
+		$width=($i+1<100) ? "1" : 100-$i;
+		$data .="<td style='background-color: $color; font-size: 6pt;' width='$width%'>&nbsp;</td>";
+	}
+	$data .="</tr></table></td>";
+	$data .="</tr></table>";
+	return $data;
+}
+
+function _print_resource() {
+	global $_PNG;
+	$_rarray=_get_resource_usage();
+	$_memp=$_rarray[0];
+	$_memt=$_rarray[1];
+	$_swapp=$_rarray[2];
+	$_swapt=$_rarray[3];
+	$_cpu=$_rarray[4];
+	$_dfp=$_rarray[5];
+	$_dft=$_rarray[6];
+	$_rfp=$_rarray[7];
+	$_rft=$_rarray[8];
+	$_memt *= 1024;
+	$_memt=mybox_size_readable($_memt,'null','%d %s');
+	$_swapt *= 1024;
+	$_swapt=mybox_size_readable($_swapt,'null','%d %s');
+	$_dft *= 1024;
+	$_dft=mybox_size_readable($_dft,'null','%d %s');
+	$_rft *= 1024;
+	$_rft=mybox_size_readable($_rft,'null','%d %s');
+	$_cpu_bar=_draw_bar($_cpu);
+	$_mem_bar=_draw_bar($_memp,$_memt);
+	$_swap_bar=_draw_bar($_swapp,$_swapt);
+	$_df_bar=_draw_bar($_dfp,$_dft);
+	$_rf_bar=_draw_bar($_rfp,$_rft);
+	echo "
+		<tr> 
+		<td background='i/menu/menu_sec_bg.gif' colspan=2 valign='middle' style='border: 1px solid #ccc; background-color: #336699; color: #ffffff; padding: 0px; margin: 0px;'>
+		<table style='border: 0px; padding: 0px; margin: 0px;'>
+		<tr><td valign='middle' style='width: 10px;'>
+		<img src='{$_PNG['gear']}' border=0 alt='' title=''>
+		</td>
+		<td valign='middle' style='color: #ffffff; font-size: 12px; font-weight: bold; font-style: normal;'>
+		Resource usage
+		</td></tr></table>
+		</td>
+		</tr>
+		<tr> 
+		<td valign='middle' class='tdname' style='padding-right: 2px;'>
+		<table style='width: 100%; border: 0px; padding: 0px; margin: 0px; text-align: right;'>
+		<tr>
+		<td style='width: 99%; text-align: right; font-size: 11px;font-weight: bold;background-color: #d8e4f1;'>CPU</td>
+		<td style='width: 1%; text-align: right;'><img src='{$_PNG['cpu']}' border=0 alt='' title=''></td>
+		</tr>
+		</table>
+		</td>
+		<td valign='middle' class='tdvalue' style='table-layout: fixed; white-space: nowrap;'>
+		$_cpu_bar
+		</td>
+		</tr>
+		<tr>
+		<td valign='middle' class='tdname' style='padding-right: 2px;'>
+		<table style='width: 100%; border: 0px; padding: 0px; margin: 0px; text-align: right;'>
+		<tr>
+		<td style='width: 99%; text-align: right; font-size: 11px;font-weight: bold;background-color: #d8e4f1;'>Memory</td>
+		<td style='width: 1%; text-align: right;'><img src='{$_PNG['ram']}' border=0 alt='' title=''></td>
+		</tr>
+		</table>
+		</td>
+		<td valign='middle' class='tdvalue' style='table-layout: fixed; white-space: nowrap;'>
+		$_mem_bar
+		</td>
+		</tr>
+		<tr> 
+		<td valign='middle' class='tdname' style='padding-right: 2px;'>
+		<table style='width: 100%; border: 0px; padding: 0px; margin: 0px; text-align: right;'>
+		<tr>
+		<td style='width: 99%; text-align: right; font-size: 11px;font-weight: bold;background-color: #d8e4f1;'>Swap</td>
+		<td style='width: 1%; text-align: right;'><img src='{$_PNG['swap']}' border=0 alt='' title=''></td>
+		</tr>
+		</table>
+		</td>
+		<td valign='middle' class='tdvalue' style='table-layout: fixed; white-space: nowrap;'>
+		$_swap_bar
+		</td>
+		</tr>
+		<tr> 
+		<td valign='middle' class='tdname' style='padding-right: 2px;'>
+		<table style='width: 100%; border: 0px; padding: 0px; margin: 0px; text-align: right;'>
+		<tr>
+		<td style='width: 99%; text-align: right; font-size: 11px;font-weight: bold;background-color: #d8e4f1;'>Virtual Disk</td>
+		<td style='width: 1%; text-align: right;'><img src='{$_PNG['disk2']}' border=0 alt='' title=''></td>
+		</tr>
+		</table>
+		</td>
+		<td valign='middle' class='tdvalue' style='table-layout: fixed; white-space: nowrap;'>
+		$_rf_bar
+		</td>
+		</tr>
+		<tr> 
+		<td valign='middle' class='tdname' style='padding-right: 2px;'>
+		<table style='width: 100%; border: 0px; padding: 0px; margin: 0px; text-align: right;'>
+		<tr>
+		<td style='width: 99%; text-align: right; font-size: 11px;font-weight: bold;background-color: #d8e4f1;'>Data Disk</td>
+		<td style='width: 1%; text-align: right;'><img src='{$_PNG['disk']}' border=0 alt='' title=''></td>
+		</tr>
+		</table>
+		</td>
+		<td valign='middle' class='tdvalue' style='table-layout: fixed; white-space: nowrap;'>
+		$_df_bar
+		</td>
+		</tr>
+	";
+	
+}
+
+function _if_dev_up_array() {
+        $_int=array();
+        $ipconfig=mybox_get_ipconfig_cache();
+        if(count($ipconfig)!=0) {
+                foreach($ipconfig as $eth => $val) {
+                        if(preg_match("/^eth(\d+)$/",$eth)) {
+                                $dev1=trim($eth);
+                                $_int[$dev1]=1;
+                        } elseif(preg_match("/^eth(\d+)\.(\d+)$/",$eth,$mm)) {
+                                $eid="eth{$mm[1]}";
+				$vid=$mm[2];
+                                $dev1=trim($eth);
+                                $_int[$dev1]="$eid";
+                                if(isset($_int[$eid])) unset($_int[$eid]);
+                        } else {
+                                continue;
+                        }
+                }
+                return $_int;
+        }
+}
+
+function _get_intf() {
+	global $_DB_NAME;
+	$db_id=mybox_db_connect($_DB_NAME);
+	$_int=_if_dev_up_array();
+	$_dev=mybox_list_devname($db_id);
+	$_name_dev=mybox_name2dev_array($db_id);
+	$_traff=get_dev_traffic();
+	$ret=array();
+	if(count($_int)!=0) {
+		foreach($_int as $_dev1 => $num) {
+			if(stripos($num,"eth")!==FALSE) {
+				$n=$_dev[$num];
+				$ip=$_name_dev["$n (Address)"];
+				$in=trim($_traff[$_dev1]['rx_bytes']);
+				$out=trim($_traff[$_dev1]['tx_bytes']);
+				$_st=mybox_nic_chklink(&$info,$_dev1);
+				$ret[]="$n,$_dev1,1,$_st,$in,$out";
+			} else {
+				$n=$_dev[$_dev1];
+				$ip=$_name_dev["$n (Address)"];
+				$in=trim($_traff[$_dev1]['rx_bytes']);
+				$out=trim($_traff[$_dev1]['tx_bytes']);
+				$_st=mybox_nic_chklink(&$info,$_dev1);
+				$ret[]="$n,$_dev1,$num,$_st,$in,$out";
+			}
+			unset($n,$ip,$_dt_a,$num,$_dev1,$in,$out);
+		}
+	}
+	@mybox_db_close($db_id);
+	return $ret;
+}
+
+function _print_intf() {
+	global $_PNG, $_PNG_NIC;
+	$_data=_get_intf();
+	echo "
+		<tr> 
+		<td background='i/menu/menu_sec_bg.gif' colspan=2 valign='middle' style='border: 1px solid #ccc; background-color: #336699; color: #ffffff; padding: 0px; margin: 0px;'>
+		<table style='border: 0px; padding: 0px; margin: 0px;'>
+		<tr><td valign='middle' style='width: 10px;'>
+		<img src='{$_PNG_NIC[1]}' border=0 alt='' title=''>
+		</td>
+		<td valign='middle' style='color: #ffffff; font-size: 12px; font-weight: bold; font-style: normal;'>
+		Network usage
+		</td></tr></table>
+		</td>
+		</tr>
+	";
+	if(count($_data)!=0) {
+		foreach($_data as $list) {
+			list($name,$dev,$state,$link,$sb,$db)=preg_split("/,/",$list);
+			$sb=mybox_convert_byte($sb);
+			$db=mybox_convert_byte($db);
+			echo "
+		<tr> 
+		<td valign='middle' class='tdname' style='padding-right: 2px;'>
+		<table style='width: 100%; border: 0px; padding: 0px; margin: 0px; text-align: right;'>
+		<tr>
+		<td style='width: 99%; text-align: right; font-size: 11px;font-weight: bold;background-color: #d8e4f1;'>$name</td>
+		<td style='width: 1%; text-align: right; font-size: 11px;font-weight: bold;'>($dev)</td>
+		</tr>
+		</table>
+		</td>
+		<td valign='middle' class='tdvalue' style='table-layout: fixed; white-space: nowrap;'>
+		<table style='width: 70%; border: 0px; padding: 0px; margin: 0px;'>
+		";
+		if($link==1) {	
+			echo "
+				<tr>
+				<td style='width: 30%; font-weight: bold; text-align: right; font-size: 11px;'>$sb </td>
+				<td style='width: 30%; font-weight: bold; text-align: left; font-size: 11px;'>/ $db</td>
+				<td style='width: 10%; text-align: left; font-size: 11px;'>(In/Out)</td>
+				</tr>
+			";
+		} else {
+			echo "
+				<tr>
+				<td style='width: 30%; font-weight: bold; text-align: right; font-size: 11px;'>unused</td>
+				<td style='width: 30%;'>&nbsp;</td>
+				<td style='width: 10%;'>&nbsp;</td>
+				</tr>
+			";
+		}
+		echo "
+		</table>
+		</td>
+		</tr>
+			";
+			unset($name,$dev,$state,$link,$sb,$db);
+		}
+	}
+	
+}
+
+function _print_utime() {
+	global $_PNG;
+	$_uptime=mybox_uptime();
+	$_udate=date('D M d H:i:s T Y');
+	$_host=mybox_fget_contents("/proc/sys/kernel/hostname");
+	if($_host=='') $_host="System Information";
+	$_bootime=date('D M d H:i:s T Y',strtotime(mybox_fget_contents("/etc/bootup")));
+	echo "
+		<tr>
+		<td background='i/menu/menu_sec_bg.gif' colspan=2 valign='middle' style='border: 1px solid #ccc; background-color: #336699; color: #ffffff; padding: 0px; margin: 0px;'>
+		<table style='border: 0px; padding: 0px; margin: 0px;'>
+		<tr><td valign='middle' style='width: 10px;'>
+		<img src='{$_PNG['system']}' border=0 alt='' title=''>
+		</td>
+		<td valign='middle' style='color: #ffffff; font-size: 12px; font-weight: bold; font-style: italic;'>
+		$_host
+		</td></tr></table>
+		</td>
+		</tr>
+		<tr> 
+		<td valign='middle' class='tdname'>System Uptime</td>
+		<td valign='middle' class='tdvalue'> 
+		$_uptime
+		</td>
+		</tr>
+		<tr> 
+		<td valign='middle' class='tdname'>System Time</td>
+		<td valign='middle' class='tdvalue'> 
+		$_udate
+		</td>
+		</tr>
+		<tr> 
+		<td valign='middle' class='tdname'>System Bootup</td>
+		<td valign='middle' class='tdvalue'> 
+		$_bootime
+		</td>
+		</tr>
+	";
+	
+}
+if(isset($_GET['resource'])&& time() >= $_GET['resource']) {
+	_print_resource();
+	exit;
+}
+if(isset($_GET['intf'])&& time() >= $_GET['intf']) {
+	_print_intf();
+	exit;
+}
+if(isset($_GET['utime'])&& time() >= $_GET['utime']) {
+	_print_utime();
+	exit;
+}
+
+if(!isset($show_status)||$show_status=='') $show_status=1;
+?>
+<html>
+<head>
+<title>MyAdmin</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<script type='text/javascript' src="/j/mybox_func.js"></script>
+<script type='text/javascript' src="/j/mybox_ajax.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?php echo $_LOGIN['auth_id'];?>";
+	page_load();
+</script>
+</head>
+<body scroll="auto">
+<?php if($show_status==1) {?>
+<table border=0 cellpadding=2 cellspacing=1 width=95% align=center style='margin-top: 0px;'>
+<tr>
+<td colspan=2 style='vertical-align: top; padding-top: 0px; table-layout: fixed;'>
+<?php mybox_page_section("System / Overview");?>
+<br>
+
+</td>
+</tr>
+<tr>
+<td style='vertical-align: top; padding-top: 0px; table-layout: fixed; width: 40%;'>
+<table cellpadding=0 cellspacing=0 style='width: 100%; border: 1px solid #ccc;'>
+<tr> 
+<td background='i/menu/menu_sec_bg.gif' colspan=2 valign='middle' style='border: 1px solid #ccc; background-color: #336699; color: #ffffff; padding: 0px; margin: 0px;'>
+<table style='border: 0px; padding: 0px; margin: 0px;'>
+<tr><td valign='middle' style='width: 10px;'>
+<img src='<?php echo $_PNG['cd'];?>' border=0 alt='' title=''>
+</td>
+<td valign='middle' style='color: #ffffff; font-size: 12px; font-weight: bold; font-style: normal;'>
+Version Information
+</td></tr></table>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Firmware version</td>
+<td valign="middle" class="tdvalue"> 
+<?php 
+echo mybox_show_firmware();
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Pattern version</td>
+<td valign="middle" class="tdvalue"> 
+<?php 
+echo mybox_fget_contents("$_PAT_PATH/version");
+?>
+</td>
+</tr>
+</table>
+<br>
+<?php 
+sophos_info(&$_info,&$_ide);
+?>
+<table cellpadding=0 cellspacing=0 style='width: 100%; border: 1px solid #ccc;'>
+<tr> 
+<td background='i/menu/menu_sec_bg.gif' colspan=3 valign='middle' style='border: 1px solid #ccc; background-color: #336699; color: #ffffff; padding: 0px; margin: 0px;'>
+<table style='border: 0px; padding: 0px; margin: 0px;'>
+<tr><td valign='middle' style='width: 10px;'>
+<img src='<?php echo $_PNG['cd'];?>' border=0 alt='' title=''>
+</td>
+<td valign='middle' style='color: #ffffff; font-size: 12px; font-weight: bold; font-style: normal;'>
+Antivirus Information
+</td></tr></table>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Engine version</td>
+<td valign="middle" class="tdvalue" style='width: 15%;'> 
+<?php 
+echo $_info['e'];
+?>
+</td>
+<td valign="middle" class="tdvalue" rowspan=3>
+<img src="/i/sophos.gif">
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">IDE version</td>
+<td valign="middle" class="tdvalue" style='width: 15%;'> 
+<?php 
+echo $_info['i'];
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Virus detection</td>
+<td valign="middle" class="tdvalue" style='width: 15%;'> 
+<?php 
+echo $_info['v'];
+?>
+</td>
+</tr>
+</table>
+<br>
+
+<table id='utime' cellpadding=0 cellspacing=0 style='width: 100%; border: 1px solid #ccc;'>
+<?php _print_utime();?>
+</table>
+<br>
+<table cellpadding=0 cellspacing=0 style='width: 100%; border: 1px solid #ccc;'>
+<tr> 
+<td background='i/menu/menu_sec_bg.gif' colspan=2 valign='middle' style='border: 1px solid #ccc;background-color: #336699; color: #ffffff; padding: 0px; margin: 0px;'>
+<table style='border: 0px; padding: 0px; margin: 0px;'>
+<tr><td valign='middle' style='width: 10px;'>
+<img src='<?php echo $_PNG['cd'];?>' border=0 alt='' title=''>
+</td>
+<td valign='middle' style='color: #ffffff; font-size: 12px; font-weight: bold; font-style: normal;'>
+License Information
+</td></tr></table>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Model</td>
+<td valign="middle" class="tdvalue"> 
+<?php echo mybox_license('pkg');?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Owner</td>
+<td valign="middle" class="tdvalue"> 
+<?php echo mybox_license('org');?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">License ID</td>
+<td valign="middle" class="tdvalue"> 
+<?php echo mybox_license('fkey');?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Registration Date</td>
+<td valign="middle" class="tdvalue"> 
+<?php echo date('d-M-Y',mybox_license('released'));?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Expiration Date</td>
+<td valign="middle" class="tdvalue"> 
+<?php 
+$_LE=mybox_license('expired');
+if($_LE!='none') {
+	echo date('d-M-Y',$_LE);
+} else {
+	echo "No expiration";
+}
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Maximum users</td>
+<td valign="middle" class="tdvalue"> 
+<?php if($_UL!=0) {
+	echo $_UL;
+} else {
+	echo "Unlimited";
+}?>
+</td>
+</tr>
+</table>
+</td>
+
+<td style='text-align: center; vertical-align: top; padding: 0px; table-layout: fixed; width: 30%;'>
+<table id='resource' cellpadding=0 cellspacing=0 style='width: 100%; border: 1px solid #ccc;'>
+<?php _print_resource();?>
+</table>
+<br>
+<table id='intf' cellpadding=0 cellspacing=0 style='width: 100%; border: 1px solid #ccc;'>
+<?php _print_intf();?>
+</table>
+
+<script type='text/javascript'>
+var doit=0;
+function update_data() {
+	if(doit==0) { 
+		update_resource('<?php echo "/index_main.exh?_NOLOGIN=1&resource=".time()."";?>');
+		doit=1;
+		return true;
+	}
+	if(doit==1) { 
+		update_utime('<?php echo "/index_main.exh?_NOLOGIN=1&utime=".time()."";?>');
+		doit=2;
+		return true;
+	}
+	if(doit==2) { 
+		update_intf('<?php echo "/index_main.exh?_NOLOGIN=1&intf=".time()."";?>');
+		doit=0;
+		return true;
+	}
+}
+window.setInterval(update_data, '60000');
+load_menu('sub1','t1d1','s1i1');
+</script>
+
+<?php  } ?>
+<?php if($show_status==2) {?>
+<form name=f method=post action="/login.exh" target=_top onsubmit="if(!confirm('Are you sure you want to proceed?')) { history.go(-1); return false;}">
+<table border=0 cellpadding=1 cellspacing=1 width=95% align=center style='margin-top: 0px;'>
+<tr>
+<td style='vertical-align: top; padding-top: 0px; table-layout: fixed;'>
+<?php mybox_page_section("System / Reboot/Shutdown");?>
+<br>
+</td>
+</tr>
+
+<tr> 
+<td valign="middle" style='border: 0px; color: #ffffff; font-size: 11px; font-weight: bold;'>
+
+<table class="data">
+<tbody>
+<tr>
+<td valign="middle" class="tdname">Action</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("Reboot"=>"5","Shutdown"=>"6");
+echo mybox_select_box('imsel1',$data_a,"5",'just_logout');
+?>
+</td>
+</tr>
+<tr>
+<td valign="middle" class="tdname">Reason</td>
+<td valign="middle" class="tdvalue"><input name="rebootreason" type="text" class="valbox2" value="maintenance"></td>
+</tr>
+<tr>
+<td valign="middle" class="tdname">&nbsp;</td>
+<td valign="middle" class="tdvalue">
+<a name="sini"><a class="btns" href="#sini" onclick="document.f.submit();">Proceed</a>&nbsp;
+<a name="sini"><a class="btns" href="#sini" onclick="history.go(-1);">Discard</a>&nbsp;
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</table>
+</form>
+<script type='text/javascript'>
+load_menu('sub1','t1d4','s1i4');
+</script>
+<?php  } ?>
+<script type='text/javascript'>
+page_kill();
+</script>
+</body>
+</html>

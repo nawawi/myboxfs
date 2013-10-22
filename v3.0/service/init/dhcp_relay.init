@@ -1,0 +1,133 @@
+#!/bin/php -Cq
+<?php 
+// dhcp.init - last update 30-Jun-2006
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="dhcp";
+include_once('clib.exl');
+putenv("PATH=/bin:/service/tools:/service/init");
+
+$_QUIET=0;
+mybox_init_set_alarm(30);
+
+if(!file_exists("/bin/dhcrelay")) {
+	mybox_init_echo($_QUIET,"ERROR","Cannot execute dhcp_relay.init. Internal error!");
+	exit(1);
+}
+
+function dhcp_relay_status() {
+	global $_QUIET;
+	$pid=mybox_get_progpid("dhcrelay");
+	if($pid!='') {
+		if($_QUIET==0) echo "* dhcrelay (pid $pid) is running...\n";
+		return 0;
+	}
+	return 1;
+}
+
+function dhcp_relay_start() {
+	global $_DB_NAME, $_QUIET, $_ROOT_DIR;
+
+	if(file_exists("$_ROOT_DIR/scripts/dhcp_relay/start")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/dhcp_relay/start");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/dhcp_relay/pre-start")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/dhcp_relay/pre-start");
+	}
+
+	$_config='';$_name_ip='';
+	$_dhcp_relay_stat=0;
+	$db_id=mybox_db_connect($_DB_NAME);
+	$result=mybox_db_query("select stat from dhcp_servers where stat='1'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		mybox_db_close($db_id);
+		return 0;
+	}
+	unset($result);
+	$result=mybox_db_query("select * from misc where name like \"dhcp_relay_%\"",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			if(trim($row['name'])=='dhcp_relay_server') $_dhcp_relay_server=trim($row['val']);
+			if(trim($row['name'])=='dhcp_relay_dev') $_dhcp_relay_dev=trim($row['val']);
+			if(trim($row['name'])=='dhcp_relay_stat') $_dhcp_relay_stat=trim($row['val']);
+		}
+	}
+	if($_dhcp_relay_stat==0) {
+		mybox_db_close($db_id);
+		mybox_init_echo($_QUIET,"INFO","DHCP Relay service disabled");
+		return 0;
+	}
+	$devname_array=mybox_list_namedev($db_id);
+	$namedev_array=mybox_name2dev_array($db_id);
+	$_name_ip=$namedev_array["$_dhcp_relay_server (Address)"];
+	$_lst=preg_split("/,/",$_dhcp_relay_dev);
+	if(count($_lst)!=0) {
+		foreach($_lst as $dv) {
+			$_dev=$devname_array[$dv];
+			$_config .="-i $_dev ";
+		}
+	}
+	$_config=trim($_config);
+	mybox_db_close($db_id);
+
+	if(@dhcp_relay_status()==1 && $_config!='' && $_name_ip!='') {
+		if(mybox_exec_cmd("dhcrelay -q $_config $_name_ip")==0) {
+			mybox_init_echo($_QUIET,"INFO","Starting DHCP Relay service");
+			@touch("/var/sys/chk_dhcp_relay");
+			if(file_exists("$_ROOT_DIR/scripts/dhcp_relay/post-start")) {
+				mybox_execq_cmd("$_ROOT_DIR/scripts/dhcp_relay/post-start");
+			}
+			return 0;
+		}
+	}
+	mybox_init_echo($_QUIET,"ERROR","Starting DHCP Relay service failed");
+	return 1;
+}
+
+function dhcp_relay_stop() {
+	global $_QUIET, $_ROOT_DIR;
+
+	@unlink("/var/sys/chk_dhcp_relay");
+
+	if(file_exists("$_ROOT_DIR/scripts/dhcp_relay/stop")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/dhcp_relay/start");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/dhcp_relay/pre-stop")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/dhcp_relay/pre-stop");
+	}
+
+	if(mybox_killall("dhcrelay")==0) {
+		mybox_init_echo($_QUIET,"INFO","Shutting down DHCP Relay service");
+		if(file_exists("$_ROOT_DIR/scripts/dhcp_relay/post-stop")) {
+			mybox_execq_cmd("$_ROOT_DIR/scripts/dhcp_relay/post-stop");
+		}
+		return 0;
+	}
+	mybox_init_echo($_QUIET,"ERROR","Shutting down DHCP Relay service failed");
+	return 1;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=dhcp_relay_start();
+		break;
+	case 'stop':
+		$ret=dhcp_relay_stop();
+		break;
+	case 'restart':
+		$ret=dhcp_relay_stop();
+		sleep(2);
+		$ret=dhcp_relay_start();
+		break;
+	case 'status':
+		$ret=dhcp_relay_status();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/status]\n";
+		break;
+}
+exit($ret);
+?>

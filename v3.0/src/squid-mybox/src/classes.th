@@ -1,0 +1,60 @@
+/* MACHINE GENERATED FILE - DO NOT EDIT */
+
+/* Produced by classdef 0.5 from the source files:
+   module.c
+   module.h
+   patfile.c
+*/
+#ifndef CLASSES_TH
+#define CLASSES_TH
+
+#define classdef(class,parent,body)
+typedef void (*_DTOR)(void *);
+
+#define new(typ) (typ *)void_O_CTOR(sizeof(typ), (_DTOR)typ##_O_DTOR, typ)
+
+#define Ddef(typ) static void typ##_O_DTOR_(typ *this); \
+                  void typ##_O_DTOR(typ *this) { \
+                           typ##_O_DTOR_(this); \
+                           typ##_O_SDTOR((typ##_O_SUPER *)this); } \
+                  static void typ##_O_DTOR_(typ *this)
+
+#define Ddef_none(typ) void typ##_O_DTOR(typ *this) { \
+                            typ##_O_SDTOR((typ##_O_SUPER *)this); }
+
+#define void_O_DTOR(t)   free(t)
+
+/* TYPEDEFS */
+#line 53 "module.h"
+typedef struct _Object Object;
+#line 155 "module.h"
+typedef struct _filterObject filterObject;
+#line 52 "patfile.c"
+typedef struct _patFileObject patFileObject;
+#line 104 "module.c"
+typedef struct _shlibObject shlibObject;
+#line 130 "module.h"
+typedef struct _moduleObject moduleObject;
+
+/* LINKS */
+#define Object_O_SUPER void
+#define Object_O_SDTOR void_O_DTOR
+#define filterObject_O_SUPER Object
+#define filterObject_O_SDTOR Object_O_DTOR
+#define patFileObject_O_SUPER Object
+#define patFileObject_O_SDTOR Object_O_DTOR
+#define shlibObject_O_SUPER Object
+#define shlibObject_O_SDTOR Object_O_DTOR
+#define moduleObject_O_SUPER Object
+#define moduleObject_O_SDTOR Object_O_DTOR
+
+/* try this:*/
+#ifdef ADD_CLASSDEF
+    ADD_CLASSDEF(Object)
+    ADD_CLASSDEF(filterObject)
+    ADD_CLASSDEF(patFileObject)
+    ADD_CLASSDEF(shlibObject)
+    ADD_CLASSDEF(moduleObject)
+#endif
+
+#endif

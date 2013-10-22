@@ -1,0 +1,2013 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="network_int";
+include_once('page.exl');
+mybox_chk_session();
+
+mybox_send_nocache();
+
+$_error=0;
+$db_id=mybox_db_connect($_DB_NAME);
+
+function clean_file_cache() {
+	@unlink("/var/sys/ipname.cache");
+	@unlink("/var/sys/name2dev.cache");
+	@unlink("/var/sys/defnetwork.cache");
+	@unlink("/var/sys/defservice.cache");
+	@unlink("/var/sys/defservice4nat.cache");
+	@unlink("/var/sys/shaperclass.cache");
+	@unlink("/var/sys/list_namedev.cache");
+	@unlink("/var/sys/myipmac.cache");
+	@unlink("/var/sys/defname.cache");
+	@unlink("/var/sys/cipname.cache");
+}
+
+function del_name($id,$table,$db_id) {
+	$name='';
+	$result=mybox_db_query("select name from $table where id='$id'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		$name=mybox_db_fetch_single($result);
+	}
+	mybox_db_query("delete from $table where id='$id'",$db_id);
+	if($name!='') {
+		update_name($name,"","2",$db_id);
+	}
+}
+
+
+function update_name($name,$nameold,$opt,$db_id) {
+	// change name
+	$namex="$name (Address)";
+	$namexold="$nameold (Address)";
+	$namenet="$name (Network)";
+	$nameonet="$nameold (Network)";
+	$nameb="$name (Broadcast)";
+	$nameob="$nameold (Broadcast)";
+	if($opt==1) {
+		// inbound
+		$table="pf_inbound";
+		mybox_db_query("update $table set src='$namex' where src='$namexold'",$db_id);
+		mybox_db_query("update $table set dst='$namex' where dst='$namexold'",$db_id);
+		mybox_db_query("update $table set src='$namenet' where src='$nameonet'",$db_id);
+		mybox_db_query("update $table set dst='$namenet' where dst='$nameonet'",$db_id);
+		mybox_db_query("update $table set src='$nameb' where src='$nameob'",$db_id);
+		mybox_db_query("update $table set dst='$nameb' where dst='$nameob'",$db_id);
+		unset($table);
+
+		// outbound
+		$table="pf_outbound";
+		mybox_db_query("update $table set src='$namex' where src='$namexold'",$db_id);
+		mybox_db_query("update $table set dst='$namex' where dst='$namexold'",$db_id);
+		mybox_db_query("update $table set src='$namenet' where src='$nameonet'",$db_id);
+		mybox_db_query("update $table set dst='$namenet' where dst='$nameonet'",$db_id);
+		mybox_db_query("update $table set src='$nameb' where src='$nameob'",$db_id);
+		mybox_db_query("update $table set dst='$nameb' where dst='$nameob'",$db_id);
+		unset($table);
+
+		// dnat
+		$table="pf_dnat";
+		mybox_db_query("update $table set src='$namex' where src='$namexold'",$db_id);
+		mybox_db_query("update $table set dst='$namex' where dst='$namexold'",$db_id);
+		mybox_db_query("update $table set fwd='$namex' where fwd='$namexold'",$db_id);
+		mybox_db_query("update $table set src='$namenet' where src='$nameonet'",$db_id);
+		mybox_db_query("update $table set dst='$namenet' where dst='$nameonet'",$db_id);
+		mybox_db_query("update $table set src='$nameb' where src='$nameob'",$db_id);
+		mybox_db_query("update $table set dst='$nameb' where dst='$nameob'",$db_id);
+		unset($table);
+
+		// snat
+		$table="pf_snat";
+		mybox_db_query("update $table set src='$namex' where src='$namexold'",$db_id);
+		mybox_db_query("update $table set dst='$namex' where dst='$namexold'",$db_id);
+		mybox_db_query("update $table set fwd='$namex' where fwd='$namexold'",$db_id);
+		mybox_db_query("update $table set src='$namenet' where src='$nameonet'",$db_id);
+		mybox_db_query("update $table set dst='$namenet' where dst='$nameonet'",$db_id);
+		mybox_db_query("update $table set src='$nameb' where src='$nameob'",$db_id);
+		mybox_db_query("update $table set dst='$nameb' where dst='$nameob'",$db_id);
+		unset($table);
+
+		// netmap
+		$table="pf_map";
+		mybox_db_query("update $table set src='$namex' where src='$namexold'",$db_id);
+		mybox_db_query("update $table set dst='$namex' where dst='$namexold'",$db_id);
+		mybox_db_query("update $table set fwd='$namex' where fwd='$namexold'",$db_id);
+		mybox_db_query("update $table set src='$namenet' where src='$nameonet'",$db_id);
+		mybox_db_query("update $table set dst='$namenet' where dst='$nameonet'",$db_id);
+		mybox_db_query("update $table set src='$nameb' where src='$nameob'",$db_id);
+		mybox_db_query("update $table set dst='$nameb' where dst='$nameob'",$db_id);
+		unset($table);
+
+		// ips
+		$_ips_net='';$_ips_http_server='';$_ips_smtp_server='';
+		$_ips_dns_server='';$_ips_sql_server='';
+		$result=mybox_db_query("select * from misc where name like \"ips_%\" ",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				if(trim($row['name'])=="ips_net") $_ips_net=trim($row['val']);
+				if(trim($row['name'])=="ips_http_server") $_ips_http_server=trim($row['val']);
+				if(trim($row['name'])=="ips_smtp_server") $_ips_smtp_server=trim($row['val']);
+				if(trim($row['name'])=="ips_dns_server") $_ips_dns_server=trim($row['val']);
+				if(trim($row['name'])=="ips_sql_server") $_ips_sql_server=trim($row['val']);
+			}
+			if($_ips_net!='') {
+				$_ips_net_a=preg_split("/,/",$_ips_net);
+				$_p='';
+				if(count($_ips_net_a)!=0) {
+					foreach($_ips_net_a as $lx) {
+						if($lx=="$namexold") {
+							$_p .="$namex,";
+						} elseif($lx=="$nameonet") {
+							$_p .="$namenet,";
+						} elseif($lx=="$nameob") {
+							$_p .="$nameb,";
+						} else {
+							$_p .="$lx,";
+						}
+					}
+					$_ips_net=trim($_p,",");
+					mybox_db_query("update misc set val='$_ips_net' where name='ips_net'",$db_id);
+					unset($_p,$_ips_net_a,$_ips_net);
+				} else {
+					if($_ips_net=="$namexold") $_ips_net="$namex";
+					if($_ips_net=="$nameonet") $_ips_net="$namenet";
+					if($_ips_net=="$nameob") $_ips_net="$nameb";
+					mybox_db_query("update misc set val='$_ips_net' where name='ips_net'",$db_id);
+				}
+			}
+			if($_ips_http_server!='') {
+				if($_ips_http_server=="$namexold") $_ips_http_server="$namex";
+				if($_ips_http_server=="$nameonet") $_ips_http_server="$namenet";
+				if($_ips_http_server=="$nameob") $_ips_http_server="$nameb";
+				mybox_db_query("update misc set val='$_ips_http_server' where name='ips_http_server'",$db_id);
+			}
+			if($_ips_smtp_server!='') {
+				if($_ips_smtp_server=="$namexold") $_ips_smtp_server="$namex";
+				if($_ips_smtp_server=="$nameonet") $_ips_smtp_server="$namenet";
+				if($_ips_smtp_server=="$nameob") $_ips_smtp_server="$nameb";
+				mybox_db_query("update misc set val='$_ips_smtp_server' where name='ips_smtp_server'",$db_id);
+			}
+			if($_ips_dns_server!='') {
+				if($_ips_dns_server=="$namexold") $_ips_dns_server="$namex";
+				if($_ips_dns_server=="$nameonet") $_ips_dns_server="$namenet";
+				if($_ips_dns_server=="$nameob") $_ips_dns_server="$nameb";
+				mybox_db_query("update misc set val='$_ips_dns_server' where name='ips_dns_server'",$db_id);
+			}
+			if($_ips_sql_server!='') {
+				if($_ips_sql_server=="$namexold") $_ips_sql_server="$namex";
+				if($_ips_sql_server=="$nameonet") $_ips_sql_server="$namenet";
+				if($_ips_sql_server=="$nameob") $_ips_sql_server="$nameb";
+				mybox_db_query("update misc set val='$_ips_sql_server' where name='ips_sql_server'",$db_id);
+			}
+		}
+		unset($result,$_ips_net,$_ips_http_server,$_ips_smtp_server,$_ips_dns_server,$_ips_sql_server);
+
+		$result=mybox_db_query("select id,src,dst from ips_exclude",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_id=$row['id'];
+				$_src=trim($row['src']);
+				$_dst=trim($row['dst']);
+				if($_src!='') {
+					if($_src=="$namexold") $_src="$namex";
+					if($_src=="$nameonet") $_src="$namenet";
+					if($_src=="$nameob") $_src="$nameb";
+					mybox_db_query("update ips_exclude set src='$_src' where id='$_id'",$db_id);
+				}
+				if($_dst!='') {
+					if($_dst=="$namexold") $_dst="$namex";
+					if($_dst=="$nameonet") $_dst="$namenet";
+					if($_dst=="$nameob") $_dst="$nameb";
+					mybox_db_query("update ips_exclude set dst='$_dst' where id='$_id'",$db_id);
+				}
+				unset($_src,$_dst,$_id);
+			}
+		}
+		unset($result);
+
+		// static route
+		$result=mybox_db_query("select id,dev from static_route",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_id=$row['id'];
+				$_dev=trim($row['dev']);
+				if($_dev!='') {
+					if($_dev=="$nameold") $_dev="$name";
+					mybox_db_query("update static_route set dev='$_dev' where id='$_id'",$db_id);
+				}
+				unset($_dev,$_id);
+			}
+		}
+		unset($result);
+
+		// DNS service
+		$_dns_acl='';$_dns_forward='';
+		$result=mybox_db_query("select * from misc where name like \"dns_%\" ",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				if(trim($row['name'])=="dns_acl") $_dns_acl=trim($row['val']);
+				if(trim($row['name'])=="dns_forward") $_dns_forward=trim($row['val']);
+			}
+			if($_dns_acl!='') {
+				$_dns_acl_a=preg_split("/,/",$_dns_acl);
+				$_p='';
+				if(count($_dns_acl_a)!=0) {
+					foreach($_dns_acl_a as $lx) {
+						if($lx=="$nameonet") {
+							$_p .="$namenet,";
+						} else {
+							$_p .="$lx,";
+						}
+					}
+					$_dns_acl=trim($_p,",");
+					mybox_db_query("update misc set val='$_dns_acl' where name='dns_acl'",$db_id);
+					unset($_p,$_dns_acl_a,$_dns_acl);
+				} else {
+					if($_dns_acl=="$nameonet") $_dns_acl="$namenet";
+					mybox_db_query("update misc set val='$_dns_acl' where name='dns_acl'",$db_id);
+				}
+			}
+			if($_dns_forward!='') {
+				$_dns_forward_a=preg_split("/,/",$_dns_forward);
+				$_p='';
+				if(count($_dns_forward_a)!=0) {
+					foreach($_dns_forward_a as $lx) {
+						if($lx=="$nameonet") {
+							$_p .="$namenet,";
+						} else {
+							$_p .="$lx,";
+						}
+					}
+					$_dns_forward=trim($_p,",");
+					mybox_db_query("update misc set val='$_dns_forward' where name='dns_forward'",$db_id);
+					unset($_p,$_dns_forward_a,$_dns_forward);
+				} else {
+					if($_dns_forward=="$nameonet") $_dns_forward="$namenet";
+					mybox_db_query("update misc set val='$_dns_forward' where name='dns_forward'",$db_id);
+				}
+			}
+		}
+		unset($result);
+		
+		// DHCP server
+		$result=mybox_db_query("select id,dev from dhcp_servers",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_id=$row['id'];
+				$_dev=trim($row['dev']);
+				if($_dev!='') {
+					if($_dev=="$nameold") $_dev="$name";
+					mybox_db_query("update dhcp_servers set dev='$_dev' where id='$_id'",$db_id);
+				}
+				unset($_dev,$_id);
+			}
+		}
+		unset($result);
+		// DHCP relay
+		$_dhcp_relay_server='';
+		$result=mybox_db_query("select val from misc where name='dhcp_relay_server'",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			$_dhcp_relay_server=mybox_db_fetch_single($result);
+			if($_dhcp_relay_server!='') {
+				if($_dhcp_relay_server=="$nameold") {
+					mybox_db_query("update misc set val='$_name' where name='dhcp_relay_server'",$db_id);
+				}
+			}
+		}
+		unset($result);
+		$_dhcp_relay_dev='';
+		$result=mybox_db_query("select val from misc where name='dhcp_relay_dev'",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			$_dhcp_relay_dev=mybox_db_fetch_single($result);
+			if($_dhcp_relay_dev!='') {
+				$_dhcp_relay_dev_a=preg_split("/,/",$_dhcp_relay_dev);
+				$_p='';
+				if(count($_dhcp_relay_dev_a)!=0) {
+					foreach($_dhcp_relay_dev_a as $lx) {
+						if($lx=="$nameoold") {
+							$_p .="$name,";
+						} else {
+							$_p .="$lx,";
+						}
+					}
+					$_dhcp_relay_dev=trim($_p,",");
+					mybox_db_query("update misc set val='$_dhcp_relay_dev' where name='dhcp_relay_dev'",$db_id);
+					unset($_p,$_dhcp_relay_dev_a,$_dhcp_relay_dev);
+				} else {
+					if($_dhcp_relay_dev=="$nameold") $_dhcp_relay_dev="$name";
+					mybox_db_query("update misc set val='$_dhcp_relay_dev' where name='dhcp_relay_dev'",$db_id);
+				}
+			}
+		}
+		unset($result);
+		// server load balancing
+		$result=mybox_db_query("select id,server from server_balancing",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_id=$row['id'];
+				$_server=trim($row['server']);
+				if($_server!='') {
+					if($_server=="$namexold") $_server="$namex";
+					if($_server=="$nameonet") $_server="$namenet";
+					if($_server=="$nameob") $_server="$nameb";
+					mybox_db_query("update server_balancing set server='$_server' where id='$_id'",$db_id);
+				}
+				unset($_server,$_id);
+			}
+		}
+		unset($result);
+		// QOS
+		$result=mybox_db_query("select id,dev from htb_class",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_id=$row['id'];
+				$_dev=trim($row['dev']);
+				if($_dev!='') {
+					if($_dev=="$nameold") $_dev="$name";
+					mybox_db_query("update htb_class set dev='$_dev' where id='$_id'",$db_id);
+				}
+				unset($_dev,$_id);
+			}
+		}
+		unset($result);
+		$result=mybox_db_query("select id,dev,src,dst from htb_client",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_id=$row['id'];
+				$_dev=trim($row['dev']);
+				$_src=trim($row['src']);
+				$_dst=trim($row['dst']);
+				if($_dev!='') {
+					if($_dev=="$nameold") $_dev="$name";
+					mybox_db_query("update htb_client set dev='$_dev' where id='$_id'",$db_id);
+				}
+				if($_src!='') {
+					if($_src=="$namexold") $_src="$namex";
+					if($_src=="$nameonet") $_src="$namenet";
+					if($_src=="$nameob") $_src="$nameb";
+					mybox_db_query("update htb_client set src='$_src' where id='$_id'",$db_id);
+				}
+				if($_dst!='') {
+					if($_dst=="$namexold") $_dst="$namex";
+					if($_dst=="$nameonet") $_dst="$namenet";
+					if($_dst=="$nameob") $_dst="$nameb";
+					mybox_db_query("update htb_client set dst='$_dst' where id='$_id'",$db_id);
+				}
+				unset($_dev,$_src,$_dst,$_id);
+			}
+		}
+		unset($result);
+		// captive portal
+		$_captive_portal_network='';
+		$result=mybox_db_query("select val from misc where name='captive_portal_network'",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			$_captive_portal_network=mybox_db_fetch_single($result);
+			if($_captive_portal_network!='') {
+				$_captive_portal_network_a=preg_split("/,/",$_captive_portal_network);
+				$_p='';
+				if(count($_captive_portal_network_a)!=0) {
+					foreach($_captive_portal_network_a as $lx) {
+						if($lx=="$nameonet") {
+							$_p .="$namenet,";
+						} else {
+							$_p .="$lx,";
+						}
+					}
+					$_captive_portal_network=trim($_p,",");
+					mybox_db_query("update misc set val='$_captive_portal_network' where name='captive_portal_network'",$db_id);
+					unset($_p,$_captive_portal_network_a,$_captive_portal_network);
+				} else {
+					if($_captive_portal_network=="$nameold") $_captive_portal_network="$name";
+					mybox_db_query("update misc set val='$_captive_portal_network' where name='captive_portal_network'",$db_id);
+				}
+			}
+		}
+		unset($result);
+		// NTP
+		$_ntp_acl='';
+		$result=mybox_db_query("select val from misc where name='ntp_acl' ",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			$_ntp_acl=mybox_db_fetch_single($result);
+			if($_ntp_acl!='') {
+				$_ntp_acl_a=preg_split("/,/",$_ntp_acl);
+				$_p='';
+				if(count($_ntp_acl_a)!=0) {
+					foreach($_ntp_acl_a as $lx) {
+						if($lx=="$nameonet") {
+							$_p .="$namenet,";
+						} else {
+							$_p .="$lx,";
+						}
+					}
+					$_ntp_acl=trim($_p,",");
+					mybox_db_query("update misc set val='$_ntp_acl' where name='ntp_acl'",$db_id);
+					unset($_p,$_ntp_acl_a,$_ntp_acl);
+				} else {
+					if($_ntp_acl=="$nameonet") $_ntp_acl="$namenet";
+					mybox_db_query("update misc set val='$_ntp_acl' where name='ntp_acl'",$db_id);
+				}
+			}
+		}
+		unset($result,$_ntp_acl);
+	}
+	if($opt==2) {
+		// inbound
+		$table="pf_inbound";
+		mybox_db_query("delete from $table where src='$namex'",$db_id);
+		mybox_db_query("delete from $table where dst='$namex'",$db_id);
+		mybox_db_query("delete from $table where src='$namenet'",$db_id);
+		mybox_db_query("delete from $table where dst='$namenet'",$db_id);
+		mybox_db_query("delete from $table where src='$nameb'",$db_id);
+		mybox_db_query("delete from $table where dst='$nameb'",$db_id);
+		unset($table);
+
+		// outbound
+		$table="pf_outbound";
+		mybox_db_query("delete from $table where src='$namex'",$db_id);
+		mybox_db_query("delete from $table where dst='$namex'",$db_id);
+		mybox_db_query("delete from $table where src='$namenet'",$db_id);
+		mybox_db_query("delete from $table where dst='$namenet'",$db_id);
+		mybox_db_query("delete from $table where src='$nameb'",$db_id);
+		mybox_db_query("delete from $table where dst='$nameb'",$db_id);
+		unset($table);
+
+		// dnat
+		$table="pf_dnat";
+		mybox_db_query("delete from $table where src='$namex'",$db_id);
+		mybox_db_query("delete from $table where dst='$namex'",$db_id);
+		mybox_db_query("delete from $table where fwd='$namex'",$db_id);
+		mybox_db_query("delete from $table where src='$namenet'",$db_id);
+		mybox_db_query("delete from $table where dst='$namenet'",$db_id);
+		mybox_db_query("delete from $table where src='$nameb'",$db_id);
+		mybox_db_query("delete from $table where dst='$nameb'",$db_id);
+		unset($table);
+
+		// snat
+		$table="pf_snat";
+		mybox_db_query("delete from $table where src='$namex'",$db_id);
+		mybox_db_query("delete from $table where dst='$namex'",$db_id);
+		mybox_db_query("delete from $table where fwd='$namex'",$db_id);
+		mybox_db_query("delete from $table where src='$namenet'",$db_id);
+		mybox_db_query("delete from $table where dst='$namenet'",$db_id);
+		mybox_db_query("delete from $table where src='$nameb'",$db_id);
+		mybox_db_query("delete from $table where dst='$nameb'",$db_id);
+		unset($table);
+
+		// netmap
+		$table="pf_map";
+		mybox_db_query("delete from $table where src='$namex'",$db_id);
+		mybox_db_query("delete from $table where dst='$namex'",$db_id);
+		mybox_db_query("delete from $table where fwd='$namex'",$db_id);
+		mybox_db_query("delete from $table where src='$namenet'",$db_id);
+		mybox_db_query("delete from $table where dst='$namenet'",$db_id);
+		mybox_db_query("delete from $table where src='$nameb'",$db_id);
+		mybox_db_query("delete from $table where dst='$nameb'",$db_id);
+
+		// ips
+		$_ips_net='';$_ips_http_server='';$_ips_smtp_server='';
+		$_ips_dns_server='';$_ips_sql_server='';
+		$result=mybox_db_query("select * from misc where name like \"ips_%\" ",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				if(trim($row['name'])=="ips_net") $_ips_net=trim($row['val']);
+				if(trim($row['name'])=="ips_http_server") $_ips_http_server=trim($row['val']);
+				if(trim($row['name'])=="ips_smtp_server") $_ips_smtp_server=trim($row['val']);
+				if(trim($row['name'])=="ips_dns_server") $_ips_dns_server=trim($row['val']);
+				if(trim($row['name'])=="ips_sql_server") $_ips_sql_server=trim($row['val']);
+			}
+			if($_ips_net!='') {
+				$_ips_net_a=preg_split("/,/",$_ips_net);
+				$_p='';
+				if(count($_ips_net_a)!=0) {
+					foreach($_ips_net_a as $lx) {
+						if($lx=="$namex") {
+							continue;
+						} elseif($lx=="$namenet") {
+							continue;
+						} elseif($lx=="$nameb") {
+							continue;
+						} else {
+							$_p .="$lx,";
+						}
+					}
+					$_ips_net=trim($_p,",");
+					mybox_db_query("update misc set val='$_ips_net' where name='ips_net'",$db_id);
+					unset($_p,$_ips_net_a,$_ips_net);
+				} else {
+					if($_ips_net=="$namex") $_ips_net="";
+					if($_ips_net=="$namenet") $_ips_net="";
+					if($_ips_net=="$nameb") $_ips_net="";
+					mybox_db_query("update misc set val='$_ips_net' where name='ips_net'",$db_id);
+				}
+			}
+			if($_ips_http_server!='') {
+				if($_ips_http_server=="$namex") $_ips_http_server="";
+				if($_ips_http_server=="$namenet") $_ips_http_server="";
+				if($_ips_http_server=="$nameb") $_ips_http_server="";
+				mybox_db_query("update misc set val='$_ips_http_server' where name='ips_http_server'",$db_id);
+			}
+			if($_ips_smtp_server!='') {
+				if($_ips_smtp_server=="$namex") $_ips_smtp_server="";
+				if($_ips_smtp_server=="$namenet") $_ips_smtp_server="";
+				if($_ips_smtp_server=="$nameb") $_ips_smtp_server="";
+				mybox_db_query("update misc set val='$_ips_smtp_server' where name='ips_smtp_server'",$db_id);
+			}
+			if($_ips_dns_server!='') {
+				if($_ips_dns_server=="$namex") $_ips_dns_server="";
+				if($_ips_dns_server=="$namenet") $_ips_dns_server="";
+				if($_ips_dns_server=="$nameb") $_ips_dns_server="";
+				mybox_db_query("update misc set val='$_ips_dns_server' where name='ips_dns_server'",$db_id);
+			}
+			if($_ips_sql_server!='') {
+				if($_ips_sql_server=="$namex") $_ips_sql_server="";
+				if($_ips_sql_server=="$namenet") $_ips_sql_server="";
+				if($_ips_sql_server=="$nameb") $_ips_sql_server="";
+				mybox_db_query("update misc set val='$_ips_sql_server' where name='ips_sql_server'",$db_id);
+			}
+		}
+		unset($result,$_ips_net,$_ips_http_server,$_ips_smtp_server,$_ips_dns_server,$_ips_sql_server);
+
+		$result=mybox_db_query("select id,src,dst from ips_exclude",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_id=$row['id'];
+				$_src=trim($row['src']);
+				$_dst=trim($row['dst']);
+				if($_src!='') {
+					if($_src=="$namex" || $_src=="$namenet" || $_src=="$nameb") {
+						mybox_db_query("delete from ips_exclude where id='$_id'",$db_id);
+					}
+				}
+				if($_dst!='') {
+					if($_dst=="$namex" || $_dst=="$namenet" || $_dst=="$nameb") {
+						mybox_db_query("delete from ips_exclude where id='$_id'",$db_id);
+					}
+				}
+				unset($_src,$_dst,$_id);
+			}
+		}
+		unset($result);
+		// static route
+		$result=mybox_db_query("select id,dev from static_route",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_id=$row['id'];
+				$_dev=trim($row['dev']);
+				if($_dev!='') {
+					if($_dev=="$name") {
+						mybox_db_query("delete from static_route where id='$_id'",$db_id);
+					}
+				}
+				unset($_dev,$_id);
+			}
+		}
+		unset($result);
+
+		// DNS service
+		$_dns_acl='';$_dns_forward='';
+		$result=mybox_db_query("select * from misc where name like \"dns_%\" ",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				if(trim($row['name'])=="dns_acl") $_dns_acl=trim($row['val']);
+				if(trim($row['name'])=="dns_forward") $_dns_forward=trim($row['val']);
+			}
+			if($_dns_acl!='') {
+				$_dns_acl_a=preg_split("/,/",$_dns_acl);
+				$_p='';
+				if(count($_dns_acl_a)!=0) {
+					foreach($_dns_acl_a as $lx) {
+						if($lx=="$namenet") continue;
+						$_p .="$lx,";
+					}
+					$_dns_acl=trim($_p,",");
+					mybox_db_query("update misc set val='$_dns_acl' where name='dns_acl'",$db_id);
+					unset($_p,$_dns_acl_a,$_dns_acl);
+				} else {
+					if($_dns_acl=="$namenet") $_dns_acl="";
+					mybox_db_query("update misc set val='$_dns_acl' where name='dns_acl'",$db_id);
+				}
+			}
+			if($_dns_forward!='') {
+				$_dns_forward_a=preg_split("/,/",$_dns_forward);
+				$_p='';
+				if(count($_dns_forward_a)!=0) {
+					foreach($_dns_forward_a as $lx) {
+						if($lx=="$namenet") continue;
+						$_p .="$lx,";
+					}
+					$_dns_forward=trim($_p,",");
+					mybox_db_query("update misc set val='$_dns_forward' where name='dns_forward'",$db_id);
+					unset($_p,$_dns_forward_a,$_dns_forward);
+				} else {
+					if($_dns_forward=="$namenet") $_dns_forward="";
+					mybox_db_query("update misc set val='$_dns_forward' where name='dns_forward'",$db_id);
+				}
+			}
+		}
+		unset($result);
+
+		// DHCP server
+		$result=mybox_db_query("select id,dev from dhcp_servers",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_id=$row['id'];
+				$_dev=trim($row['dev']);
+				if($_dev!='') {
+					if($_dev=="$name") {
+						mybox_db_query("delete from dhcp_servers where id='$_id'",$db_id);
+					}
+				}
+				unset($_dev,$_id);
+			}
+		}
+		unset($result);
+		// DHCP relay
+		$_dhcp_relay_server='';
+		$result=mybox_db_query("select val from misc where name='dhcp_relay_server'",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			$_dhcp_relay_server=mybox_db_fetch_single($result);
+			if($_dhcp_relay_server!='') {
+				if($_dhcp_relay_server=="$name") {
+					mybox_db_query("update misc set val='' where name='dhcp_relay_server'",$db_id);
+				}
+			}
+		}
+		unset($result);
+		$_dhcp_relay_dev='';
+		$result=mybox_db_query("select val from misc where name='dhcp_relay_dev'",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			$_dhcp_relay_dev=mybox_db_fetch_single($result);
+			if($_dhcp_relay_dev!='') {
+				$_dhcp_relay_dev_a=preg_split("/,/",$_dhcp_relay_dev);
+				$_p='';
+				if(count($_dhcp_relay_dev_a)!=0) {
+					foreach($_dhcp_relay_dev_a as $lx) {
+						if($lx=="$name") continue;
+						$_p .="$lx,";
+					}
+					$_dhcp_relay_dev=trim($_p,",");
+					mybox_db_query("update misc set val='$_dhcp_relay_dev' where name='dhcp_relay_dev'",$db_id);
+					unset($_p,$_dhcp_relay_dev_a,$_dhcp_relay_dev);
+				} else {
+					if($_dhcp_relay_dev=="$name") $_dhcp_relay_dev="";
+					mybox_db_query("update misc set val='$_dhcp_relay_dev' where name='dhcp_relay_dev'",$db_id);
+				}
+			}
+		}
+		unset($result);
+		// server load balancing
+		$result=mybox_db_query("select id,server from server_balancing",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_id=$row['id'];
+				$_server=trim($row['server']);
+				if($_server!='') {
+					if($_server=="$namex" || $_server=="$namenet" || $_server=="$nameb") {
+						mybox_db_query("delete from server_balancing where id='$_id'",$db_id);
+					}
+				}
+				unset($_server,$_id);
+			}
+		}
+		unset($result);
+		// QOS
+		$result=mybox_db_query("select id,dev from htb_class",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_id=$row['id'];
+				$_dev=trim($row['dev']);
+				if($_dev==$_name) {
+					mybox_db_query("delete from htb_class where id='$_id'",$db_id);
+				}
+				unset($_dev,$_id);
+			}
+		}
+		unset($result);
+		$result=mybox_db_query("select id,dev,src,dst from htb_client",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_id=$row['id'];
+				$_dev=trim($row['dev']);
+				$_src=trim($row['src']);
+				$_dst=trim($row['dst']);
+				if($_dev==$_name 
+					|| $_src=="$namex"
+					|| $_src=="$namenet"
+					|| $_src=="$nameb"
+					|| $_dst=="$namex"
+					|| $_dst=="$namenet"
+					|| $_dst=="$nameb"
+				) {
+					mybox_db_query("delete from htb_client where id='$_id'",$db_id);
+				}
+				unset($_dev,$_id);
+			}
+		}
+		unset($result);
+		// captive portal
+		$_captive_portal_network='';
+		$result=mybox_db_query("select val from misc where name='captive_portal_network'",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			$_captive_portal_network=mybox_db_fetch_single($result);
+			if($_captive_portal_network!='') {
+				$_captive_portal_network_a=preg_split("/,/",$_captive_portal_network);
+				$_p='';
+				if(count($_captive_portal_network_a)!=0) {
+					foreach($_captive_portal_network_a as $lx) {
+						if($lx=="$namenet") continue;
+						$_p .="$lx,";
+					}
+					$_captive_portal_network=trim($_p,",");
+					mybox_db_query("update misc set val='$_captive_portal_network' where name='captive_portal_network'",$db_id);
+					unset($_p,$_captive_portal_network_a,$_captive_portal_network);
+				} else {
+					if($_captive_portal_network=="$namenet") $_captive_portal_network="";
+					mybox_db_query("update misc set val='$_captive_portal_network' where name='captive_portal_network'",$db_id);
+				}
+			}
+		}
+		unset($result);
+		// NTP
+		$_ntp_acl='';
+		$result=mybox_db_query("select val from misc where name='ntp_acl'",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			$_ntp_acl=mybox_db_fetch_single($result);
+			if($_ntp_acl!='') {
+				$_ntp_acl_a=preg_split("/,/",$_ntp_acl);
+				$_p='';
+				if(count($_ntp_acl_a)!=0) {
+					foreach($_ntp_acl_a as $lx) {
+						if($lx=="$namenet") {
+							continue;
+						} else {
+							$_p .="$lx,";
+						}
+					}
+					$_ntp_acl=trim($_p,",");
+					mybox_db_query("update misc set val='$_ntp_acl' where name='ntp_acl'",$db_id);
+					unset($_p,$_ntp_acl_a,$_ntp_acl);
+				} else {
+					if($_ntp_acl=="$namenet") $_ntp_acl="";
+					mybox_db_query("update misc set val='$_ntp_acl' where name='ntp_acl'",$db_id);
+				}
+			}
+		}
+		unset($result,$_ntp_acl);
+	}
+}
+
+if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+	if(isset($do_id)&&$do_id=='apply_chg') {
+		mybox_echo_query("network-restart");
+		$msg="<script>waitcount();</script>";
+	}
+	if($tab==1) {
+		if(isset($do_save)&&$do_save==1) {
+			if($col==1) {
+				if(isset($do_id)&&$do_id!='') {
+					if($do_id=='del') {
+						del_name($idx,"ipaddr",$db_id);
+						mybox_db_flush($db_id);
+						$oid=array();
+						$result=mybox_db_query("select id from ipaddr",$db_id);
+						if(mybox_db_num_rows($result)!=0) {
+							while($row=mybox_db_fetch_assoc($result)) {
+								$oid[]=$row['id'];
+							}
+						}
+						if(count($oid)!=0) {
+							$y=1;
+							foreach($oid as $x) {
+								mybox_db_query("update ipaddr set id='$y' where id='$x'",$db_id);
+								$y++;
+							}
+							unset($y,$x,$oid,$result);
+							mybox_db_flush($db_id);
+						}
+						clean_file_cache();
+					}
+					if($do_id=='onboot' && $onboot!='' && $idx!='') {
+						if($onboot==0) {$onboot=1;}else{$onboot=0;}
+						mybox_db_query("update ipaddr set onboot='$onboot' where id='$idx'",$db_id);
+					}
+				}
+			}
+			if($col==2) {
+				if($do_id!='edit') {
+					if(!isset($gateway)||$gateway=='') $gateway='';
+					if(!isset($vlanid)||$vlanid=='') $vlanid='';
+					$note=mybox_escape_str($note);
+					$name=mybox_escape_str($name);
+					$gateway=trim($gateway);
+					$ip=trim($ip);
+					$mtu=trim($mtu);
+					$vlanid=trim($vlanid);
+					mybox_db_query("insert into ipaddr (name,dev,ip,prefix,isdefault,gateway,proxyarp,vid,mtu,type,onboot,note) values('$name','$dev','$ip','$mask','$isdefault','$gateway','$proxyarp','$vlanid','$mtu','$type','$onboot','$note')",$db_id);
+					if($isdefault==1) {
+						mybox_db_query("update ipaddr set id='0' where isdefault='1',uplink='1',upprio='1'",$db_id);
+					}
+					$msg="Configuration saved";$tab=1;$col=1;
+					clean_file_cache();
+				}
+				if($do_id=='edit' && $id!='') {
+					if($dev!='' && $devold!='' && $dev!=$devold) {
+						// change device
+						mybox_db_query("update ipaddr set dev='$devold' where dev='$dev'",$db_id);
+						mybox_db_query("update ipaddr set dev='$dev' where id='$id'",$db_id);
+						// vip
+						$_dv=array();
+						$result=mybox_db_query("select id from vip where dev='$dev'",$db_id);
+						while($row=mybox_db_fetch_assoc($result)) {
+							$_dv[]=$row['id'];
+						}
+						unset($result);
+						mybox_db_query("update ipalias set dev='$dev' where dev='$devold'",$db_id);
+						if(count($_dv)!=0) {
+							foreach($_dv as $dv) {
+								mybox_db_query("update ipalias set dev='$devold' where id='$dv'",$db_id);
+							}
+						}
+						unset($result,$_dv,$dv);
+						// vlan
+						$_dv=array();
+						$result=mybox_db_query("select id from vlan where dev='$dev'",$db_id);
+						while($row=mybox_db_fetch_assoc($result)) {
+							$_dv[]=$row['id'];
+						}
+						unset($result);
+						mybox_db_query("update vlan set dev='$dev' where dev='$devold'",$db_id);
+						if(count($_dv)!=0) {
+							foreach($_dv as $dv) {
+								mybox_db_query("update vlan set dev='$devold' where id='$dv'",$db_id);
+							}
+						}
+						unset($result,$_dv,$dv);
+						$_dv=array();
+						$result=mybox_db_query("select id from htb_class where dev='$dev'",$db_id);
+						while($row=mybox_db_fetch_assoc($result)) {
+							$_dv[]=$row['id'];
+						}
+						unset($result);
+						mybox_db_query("update htb_class set dev='$dev' where dev='$devold'",$db_id);
+						if(count($_dv)!=0) {
+							foreach($_dv as $dv) {
+								mybox_db_query("update htb_class set dev='$devold' where id='$dv'",$db_id);
+							}
+						}
+						unset($result,$_dv,$dv);
+					}
+					$name=mybox_escape_str($name);
+					if($isdefault==0) {
+						$gateway='';
+					}
+					if(!isset($gateway)||$gateway=='') $gateway='';
+					if(!isset($vlanid)||$vlanid=='') $vlanid='';
+					$note=mybox_escape_str($note);
+					$name=mybox_escape_str($name);
+					$gateway=trim($gateway);
+					$ip=trim($ip);
+					$mtu=trim($mtu);
+					$vlanid=trim($vlanid);
+					$note=mybox_escape_str($note);
+					mybox_db_query("update ipaddr set name='$name',dev='$dev',ip='$ip',prefix='$mask',isdefault='$isdefault',gateway='$gateway',proxyarp='$proxyarp',vid='$vlanid',mtu='$mtu',type='$type',onboot='$onboot',note='$note' where id='$id'",$db_id);
+					if($name!=$nameold) {
+						update_name($name,$nameold,"1",$db_id);
+						clean_file_cache();
+					}
+					$msg="Configuration saved";$tab=1;$col=1;$do_id='';
+				}
+			}
+		}
+	} // tab==1
+
+	if($tab==2 || $tab==3) {
+		$table="ipalias";
+		if($tab==3) $table="vlan";
+		if(isset($do_save)&&$do_save==1) {
+			if(count($id)!=0) {
+				foreach($id as $_pid => $_rest) {
+					$_name=trim($name[$_pid]);
+					$_nameold=$nameold[$_pid];
+					$_ip=trim($ip[$_pid]);
+					$_prefix=$prefix[$_pid];
+					$_onboot=$onboot[$_pid];
+					$_note=mybox_escape_str($note[$_pid]);
+					if($_ip=='') continue;
+					if($_onboot!='') $_onboot='1';
+					if($_onboot=='') $_onboot='0';
+					if(preg_match("/^\d+/",$_pid)) {
+						mybox_db_query("update $table set name='$_name',ip='$_ip',prefix='$_prefix',onboot='$_onboot',note='$_note' where id='$_pid' and dev='$dev'",$db_id);
+						if($_name!=$_nameold) {
+							update_name($_name,$_nameold,"1",$db_id);
+						}
+					} else {
+						mybox_db_query("insert into $table (name,dev,ip,prefix,onboot,note) values ('$_name','$dev','$_ip','$_prefix','$_onboot','$_note')",$db_id);
+					}
+				}
+				clean_file_cache();
+			}
+		}
+		if(isset($do_save)&&$do_save==2) {
+			if(count($del)!=0) {
+				foreach($del as $id) {
+					if($id!='') del_name($id,$table,$db_id);
+				}
+				mybox_db_flush($db_id);
+				clean_file_cache();
+			}
+		}
+		if(isset($do_id)&&$do_id==del) {
+			if($id!='') {
+				del_name($id,$table,$db_id);
+				mybox_db_flush($db_id);
+				clean_file_cache();
+			}
+		}
+	} // tab==2|3
+	if($tab==4) {
+		if($col==1) {
+			if(isset($do_save)&&$do_save==1) {
+				mybox_db_query("update misc set val='$ustat' where name='uplink_stat'",$db_id);
+				mybox_db_query("update misc set val='$umode' where name='uplink_mode'",$db_id);
+				mybox_db_query("update misc set val='$uchkip' where name='uplink_lst'",$db_id);
+				mybox_db_query("update misc set val='$uchkint' where name='uplink_int'",$db_id);
+				$msg="Configuration saved";
+			}
+		}
+		if($col==2) {
+			if(isset($do_save)&&$do_save==1) {
+				if(count($id)!=0) {
+					foreach($id as $_pid => $_rest) {
+						$_pid=trim($_pid);
+						if($_pid=='') continue;
+						$_gateway=trim($gateway[$_pid]);
+						$_priority=$priority[$_pid];
+						$_uplink=$uplink[$_pid];
+						if($_uplink=='') $_uplink=0;
+						if($_uplink!='') $_uplink=1;
+						mybox_db_query("update ipaddr set gateway='$_gateway',upprio='$_priority',uplink='$_uplink' where id='$_pid'",$db_id);
+					}
+					$msg="Configuration saved";
+				}
+			}
+		}
+	} // tab==4
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='') || (isset($chgdev)&&$chgdev!='')) {
+		$msg="Permission denied";
+	}
+}
+
+if(file_exists("/var/sys/network_error")) {
+	$msg=mybox_fget_contents("/var/sys/network_error");
+}
+$_int=mybox_if_dev_up_array();
+clearstatcache();
+if(!isset($tab)||$tab=='') $tab=1;
+if(!isset($col)||$col=='') $col=1;
+
+$data_nmask=array();
+if(count($_CLASSIP)!=0) {
+	foreach($_CLASSIP as $_pprefix => $_mmask) {
+		$data_nmask["/$_pprefix ($_mmask)"]="$_pprefix";
+	}
+}
+?>
+<html>
+<head>
+<title>MyAdmin</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<script type='text/javascript' src="/j/mybox_func.js"></script>
+<script type='text/javascript' src="/j/mybox_overlib.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?php echo $_LOGIN['auth_id'];?>";
+	page_load();
+</script>
+<script type='text/javascript'>
+function do_changes() {
+	<?php if($tab==2 || $tab==3){?>
+	if(!chkvalidip()) { return false; }
+	if(!chkvalidname()) { return false; }
+	<?php }?>
+	self.location.href='<?php echo "/network_int.exh?tab=$tab&do_id=apply_chg";?>';	
+}
+function waitcount() {
+	page_reload('600','<?php echo "/network_int.exh?tab=$tab&col=$col&col2=$col2";?>');
+};
+</script>
+</head>
+<body onload="load_menu('sub4','t4d1','s4i1');" scroll="auto">
+<form name=f method=post action="/network_int.exh">
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 0px;'>
+<tr>
+<td>
+<?php mybox_page_section("Network / Interfaces");?>
+<br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="/network_int.exh?tab=1" <?php if($tab==1){?>class="tabact"<?php }?>>Interfaces</a></li>
+<li><a href="/network_int.exh?tab=2" <?php if($tab==2){?>class="tabact"<?php }?>>Virtual IP</a></li>
+<li><a href="/network_int.exh?tab=3" <?php if($tab==3){?>class="tabact"<?php }?>>Virtual LAN</a></li>
+<li><a href="/network_int.exh?tab=4" <?php if($tab==4){?>class="tabact"<?php }?>>ISP Redundancy</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td> 
+<?php mybox_page_msg($msg);?>
+<br>
+
+<!-- tab container -->
+<?php if($tab==1) {?>
+
+<table width="100%" border="0" cellpadding="0" cellspacing="0">
+<tr><td>
+<ul id="tabnav">
+<li class="<?php if($col==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=1) { echo "<a href=\"/network_int.exh?tab=$tab&col=1\">"; }?>Address<?php if($col!=1) { echo "</a>"; }?></li>
+<li class="<?php if($col==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=2) { echo "<a href=\"/network_int.exh?tab=$tab&col=2\">"; }?><?php if($do_id=='edit') { echo "Edit Interface"; } else { echo "New Interface"; }?><?php if($col!=2) { echo "</a>"; }?></li>
+</ul>
+</td></tr>
+<tr> 
+<td class="tabcont">
+<?php if($col==1) {
+$result=mybox_db_query("select * from ipaddr",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	echo "
+		<table class='data' width='100%'>
+		<thead class='blue'> 
+		<tr>
+		<td style='font-weight: bold; width: 1%;border-right: 0px;'>#</td> 
+		<td style='font-weight: bold;border-right: 0px;border-left: 0px;'>Name</td>
+		<td style='font-weight: bold; width: 4%;border-right: 0px;border-left: 0px;'>Hardware</td>
+		<td style='font-weight: bold;border-right: 0px;border-left: 0px;'>Address</td>
+		<td style='font-weight: bold;border-right: 0px;border-left: 0px;'>Setting</td>
+		<td style='font-weight: bold; width: 2%; border-right: 0px;border-left: 0px;'>Active</td>
+		<td style='font-weight: bold; width: 5%; border-left: 0px;'>&nbsp;</td>
+		</tr></thead>
+		<tbody>
+	";
+	$_cnt=1;
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_id=$row['id'];
+		$_name=mybox_unescape_str($row['name']);
+		$_dev=$row['dev'];
+		$_ip=$row['ip'];
+		$_prefix=$row['prefix'];
+		$_mtu=$row['mtu'];
+		$_type=$row['type'];
+		$_isdefault=$row['isdefault'];
+		$_gateway=$row['gateway'];
+		$_proxyarp=$row['proxyarp'];
+		$_vid=$row['vid'];
+		$_onboot=$row['onboot'];
+		$_note=mybox_unescape_str($row['note']);
+		if($_note!='') {
+			$_note=mybox_print_note($_note);
+		}		
+		$_stat='';
+		$_oper=0;
+		//if($_int[$_dev]==1) {
+		//	$_oper=1;
+		//}
+		$_info='';
+		if(mybox_nic_chklink(&$_info,$_dev)==1) $_oper=1;
+		if($_info!='') $_info="onmouseover=\"return overlib('$_info',LEFT,FULLHTML);\" onmouseout=\"return nd();\"";
+		$lo="onclick=\"self.location.href='/network_int.exh?tab=1&col=2&id=$_id&do_id=edit';\" ";
+		$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff;'";
+		echo "
+		<tr $lt>
+		<td $lo style='vertical-align: top;'>$_cnt</td> 
+		<td $lo style='vertical-align: top;'>$_name</td>
+		<td $lo style='vertical-align: top;''>$_dev</td>
+		<td $lo style='vertical-align: top;'>$_ip/$_prefix</td>
+		<td $lo style='vertical-align: top;'>{$_TTYPE[$_type]}";
+		if($_type==2 && $_vid!='') echo " (VLAN $_vid)";
+		if($_mtu!='') echo "<br>- MTU $_mtu";
+		if($_proxyarp==1) echo "<br>- PROXYARP";
+		if($_isdefault==1 && $_gateway!='') echo "<br>- DEFAULT GW $_gateway";
+		echo "
+		$_note
+		</td>
+		<td style='text-align: center;vertical-align: middle;'><a href='#' onclick=\"self.location.href='/network_int.exh?tab=1&col=1&do_save=1&do_id=onboot&onboot=$_onboot&idx=$_id';return false;\"><img src='{$_PNG_YESNO[$_onboot]}' border=0 alt='' title=''></a></td>
+		<td style='text-align: right;vertical-align: middle; table-layout: fixed; white-space: nowrap;'>
+		<a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='/network_int.exh?tab=1&col=1&do_save=1&do_id=del&idx=$_id';return false;\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a>
+		<span style='' $_info><img src='{$_PNG_NIC[$_oper]}' border=0 alt='' title=''></span>
+		</td>
+		</tr>
+		";
+		$_cnt++;
+	}
+} else {
+	echo "
+	<br>
+	<span class='notedef'>
+	There are no interface defined.
+	</span>
+	<br><br>
+	";
+}
+}//col==1?>
+<?php if($col==2){
+	$_have_default=0;
+	$result=mybox_db_query("select isdefault from ipaddr where isdefault='1'",$db_id);
+	if(mybox_db_num_rows($result)!=0) $_have_default=1;
+	unset($result);
+	$_dd=mybox_list_devname($db_id);
+	$_jsdv='';$_chdv=array();$_jsname='';$_jsip='';
+	$result=mybox_db_query("select dev,name,ip from ipaddr",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$ddv=$row['dev'];
+			$name=mybox_unescape_str($row['name']);
+			$xip=$row['ip'];
+			$_jsip .="$xip ";
+			$_jsdv .="$ddv ";
+			$_jsname .="$name ";
+			$_chdv[$ddv]=1;
+		}
+	}
+	$_jsdv=trim($_jsdv);
+	$_jsname=trim($_jsname);
+	$_jsip=trim($_jsip);
+	unset($result,$ddv,$name,$xip);
+	$_mtu="1500";$_type=1;
+	if($do_id=='edit') {
+		$result=mybox_db_query("select * from ipaddr where id='$id'",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_id=$row['id'];
+				$_name=mybox_unescape_str($row['name']);
+				$_dev=$row['dev'];
+				$_ip=$row['ip'];
+				$_prefix=$row['prefix'];
+				$_mtu=$row['mtu'];
+				$_type=$row['type'];
+				$_isdefault=$row['isdefault'];
+				$_gateway=$row['gateway'];
+				$_proxyarp=$row['proxyarp'];
+				$_vid=$row['vid'];
+				$_onboot=$row['onboot'];
+				if($_isdefault==1) {
+					$_have_default=0;
+				}
+				$_note=mybox_unescape_str($row['note']);
+			}
+		}
+	}
+?>
+<script type='text/javascript'>
+function chk_vlan(v,id) {
+	if(v==2) {
+		do_show(id);
+		do_hide('ppid');
+	} else {
+		do_hide(id);
+		do_show('ppid');
+	}
+};
+
+function do_submit() {
+	<?php 
+	echo "var jsdv='$_jsdv';";
+	echo "var jsname='$_jsname';";
+	echo "var jsip='$_jsip';";
+	?>
+	var name=Trim(document.f.name.value);
+	var dev=Trim(document.f.dev.value);
+	var ip=Trim(document.f.ip.value);
+	var mtu=Trim(document.f.mtu.value);
+	if(name=='') {
+		pop_msg("Interface name empty");
+		return false;
+	};
+	if(jsname!='') {
+		var pname=jsname.split(" ");
+		if(pname!=null) {
+			for(var x=0;x<pname.length;x++) {
+				if(name.toUpperCase()==pname[x].toUpperCase()) {
+				<?php if($do_id=='edit'){?>
+					var nameold=Trim(document.f.nameold.value);
+					if(name.toUpperCase()!=nameold.toUpperCase()) {
+						pop_msg("Interface name '"+name+"' already exist");
+						return false;
+					}
+				<?php } else {?>
+					pop_msg("Interface name '"+name+"' already exist");
+					return false;
+				<?php }?>
+				}
+			}
+		}
+	};
+	if(jsdv!='') {
+		var pdev=jsdv.split(" ");
+		if(pdev!=null) {
+			for(var x=0;x<pdev.length;x++) {
+				if(dev==pdev[x]) {
+				<?php if($do_id=='edit'){?>
+					var devold=Trim(document.f.devold.value);
+					if(dev!=devold && !confirm("Interface device '"+dev+"' already assign to other interface. Confirming this alert will replace existing setting to other free device.")) {
+						return false;
+					}
+				<?php } else {?>
+					pop_msg("Interface device '"+dev+"' already assign to other interface.");
+					return false;
+				<?php }?>
+				}
+			}
+		}
+	};
+	if(!mip1(ip)) {
+		if(ip=='') {
+			pop_msg("Interface Address empty");
+		} else {
+			pop_msg("Invalid Interface Address '"+ip+"'");
+		}
+		return false;
+	};
+	var pip=jsip.split(" ");
+	if(pip!=null) {
+		for(var x=0;x<pip.length;x++) {
+			if(ip==pip[x]) {
+			<?php if($do_id=='edit'){?>
+				var ipold=Trim(document.f.ipold.value);
+				if(ip!=ipold) {
+					pop_msg("Interface Address '"+ip+"' already exist");
+					return false;
+				}
+			<?php } else {?>
+				pop_msg("Interface Address '"+ip+"' already exist");
+				return false;
+			<?php }?>
+			}
+		}
+	};
+	if(!isnum(mtu)) {
+		pop_msg("Invalid interface MTU size '"+mtu+"'");
+		return false;
+	};
+	if(document.f.gateway) {
+		if(document.f.isdefault.checked) {
+			var gw=Trim(document.f.gateway.value);
+			if(!mip1(gw)) {
+				if(gw=='') {
+					pop_msg("Gateway IP empty");
+				} else {
+					pop_msg("Invalid Gateway IP '"+gw+"'");
+				}
+				return false;
+			}
+		}
+	};
+	if(document.f.vlanid) {
+		if(document.f.type.value==2) {
+			var vlanid=Trim(document.f.vlanid.value);
+			if(!isnum(vlanid)) {
+				pop_msg("Invalid VLAN Tag '"+vlanid+"'");
+				return false;
+			}
+		}
+	};
+	document.f.do_save.value='1';
+	document.f.submit();
+	return true;
+}
+</script>
+<table width="100%" class="data">
+<tr> 
+<td valign="middle" class="tdname">Name</td>
+<td valign="middle" class="tdvalue">
+<input name="name" type="text" class="valbox2" size=30 maxlength=20 value="<?php echo $_name;?>">
+<?php if($do_id=='edit') {?><input name="nameold" type=hidden value="<?php echo $_name;?>"><?php }?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Type</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array();
+foreach($_TTYPE as $u2 => $u1) {
+	$data_a[$u1]=$u2;
+}
+$set_a=array("act"=>"chk_vlan('b', 'vhide')");
+echo mybox_select_box('nisel1',$data_a,$_type,'type',$set_a);
+?>
+</td>
+</tr>
+<tr id='vhide' <?php if($_vid!=''){?>style="display: '';"<?php }else{?>style="display: none;"<?php }?>> 
+<td valign="middle" class="tdname">VLAN Tag</td>
+<td valign="middle" class="tdvalue">
+<input name="vlanid" type="text" class="valbox2" size=30 maxlength=20 value="<?php echo $_vid;?>">
+</td>
+</tr>
+<?php if($_have_default==0) {?>
+<tr> 
+<td valign="middle" class="tdname">Default Gateway</td>
+<td valign="middle" class="tdvalue">
+<script type='text/javascript'>
+function chk_isdefaultgw(val) {
+	if(val==0) {
+		do_hide('ghide');
+	} else {
+		do_show('ghide');
+	}
+}
+</script>
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+$set_a=array("act"=>"chk_isdefaultgw('b')");
+if(!isset($_isdefault)||$_isdefault=='') $_isdefault=0;
+echo mybox_select_box('nisel2',$data_a,$_isdefault,'isdefault',$set_a);
+?>
+</td>
+</tr>
+<tr id='ghide' <?php if($_isdefault==1){?>style="display: '';"<?php }else{?>style="display: none;"<?php }?>> 
+<td valign="middle" class="tdname">Gateway IP</td>
+<td valign="middle" class="tdvalue">
+<input name="gateway" type="text" class="valbox2" value="<?php echo $_gateway;?>">
+</td>
+</tr>
+<?php }// have_default gw?>
+<tr> 
+<td valign="middle" class="tdname">Hardware</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array();
+$_freedv=''; $_devold=''; $tk=0;
+for($x=0;$x<9;$x++) {
+	$dv="eth$x";
+	if($do_id!='edit') {
+		if($_chdv[$dv]!=1 && $tk==0) {
+			$tk=1;
+			$_dev=$dv;
+			$data_a[$dv]=$dv;
+		} else {
+			$data_a[$dv]=$dv;
+		}
+	} else {
+		if($dv==$_dev) {
+			$data_a[$dv]=$dv;
+			$_devold=$dv;
+		} else {
+			if($_chdv[$dv]!=1 && $_freedv=='') $_freedv=$dv;
+			$data_a[$dv]=$dv;
+		}
+	}
+}
+echo mybox_select_box('nisel3',$data_a,"$_dev",'dev',$set_a);
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Address</td>
+<td valign="middle" class="tdvalue">
+<input name="ip" type="text" class="valbox2" value="<?php echo $_ip;?>">
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Netmask</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if($_prefix=='') $_prefix="24";
+$set_a=array("height"=>"150px");
+echo mybox_select_box('nisel4',$data_nmask,"$_prefix",'mask',$set_a);
+?>
+</td>
+</tr>
+<tr id='ppid' <?php if($do_id=='edit' && $_type==2) {?>style='display: none;'<?php }?>> 
+<td valign="middle" class="tdname">Proxy ARP</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+if(!isset($_proxyarp)||$_proxyarp=='') $_proxyarp=0;
+echo mybox_select_box('nisel5',$data_a,"$_proxyarp",'proxyarp');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">MTU</td>
+<td valign="middle" class="tdvalue">
+<input name="mtu" type="text" class="valbox2" value="<?php echo $_mtu;?>">
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Enable this interface</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("On"=>"1","Off"=>"0");
+if(!isset($_onboot)||$_onboot=='') $_onboot=0;
+echo mybox_select_box('nisel6',$data_a,$_onboot,'onboot');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Comment</td>
+<td valign="middle" class="tdvalue">
+<input name="note" type="text" class="valbox2" value="<?php echo $_note;?>">
+</td>
+</tr>
+</table>
+<input type=hidden name=freedev value='<?php echo $_freedv;?>'>
+<input type=hidden name=devold value='<?php echo $_devold;?>'>
+<input type=hidden name=ipold value='<?php echo $_ip;?>'>
+<?php }//col==2?>
+</td>
+</tr>
+</tbody>
+</table>
+<input type=hidden name=col value=<?php echo $col;?>>
+<input type=hidden name=do_id value='<?php echo $do_id;?>'>
+<?php if($col==2 && $do_id=='edit') {?>
+<input type=hidden name=id value=<?php echo $id;?>>
+<?php }?>
+<?php  }//tab==1 ?>
+<?php if($tab==2 || $tab==3) {
+// VIRTUAL IP / VLAN
+	$table="ipalias";
+	$btable="vlan";
+	$tabopt="1";
+	if($tab==3) {
+		$table="vlan";
+		$btable="ipalias";
+		$tabopt="2";
+	}
+	$_jsname='';$_jsip='';
+	$result=mybox_db_query("select name,ip from ipaddr",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$name=mybox_unescape_str($row['name']);
+			$xip=$row['ip'];
+			$_jsip .="$xip ";
+			$_jsname .="$name ";
+		}
+	}
+	unset($result);
+	$result=mybox_db_query("select name,ip from $btable",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$name=mybox_unescape_str($row['name']);
+			$xip=$row['ip'];
+			$_jsip .="$xip ";
+			$_jsname .="$name ";
+		}
+	}
+	$_jsdv=trim($_jsdv);
+	$_jsname=trim($_jsname);
+	$_jsip=trim($_jsip);
+	unset($result,$name,$xip);
+?>
+<script type='text/javascript'>
+	function do_submit() {
+		if(!chkvalidip()) { return false; }
+		if(!chkvalidname()) { return false; }
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	};
+
+	function chkshift(newdev,oldev,id) {
+		self.location.href='/network_int.exh?tab=<?php echo $tab;?>&chgdev=1&new='+newdev+'&old='+oldev+'&id='+id;
+	};
+	function chkshiftdev(newdev) {
+		self.location.href='/network_int.exh?tab=<?php echo $tab;?>&dev='+newdev;
+	};
+	function chk_otherip(ip) {
+		<?php echo "var jsip='$_jsip';";?>
+		if(jsip=='') return true;
+		var pip=jsip.split(" ");
+		if(pip!=null) {
+			for(var x=0;x<pip.length;x++) {
+				if(ip==pip[x]) {
+					pop_msg("Interface Address '"+ip+"' already exist");
+					return false;
+				}
+			}
+		};
+		return true;
+	};
+	function chk_othername(name) {
+		<?php echo "var jsname='$_jsname';";?>
+		if(jsname=='') return true;
+		var pname=jsname.split(" ");
+		if(pname!=null) {
+			for(var x=0;x<pname.length;x++) {
+				if(name.toUpperCase()==pname[x].toUpperCase()) {
+					pop_msg("Interface name '"+name+"' already exist");
+					return false;
+				}
+			}
+		};
+		return true;
+	};
+	function chkvalidip() {
+		var ip1='';
+		var ip2='';
+		var mask1='';
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='text') {
+			    	if( document.f.elements[i].name.substr( 0, 2 ) == 'ip') {
+					ip1=document.f.elements[i].value;
+					if(ip1=='') {
+						pop_msg("Interface IP Address not defined");
+						return false;
+					};
+					if(!mip1(ip1)) {
+						pop_msg("Invalid Interface IP Address '"+ip1+"'");
+						return false;
+					};
+					if(ip1=='' && ip2=='' ) {
+						pop_msg("Interface IP Address not defined");
+						return false;
+					};
+					if(ip1==ip2) {
+						pop_msg("Interface IP Address '"+ip1+"' already exist");
+						return false;
+					};
+					if(!chk_otherip(ip1)) {
+						pop_msg("Interface IP Address '"+ip1+"' already exist");
+						return false;
+					};
+					ip2=ip1;
+    				}	
+			}
+  		};
+		return true;
+	};
+	function chkvalidname() {
+		var name1='';
+		var name2='';
+		for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='text') {
+				if( document.f.elements[i].name.substr( 0, 4 ) == 'name') {
+					name1=document.f.elements[i].value;
+					if(name1=='') {
+						pop_msg("Interface name not defined");
+						return false;
+					};
+					if(name1=='' && name2=='' ) {
+						pop_msg("Interface name not defined");
+						return false;
+					};
+					if(name1==name2) {
+						pop_msg("Interface name '"+name1+"' already exist");
+						return false;
+					};
+					if(!chk_othername(name1)) {
+						pop_msg("Interface name '"+name1+"' already exist");
+						return false;
+					};
+					name2=name1;
+    				}	
+			}
+  		};
+		return true;
+	};
+
+	function delete_int(val) {
+		var ar=document.getElementById('inttab').getElementsByTagName("a");
+		for(var i=0; i<ar.length; i++) {
+			if(ar[i].id) {
+				if(ar[i].id==val) {
+					var x=i;
+					x=x+1;
+					document.getElementById('inttab').deleteRow(x);
+				}
+			}
+		};
+		i=null;
+	};
+	function do_add_selbox(xid) {
+		var mid="nisel7"+xid;
+		var nid="name"+xid;
+		var html='';
+		html +="<table style='table-layout: fixed; margin: 0px; padding: 0px; border: 0px;'>";
+		html +="<tr><td style='vertical-align: top;margin: 0px; padding: 0px; border: 0px;'>";
+		html +="<input type=text name=ip["+xid+"] value='' size=20 class='valbox3'></td>";
+		<?php 
+			$set_a=array("height"=>"150px","width"=>"150","bg"=>"#F8F7F7","bdc"=>"#F8F7F7","fwb"=>"bold");
+			$_txt=mybox_select_box("mid",$data_nmask,"24","prefix[xid]",$set_a);
+			$_txt=preg_replace("/\"/","\\\"",$_txt);
+			$_txt=preg_replace("/'namemid'/","'\"+nid+\"'",$_txt);
+			$_txt=preg_replace("/id='prefix\[xid\]'/","id='prefix[\"+xid+\"]'",$_txt);
+			$_txt=preg_replace("/name='prefix\[xid\]'/","name='prefix[\"+xid+\"]'",$_txt);
+			$_txt=preg_replace("/id='mid'/","id='\"+mid+\"'",$_txt);
+			$_txt=preg_replace("/do_hide\('mid'\)/","do_hide('\"+mid+\"')",$_txt);
+			$_txt=preg_replace("/do_show\('mid'\)/","do_show('\"+mid+\"')",$_txt);
+			$_txt=preg_replace("/dohide_show\('mid'\)/","dohide_show('\"+mid+\"')",$_txt);
+			$_txt=preg_replace("/insert_value\('prefix\[xid\]'/","insert_value('prefix[\"+xid+\"]'",$_txt);
+		?>
+		html +="<?php echo $_txt;?>";
+		html +="</td><td style='vertical-align: top; margin: 0px; padding: 0px; border: 0px;'>";
+		html +="</tr></table>";
+		return html;
+	}
+	function do_add_new() {
+		var x=document.getElementById('inttab').rows.length;
+		if(x >= 2) {
+			var i=x - 1;
+		};
+		if(document.getElementById('op1')) {
+			var i=x - 2;
+		};
+		var htmlid="new"+i;
+		var html=do_add_selbox(htmlid);
+		var tab=document.getElementById('inttab').insertRow(i);
+		tab.insertCell(0).innerHTML="<input type=hidden name=id[new"+i+"] value='new"+i+"'>"+i;
+		tab.insertCell(1).innerHTML="<input type=text name=name[new"+i+"] value='' size=20 class='valbox3'>";
+		tab.insertCell(2).innerHTML=html;
+		tab.insertCell(3).innerHTML="<div style='text-align: center;'><input type=checkbox name=onboot[new"+i+"]></div>";		
+		tab.insertCell(4).innerHTML="<img src='<?php echo $_PNG['note'];?>' border=0 alt='' title=''>&nbsp;<input type=text name=note[new"+i+"] value='' size=25 class='valbox3'>";		
+		tab.insertCell(5).innerHTML="<div style='text-align: right;'><a href='#' id='t"+i+"' onclick=\"delete_int('t"+i+"');return false;\"><img src='<?php echo $_PNG['delete'];?>' border=0 alt='' title=''></a><input type=checkbox name=del[new"+i+"] value=new"+i+"></div>";
+		<?php unset($_sel);?>
+	}
+</script>
+<?php 
+$_header="
+		<table id='inttab' class='data' width='100%'>
+		<thead class='blue'> 
+		<tr>
+		<td style='font-weight: bold;border-right: 0px;'>#</td> 
+		<td style='font-weight: bold;border-right: 0px;border-left: 0px;'>Name</td>
+		<td style='font-weight: bold;border-right: 0px;border-left: 0px;'>Address</td>
+		<td style='font-weight: bold;border-right: 0px;border-left: 0px;text-align: center;'>Active</td>
+		<td style='font-weight: bold;border-left: 0px;' colspan=2>Comment</td>
+		</tr></thead>
+		<tbody>
+	";
+$_body='';
+
+if(!isset($dev)||$dev=='') {
+	$dev=mybox_search_devname("$table",$db_id);
+}
+$_dd=mybox_list_devname($db_id,"$tabopt");
+$x=1;$chk_record=0;
+$result=mybox_db_query("select * from $table where dev='$dev'",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_id=$row['id'];
+		$_name=mybox_unescape_str($row['name']);
+		$_dev=$row['dev'];
+		$_ip=$row['ip'];
+		$_prefix=$row['prefix'];
+		$_onboot=$row['onboot'];
+		$_note=mybox_unescape_str($row['note']);
+		$_stat='';
+		if($_onboot==1) $_stat='checked';
+		$_body .="
+		<tr>
+		<td><input type=hidden name=id[$_id] value='$_id'>$x</td>
+		<td><input type=hidden name=nameold[$_id] value='$_name'><input type=text name=name[$_id] value='$_name' size=20 class='valbox3'></td>
+		<td>
+		<table style='table-layout: fixed; margin: 0px; padding: 0px; border: 0px;'>
+		<tr><td style='vertical-align: top; margin: 0px; padding: 0px; border: 0px;'>
+		<input type=text name=ip[$_id] value='$_ip' size=20 class='valbox3'>
+		</td>";
+		if($_prefix=='') $_prefix="24";
+		$set_a=array("height"=>"150px","width"=>"150","bg"=>"#F8F7F7","bdc"=>"#F8F7F7","fwb"=>"bold");
+		$_body .="<td style='vertical-align: top; margin: 0px; padding: 0px; border: 0px;'>";
+		$_body .=mybox_select_box("nisel7$x",$data_nmask,"$_prefix","prefix[$_id]",$set_a);
+		$_body .="</td></tr></table>";
+		$_body .="</td>
+		<td style='text-align: center; table-layout: fixed; white-space: nowrap;'><input type=checkbox name=onboot[$_id] $_stat></td>
+		<td style='table-layout: fixed; white-space: nowrap;'><img src='{$_PNG['note']}' border=0 alt='' title=''>&nbsp;<input type=text name=note[$_id] value='$_note' size=25 class='valbox3'></td>
+		<td style='text-align: right; table-layout: fixed; white-space: nowrap;' valign=bottom><a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='/network_int.exh?tab=$tab&do_id=del&id=$_id';\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a><input type=checkbox name=del[$_id] value=$_id></td>
+		</tr>";
+		$x++;$chk_record++;
+	}	
+}
+
+if($x > 1) {
+	$_body .="<tr id='op1'>
+		<td style='text-align: right;' align=right valign=top colspan=6>
+		<a href='#' onclick='do_delete(2);return false;'>Delete</a> / <a href='#' onclick='dotoggle();return false;'>Toggle</a> <img src='{$_PNG['arrow_rtr']}' border=0 alt='' title=''></td>
+		</tr>
+	";
+} 
+if(count($_dd)!=0) {
+	$_body .="<tr><td align=right valign=bottom colspan=6 style='white-space: nowrap;'>";
+	$_body .="<table style='table-layout: fixed; margin: 0px; padding: 0px; border: 0px;'>
+		<tr><td style='vertical-align: middle; margin: 0px; padding: 0px; border: 0px;'>
+		";
+	$_body .="<a class='btns' href='#' onclick='return do_add_new();return false;'>Create additional";
+	if($tab==2){
+		$_body .="Virtual IP";
+	}else{
+		$_body .="VLAN";
+	}
+	$_body .="</a>";
+	$_body .="&nbsp;&nbsp;<b>On interface :</b></td>";
+
+	$data_a=array();
+	foreach($_dd as $_dev => $_name) {
+		if($dev=='') $dev=$_dev;
+		$data_a[$_name]=$_dev;
+	}
+	$set_a=array("act"=>"chkshiftdev(''b'')");
+	$_body .="<td style='vertical-align: middle; margin: 0px; padding: 0px; border: 0px;'>";
+	$_body .=mybox_select_box('nisel8',$data_a,$dev,'dev',$set_a);
+	$_body .="</td></tr></table>";
+}
+
+if($_body!='') {
+	echo "
+		$_header
+		$_body
+		</td>
+		</tr>
+		</tbody>
+		</table>
+	";
+} else {
+	echo "
+	<br>
+	<span class='notedef'>
+	There are no interface available.
+	</span>
+	<br><br>";$_error=1;
+}
+?>
+
+
+
+<?php  }//tab==2|3 ?>
+<?php if($tab==4) {?>
+<script type='text/javascript'>
+	function do_submit() {
+		<?php if($col==1) {?>
+		if(!chk_ip()) { return false; }
+		if(!chk_int()) { return false; }
+		<?php }?>
+		<?php if($col==2) {?>
+		if(!chk_gw()) { return false; }
+		<?php }?>
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	}
+	<?php if($col==1) {?>
+	function chk_ip() {
+		var list=Trim(document.f.uchkip.value);
+		list=Trim(list);
+		if(list=='' || !mip1list(list)) {
+			pop_msg("Invalid IP");
+			return false;
+		}
+		return true;
+	}
+	function chk_int() {
+		var p=Trim(document.f.uchkint.value);
+		if(!isnum(p)) {
+			pop_msg("Invalid Check interval value");
+			return false;
+		}
+		return true;
+	}
+	<?php } // col==1?>
+	<?php if($col==2) {?>
+	function chk_gw() {
+		var ip1='';
+		var ip2='';
+		for(var i = 0; i < document.f.elements.length; i++) {
+			var x=0;
+			if(document.f.elements[i].type=='text') {
+				if(document.f.elements[i].name.substr( 0, 7 ) == 'gateway') {
+					x=i + 2;
+					var ok=0;
+					if(document.f.elements[x].type=='checkbox') {
+						if(document.f.elements[x].checked==true) {
+							ok=1;
+						}
+					}
+					ip1=document.f.elements[i].value;
+					if(ok==1 && ip1=='') {
+						pop_msg("No Gateway Address defined");
+						return false;
+					}
+					if(ok==1 && !mip1(ip1)) {
+						pop_msg("Invalid Gateway Address '"+ip1+"'");
+						return false;
+					} 
+					if(ok==1 && ip1=='' && ip2=='' ) {
+						return false;
+					}
+					if((ip1!='' && ip2!='') && ip1==ip2) {
+						pop_msg("Gateway Address '"+ip1+"' already exist");
+						return false;
+					}
+					ip2=ip1;
+    				}
+			}
+  		}
+		var ip1='';
+		var ip2='';
+		for(var i = 0; i < document.f.elements.length; i++) {
+			var x=0;
+			if(document.f.elements[i].type=='select-one') {
+				if(document.f.elements[i].name.substr( 0, 8 ) == 'priority') {
+					x=i + 2;
+					var ok=0;
+					if(document.f.elements[x].type=='checkbox') {
+						if(document.f.elements[x].checked==true) {
+							ok=1;
+						}
+					}
+					ip1=document.f.elements[i].value;
+					if((ip1!='' && ip2!='') && ip1==ip2) {
+						pop_msg("Priority cannot be same");
+						return false;
+					}
+					ip2=ip1;
+    				}
+			}
+  		}
+		return true;
+	}
+	<?php } // col==2?>
+</script>
+<table width="100%" border="0" cellpadding="0" cellspacing="0">
+<tr><td>
+<ul id="tabnav">
+<li class="<?php if($col==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=1) { echo "<a href=\"/network_int.exh?tab=$tab&col=1\">"; }?>Setting<?php if($col!=1) { echo "</a>"; }?></li>
+<li class="<?php if($col==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=2) { echo "<a href=\"/network_int.exh?tab=$tab&col=2\">"; }?>Interfaces<?php if($col!=2) { echo "</a>"; }?></li>
+</ul>
+</td></tr>
+<tr> 
+<td class="tabcont">
+<?php if($col==1){
+	$_umode=1;
+	$result=mybox_db_query("select name,val from misc where name like \"uplink_%\"",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			if(trim($row['name'])=="uplink_stat") $_ustat=$row['val'];
+			if(trim($row['name'])=="uplink_mode") $_umode=$row['val'];
+			if(trim($row['name'])=="uplink_lst") $_uchkip=trim($row['val']);
+			if(trim($row['name'])=="uplink_int") $_uchkint=$row['val'];
+		}
+	}
+?>
+<table width="100%" class=data>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Enable this service</td>
+<td width="70%" valign="middle" class="tdvalue">
+<?php 
+$data_a=array("On"=>"1","Off"=>"0");
+if(!isset($_ustat)||$_ustat=='') $_ustat=0;
+echo mybox_select_box('nisel9',$data_a,$_ustat,'ustat');
+?>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Mode</td>
+<td width="70%" valign="middle" class="tdvalue">
+<?php 
+$data_a=array();
+foreach($_UPLINK_MODE as $a => $b) {
+	$data_a[$b]=$a;
+}
+if(!isset($_umode)||$_umode=='') $_umode=2;
+echo mybox_select_box('nisel10',$data_a,$_umode,'umode');
+?>
+</select>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Check IP</td>
+<td width="70%" valign="middle" class="tdvalue">
+<input type=text name="uchkip" value='<?php echo $_uchkip;?>' size=30 class='valbox'>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Check interval</td>
+<td width="70%" valign="middle" class="tdvalue">
+<input type=text name="uchkint" value='<?php echo $_uchkint;?>' size=10 class='valbox'> seconds
+</td>
+</tr>
+</table>
+<?php }//col==1?>
+<?php if($col==2) {
+$result=mybox_db_query("select id,name,ip,prefix,isdefault,uplink,upprio,gateway,onboot from ipaddr where onboot='1'",$db_id);
+$num_result=mybox_db_num_rows($result);
+if($num_result!=0) {
+	echo "<table class='data' width='100%'>
+		<thead class='blue'> 
+		<tr>
+		<td style='font-weight: bold; width: 1%; border-right: 0px;'>#</td>
+		<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Name</td>
+		<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Address</td>
+		<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Gateway</td>
+		<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Priority</td>
+		<td style='font-weight: bold; border-left: 0px;width: 2%;'>Active</td>
+		</tr></thead>
+		<tbody bgcolor='#ffffff'>	
+	";
+	$_cnt=1;
+	$set_a=array("width"=>"50","bg"=>"#F8F7F7","bdc"=>"#F8F7F7","fwb"=>"bold");
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_id=$row['id'];
+		$_name=mybox_unescape_str($row['name']);
+		$_name=mybox_get_defname($_name,2,0,$db_id);
+		$_ip=$row['ip'];
+		$_prefix=$row['prefix'];
+		$_isdefault=$row['isdefault'];
+		$_uplink=$row['uplink'];
+		$_upprio=$row['upprio'];
+		$_gateway=$row['gateway'];
+		$_onboot=$row['onboot'];
+		$_stat='';
+		if($_uplink==1) $_stat="checked";
+		if($_isdefault==1) {
+			echo "
+			<tr>
+			<td><input type='hidden' name='id[$_id]' value='$_id'>$_cnt</td>
+			<td>$_name</td>
+			<td>$_ip/$_prefix</td>
+			<td><input type='hidden' name='gateway[$_id]' value='$_gateway'>$_gateway</td>
+			<td><input type='hidden' name='priority[$_id]' value='1'>$_upprio</td>
+			<td><input type='hidden' name='uplink[$_id]' value='1'>default</td>
+			</tr>
+			";
+		} else {
+			echo "
+			<tr>
+			<td><input type='hidden' name='id[$_id]' value='$_id'>$_cnt</td>
+			<td>$_name</td>
+			<td>$_ip/$_prefix</td>
+			<td><input type=text name='gateway[$_id]' value='$_gateway' size=20 class='valbox3'></td>
+			<td>
+			";
+			$data_a=array();
+			for($x=2;$x < $num_result + 1;$x++) {
+				$data_a[$x]=$x;
+			}
+			echo mybox_select_box("nisel11$_cnt",$data_a,$_upprio,"priority[$_id]",$set_a);
+			echo "
+			</td>
+			<td><input type=checkbox name='uplink[$_id]' $_stat></td>
+			</tr>
+			";
+		}
+		$_cnt++;
+	}
+	echo "</tbody></table>";
+} else {
+	echo "
+	<br>
+	<span class='notedef'>
+	There are no interface available.
+	</span>
+	<br><br>";$_error=1;
+}
+?>
+
+<?php }//col==2?>
+</td>
+</tr>
+</table>
+<input type=hidden name=col value=<?php echo $col;?>>
+<?php } // tab==4?>
+
+<table align=right>
+<tbody>
+<tr>
+<?php if($tab==1 && $col==2) {}else {?>
+<td>
+<a name="sini"><a class="btn" href="#sini" onclick="return do_changes();return false;">Reload</a>
+</td>
+<?php }?>
+<?php if($_error==1 && ($tab==1 && $col==1)) {}else {
+if($tab==1 && $col==1) {} else {
+?>
+<td>
+<a name="sini"><a class="btn" href="#sini" onclick="return do_submit();return false;"><?php if($tab==1 && $col==2 && $do_id=='edit') { echo "Update"; } else { echo "Save";}?></a>
+</td>
+<?php }}?>
+</tr> 
+</tbody>
+</table>
+<!-- end tab container -->
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?php echo $tab;?>>
+</form>
+<script type='text/javascript'>page_kill();</script>
+</body>
+</html>
+
+<?php mybox_db_close($db_id);?>

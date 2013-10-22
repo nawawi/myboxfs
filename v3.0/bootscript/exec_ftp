@@ -1,0 +1,65 @@
+#!/bin/sh
+# $Id: exec_ftp.sh,v 1.0 2008/01/24 14:26:00 nawawi Exp $
+# iosh ftp helper
+
+. /etc/init.boot/functions
+
+OPT=$1
+HOST=$2
+USER=$3
+FILE=$4
+PORT=$5
+XCDIR="";
+if [ "x$OPT" = "x" -a "x$HOST" = "x" -a "x$USER" = "x" -a "x$FILE" = "x" ]; then
+        echo "% Invalid options";
+        exit 1;
+fi
+case $OPT in
+	put) TYPE=1;;
+	get) TYPE=2;;
+	*) echo "% Invalid options";exit 1;;
+esac
+
+cd /config
+
+if [ "$TYPE" = "1" ]; then
+	dir=$(dirname $FILE);
+	if [ "x$dir" != "x" -a -d "$dir" ]; then
+		cd $dir;
+		dirc=$(pwd |grep ^/config);
+		if [ "x$dirc" = "x" ]; then
+			echo "% No such file";
+			exit;
+		fi
+	fi
+	cd /config
+	if [ ! -r "/config/$FILE" ]; then
+		echo "% No such file";
+		exit 1;
+	fi
+elif [ "$TYPE" = "2" ]; then
+	dir=$(dirname $FILE);
+	if [ "x$dir" != "x" ]; then
+		XCDIR="cd $dir";
+		FILE=$(basename $FILE);
+	fi
+fi
+[ "x$PORT" = "x" ] && PORT="21";
+
+echo -n "Password: "
+read -s PASS
+if [ "x$PASS" = "x" ]; then
+	echo "% Invalid options";
+	exit 1;
+fi
+echo "";
+ftp -i -v -n  $HOST $PORT <<End-Of-Session
+user $USER $PASS
+binary
+hash
+bell
+$XCDIR
+$OPT $FILE
+bye
+End-Of-Session
+exit $?

@@ -1,0 +1,73 @@
+<?php 
+	if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+	$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+	$_SYSID="login";
+	include_once('page.exl');
+	$auth_addr=mybox_get_client_ip();
+	if(isset($just_login)&&$just_login==1) {
+		mybox_chk_login($passwd);
+		mybox_chk_session();
+		$ErrorMsg='';
+		if($_LOGIN['auth_id']!='admin' && $_LOGIN['auth_id']!='look') {
+			mybox_authlog("Password incorrect");
+			mybox_alert_queue("[WARNING] Password incorrect","Password incorrect. Logged IP $auth_addr","3");
+			mybox_send_logout(0);
+			exit;
+		}
+		mybox_authlog("Password Accepted");
+		mybox_alert_queue("[INFO] Password Accepted","Password accepted. Logged IP $auth_addr","4");
+		mybox_go_url("/");
+		exit;	
+	}
+	if(isset($just_logout)&&$just_logout==1) {
+		mybox_chk_session();
+		mybox_authlog("Session logout");
+		mybox_alert_queue("[INFO] Session logout","Session logout. Logged IP $auth_addr","4");
+		mybox_session_logout();
+		mybox_send_logout(1);
+		exit;
+	}
+	if(isset($just_logout)&&$just_logout==5) {
+		mybox_chk_session();
+		if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+			$auth=$_LOGIN['auth_id'];
+			if($_LOGIN['auth_addr']=='') {
+				$auth_addr=getenv("REMOTE_ADDR");
+			} else {
+				$auth_addr=$_LOGIN['auth_addr'];
+			}
+			mybox_slog("INFO","$auth access from $auth_addr rebooting the system with reason $rebootreason");
+			mybox_alert_queue("[INFO] System reboot","$auth access from $auth_addr rebooting the system with reason $rebootreason","1",1);
+			@touch("/var/sys/reboot_from_web");			
+			mybox_session_logout();
+			mybox_echo_query("mfs-reboot");
+			mybox_send_logout(2);
+		}
+		exit;
+	}
+	if(isset($just_logout)&&$just_logout==6) {
+		mybox_chk_session();
+		if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+			$auth=$_LOGIN['auth_id'];
+			if($_LOGIN['auth_addr']=='') {
+				$auth_addr=getenv("REMOTE_ADDR");
+			} else {
+				$auth_addr=$_LOGIN['auth_addr'];
+			}
+			mybox_alert_queue("[INFO] System shutdown","$auth access from $auth_addr shutdown the system with reason $rebootreason","2",1);
+			@touch("/var/sys/shutdown_from_web");
+			mybox_session_logout();
+			mybox_echo_query("mfs-shutdown");
+			mybox_send_logout(3);
+		}
+		exit;
+	}
+	if(isset($just_logout)&&$just_logout=="about") {
+		mybox_index_about();
+		exit;
+	}
+	mybox_authlog("Invalid login request.");
+	mybox_alert_queue("[WARNING] Invalid login request","Invalid login request. Logged IP $auth_addr","6");
+	mybox_send_logout(4);
+	exit;
+?>

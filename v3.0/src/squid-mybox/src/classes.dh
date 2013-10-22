@@ -1,0 +1,95 @@
+/* MACHINE GENERATED FILE - DO NOT EDIT */
+
+/* Produced by classdef 0.5 from the source files:
+   module.c
+   module.h
+   patfile.c
+*/
+#ifndef CLASSES_DH
+#define CLASSES_DH
+
+/* STRUCTS */
+
+#line 53 "module.h"
+struct _Object {
+#line 54 "module.h"
+    int refCount;
+    void (*destroy)(void *this);
+};
+
+#line 155 "module.h"
+struct _filterObject {
+#line 54 "module.h"
+    int refCount;
+    void (*destroy)(void *this);
+#line 156 "module.h"
+    moduleObject *owner;
+    char *uri;
+    struct _filterObject *next;
+    int (*filter)(struct _filterObject *this, MemBuf *target,
+                 const char *buf, int len, const char* content_type, const char* client_addr, const char* auth_user);                                     
+
+};
+
+#line 52 "patfile.c"
+struct _patFileObject {
+#line 54 "module.h"
+    int refCount;
+    void (*destroy)(void *this);
+#line 53 "patfile.c"
+    struct _patChain *chain;
+    char *fileName;
+    time_t mtime;
+    int replace;
+    char *buf;
+    size_t buflen;
+};
+
+#ifdef MODULE_C
+#line 104 "module.c"
+struct _shlibObject {
+#line 54 "module.h"
+    int refCount;
+    void (*destroy)(void *this);
+#line 105 "module.c"
+    struct _shlibObject *next, *prev;
+    char *name;
+    shl_t hndl;
+};
+#endif
+
+#line 130 "module.h"
+struct _moduleObject {
+#line 54 "module.h"
+    int refCount;
+    void (*destroy)(void *this);
+#line 131 "module.h"
+    union {
+        int typ;
+        struct _moduleObject *next;
+    } chain;
+    union {
+        int version;
+        struct _moduleOwner *owner;
+    } info;
+    const char *description;
+    const char *trigger;
+    void *(*filter)(moduleObject *this, const void *arg);
+
+
+    patFileObject *patFile;
+};
+
+/* CTOR/DTOR DECLS */
+#line 53 "module.h"
+extern void Object_O_DTOR(Object *);
+#line 155 "module.h"
+extern void filterObject_O_DTOR(filterObject *);
+#line 52 "patfile.c"
+extern void patFileObject_O_DTOR(patFileObject *);
+#line 104 "module.c"
+extern void shlibObject_O_DTOR(shlibObject *);
+#line 130 "module.h"
+extern void moduleObject_O_DTOR(moduleObject *);
+
+#endif

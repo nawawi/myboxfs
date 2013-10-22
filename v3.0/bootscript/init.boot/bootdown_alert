@@ -1,0 +1,21 @@
+#!/bin/sh
+# $Id: bootdown.sh,v 7.0 2008/01/21 03:29:00 nawawi Exp $
+
+trap : 1 2 3 15
+PATH="/bin"
+TERM=linux
+export PATH TERM
+umask 077
+cd /
+. /etc/init.boot/functions
+
+if [ -d "/var/sys/alert_setting" ]; then
+	for f in /var/sys/alert_setting/alert*; do
+		[ "$f" = "/var/sys/alert_setting/alert1" ] && continue;
+		[ "$f" = "/var/sys/alert_setting/alert2" ] && continue;
+		[ "$f" = "/var/sys/alert_setting/alert18" ] && continue;
+		rm -f $f
+	done
+fi
+/service/init/initconf.init reboot_bootup_alert >/dev/null 2>&1
+exit 0;

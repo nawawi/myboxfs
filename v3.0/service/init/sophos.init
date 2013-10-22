@@ -1,0 +1,275 @@
+#!/bin/php -Cq
+<?php 
+// sophos.init
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="sophos";
+include_once('clib.exl');
+include_once('av.exl');
+putenv("PATH=/bin:/service/tools:/service/init");
+
+$_QUIET=0;
+mybox_init_set_alarm(30);
+
+if(!file_exists("/bin/sophosd")) {
+	mybox_init_echo($_QUIET,"ERROR","Cannot execute sophos.init. Internal error!");
+	exit(1);
+}
+
+function sophos_config() {
+	global $_DB_NAME, $_QUIET;
+	$db_id=mybox_db_connect($_DB_NAME);
+
+	$_enable=0;
+	$result=mybox_db_query("select val from cf where name='cf_sophos_stat'",$db_id);
+        if(mybox_db_num_rows($result)!=0) {
+                $_enable=mybox_db_fetch_single($result);
+        }
+	mybox_db_close($db_id);
+
+	if($_enable==0) {
+		@unlink("/var/sys/chk_sophosd");
+		mybox_init_echo($_QUIET,"INFO","SOPHOS AV service disabled");
+		exit(0);
+	}
+	$_config='';
+	$_config .="saviconfig: /etc/sophos.savi\n";
+	$_config .="maxproc: 0\n";
+	$_config .="pidfile: /var/run/sophosd.pid\n";
+	$_config .="socketfile: /var/spool/sophos\n";
+	$_config .="umask: 0007\n";
+	$_config .="user: mfs\n";
+	$_config .="group: mfs\n";
+	$_config .="timeout: 300\n";
+	$_config .="logname: sophos\n";
+	$_config .="logfacility: mail\n";
+	$_config .="logpriority: notice\n";
+	$_config .="error_strings: yes\n";
+	$_config .="timestamps: no\n";
+	$_config .="show_virusname: yes\n";
+	$_config .="callbacks: yes\n";
+	$_config .="limit_classif: 10\n";
+	$_config .="limit_nextfile: 10000\n";
+	$_config .="limit_decompr: 1000\n";
+	$_config .="socket_check: yes\n";
+	$_config .="net_port: 4009\n";
+	$_config .="net_tempdir: /strg/mybox/avscan\n";
+	mybox_save_to_file("/etc/sophos.cfg","$_config");
+
+	$_config='';
+	$_config .="GrpExecutable: 2\n";
+	$_config .="GrpArchiveUnpack: 2\n";
+	$_config .="GrpSelfExtract: 2\n";
+	$_config .="GrpInternet: 2\n";
+	$_config .="GrpMSOffice: 2\n";
+	$_config .="GrpMisc: 2\n";
+	$_config .="GrpSuper: 2\n";
+	$_config .="GrpDisinfect: 2\n";
+	$_config .="GrpClean: 2\n";
+	$_config .="NamespaceSupport: 0\n";
+	$_config .="FullSweep: 0\n";
+	$_config .="DynamicDecompression: 1\n";
+	$_config .="FullMacroSweep: 0\n";
+	$_config .="OLE2Handling: 1\n";
+	$_config .="IgnoreTemplateBit: 1\n";
+	$_config .="VBA3Handling: 1\n";
+	$_config .="VBA5Handling: 1\n";
+	$_config .="OF95DecryptHandling: 1\n";
+	$_config .="HelpHandling: 1\n";
+	$_config .="DecompressVBA5: 1\n";
+	$_config .="Emulation: 1\n";
+	$_config .="PEHandling: 1\n";
+	$_config .="ExcelFormulaHandling: 1\n";
+	$_config .="PowerPointMacroHandling: 1\n";
+	$_config .="PowerPointEmbeddedHandling: 1\n";
+	$_config .="ProjectHandling: 1\n";
+	$_config .="ZipDecompression: 1\n";
+	$_config .="ArjDecompression: 1\n";
+	$_config .="RarDecompression: 1\n";
+	$_config .="UueDecompression: 1\n";
+	$_config .="GZipDecompression: 1\n";
+	$_config .="TarDecompression: 1\n";
+	$_config .="CmzDecompression: 1\n";
+	$_config .="HqxDecompression: 1\n";
+	$_config .="MbinDecompression: 1\n";
+	$_config .="LoopBackEnabled: 0\n";
+	$_config .="MaxRecursionDepth: 16\n";
+	$_config .="Lha: 1\n";
+	$_config .="SfxArchives: 1\n";
+	$_config .="TnefAttachmentHandling: 1\n";
+	$_config .="MSCompress: 1\n";
+	$_config .="MSCabinet: 1\n";
+	$_config .="DeleteAllMacros: 0\n";
+	$_config .="Vbe: 1\n";
+	$_config .="ExecFileDisinfection: 1\n";
+	$_config .="VisioFileHandling: 1\n";
+	$_config .="Mime: 1\n";
+	$_config .="ActiveMimeHandling: 1\n";
+	$_config .="DelVBA5Project: 1\n";
+	$_config .="ScrapObjectHandling: 1\n";
+	$_config .="SrpStreamHandling: 1\n";
+	$_config .="Office2001Handling: 1\n";
+	$_config .="Upx: 1\n";
+	$_config .="PalmPilotHandling: 1\n";
+	$_config .="Pdf: 1\n";
+	$_config .="Rtf: 1\n";
+	$_config .="Html: 1\n";
+	$_config .="Elf: 1\n";
+	$_config .="WordB: 1\n";
+	$_config .="OutlookExpress: 1\n";
+	$_config .="Java: 1\n";
+	$_config .="Access: 1\n";
+	$_config .="AppleSingle: 1\n";
+	$_config .="VbFiltering: 0\n";
+	$_config .="Ole2FileDisinfection: 1\n";
+	$_config .="MachO: 1\n";
+	$_config .="ZipUseChd: 1\n";
+	$_config .="ISCabinet: 0\n";
+	$_config .="ISCabinetFull: 1\n";
+	$_config .="ITSS: 0\n";
+	$_config .="TnefEmbedHandling: 0\n";
+	$_config .="Bzip2: 0\n";
+	$_config .="Stuffit: 0\n";
+	$_config .="OpenMacRf: 1\n";
+	$_config .="Vba5p: 0\n";
+	$_config .="OleDataMsoHandling: 1\n";
+	$_config .="OleScriptHandling: 1\n";
+	$_config .="OleRawHandling: 1\n";
+	$_config .="Vba5Dir: 0\n";
+	$_config .="Skip: 1\n";
+	$_config .="Base64: 0\n";
+	$_config .="UTF16: 1\n";
+	$_config .="CleanJpeg: 1\n";
+	$_config .="CleanBmp: 1\n";
+	$_config .="CleanGif: 1\n";
+	$_config .="CleanRiff: 1\n";
+	$_config .="CleanTiff: 1\n";
+	$_config .="CleanPng: 1\n";
+	$_config .="Xml: 1\n";
+	$_config .="FullPdf: 1\n";
+	$_config .="UnixArchive: 1\n";
+	$_config .="Rpm: 1\n";
+	mybox_save_to_file("/etc/sophos.savi","$_config\n");
+	return 1;
+}
+
+function sophos_status() {
+	global $_QUIET;
+	$pid=mybox_get_progpid("sophosd");
+	if($pid!='') {
+		if($_QUIET==0) echo "* sophosd (pid $pid) is running...\n";
+		return 0;
+	}
+	return 1;
+}
+
+function sophos_start() {
+	global $_QUIET, $_ROOT_DIR;
+
+	@unlink("/var/spool/sophos");
+	@unlink("/var/sys/chk_sophosd");
+
+	if(file_exists("$_ROOT_DIR/scripts/sophos/start")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/sophos/start");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/sophos/pre-start")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/sophos/pre-start");
+	}
+	@mybox_mkdirr("$_ROOT_DIR/avscan/children");
+	if(@sophos_config()==1 && @sophos_status()==1) {
+		if(mybox_exec_cmd("sophosd -D")==0) {
+			mybox_init_echo($_QUIET,"INFO","Starting SOPHOS AV service");
+			@touch("/var/sys/chk_sophosd");
+			if(file_exists("$_ROOT_DIR/scripts/sophos/post-start")) {
+				mybox_execq_cmd("$_ROOT_DIR/scripts/sophos/post-start");
+			}
+			if(!file_exists("/var/sys/init_no_restart") && file_exists("/var/sys/chk_p3scan")) {
+				mybox_echo_query("mail_proxy-restart-quiet");
+			}
+			return 0;
+		}
+	} 
+	@touch("/var/sys/chk_sophosd");
+	mybox_init_echo($_QUIET,"ERROR","Starting SOPHOS service failed");
+	return 1;
+}
+
+function sophos_stop() {
+	global $_QUIET, $_ROOT_DIR;
+	@unlink("/var/sys/chk_sophosd");
+	if(file_exists("$_ROOT_DIR/scripts/sophos/stop")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/sophos/stop");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/sophos/pre-stop")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/sophos/pre-stop");
+	}
+	if(mybox_killall("sophosd")==0) {
+		mybox_init_echo($_QUIET,"INFO","Shutting down SOPHOS AV service");
+		if(file_exists("$_ROOT_DIR/scripts/sophos/post-stop")) {
+			mybox_execq_cmd("$_ROOT_DIR/scripts/sophos/post-stop");
+		}
+		@unlink("/var/spool/sophos");
+		@mybox_unlink("$_ROOT_DIR/avscan/*");
+		return 0;
+	}
+	@touch("/var/sys/chk_sophosd");
+	mybox_init_echo($_QUIET,"ERROR","Shutting down SOPHOS AV service failed");
+	return 1;
+}
+
+function sophos_reload() {
+	global $_QUIET, $_ROOT_DIR;
+
+	if(file_exists("$_ROOT_DIR/scripts/sophos/reload")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/sophos/reload");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/sophos/pre-reload")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/sophos/pre-reload");
+	}
+
+	@mybox_mkdirr("$_ROOT_DIR/avscan/children");
+	if(@sophos_config()==1 && @sophos_status()==0) {
+		@exec("pkill -HUP -f sophosd",$out,$ret);
+		if($ret==0) {
+			mybox_init_echo($_QUIET,"INFO","Reloading SOPHOS AV service");
+			if(file_exists("$_ROOT_DIR/scripts/sophos/post-reload")) {
+				mybox_execq_cmd("$_ROOT_DIR/scripts/sophos/post-reload");
+			}
+			return 0;
+		}
+	}
+	mybox_init_echo($_QUIET,"ERROR","Reloading SOPHOS service failed");
+	@unlink("/var/sys/chk_sophosd");
+	return 1;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=sophos_start();
+		break;
+	case 'stop':
+		$ret=sophos_stop();
+		break;
+	case 'restart':
+		$ret=sophos_stop();
+		sleep(2);
+		$ret=sophos_start();
+		break;
+	case 'status':
+		$ret=sophos_status();
+		break;
+	case 'reload':
+		$ret=sophos_reload();
+		break;
+	case 'config':
+		$ret=sophos_config();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/reload/status]\n";
+		break;
+}
+exit($ret);
+?>

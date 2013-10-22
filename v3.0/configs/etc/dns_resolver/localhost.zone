@@ -1,0 +1,10 @@
+$ORIGIN localhost.
+@                       1D IN SOA       @ do-not-reply.mybox-notify.net. (
+                                        1178269157      ; serial
+                                        3H              ; refresh
+                                        15M             ; retry
+                                        1W              ; expiry
+                                        1D )            ; minimum
+
+                        1D IN NS        @
+                        1D IN A         127.0.0.1

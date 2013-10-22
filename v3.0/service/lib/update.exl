@@ -1,0 +1,455 @@
+<?php 
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+
+function mybox_update_alarm_handler($signal) {
+	exit;
+}
+
+function mybox_update_set_alarm($sec) {
+	declare(ticks = 1);
+	pcntl_signal(SIGALRM, "mybox_update_alarm_handler", true);
+	pcntl_alarm($sec);
+}
+
+function mybox_update_del_cacheset() {
+	@unlink("/var/sys/update.cache");
+}
+function mybox_update_setting(&$_update_firmware,&$_update_pattern,&$_update_save,
+				&$_update_speed,&$_update_proxy_stat,&$_update_proxy_host,
+				&$_update_proxy_port,&$_update_proxy_user_stat,
+				&$_update_proxy_user,&$_update_proxy_pass,$db_id='') {
+	global $_VERBOSE, $_DB_NAME;
+	$_update_firmware=0;
+	$_update_pattern=0;
+	$_update_save=1;
+	$_update_speed=0;
+	$_update_proxy_stat=0;
+	$_update_proxy_user_stat=0;
+	$_data=array();
+	$db_close=0;
+	if(file_exists("/var/sys/update.cache")) {
+		$_data=unserialize(mybox_fget_contents("/var/sys/update.cache"));
+	} else {
+		if($db_id=='') {
+			$db_id=mybox_db_connect($_DB_NAME);
+			$db_close=1;
+		}
+		$result=mybox_db_query("select * from misc where name like \"update_%\"",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_name=trim($row['name']);
+				$_val=trim($row['val']);
+				$_data[$_name]=$_val;
+				unset($_name,$_val);
+			}
+		}
+		unset($_name,$_val);
+		if($db_close==1) mybox_db_close($db_id);
+		mybox_save_to_file("/var/sys/update.cache",serialize($_data));
+	}
+	if(count($_data)!=0) {
+		foreach($_data as $_name => $_val) {
+			$_name="_$_name";
+			$$_name=$_val;
+		}
+	}
+}
+
+function mybox_update_version_convert($ver) {
+	$n=0;
+	if(preg_match("/(\d\d)\.(\d\d)(\d\d)(\d\d)/",$ver,$mm)) {
+		$y=$mm[1];
+		$m=$mm[2];
+		$h=$mm[3];
+		$d=$mm[4];
+		$n=strtotime("$m/$d/$y $h:00:00");
+	}
+	return $n;
+}
+
+function mybox_update_version_check($ver) {
+	global $_VERBOSE, $_UPDATE_PATH;
+	$cv=mybox_update_version_convert(mybox_fget_contents("/etc/firmware"));
+	$cn=mybox_update_version_convert($ver);
+	if($cv >= $cn) return 0;
+	return 1;
+}
+
+function mybox_update_get_pkg_info($file) {
+	$fx=basename($file,".mpu");
+	$vn='';
+	exec("/bin/tar -O -zxf $file $fx/info 2>/dev/null",$out,$ret);
+	if($ret==0) {
+		if(count($out)==0) return;
+		foreach($out as $txt) {
+			$vn .="$txt\n";
+		}
+	}
+	return $vn;
+}
+function mybox_update_get_pkg_options($file) {
+	$fx=basename($file,".mpu");
+	$vn='';
+	exec("/bin/tar -O -zxf $file $fx/options 2>/dev/null",$out,$ret);
+	if($ret==0) {
+		if(count($out)==0) return;
+		foreach($out as $txt) {
+			$vn .="$txt\n";
+		}
+	}
+	return $vn;
+}
+function mybox_update_chk_file($file) {
+	$vc=mybox_fget_contents("/etc/version_core");
+	$fx=basename($file,".mpu");
+	if(!preg_match("/update-(.*)/",$fx,$mm)) return 0;
+	$vt="{$vc}.{$mm[1]}";
+	exec("/bin/tar -O -zxf $file $fx/version 2>/dev/null",$out,$ret);
+	if($ret==0) {
+		if(count($out)==0) return 0;
+		$vn=trim($out[0]);
+		if($vn=='') return 0;
+		if($vt!=$vn) return 0;
+		return 1;
+	}
+	return 0;
+}
+
+function mybox_update_dl_list() {
+	@unlink("$_UPDATE_PATH/FIRMWARE-DL.DONE");
+	$buff=mybox_dir2array("$_UPDATE_PATH/files/*.mpu");
+	if(count($buff)==0) return 0;
+	$sk='';
+	foreach($buff as $lx) {
+		$ln=basename($lx);
+		$sk .="$ln,";
+		unset($ln,$lx);
+	}
+	$sk=trim($sk,",");
+	if($sk!='') mybox_save_to_file("$_UPDATE_PATH/FIRMWARE-DL.DONE",$sk);
+	return 1;
+}
+
+function mybox_update_dl_chk() {
+	global $_VERBOSE, $_UPDATE_PATH;
+	$buff=mybox_dir2array("$_UPDATE_PATH/files_part/*.mpu");
+	if(count($buff)==0) return 0;
+	foreach($buff as $lx) {
+		if(mybox_update_chk_file($lx)==1) {
+			$ln=basename($lx);
+			if(rename($lx,"$_UPDATE_PATH/files/$ln")==TRUE) {
+				mybox_update_log($_VERBOSE,"INFO","New firmware update '$ln' ready for installation");
+			} else {
+				mybox_update_log($_VERBOSE,"INFO","New firmware update '$ln' file corrupted");
+				@unlink($lx);
+			}
+		} else {
+			mybox_update_log($_VERBOSE,"INFO","New firmware update '$ln' file corrupted");
+			@unlink($lx);
+		}
+		unset($ln,$lx);
+	}
+	mybox_update_dl_list();
+}
+
+function mybox_update_send_notice() {
+	touch("/tmp/NOTICE");
+	return 0;
+}
+
+function mybox_update_dl_status($file) {
+	$ret=0;
+	if($fi=fopen($file,"r")) {
+		while($buff=fgets($fi,108)) {
+			$buff=trim($buff);
+			if($buff!='') {
+				if(preg_match("/^FINISHED/",$buff)) {
+					$ret=1;
+					break;
+				} elseif(preg_match("/^The file is already fully retrieved/",$buff)) {
+					$ret=2;
+					break;
+				}
+			}
+		}
+		fclose($fi);
+	}
+	@unlink($file);
+	return $ret;
+}
+
+function mybox_update_cancel($signo) {
+	global $_VERBOSE, $log, $log1;
+	if(isset($log)&&$log!='' && file_exists($log)) @unlink($log);
+	if(isset($log1)&&$log1!='' && file_exists($log1)) @unlink($log1);
+	@unlink("/var/sys/firm_download");
+	@unlink("/var/sys/firm_update");
+	mybox_unlink("/tmp/ips-*.bck");
+	mybox_unlink("/tmp/cf-*.bck");
+	if($signo!="-99999") mybox_update_dl_chk();
+}
+
+function mybox_update_dl_firmware() {
+	global $_VERBOSE, $_UPDATE_PATH, $_PAT_PATH, $log;
+	pcntl_signal(SIGINT, "mybox_update_cancel");
+	pcntl_signal(SIGTSTP, "mybox_update_cancel");
+	pcntl_signal(SIGALRM, "mybox_update_cancel");
+
+	mybox_update_set_alarm("3600");
+
+	mybox_update_setting(&$_update_firmware,&$_update_pattern,&$_update_save,
+				&$_update_speed,&$_update_proxy_stat,&$_update_proxy_host,
+				&$_update_proxy_port,&$_update_proxy_user_stat,
+				&$_update_proxy_user,&$_update_proxy_pass);
+
+	mybox_update_log($_VERBOSE,"INFO","Starting Firmware Update Downloader");
+	if(mybox_get_progpid("wget")!="") {
+		mybox_update_log($_VERBOSE,"ERROR","Another instance of this process is already running, exiting");
+		mybox_update_cancel("-99999");
+		return 0;
+	}
+	$vc=mybox_fget_contents("/etc/version_core");
+	$match='';
+	$rc="robots=off\n";
+	$log="/tmp/dl".time().".log";
+	$set="-r -c --no-cache --no-parent --user-agent=\"Mybox/v{$vc}\" --tries=45 -nd -nH -l1";
+	if($_VERBOSE==0) $set .=" --output-file=$log";
+	if(file_exists("$_UPDATE_PATH/FIRMWARE.NEW")) {
+		$match=mybox_fget_contents("$_UPDATE_PATH/FIRMWARE.NEW");
+		$match=trim($match,",");
+	}
+	if($match=='') return 0;
+	$set .=" -A \"$match\"";
+	if(file_exists("$_UPDATE_PATH/FIRMWARE-DL.DONE")) {
+		$skip=mybox_fget_contents("$_UPDATE_PATH/FIRMWARE-DL.DONE");
+		if($skip!='') $set .=" -R \"$skip\"";
+	}
+	if($_update_proxy_stat==1) {
+		$rc .="http_proxy=\"http://{$_update_proxy_host}:{$_update_proxy_port}/\"\n";
+		if($_update_proxy_user_stat==1) {
+			$pass=mybox_str_decrypt($_update_proxy_pass);
+			$set .=" --proxy --proxy-user={$_update_proxy_user} --proxy-password={$pass}";
+		}
+	}
+	if($_update_speed!=0) $set .=" --limit-rate={$_update_speed}k";
+	$set .=" -P $_UPDATE_PATH/files_part http://updates.mybox.com.my/pub/v{$vc}";
+	mybox_save_to_file("/etc/wgetrc","$rc");
+	$do=0;
+	@touch("/var/sys/firm_download");
+	@system("/bin/wget $set",$ret);
+	mybox_update_dl_chk();
+	if($ret==0) {
+		if(mybox_update_dl_status($log)==1) {
+			mybox_update_send_notice();
+		}
+	}
+	@unlink($log);
+	@unlink("/var/sys/firm_download");
+	mybox_update_log($_VERBOSE,"INFO","Stopping Firmware Update Downloader");
+}
+
+function mybox_update_get_update() {
+	global $_VERBOSE, $_UPDATE_PATH, $_PAT_PATH, $log1;
+	mybox_update_set_alarm("3600");
+	mybox_update_get_pat_ver();
+	$dl_frim=mybox_update_get_firm_ver();
+	mybox_update_setting(&$_update_firmware,&$_update_pattern,&$_update_save,
+				&$_update_speed,&$_update_proxy_stat,&$_update_proxy_host,
+				&$_update_proxy_port,&$_update_proxy_user_stat,
+				&$_update_proxy_user,&$_update_proxy_pass);
+	$vc=mybox_fget_contents("/etc/version_core");
+	if($_update_firmware==1 && file_exists("$_UPDATE_PATH/FIRMWARE.NEW") && $dl_frim==1) {
+		mybox_update_dl_firmware();
+	}
+	pcntl_signal(SIGINT, "mybox_update_cancel");
+	pcntl_signal(SIGTSTP, "mybox_update_cancel");
+	pcntl_signal(SIGALRM, "mybox_update_cancel");
+	$log1="/tmp/sync".time().".log";
+	if($_update_pattern==1) {
+		unset($ret);
+		if(mybox_update_chk_pat_ver()!=0) {
+			mybox_update_set_alarm("3600");
+			mybox_update_log($_VERBOSE,"INFO","Starting Pattern Update Installer");
+			if(mybox_get_progpid("rsync")!="") {
+				mybox_update_log($_VERBOSE,"ERROR","Another instance of this process is already running, exiting");
+				mybox_update_cancel("-99999");				
+				return 0;
+			}
+			$pcn=mybox_fget_contents("$_UPDATE_PATH/PAT.VERSION");
+			$ipsb="ips-".time().".bck";
+			$cfb="cf-".time().".bck";
+			$_cmd='';
+			$_cmd .="/bin/rsync --delete-after -azu ";
+			if($_VERBOSE==1) $_cmd .="-v --progress "; 
+			$_cmd .="--exclude=\"ips_cnt.cache\" ";
+			$_cmd .="--exclude=\"ips_drop\" ";
+			$_cmd .="--exclude=\"ips.conf\" ";
+			$_cmd .="--exclude=\"ips-im.conf\" ";
+			$_cmd .="--exclude=\"ips-p2p.conf\" ";
+			$_cmd .="--exclude=\"ips.config-p2p\" ";
+			$_cmd .="--exclude=\"ips.config-last\" ";
+			$_cmd .="--exclude=\"barnyard.conf\" ";
+			$_cmd .="--exclude=\"pscan_cnt.cache\" ";
+			$_cmd .="--exclude=\"queue\" ";
+			$_cmd .="--exclude=\"queue.a\" ";
+			$_cmd .="--exclude=\"ips_active.array\" ";
+			$_cmd .="--exclude=\"sid-msg.map\" ";
+			$_cmd .="--exclude=\"url_block\" ";
+			$_cmd .="--exclude=\"SITE_REDIRECT\" ";
+			$_cmd .="--exclude=\"EXT_BLOCK\" ";
+			$_cmd .="--exclude=\"DOMAIN_EXCLUDE\" ";
+			$_cmd .="--exclude=\"version\" ";
+			if($_VERBOSE==0) $_cmd .="--log-file=$log1 ";
+			if($_update_speed!=0) $set .="--bwlimit={$_update_speed}k ";
+        		$_cmd .="update@updates.mybox.com.my::v{$vc} $_PAT_PATH/";
+			mybox_backup_ips_setting("/tmp/$ipsb");
+			mybox_backup_cf_setting("/tmp/$cfb");
+			putenv("RSYNC_PASSWORD=update");
+			if($_VERBOSE==0) {
+				exec("$_cmd 2>/dev/null",$out,$ret);
+			} else {
+				system("$_cmd",$ret);
+			}
+			mybox_restore_ips_setting("/tmp/$ipsb");
+			mybox_restore_cf_setting("/tmp/$cfb");
+			@unlink("/tmp/$ipsb");
+			if($ret==0) {
+				copy("$_UPDATE_PATH/PAT.VERSION","$_PAT_PATH/version");
+				mybox_update_log($_VERBOSE,"INFO","Updating new pattern update '$pcn' successful");
+			} else {
+				mybox_update_log($_VERBOSE,"ERROR","Updating new pattern update '$pcn' failed");
+			}
+			mybox_update_log($_VERBOSE,"INFO","Stopping Pattern Update Installer");
+		}
+	}
+	@unlink($log1);	
+}
+
+function mybox_update_get_pat_ver() {
+	global $_VERBOSE, $_PAT_PATH, $_UPDATE_PATH;
+	$vc=mybox_fget_contents("/etc/version_core");
+	$cv=mybox_fget_contents("$_PAT_PATH/version");
+	$cn=file_get_contents("http://info.mybox.com.my/patchk.php?chk=1&vc=$vc");
+	mybox_update_log($_VERBOSE,"INFO","Searching for available pattern update");
+	$vn=mybox_fget_contents("$_PAT_PATH/version");
+	if(($cn!='' && $vn!='')&&($cn==$vn)) $cn='';
+	if($cn=='') {
+		mybox_update_log($_VERBOSE,"INFO","No pattern update available for installation");
+		$cn=$cv;
+	} else {
+		mybox_update_log($_VERBOSE,"INFO","New pattern update available: $cn");
+	}
+	mybox_save_to_file("$_UPDATE_PATH/PAT.VERSION","$cn\n");
+}
+
+function mybox_update_get_firm_ver() {
+	global $_VERBOSE, $_PAT_PATH, $_UPDATE_PATH;
+	$vc=mybox_fget_contents("/etc/version_core");
+	$vs=mybox_fget_contents("/etc/firmware");
+	$cn=file_get_contents("http://info.mybox.com.my/firmchk.php?chk=1&vc=$vc&vs=$vs");
+	$cn=trim($cn);
+	$fn=mybox_fget_contents("$_UPDATE_PATH/FIRMWARE.NEW");
+	$fb=mybox_fget_contents("$_UPDATE_PATH/FIRMWARE-DL.DONE");
+	if(($cn!='' && $fn!='')&&($cn==$fn)) $cn='';
+	$ret=0;
+	if(($cn!='' && $fb!='')&&($cn==$fb)) {
+		$cn='';
+		$ret=0;
+	}
+	mybox_update_log($_VERBOSE,"INFO","Searching for available firmware update");
+	if($cn!='') {
+		mybox_update_log($_VERBOSE,"INFO","New firmware update available: $cn");
+		mybox_save_to_file("$_UPDATE_PATH/FIRMWARE.NEW","$cn\n");
+		$ret=1;
+	} else {
+		mybox_update_log($_VERBOSE,"INFO","No firmware update available for installation");
+		$ret=0;
+	}
+	return $ret;
+}
+
+function mybox_update_chk_pat_ver() {
+	global $_VERBOSE, $_PAT_PATH, $_UPDATE_PATH;
+	$cv=mybox_update_version_convert(mybox_fget_contents("$_PAT_PATH/version"));
+	if(!file_exists("$_UPDATE_PATH/PAT.VERSION")) mybox_update_get_pat_ver();
+	$cnn=mybox_fget_contents("$_UPDATE_PATH/PAT.VERSION");
+	$cn=mybox_update_version_convert($cnn);
+	if($cv >= $cn) return 0;
+	return $cnn;
+}
+$_FORCE=0;
+function mybox_update_firmware() {
+	global $_VERBOSE, $_UPDATE_PATH, $_RTMP_PATH;
+	global $_FORCE;
+	$buff=mybox_dir2array("$_UPDATE_PATH/files/*.mpu");
+	if(count($buff)==0) return 0;
+	@unlink("/tmp/post-update");
+	mybox_update_setting(&$_update_firmware,&$_update_pattern,&$_update_save,
+				&$_update_speed,&$_update_proxy_stat,&$_update_proxy_host,
+				&$_update_proxy_port,&$_update_proxy_user_stat,
+				&$_update_proxy_user,&$_update_proxy_pass);
+	mybox_update_log($_VERBOSE,"INFO","Starting firmware update installer");
+	$sk=array();$del=array();
+	$ok=0;
+	@touch("/var/sys/firm_update");
+	foreach($buff as $lx) {
+		$lnx=basename($lx,".mpu");
+		if(!preg_match("/update-(.*)/",$lnx,$mm)) return 0;
+		$pn=$mm[1];
+		if(mybox_update_version_check($pn)==0 && $_FORCE==0) continue;
+		$ok++;
+		$out=array();
+		exec("tar -C $_RTMP_PATH -zxf $lx 2>/dev/null",$out,$ret);
+		if($ret==0 && file_exists("$_RTMP_PATH/$lnx/setup")) {
+			if(chdir("$_RTMP_PATH/$lnx")===TRUE) {
+				exec("./setup 2>/dev/null",$out1,$ret1);
+				if($ret1==0) {
+					$sk[]="$pn";
+					$del[]="$lx";
+					mybox_save_to_file("$_UPDATE_PATH/SYSTEM.VERSION","$pn\n");
+					mybox_save_to_file("/etc/firmware","$pn\n");
+					mybox_update_log($_VERBOSE,"INFO","Updating new firmware update '$pn' successful");
+				} else {
+					mybox_update_log($_VERBOSE,"ERROR","Updating new firmware update '$pn' failed");
+				}
+				unset($ret1,$out1);
+			}
+			@chdir("/");
+			@mybox_rmdir("$_RTMP_PATH/$lnx");
+		}
+		unset($ret,$lnx,$mm);
+	}
+	if($_update_save==0 && count($del)!=0) {
+		foreach($del as $ff) {
+			if(file_exists($ff)) @unlink($ff);
+		}
+	}
+	if(count($sk)!=0) {
+		$sko=mybox_file2array("$_UPDATE_PATH/SYSTEM.INDEX");
+		$skn=array_merge($sko, $sk);
+		sort($skn);
+		$kb=array();
+		foreach($skn as $lk) {
+			if($kb[$lk]==1) continue;
+			$kb[$lk]=1;
+		}
+		foreach($kb as $a => $b) {
+			$fn .="$a\n";
+		}
+		if($fn!='') mybox_save_to_file("$_UPDATE_PATH/SYSTEM.INDEX",$fn);
+	}
+	@unlink("$_UPDATE_PATH/FIRMWARE-DL.DONE");
+	if($ok==0) {
+		mybox_update_log($_VERBOSE,"INFO","No firmware update for installation");
+	}
+	if(file_exists("/tmp/post-update")) {
+		mybox_update_log($_VERBOSE,"INFO","Running post-installation script");
+		mybox_update_log($_VERBOSE,"INFO","Stopping firmware update installer");
+		exec("/bin/sh /tmp/post-update 2>/dev/null");
+		@unlink("/tmp/post-update");
+	} else {
+		mybox_update_log($_VERBOSE,"INFO","Stopping firmware update installer");
+	}
+	@unlink("/var/sys/firm_update");
+}
+?>

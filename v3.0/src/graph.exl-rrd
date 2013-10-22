@@ -1,0 +1,615 @@
+<?
+//last update 7:40 PM 15/11/2005
+// updates: 05-Nov-2006; update to rrdtool-1.2.x
+
+//if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+
+$rrdtool=new Perl();
+$rrdtool->eval('use RRDs;');
+
+// traffic
+function mybox_create_traffic_db($dev) {
+	global $_RRA_PATH, $rrdtool;
+	$rrd_source="$_RRA_PATH/traffic_$dev".".db";
+	if(file_exists("$rrd_source")) return;
+
+	$rrdtool->{"RRDs::create"}("$rrd_source",
+						"--step",
+						"300",
+						"DS:traffic_in:COUNTER:600:0:U",
+						"DS:traffic_out:COUNTER:600:0:U",
+						"RRA:AVERAGE:0.5:1:600",
+						"RRA:AVERAGE:0.5:6:700",
+						"RRA:AVERAGE:0.5:24:775",
+						"RRA:AVERAGE:0.5:288:797",
+						"RRA:MAX:0.5:1:600",
+						"RRA:MAX:0.5:6:700",
+						"RRA:MAX:0.5:24:775",
+						"RRA:MAX:0.5:288:797"
+					);
+}
+
+function mybox_update_traffic_db($dev) {
+	global $_RRA_PATH, $time, $rrdtool;
+	if(!file_exists("/var/sys/net_graph")) return 1;
+	$_INFO=unserialize(mybox_fget_contents("/var/sys/net_graph"));
+	if(count($_INFO)==0) return 1;
+
+	$rrd_source="$_RRA_PATH/traffic_$dev".".db";
+	if(!file_exists("$rrd_source")) mybox_create_traffic_db($dev);
+	$_dev=get_dev_traffic();
+	$value_in=trim($_dev[$dev]['rx_bytes']);
+	$value_out=trim($_dev[$dev]['tx_bytes']);
+
+	$rrdtool->{"RRDs::update"}("$rrd_source",
+					"--template",
+					"traffic_out:traffic_in",
+					"$time:$value_out:$value_in"
+				);
+	$rrdtool->{"RRDs::tune"}("$rrd_source",
+					"--minimum",
+					"traffic_in:0"
+				);
+	$rrdtool->{"RRDs::tune"}("$rrd_source",
+					"--minimum",
+					"traffic_out:0"
+				);
+}
+
+function mybox_create_traffic_graph($type='default',$name='traffic_',$title,$dev,$datestart,$dateend,$rra_step,$height='120',$width='500') {
+	global $_RRA_PATH, $_GRAPH_PATH, $rrd_lastupdate, $rrdtool;
+	@unlink("$_GRAPH_PATH/$name.png");
+	if(!file_exists("/var/sys/net_graph")) return;
+	$_INFO=unserialize(mybox_fget_contents("/var/sys/net_graph"));
+	if(count($_INFO)==0) return 1;
+	$_ipaddrname=$_INFO[$dev]['name'];
+	$_ipaddrip=$_INFO[$dev]['ip'];
+	$rrd_source="$_RRA_PATH/traffic_$dev".".db";
+
+	if($_ipaddrname=='') return;
+
+	$title="Traffic - $title $_ipaddrname ($dev) $_ipaddrip";
+	$_times=trim($datestart,"-");
+	$_times=time() - $_times;
+	$_timee=trim($dateend,"-");
+	$_timee=time() - $_timee;
+	$_timef=date('d-M-Y H:i:s',$_times);
+	$_timef=preg_replace("/:/","\:",$_timef);
+	$_timet=date('d-M-Y H:i:s',$_timee);
+	$_timet=preg_replace("/:/","\:",$_timet);
+
+	$rrdtool->{"RRDs::graph"}("$_GRAPH_PATH/$name.png",
+			"--imgformat=PNG",
+			"--color=BACK#FFFFFF",
+			"--start=$datestart",
+			"--end=$dateend",
+			"--title=$title",
+			"--rigid",
+			"--interlaced",
+			"--base=1024",
+			"--height=$height",
+			"--width=$width",
+			"--alt-autoscale-max",
+			"--lower-limit=0",
+			"--vertical-label=Bits per second",
+			"--slope-mode",
+			"COMMENT:From $_timef to $_timet\c",
+			"COMMENT: \\n",
+			"DEF:a=$rrd_source:traffic_in:AVERAGE",
+			"DEF:b=$rrd_source:traffic_out:AVERAGE",
+			"CDEF:cdefa=a,8,*",
+			"CDEF:cdeff=b,8,*",
+			"AREA:cdefa#EA8F00:Inbound ",
+			"GPRINT:cdefa:LAST:Current\:%8.2lf %s",
+			"GPRINT:cdefa:AVERAGE:Average\:%8.2lf %s",
+			"GPRINT:cdefa:MAX:Maximum\:%8.2lf %s",
+			"COMMENT: \\n",
+			"LINE1:cdeff#FF0000:Outbound",
+			"GPRINT:cdeff:LAST:Current\:%8.2lf %s",
+			"GPRINT:cdeff:AVERAGE:Average\:%8.2lf %s",
+			"GPRINT:cdeff:MAX:Maximum\:%8.2lf %s",
+			"COMMENT:\\n"
+		);
+}
+
+function mybox_get_traffic_graph() {
+	global $_DB_NAME, $_CREATE_GRAPH;
+	//foreach(get_dev_traffic() as $dev => $b) {
+	foreach(mybox_if_dev_up_array() as $dev => $b) {
+		$dev=trim($dev);
+		//if(!preg_match("/eth(\d+)$/",$dev)) continue;
+		mybox_create_traffic_db($dev);
+		mybox_update_traffic_db($dev);
+		if($_CREATE_GRAPH==1) {
+			$daily="traffic_$dev"."_daily";
+			$weekly="traffic_$dev"."_weekly";
+			$monthly="traffic_$dev"."_monthly";
+			$yearly="traffic_$dev"."_yearly";
+			mybox_create_traffic_graph('default',$daily,'Daily',$dev,'-86400','-300',1);
+			mybox_create_traffic_graph('default',$weekly,'Weekly',$dev,'-604800','-1800',6);
+			mybox_create_traffic_graph('default',$monthly,'Monthly',$dev,'-2678400','-7200',24);
+			mybox_create_traffic_graph('default',$yearly,'Yearly',$dev,'-33053184','-86400',288);
+			unset($daily,$weekly,$monthly,$yearly);
+			usleep(7500); // cpu tune;
+		}
+	}
+}
+
+// end traffic
+// cpu 
+function mybox_create_cpu_db() {
+	global $_RRA_PATH, $rrdtool;
+	$rrd_source="$_RRA_PATH/cpu.db";
+
+	if(file_exists("$rrd_source")) return;
+	$rrdtool->{"RRDs::create"}("$rrd_source",
+						"--step",
+						"300",
+						"DS:used:GAUGE:600:0:500",
+						"RRA:AVERAGE:0.5:1:600",
+						"RRA:AVERAGE:0.5:6:700",
+						"RRA:AVERAGE:0.5:24:775",
+						"RRA:AVERAGE:0.5:288:797",
+						"RRA:MAX:0.5:1:600",
+						"RRA:MAX:0.5:6:700",
+						"RRA:MAX:0.5:24:775",
+						"RRA:MAX:0.5:288:797"
+					);
+}
+
+function mybox_update_cpu_db() {
+	global $_RRA_PATH, $time, $rrdtool;
+
+	$rrd_source="$_RRA_PATH/cpu.db";
+
+	putenv("TERM=linux");
+	exec("procinfo",$buff,$ret);
+	$idle=0;
+        $str=trim($buff[10]);
+	if(preg_match("/\s+(\S+)\%\s+/",$str,$mm)) {
+		$idle=round($mm[1]);	
+	}
+	$cpu=(100 - $idle);
+
+	$rrdtool->{"RRDs::update"}("$rrd_source",
+					"--template",
+					"used",
+					"$time:$cpu"
+				);
+}
+
+function mybox_create_cpu_graph($name,$title,$datestart,$dateend,$rra_step,$height='120',$width='500') {
+	global $_RRA_PATH, $_GRAPH_PATH, $rrdtool;
+
+	$rrd_source="$_RRA_PATH/cpu.db";
+
+	$_times=trim($datestart,"-");
+	$_times=time() - $_times;
+	$_timee=trim($dateend,"-");
+	$_timee=time() - $_timee;
+	$_timef=date('d-M-Y H:i:s',$_times);
+	$_timef=preg_replace("/:/","\:",$_timef);
+	$_timet=date('d-M-Y H:i:s',$_timee);
+	$_timet=preg_replace("/:/","\:",$_timet);
+
+	$rrdtool->{"RRDs::graph"}("$_GRAPH_PATH/$name.png",
+			"--imgformat=PNG",
+			"--color=BACK#FFFFFF",
+			"--start=$datestart",
+			"--end=$dateend",
+			"--title=$title",
+			"--rigid",
+			"--interlaced",
+			"--height=$height",
+			"--width=$width",
+			"--upper-limit=100",
+			"--lower-limit=0",
+			"--units-exponent=0",
+			"--slope-mode",
+			"--base=1024",
+			"--vertical-label=percent",
+			"COMMENT:From $_timef to $_timet\c",
+			"COMMENT: \\n",
+			"DEF:a=$rrd_source:used:AVERAGE",
+			"AREA:a#EA8F00:CPU\tusage(%)",
+			"GPRINT:a:LAST:Current\:%8.1lf",
+			"GPRINT:a:AVERAGE:Average\:%8.1lf",
+			"GPRINT:a:MAX:Maximum\:%8.1lf\\n"
+		);
+}
+
+function mybox_get_cpu_graph() {
+	global $_CREATE_GRAPH;
+	mybox_create_cpu_db();
+	mybox_update_cpu_db();
+	if($_CREATE_GRAPH==0) return;
+	// cpu
+	mybox_create_cpu_graph('cpu_daily','CPU Usage Daily','-86400','-300',1,100,500);
+	mybox_create_cpu_graph('cpu_weekly','CPU Usage Weekly','-604800','-1800',6,100,500);
+	mybox_create_cpu_graph('cpu_monthly','CPU Usage Monthly','-2678400','-7200',24,100,500);
+	mybox_create_cpu_graph('cpu_yearly','CPU Usage Yearly','-33053184','-86400',288,100,500);
+}
+// end cpu usage
+// mem usage
+function mybox_create_mem_db() {
+	global $_RRA_PATH, $rrdtool;
+	$rrd_source="$_RRA_PATH/memory.db";
+
+	if(file_exists("$rrd_source")) return;
+	$rrdtool->{"RRDs::create"}("$rrd_source",
+						"--step",
+						"300",
+						"DS:mem_used:GAUGE:600:0:500",
+						"DS:swap_used:GAUGE:600:0:500",
+						"RRA:AVERAGE:0.5:1:600",
+						"RRA:AVERAGE:0.5:6:700",
+						"RRA:AVERAGE:0.5:24:775",
+						"RRA:AVERAGE:0.5:288:797",
+						"RRA:MAX:0.5:1:600",
+						"RRA:MAX:0.5:6:700",
+						"RRA:MAX:0.5:24:775",
+						"RRA:MAX:0.5:288:797"
+					);
+
+}
+function mybox_update_mem_db() {
+	global $_RRA_PATH, $time, $rrdtool;
+
+	$rrd_source="$_RRA_PATH/memory.db";
+
+	$memtotal=0;$memfree=0;$memused=0;
+	$swaptotal=0;$swapfree=0;$swapused=0;
+	$memp=0;$swapp=0;
+
+	if(file_exists("/proc/meminfo")) {
+		$buff=file("/proc/meminfo");
+		if(count($buff)!=0) {
+			foreach($buff as $lx) {
+				$lx=trim($lx);
+				if($lx=='') continue;
+				if(preg_match("/^MemTotal\:\s+(\d+)\s+/",$lx,$mm)) {
+					$memtotal=$mm[1];
+				}
+				unset($mm);
+				if(preg_match("/^MemFree\:\s+(\d+)\s+/",$lx,$mm)) {
+					$memfree=$mm[1];
+				}
+				unset($mm);
+				if(preg_match("/^MemUsed\:\s+(\d+)\s+/",$lx,$mm)) {
+					$memused=$mm[1];
+				}
+				unset($mm);
+				if(preg_match("/^SwapTotal\:\s+(\d+)\s+/",$lx,$mm)) {
+					$swaptotal=$mm[1];
+				}
+				unset($mm);
+				if(preg_match("/^SwapFree\:\s+(\d+)\s+/",$lx,$mm)) {
+					$swapfree=$mm[1];
+				}
+				unset($mm);
+				if(preg_match("/^SwapUsed\:\s+(\d+)\s+/",$lx,$mm)) {
+					$swapused=$mm[1];
+				}
+			}
+			unset($buff,$lx);
+			$memp=@(($memused / $memtotal) * 100);
+			$swapp=@(($swapused / $swaptotal) * 100);
+			$memp=round($memp,0);
+			$swapp=round($swapp,0);
+		}
+	}
+
+	$rrdtool->{"RRDs::update"}("$rrd_source",
+					"--template",
+					"mem_used:swap_used",
+					"$time:$memp:$swapp"
+				);
+}
+
+function mybox_create_mem_graph($name,$title,$datestart,$dateend,$rra_step,$height='120',$width='500') {
+	global $_RRA_PATH, $_GRAPH_PATH, $rrdtool;
+
+	$rrd_source="$_RRA_PATH/memory.db";
+
+	$_times=trim($datestart,"-");
+	$_times=time() - $_times;
+	$_timee=trim($dateend,"-");
+	$_timee=time() - $_timee;
+	$_timef=date('d-M-Y H:i:s',$_times);
+	$_timef=preg_replace("/:/","\:",$_timef);
+	$_timet=date('d-M-Y H:i:s',$_timee);
+	$_timet=preg_replace("/:/","\:",$_timet);
+
+	$rrdtool->{"RRDs::graph"}("$_GRAPH_PATH/$name.png",
+				"--imgformat=PNG",
+				"--color=BACK#FFFFFF",
+				"--start=$datestart",
+				"--end=$dateend",
+				"--title=$title",
+				"--rigid",
+				"--interlaced",
+				"--height=$height",
+				"--width=$width",
+				"--upper-limit=100",
+				"--lower-limit=0",
+				"--units-exponent=0",
+				"--slope-mode",
+				"--base=1024",
+				"--vertical-label=percent",
+				"COMMENT:From $_timef to $_timet\c",
+				"COMMENT: \\n",
+				"DEF:a=$rrd_source:mem_used:AVERAGE",
+				"DEF:b=$rrd_source:swap_used:AVERAGE",
+				"AREA:a#FF5700:Memory\tusage(%)",
+				"GPRINT:a:LAST: Current\:%8.1lf",
+				"GPRINT:a:AVERAGE:Average\:%8.1lf",
+				"GPRINT:a:MAX:Maximum\:%8.1lf\\n",
+				"AREA:b#FFC73B:Swap\\tusage(%)",
+				"GPRINT:b:LAST: Current\:%8.1lf",
+				"GPRINT:b:AVERAGE:Average\:%8.1lf",
+				"GPRINT:b:MAX:Maximum\:%8.1lf\\n"
+			);
+
+}
+function mybox_get_mem_graph() {
+	global $_CREATE_GRAPH;
+	mybox_create_mem_db();
+	mybox_update_mem_db();
+	if($_CREATE_GRAPH==0) return;
+	mybox_create_mem_graph('mem_daily','Memory/Swap Usage Daily','-86400','-300',1,100,500);
+	mybox_create_mem_graph('mem_weekly','Memory/Swap Usage Weekly','-604800','-1800',6,100,500);
+	mybox_create_mem_graph('mem_monthly','Memory/Swap Usage Monthly','-2678400','-7200',24,100,500);
+	mybox_create_mem_graph('mem_yearly','Memory/Swap Usage Yearly','-33053184','-86400',288,100,500);
+}
+// end mem usage
+
+// storage
+function mybox_create_storage_db() {
+	global $_RRA_PATH, $rrdtool;
+	$rrd_source="$_RRA_PATH/storage.db";
+
+	if(file_exists("$rrd_source")) return;
+	$rrdtool->{"RRDs::create"}("$rrd_source",
+						"--step",
+						"300",
+						"DS:root:GAUGE:600:0:500",
+						"DS:strg:GAUGE:600:0:5000",
+						"DS:boot:GAUGE:600:0:5000",
+						"RRA:AVERAGE:0.5:1:600",
+						"RRA:AVERAGE:0.5:6:700",
+						"RRA:AVERAGE:0.5:24:775",
+						"RRA:AVERAGE:0.5:288:797",
+						"RRA:MAX:0.5:1:600",
+						"RRA:MAX:0.5:6:700",
+						"RRA:MAX:0.5:24:775",
+						"RRA:MAX:0.5:288:797"
+					);
+}
+
+function mybox_update_storage_db() {
+	global $_RRA_PATH, $time, $rrdtool;
+
+	$rrd_source="$_RRA_PATH/storage.db";
+
+	exec("df",$buff,$ret);
+	$rtotal=0;$rfree=0;$rused=0;$rusedp=0;
+	$stotal=0;$sfree=0;$sused=0;$susedp=0;
+	$btotal=0;$bfree=0;$bused=0;$busedp=0;
+        if(count($buff)!=0) {
+		foreach($buff as $lx) {
+			$lx=trim($lx);
+			if($lx=='') continue;
+			if(preg_match("/^virtual\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+/",$lx,$mm)) {
+				$rtotal=$mm[1];
+				$rused=$mm[2];
+				$rfree=$mm[3];
+				$rfusedp=trim($mm[4],'%');
+			} elseif(preg_match("/^(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+\/strg/",$lx,$mm)) {
+				$stotal=$mm[2];
+				$sused=$mm[3];
+				$sfree=$mm[4];
+				$sfusedp=trim($mm[5],'%');
+			} elseif(preg_match("/^(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+\/boot/",$lx,$mm)) {
+				$btotal=$mm[2];
+				$bused=$mm[3];
+				$bfree=$mm[4];
+				$bfusedp=trim($mm[5],'%');
+			}
+		}
+		$rfusedp=round($rfusedp,0);
+		$sfusedp=round($sfusedp,0);
+		$bfusedp=round($bfusedp,0);
+	}
+	unset($buff,$mm);
+
+	$rrdtool->{"RRDs::update"}("$rrd_source",
+					"--template",
+					"root:strg:boot",
+					"$time:$rfusedp:$sfusedp:$bfusedp"
+				);
+}
+
+function mybox_create_storage_graph($name,$title,$datestart,$dateend,$rra_step,$height='120',$width='500') {
+	global $_RRA_PATH, $_GRAPH_PATH, $rrdtool;
+
+	$rrd_source="$_RRA_PATH/storage.db";
+
+	$_times=trim($datestart,"-");
+	$_times=time() - $_times;
+	$_timee=trim($dateend,"-");
+	$_timee=time() - $_timee;
+	$_timef=date('d-M-Y H:i:s',$_times);
+	$_timef=preg_replace("/:/","\:",$_timef);
+	$_timet=date('d-M-Y H:i:s',$_timee);
+	$_timet=preg_replace("/:/","\:",$_timet);
+
+	$rrdtool->{"RRDs::graph"}("$_GRAPH_PATH/$name.png",
+			"--imgformat=PNG",
+			"--color=BACK#FFFFFF",
+			"--start=$datestart",
+			"--end=$dateend",
+			"--title=$title",
+			"--rigid",
+			"--interlaced",
+			"--height=$height",
+			"--width=$width",
+			"--upper-limit=100",
+			"--lower-limit=0",
+			"--units-exponent=0",
+			"--slope-mode",
+			"--base=1024",
+			"--vertical-label=percent",
+			"COMMENT:From $_timef to $_timet\c",
+			"COMMENT: \\n",
+			"DEF:a=$rrd_source:root:AVERAGE",
+			"DEF:b=$rrd_source:strg:AVERAGE",
+			"DEF:c=$rrd_source:boot:AVERAGE",
+			"AREA:a#FFC73B:virtual\tusage(%)",
+			"GPRINT:a:LAST: Current\:%8.1lf",
+			"GPRINT:a:AVERAGE:Average\:%8.1lf",
+			"GPRINT:a:MAX:Maximum\:%8.1lf\\n",
+			"AREA:b#FF5700:data\tusage(%)",
+			"GPRINT:b:LAST: Current\:%8.1lf",
+			"GPRINT:b:AVERAGE:Average\:%8.1lf",
+			"GPRINT:b:MAX:Maximum\:%8.1lf\\n",
+			"AREA:c#8F005C:boot\tusage(%)",
+			"GPRINT:c:LAST: Current\:%8.1lf",
+			"GPRINT:c:AVERAGE:Average\:%8.1lf",
+			"GPRINT:c:MAX:Maximum\:%8.1lf\\n"
+		);
+}
+
+function mybox_get_storage_graph() {
+	global $_CREATE_GRAPH;
+	mybox_create_storage_db();
+	mybox_update_storage_db();
+	if($_CREATE_GRAPH==0) return;
+	mybox_create_storage_graph('hd_daily','Partition Usage Daily','-86400','-300',1,100,500);
+	mybox_create_storage_graph('hd_weekly','Partition Usage Weekly','-604800','-1800',6,100,500);
+	mybox_create_storage_graph('hd_monthly','Partition Usage Monthly','-2678400','-7200',24,100,500);
+	mybox_create_storage_graph('hd_yearly','Partition Usage Yearly','-33053184','-86400',288,100,500);
+}
+// end storage
+
+// ips hits
+function mybox_create_ips_db() {
+	global $_RRA_PATH, $rrdtool;
+	$rrd_source="$_RRA_PATH/ipsdrop.db";
+
+	if(file_exists("$rrd_source")) return;
+	$rrdtool->{"RRDs::create"}("$rrd_source",
+						"--step",
+						"300",
+						"DS:ips_pass:GAUGE:600:0:U",
+						"DS:ips_drop:GAUGE:600:0:U",
+						"DS:pscan_pass:GAUGE:600:0:U",
+						"DS:pscan_drop:GAUGE:600:0:U",
+						"RRA:AVERAGE:0.5:1:600",
+						"RRA:AVERAGE:0.5:6:700",
+						"RRA:AVERAGE:0.5:24:775",
+						"RRA:AVERAGE:0.5:288:797",
+						"RRA:MAX:0.5:1:600",
+						"RRA:MAX:0.5:6:700",
+						"RRA:MAX:0.5:24:775",
+						"RRA:MAX:0.5:288:797"
+					);
+}
+
+function mybox_update_ips_db() {
+	global $_RRA_PATH, $time, $rrdtool;
+
+	$rrd_source="$_RRA_PATH/ipsdrop.db";
+	$ips_pass=0;$ips_drop=0;
+	$ips_array=array();
+	$ips_array=mybox_ips_cnt(0);
+	$ips_pass=$ips_array['alert'];
+	$ips_drop=$ips_array['drop'];
+	mybox_ips_cnt(1,array('drop'=>'0','alert'=>'0'));
+	$pscan_pass=0;$pscan_drop=0;
+	$pscan_array=array();
+	$pscan_array=mybox_pscan_cnt(0);
+	mybox_pscan_cnt(1,array('drop'=>'0','pass'=>'0'));
+	$pscan_pass=$pscan_array['pass'];
+	$pscan_drop=$pscan_array['drop'];
+
+	$rrdtool->{"RRDs::update"}("$rrd_source",
+					"--template",
+					"ips_pass:ips_drop:pscan_pass:pscan_drop",
+					"$time:$ips_pass:$ips_drop:$pscan_pass:$pscan_drop"
+				);
+}
+
+function mybox_create_ips_graph($type,$name,$title,$datestart,$dateend,$rra_step,$height='120',$width='500') {
+	global $_RRA_PATH, $_GRAPH_PATH, $rrdtool;
+	global $time, $rrd_lastupdate;
+
+	$rrd_source="$_RRA_PATH/ipsdrop.db";
+	$_timetotal=trim($dateend,"-");
+
+	$_times=trim($datestart,"-");
+	$_times=time() - $_times;
+	$_timee=trim($dateend,"-");
+	$_timee=time() - $_timee;
+	$_timef=date('d-M-Y H:i:s',$_times);
+	$_timef=preg_replace("/:/","\:",$_timef);
+	$_timet=date('d-M-Y H:i:s',$_timee);
+	$_timet=preg_replace("/:/","\:",$_timet);
+
+	if($type==1) {
+		$vtitle="Events";
+		$st="ips";$su="Alert";
+	} else {
+		$vtitle="Hits";
+		$st="pscan";$su="Pass";
+	}
+
+	$rrdtool->{"RRDs::graph"}("$_GRAPH_PATH/$name.png",
+			"--imgformat=PNG",
+			"--color=BACK#FFFFFF",
+			"--start=$datestart",
+			"--end=$dateend",
+			"--title=$title",
+			"--rigid",
+			"--interlaced",
+			"--base=1000",
+			"--height=$height",
+			"--width=$width",
+			"--alt-autoscale-max",
+			"--lower-limit=0",
+			"--units-exponent=0",
+			"--slope-mode",
+			"--vertical-label=$vtitle",
+			"COMMENT:From $_timef to $_timet\c",
+			"COMMENT: \\n",
+			"DEF:a=$rrd_source:$st_drop:AVERAGE",
+			"DEF:b=$rrd_source:ips_pass:AVERAGE",
+			"AREA:a#FF0000\:Drop\t",
+			"GPRINT:a:LAST:Current\:%8.0lf",
+			"GPRINT:a:AVERAGE:Average\:%8.0lf",
+			"GPRINT:a:MAX:Maximum\:%8.0lf\\n",
+			"AREA:b#00CF00:$su\t",
+			"GPRINT:b:LAST:Current\:%8.0lf",
+			"GPRINT:b:AVERAGE:Average\:%8.0lf",
+			"GPRINT:b:MAX:Maximum\:%8.0lf\\n"
+		);
+}
+
+function mybox_get_ips_graph() {
+	global $_CREATE_GRAPH;
+	mybox_create_ips_db();
+	mybox_update_ips_db();
+	if($_CREATE_GRAPH==0) return;
+	// ips
+	mybox_create_ips_graph('1','ips_daily','Intrusion Protection statistics (Daily)','-86400','-300',1,100,500);
+	mybox_create_ips_graph('1','ips_weekly','Intrusion Protection statistics (Weekly)','-604800','-1800',6,100,500);
+	mybox_create_ips_graph('1','ips_monthly','Intrusion Protection statistics (Monthly)','-2678400','-7200',24,100,500);
+	mybox_create_ips_graph('1','ips_yearly','Intrusion Protection statistics (Yearly)','-33053184','-86400',288,100,500);
+	// portscan
+	mybox_create_ips_graph('2','pscan_daily','Portscan Hits (Daily)','-86400','-300',1,100,500);
+	mybox_create_ips_graph('2','pscan_weekly','Portscan Hits (Weekly)','-604800','-1800',6,100,500);
+	mybox_create_ips_graph('2','pscan_monthly','Portscan Hits (Monthly)','-2678400','-7200',24,100,500);
+	mybox_create_ips_graph('2','pscan_yearly','Portscan Hits (Yearly)','-33053184','-86400',288,100,500);
+}
+// end ips hits
+
+?>

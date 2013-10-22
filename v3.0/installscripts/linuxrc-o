@@ -1,0 +1,138 @@
+#!/bin/sh
+# +-----------------------------------------------------------------------------+
+# | Copyright (c) 2002-2006 Tracenetwork Corporation Sdn. Bhd.           	|
+# +-----------------------------------------------------------------------------+
+# | This source file is belongs to nawawi, the author.                    	|
+# | Any changes/use of the source, please email to the author.           	|
+# +-----------------------------------------------------------------------------+
+# | Authors: nawawi, Mohd nawawi Mohamad Jamili <nawawi@tracenetwork.com.my 	|
+# +-----------------------------------------------------------------------------+
+#
+
+trap : 1 2 3 15
+PATH="/bin"
+TERM=linux
+umask 077
+
+cd /
+grepn() { echo ${1%%$2*};}
+do_sleep() {
+        local spin="- \\ | / \\ | /";
+        local pt="0"
+        for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+        	let pt=pt+5
+        	for f in $spin; do
+        	usleep 0
+                	echo -n -e "$1 $pt% [$f]  \r"
+        	done
+        done
+        echo -n -e "$1 100% OK  \r"
+        echo ""
+}
+
+if [ -f "/etc/banner" ]; then
+	echo ""
+	while read b;do
+		echo "$b"
+	done < /etc/banner
+fi
+
+mount -n -t proc virtual /proc
+mount -n -t sysfs virtual /sys
+
+FOUNDMEM="$(awk '/MemTotal/{print $2}' /proc/meminfo)"
+TOTALMEM="$(awk 'BEGIN{m=0};/MemFree|Cached/{m+=$2};END{print m}' /proc/meminfo)"
+if [ -z "$FOUNDMEM" -o "$FOUNDMEM" = 0 ]; then
+	echo "**** MEMORY COUNTING FAILED! ****"
+	exit 1
+fi
+if [ -f "/proc/kcore" ]; then
+	PM="$(du /proc/kcore)"
+	PM=$(grepn $PM ' ')
+	echo "* Physical memory size: $PM kB"
+	if [ ! -z "$PM" -a "$PM" -lt "184324" ]; then
+		echo "**** NOT ENOUGH MEMORY ($PM kB) ****"
+		exit 1
+	fi
+fi
+echo "* Total memory found: $FOUNDMEM kB"
+do_sleep "* Initializing.."
+
+MINSIZE=2000
+MINLEFT=16000
+MAXSIZE="$(expr $TOTALMEM - $MINLEFT)"
+RAMSIZE="$(expr $TOTALMEM / 5)"
+
+if test -n "$TOTALMEM" -a "$TOTALMEM" -gt "$MINLEFT"; then
+	test -z "$RAMSIZE" && RAMSIZE=65536
+	RAMSIZE=$(expr $RAMSIZE \* 4)
+fi
+
+echo "* Creating Mybox-installer filesystem ($RAMSIZE kB) on shared memory."
+mount -n -t tmpfs -o "rw,size=${RAMSIZE}k" virtual /ramd
+chmod 700 /ramd > /dev/null 2>&1
+cd /ramd
+for f in /*; do case $f in /lost+found|/ramd|/proc|/dev|/sys);; *) cp -dpR $f /ramd/ ;; esac done
+mkdir -p dev/pts initrd
+
+umount /proc >/dev/null 2>&1
+umount /sys >/dev/null 2>&1
+
+pivot_root . initrd
+
+cd /
+mkdir proc sys
+mount -t proc virtual /proc
+mount -t sysfs virtual /sys
+
+echo "0 0 0 0" > /proc/sys/kernel/printk
+
+echo -n "-> Extracting modules.."
+for f in /tmp/*.bz2;do
+	tar -C / -jxf $f
+	echo -n "."; usleep 0; wait
+done
+echo -e "                                  \r* Extracting modules. Done."
+echo "/bin/modprobe" > /proc/sys/kernel/modprobe
+depmod -a >> /dev/null 2>&1
+[ $? = 0 ] && echo -e "* Searching modules dependency. Done."
+if [ -f "/lib/modules/drivers.txt" ]; then
+	while read mods;do
+		mods=$(basename $mods .ko)
+		echo -n -e "-> Scanning for $mods..                                \r"
+		modprobe -q -k $mods >> /dev/null 2>&1
+		usleep 0
+	done < /lib/modules/drivers.txt
+
+fi
+echo -e "                                  \r* Scanning. Done."
+
+mdev -s >/dev/null 2>&1
+mount -t devpts devpts /dev/pts >/dev/null 2>&1
+mknod /dev/ppp c 108 0 >/dev/null 2>&1
+mv /dev/random /dev/random-block
+ln -s /dev/urandom /dev/random
+mknod /dev/ttyS0 c 4 64 >/dev/null 2>&1
+mknod /dev/ttyS1 c 4 65 >/dev/null 2>&1
+chmod 700 * >/dev/null 2>&1
+
+echo "
+::sysinit:/install/sh
+tty2::respawn:/bin/sh
+tty3::respawn:/bin/sh
+::restart:/bin/init
+::ctrlaltdel:bin/reboot
+::ctrlaltdel:/bin/reset
+::ctrlaltdel:/bin/reboot
+::shutdown:/bin/reboot
+" > /etc/inittab
+
+echo "Loading /install"
+sleep 2
+exec chroot . /bin/init < /dev/console > /dev/console 2>&1
+
+echo "********** ERROR! **********"
+echo "You are not supposed to be here, something went wrong!"
+echo "calling chroot failed?"
+echo "Press Ctrl+Alt+Del or switch off/on for reboot."
+while [ 1 = 1 ]; do sh; done

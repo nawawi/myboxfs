@@ -1,0 +1,13 @@
+<?php 
+if(!isset($p)||$p=='') {
+	$fp = fopen("i/blank.png", 'rb');
+	header("Content-Type: image/png");
+	@fpassthru($fp);
+	exit;
+}
+$fp = fopen("g/$p", 'rb');
+header("Pragma: no-cache");
+header("Content-Type: image/png");
+@fpassthru($fp);
+exit;
+?>

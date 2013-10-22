@@ -1,0 +1,173 @@
+#!/bin/php -Cq
+<?php 
+// ntp.init - last update 08-Jun-2007
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="ntp";
+include_once('clib.exl');
+putenv("PATH=/bin:/service/tools:/service/init");
+
+$_QUIET=0;
+mybox_init_set_alarm(30);
+
+if(!file_exists("/bin/ntpd")) {
+	mybox_init_echo($_QUIET,"ERROR","Cannot execute ntp.init. Internal error!");
+	exit(1);
+}
+
+if(!is_dir("/var/spool/ntp")) {
+	mybox_mkdirr("/var/spool/ntp");
+}
+
+function ntp_get_ip($_defnet_array,$_name) {
+	if(isset($_defnet_array[$_name]['name']) && $_defnet_array[$_name]['name']!='') {
+		$_type=$_defnet_array[$_name]['type'];
+		$_ip=$_defnet_array[$_name]['ip'];
+		if($_type==2) {
+			$_cmd_array[]="$_ip";
+		}
+	} elseif(isset($_defnet_array[$_name]['group']) && $_defnet_array[$_name]['group']!='') {
+		foreach($_defnet_array[$_name] as $a => $b) {
+			if(!is_array($b)) continue;
+			$_type=$b['type'];
+			$_ip=$b['ip'];
+			if($_type==2) {
+				$_cmd_array[]="$_ip";
+			}
+		}
+	}
+	return $_cmd_array;
+}
+
+function ntp_config() {
+	global $_DB_NAME, $_QUIET, $_CLASSIP;
+	$db_id=mybox_db_connect($_DB_NAME);
+	$_ntp_server='';
+	$result=mybox_db_query("select val from misc where name='ntp_server'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		$_ntp_server=mybox_db_fetch_single($result);	
+	}
+	if($_ntp_server=='') $_ntp_server='141.82.30.253';
+
+	$_defnet_array=mybox_defnetwork_array($db_id);
+	$_alist_a=array();
+	$_src_array=array();
+	$_alist_a=preg_split("/,/",$_ntp_server);
+	if(count($_alist_a)!=0) {
+		foreach($_alist_a as $_src) {
+			if(isset($_defnet_array[$_src])&&$_defnet_array[$_src]!='') {
+				$_src_array=ntp_get_ip($_defnet_array,$_src);
+			}
+		}
+	} else {
+		$_src=$_ntp_server;
+		if(isset($_defnet_array[$_src])&&$_defnet_array[$_src]!='') {
+			$_src_array=ntp_get_ip($_defnet_array,$_src);
+		}
+	}
+	$_c_server='';
+	if(count($_src_array)!=0) {
+		foreach($_src_array as $sx) {
+			$_c_server .="server $sx iburst minpoll 7 maxpoll 15\n";
+		}
+	} else {
+		$_c_server .="server 141.82.30.253 iburst minpoll 7 maxpoll 15\n";
+	}
+	$_config='';
+	$_config .="server 127.127.1.0 minpoll 7 maxpoll 15\n";
+	$_config .="fudge 127.127.1.0 stratum 10\n";
+	$_config .="$_c_server\n";
+	$_config .="tinker panic 0\n";
+	$_config .="driftfile /var/spool/ntp/ntp.drift\n";
+	mybox_save_to_file("/etc/ntp.conf","$_config");
+	if(!file_exists("/var/spool/ntp/ntp.drift")) mybox_save_to_file("/var/spool/ntp/ntp.drift","0.0\n");
+	return 1;
+}
+
+function ntp_status() {
+	global $_QUIET;
+	$pid=mybox_get_progpid("ntpd");
+	if($pid!='') {
+		if($_QUIET==0) echo "* ntpd (pid $pid) is running...\n";
+		return 0;
+	}
+	return 1;
+}
+
+function ntp_start() {
+	global $_QUIET, $_ROOT_DIR;
+
+	if(file_exists("$_ROOT_DIR/scripts/ntp/start")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/ntp/start");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/ntp/pre-start")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/ntp/pre-start");
+	}
+
+	if(@ntp_config()==1 && @ntp_status()==1) {
+		$opt="-l /dev/null";
+		if(file_exists("/var/sys/log_setting/ntpd") || file_exists("/var/sys/log_setting/ntpd")) {
+			$opt="";
+		}
+		if(mybox_exec_cmd("ntpd -A -g $opt")==0) {
+			mybox_init_echo($_QUIET,"INFO","Starting NTP service");
+			@touch("/var/sys/chk_ntpd");
+			if(file_exists("$_ROOT_DIR/scripts/ntp/post-start")) {
+				mybox_execq_cmd("$_ROOT_DIR/scripts/ntp/post-start");
+			}
+			return 0;
+		}
+	} 
+	@touch("/var/sys/chk_ntpd");
+	mybox_init_echo($_QUIET,"ERROR","Starting NTP service failed");
+	return 1;
+}
+
+function ntp_stop() {
+	global $_QUIET, $_ROOT_DIR;
+	@unlink("/var/sys/chk_ntpd");
+	if(file_exists("$_ROOT_DIR/scripts/ntp/stop")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/ntp/stop");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/ntp/pre-stop")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/ntp/pre-stop");
+	}
+	if(mybox_killall("ntpd")==0) {
+		mybox_init_echo($_QUIET,"INFO","Shutting down NTP service");
+		if(file_exists("$_ROOT_DIR/scripts/ntp/post-stop")) {
+			mybox_execq_cmd("$_ROOT_DIR/scripts/ntp/post-stop");
+		}
+		return 0;
+	}
+	@touch("/var/sys/chk_ntpd");
+	mybox_init_echo($_QUIET,"ERROR","Shutting down NTP service failed");
+	return 1;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=ntp_start();
+		break;
+	case 'stop':
+		$ret=ntp_stop();
+		break;
+	case 'restart':
+		$ret=ntp_stop();
+		sleep(2);
+		$ret=ntp_start();
+		break;
+	case 'status':
+		$ret=ntp_status();
+		break;
+	case 'config':
+		$ret=ntp_config();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/status]\n";
+		break;
+}
+exit($ret);
+?>

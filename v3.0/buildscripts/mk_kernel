@@ -1,0 +1,179 @@
+#!/bin/sh -e
+
+START=$(pwd)
+CONFIG="$START/configs/kernel.config-2.6.18-ipsec+badram+usb"
+MYV="3.0"
+RELV=$(date +"%y.%m")
+
+KERNEL_SOURCE=/usr/src/linux
+REL_DIR=$START/kernel_base
+REL_MOD=$REL_DIR/modules
+LZMAC="/mfs-gcc/bin/lzmacomp"
+
+if [ ! -d "$KERNEL_SOURCE" ]; then
+	echo "$KERNEL_SOURCE not found"
+	exit;
+fi
+
+if [ ! -f "$CONFIG" ]; then
+	echo "$CONFIG not found"
+	exit;
+fi
+
+MYBOX_INFO="
+#undef UTS_SYSNAME
+#define UTS_SYSNAME \"TraceNetOS\"
+#undef UTS_VERSION
+#define UTS_VERSION \"v$MYV\"
+#undef LINUX_COMPILE_BY
+#define LINUX_COMPILE_BY \"awie\"
+#undef LINUX_COMPILE_HOST 
+#define LINUX_COMPILE_HOST \"devel.tracenetwork.com.my\"
+#undef LINUX_COMPILE_DOMAIN
+#define LINUX_COMPILE_DOMAIN \"tracenetwork.com.my\"
+#undef UTS_MACHINE
+#define UTS_MACHINE \"i686\"
+"
+
+rm -rf $REL_DIR
+mkdir -p $REL_MOD
+
+cd $KERNEL_SOURCE
+make distclean
+make clean
+make mrproper
+sync
+cat $CONFIG > $KERNEL_SOURCE/.config
+echo "$MYBOX_INFO" > $KERNEL_SOURCE/include/linux/mybox.h
+sync
+make oldconfig
+
+export CFLAGS="-mregparm=3"
+make INSTALL_MOD_PATH=$REL_MOD
+make INSTALL_MOD_PATH=$REL_MOD modules_install
+
+cd $START
+
+K_VER=$(ls $REL_MOD/lib/modules)
+if [ -f "$KERNEL_SOURCE/arch/i386/boot/bzImage" ]; then
+	cp -v $KERNEL_SOURCE/arch/i386/boot/bzImage $REL_DIR/mfs-kernel
+	upx-kernel -9 $REL_DIR/mfs-kernel
+	du -hc $REL_DIR/$KVER
+fi
+
+if [ ! -d "$REL_MOD/lib/modules/$K_VER/kernel" ]; then
+	echo "Compiling kernel failed"
+	exit
+fi
+
+
+cd $START
+
+#find kernel_base/modules/lib/modules/*/kernel/drivers/* -name '*.ko' |sed -e 's/kernel_base\/modules//g' >> $REL_MOD/lib/modules/drivers.txt
+
+rm -fv $REL_MOD/lib/modules/$K_VER/build 
+rm -fv $REL_MOD/lib/modules/$K_VER/source
+rm -fv $REL_MOD/lib/modules/$K_VER/modules.ccwmap
+rm -fv $REL_MOD/lib/modules/$K_VER/modules.ieee1394map
+rm -fv $REL_MOD/lib/modules/$K_VER/modules.inputmap
+rm -fv $REL_MOD/lib/modules/$K_VER/modules.isapnpmap
+
+cd $REL_MOD
+
+# ppp/pptp modules
+find lib/modules/*/kernel/drivers/net/ppp* -name '*.ko' >> lib/modules/ppp.txt
+find lib/modules/*/kernel/drivers/net/* -name 'slhc.ko' >> lib/modules/ppp.txt
+find lib/modules/*/kernel/drivers/net/* -name 'slip.ko' >> lib/modules/ppp.txt
+tar -cvf $REL_DIR/kmods_ppp.tar \
+lib/modules/ppp.txt \
+lib/modules/$K_VER/kernel/drivers/net/slhc.ko \
+lib/modules/$K_VER/kernel/drivers/net/slip.ko \
+lib/modules/$K_VER/kernel/drivers/net/ppp* |sort
+$LZMAC $REL_DIR/kmods_ppp.tar > $REL_DIR/kmods_ppp.mpk
+rm -fv $REL_DIR/kmods_ppp.tar
+rm -rfv lib/modules/$K_VER/kernel/drivers/net/ppp*
+rm -rfv lib/modules/$K_VER/kernel/drivers/net/slhc.ko
+rm -rfv lib/modules/$K_VER/kernel/drivers/net/slip.ko
+rm -fv lib/modules/ppp.txt
+
+# ipv4/iptables
+tar -cvf $REL_DIR/kmods_iptables.tar lib/modules/$K_VER/kernel/net/ipv4 lib/modules/$K_VER/kernel/net/netfilter |sort
+$LZMAC $REL_DIR/kmods_iptables.tar > $REL_DIR/kmods_iptables.mpk
+rm -fv $REL_DIR/kmods_iptables.tar
+rm -rfv lib/modules/$K_VER/kernel/net/ipv4 lib/modules/$K_VER/kernel/net/netfilter
+
+# Qos
+tar -cvf $REL_DIR/kmods_qos.tar lib/modules/$K_VER/kernel/net/sched |sort
+$LZMAC $REL_DIR/kmods_qos.tar > $REL_DIR/kmods_qos.mpk
+rm -fv $REL_DIR/kmods_qos.tar
+rm -rfv lib/modules/$K_VER/kernel/net/sched
+
+# scsi modules
+find lib/modules/*/kernel/drivers/scsi -name '*.ko' >> lib/modules/scsi.txt
+find lib/modules/*/kernel/drivers/message/fusion/mpt* -name '*.ko' >> lib/modules/scsi.txt
+tar -cvf $REL_DIR/kmods_scsi.tar \
+lib/modules/scsi.txt \
+lib/modules/$K_VER/kernel/drivers/scsi \
+lib/modules/$K_VER/kernel/drivers//message/fusion/mpt* |sort
+$LZMAC $REL_DIR/kmods_scsi.tar > $REL_DIR/kmods_scsi.mpk
+rm -fv $REL_DIR/kmods_scsi.tar
+rm -rfv lib/modules/$K_VER/kernel/drivers/scsi
+rm -rfv lib/modules/$K_VER/kernel/drivers/message/fusion/mpt*
+rm -fv  lib/modules/scsi.txt
+
+# usb modules
+find lib/modules/*/kernel/drivers/usb/* -name '*.ko' >> lib/modules/usb.txt
+tar -cvf $REL_DIR/kmods_usb.tar lib/modules/usb.txt lib/modules/$K_VER/kernel/drivers/usb |sort
+$LZMAC $REL_DIR/kmods_usb.tar > $REL_DIR/kmods_usb.mpk
+rm -fv $REL_DIR/kmods_usb.tar 
+rm -rfv lib/modules/$K_VER/kernel/drivers/usb
+rm -fv lib/modules/usb.txt
+
+# lcd modules
+find lib/modules/*/kernel/drivers/net/* -name 'mii.ko' >> lib/modules/lcd.txt
+find lib/modules/*/kernel/drivers/net/* -name 'hamachi.ko' >> lib/modules/lcd.txt
+find lib/modules/*/kernel/drivers/parport/* -name '*.ko' >> lib/modules/lcd.txt
+tar -cvf $REL_DIR/kmods_lcd.tar \
+lib/modules/lcd.txt \
+lib/modules/$K_VER/kernel/drivers/net/mii.ko \
+lib/modules/$K_VER/kernel/drivers/net/hamachi.ko \
+lib/modules/$K_VER/kernel/drivers/parport/* |sort
+$LZMAC $REL_DIR/kmods_lcd.tar > $REL_DIR/kmods_lcd.mpk
+rm -fv $REL_DIR/kmods_lcd.tar
+rm -rfv lib/modules/$K_VER/kernel/drivers/parport/*
+rm -rfv lib/modules/$K_VER/kernel/drivers/net/mii.ko
+rm -rfv lib/modules/$K_VER/kernel/drivers/net/hamachi.ko
+rm -fv lib/modules/lcd.txt
+
+# nic modules
+find lib/modules/*/kernel/drivers/net/* -name '*.ko' >> lib/modules/nic.txt
+tar -cvf $REL_DIR/kmods_nic.tar \
+lib/modules/nic.txt \
+lib/modules/$K_VER/kernel/drivers/net |sort
+$LZMAC $REL_DIR/kmods_nic.tar > $REL_DIR/kmods_nic.mpk
+rm -fv $REL_DIR/kmods_nic.tar
+rm -rfv lib/modules/$K_VER/kernel/drivers/net
+rm -fv lib/modules/nic.txt
+
+# base
+tar -cvf $REL_DIR/kmods_base.tar lib |sort
+$LZMAC $REL_DIR/kmods_base.tar > $REL_DIR/kmods_base.mpk
+rm -fv $REL_DIR/kmods_base.tar
+
+cd $START
+if [ ! -f "$REL_DIR/iptables.mpk" ]; then
+	sh mk_iptables
+fi
+
+if [ ! -f "$REL_DIR/keymaps.mpk" ]; then
+	sh mk_keymaps
+fi
+
+if [ ! -f "$REL_DIR/zoneinfo.mpk" ]; then
+	sh mk_zoneinfo
+fi
+
+cp -v $KERNEL_SOURCE/System.map $REL_DIR
+
+cd $START
+echo "$MYV" >MYBOX_VERSION

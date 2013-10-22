@@ -1,0 +1,118 @@
+README file for SquidClamav Version 2.0
+
+SquidClamav - A Clamav Antivirus Redirector for Squid -
+		http://www.samse.fr/GPL/squidclamav/
+
+
+Requirement :
+--------------
+
+You need libcurl 7.12.1 at least.
+Here the libraries linkage I use :
+
+-lcurl -ldl -lssl -lcrypto -ldl -lz -lbz2 -lgmp -lpthread
+
+
+Installation instructions :
+---------------------------
+
+make
+make install
+
+See and modify the configuration file to match your needs
+
+If you want debug information set debug to 1.
+
+
+Squid 2.5 configuration :
+---------------------
+
+To integrate squidclamav to your squid cache just edit the squid.conf
+file and set the following:
+
+on ACL definition you should have declared:
+
+	acl localhost src 127.0.0.1/255.255.255.255
+	acl to_localhost dst 127.0.0.0/8
+
+on http_acces definition you should declared the follwing :
+
+	http_access deny to_localhost
+	http_access allow localhost
+	url_rewrite_access deny localhost
+
+and on the redirect section the following:
+
+	url_rewrite_program /usr/local/squidclamav/bin/squidclamav
+	url_rewrite_children 15
+
+If you have huge access and enough memory set the url_rewrite_children to
+upper value.
+
+Squid 2.6 configuration :
+---------------------
+
+As 2.6 has signifiant change in the configuration file regarding
+redirector, to integrate squidclamav to your squid cache just edit
+the squid.conf file and set the following:
+
+on ACL definition you should have declared:
+
+	acl localhost src 127.0.0.1/255.255.255.255
+
+on http_acces definition you should declared the follwing :
+
+	http_access allow localhost
+	redirector_access deny localhost
+
+and on the redirect section the following:
+
+	redirect_program /usr/local/squidclamav/bin/squidclamav
+	redirect_children 15
+
+If you have huge access and enough memory set the redirect_children to
+upper value.
+
+SquidClamAv configuration:
+--------------------------
+
+See README file.
+
+Virus Scanning:
+---------------
+
+Virus scanning is now down with an open stream to clamd tcp daemon.
+You can run it on the same host or for any other dedicated machine.
+
+If you find it useful, I'd like to know - please send email
+to gilles@darold.net
+
+
+This project is a modified version of the excellent Squirm Redirector for Squid
+Maintained by Chris Foote, and copyrighted as follow :
+
+        Copyright (C) 1998 Chris Foote & Wayne Piekarski
+
+The original Squirm version used was squirm-1.0betaB. Some other parts are
+cut and paste from the ex1.c program given in the ClamAv distribution and
+are copyrighted: Copyright (C) 2002 - 2004 Tomasz Kojm
+
+All other code: Copyright (C) 2005-2006 Gilles Darold - Groupe SAMSE
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+Please see the file GPL in this directory for full copyright
+information.
+

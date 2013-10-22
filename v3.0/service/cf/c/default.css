@@ -1,0 +1,15 @@
+html {overflow-x: auto;font-family: Arial, Helvetica, sans-serif;}
+body {font-family: Arial, Helvetica, sans-serif;font-size: 12px;margin-left: 1px; margin-right: 1px; margin-top: 10px; margin-bottom: 0px; background: #ffffff; }
+table,tabody,td,tr,div,p,a {font-size: 12px; font-weight: normal; }
+img {border: 0px none;}
+a { color: #FF6600; text-decoration: none; font-weight: normal; }
+a:hover { color: #FF6600; text-decoration: underline; font-weight: normal; }
+.footnote {font-size: 10px;color: #000000;text-decoration: none;margin-top: 5px;padding: 2px;padding-right: 2px;}
+a.footnote,a:visited.footnote,a:hover.footnote,a:link.footnote {font-size: 10px;color: #000000;text-decoration: none;}
+a:hover.footnote {font-size: 10px;color: #000000;text-decoration: underline;}
+.block1 {background-color: #ffffff;padding: 2px;width: 100%;}
+.windowed {background-color:#ffffc5;border:1px solid #000;padding: 2px;width: 100%;}
+.t1 {width: 150px; border: 0px; padding: 0px; font-size: 12px; font-weight: bold; background: #dddddd;}
+.t2 {width: 450px;border: 0px; padding: 0px; font-size: 12px; font-weight: bold; background: #eeeeee;}
+.tb {border: 0px; padding: 0px; margin: 0px; background: #dddddd;width: 600px;}
+.notice {font-size: 11px;background: #ff6600;color: #ffffff;font-weight: bold;}

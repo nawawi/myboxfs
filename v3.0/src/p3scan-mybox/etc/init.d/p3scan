@@ -1,0 +1,75 @@
+#!/bin/bash
+#
+# p3scan startup script
+#
+# usage: p3scan { start | stop | restart | status }
+#
+# Jack S. Lai - laitcg@cox.net
+. /etc/sysconfig/init
+pretty(){
+   echo -en $CMDTITLE
+   if $CMD 2> /dev/null; then
+      $MOVE_TO_COL
+      echo -en "["
+      $SETCOLOR_SUCCESS
+      echo -en "  OK  \c"
+      $SETCOLOR_NORMAL
+      echo "]"
+   else
+      $MOVE_TO_COL
+      echo -en "["
+      $SETCOLOR_FAILURE
+      echo -en "FAILED\c"
+      $SETCOLOR_NORMAL
+      echo "]"
+   fi
+}
+
+case "$1" in
+   start)
+      # Start p3scan
+      echo -en "Starting p3scan"
+      `which p3scan` &
+      $MOVE_TO_COL
+      echo -en "["
+      $SETCOLOR_SUCCESS
+      echo -en "  OK  \c"
+      $SETCOLOR_NORMAL
+      echo "]"
+      ;;
+   stop)
+      # Stop p3scan
+      if [ -a /var/run/p3scan/p3scan.pid ]; then
+         CMDTITLE="Stopping p3scan"
+         CMD="kill `cat /var/run/p3scan/p3scan.pid` &>/dev/null"
+         pretty
+         rm -f /var/run/p3scan/p3scan.pid
+      else
+         echo -en "Stopping p3scan"
+         killall p3scan &>/dev/null
+         $MOVE_TO_COL
+         echo -en "["
+         $SETCOLOR_WARNING
+         echo -en "  OK  \c"
+         $SETCOLOR_NORMAL
+         echo "]"
+      fi
+      ;;
+   status)
+      # p3scan status
+      if [ -a /var/run/p3scan/p3scan.pid ]; then
+         PID=`cat /var/run/p3scan/p3scan.pid`
+         echo "p3scan OK, running: $PID"
+      else
+         echo "p3scan is stopped"
+      fi
+      ;;
+   restart)
+      $0 stop
+      $0 start
+      ;;
+   *)
+      echo "Usage: p3scan { start | stop | restart | status }"
+      exit 1
+esac
+exit 0

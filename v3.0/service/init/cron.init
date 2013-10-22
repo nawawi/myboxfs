@@ -1,0 +1,211 @@
+#!/bin/php -Cq
+<?php 
+// cron.init - last update 30-Jun-2006
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="cron";
+include_once('clib.exl');
+putenv("PATH=/bin:/service/tools:/service/init");
+
+$_QUIET=0;
+mybox_init_set_alarm(30);
+
+if(!file_exists("/bin/crond") || !file_exists("/bin/crontab")) {
+	mybox_init_echo($_QUIET,"ERROR","Cannot execute cron.init. Internal error!");
+	exit(1);
+}
+
+if(!is_dir("/var/spool/cron/crontabs")) {
+	mybox_mkdirr("/var/spool/cron/crontabs");
+}
+
+function create_cron_time($time,$cmd) {
+	$_val='';
+	$ct=$time;
+	if($ct >= 44640) {
+		$ct=floor($ct / 44640);
+		if($ct > 12) {
+			$_val='';
+		} else {
+			$_val="0 0 1 */$ct * $cmd";
+		}
+	} else if($ct >= 1440) {
+		$ct=floor($ct / 1440);
+		if($ct > 31) {
+			$_val='';
+		} else {
+			$_val="0 0 */$ct * * $cmd";
+		}
+	} else if($ct >= 60) {
+		$ct=floor($ct / 60);
+		if($ct > 23) {
+			$_val='';
+		} else {
+			$_val="0 */$ct * * * $cmd";
+		}
+	} else {
+		$_val="*/$ct * * * * $cmd";	
+	}
+	return "$_val";
+}
+
+function cron_config() {
+	global $_DB_NAME, $_QUIET, $_ROOT_DIR;
+	$db_id=mybox_db_connect($_DB_NAME);
+
+	$_config="";
+	$_config .="02 1 * * * /service/tools/mfs-query.exc l\n";
+	$_config .="*/5 * * * * /service/tools/mfs-graph.exc\n";
+	$_config .="02 1 * * * /service/tools/mfs-query.exc p\n";
+	$_config .="*/10 * * * * /service/tools/mfs-query.exc sc\n";
+	$_config .="05 3 * * * /bin/prog_reload\n";
+	$_config .="* * * * * /bin/taskreset\n";
+	$_config .="03 * * * * /service/tools/mfs-update.exc check\n";
+
+
+	$result=mybox_db_query("select * from misc where name like \"backup_%\"",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			if(trim($row['name'])=='backup_int') $_bint=trim($row['val']);
+			if(trim($row['name'])=='backup_max') $_bmax=trim($row['val']);
+			if(trim($row['name'])=='backup_stat') $_bstat=trim($row['val']);
+		}
+	}
+	unset($result);
+	$result=mybox_db_query("select * from cf where name like \"cf_sophos%\" or name like \"cf_spamsa_%\" ",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_xname=trim($row['name']);
+			$_xval=trim($row['val']);
+			$_name="_$_xname";
+			$$_name="$_xval";
+
+		}
+		unset($_xname,$_xval,$_name);
+	}
+	if($_cf_sophos_stat=='') $_cf_sophos_stat=0;
+	if($_cf_sophos_autoupdate=='') $_cf_sophos_autoupdate=0;
+	if($_cf_spamsa_stat=='') $_cf_spamsa_stat=0;
+	if($_cf_spamsa_autoupdate=='') $_cf_spamsa_autoupdate=0;
+	if($_cf_spamsa_heuristic=='') $_cf_spamsa_heuristic=0;
+
+	if($_bstat==1) {
+		if($_bint==1) {
+			// monthly
+			$_config .="42 4 1 * * /service/init/initconf.init backup $_bmax\n";
+		} elseif($_bint==2) {
+			// weekly
+			$_config .="22 4 * * 0 /service/init/initconf.init backup $_bmax\n";
+		} elseif($_bint==3) {
+			// daily
+			$_config .="02 4 * * * /service/init/initconf.init backup $_bmax\n";
+		}
+	}
+	if($_cf_sophos_stat==1 && $_cf_sophos_autoupdate==1) {
+		$_config .="30 0 * * * /bin/sophos_update\n";
+	}
+	if($_cf_spamsa_stat==1 && $_cf_spamsa_autoupdate==1) {
+		$_opt='';
+		if($_cf_spamsa_heuristic==1) $_opt="-c";
+		$_config .="30 2 * * * /bin/spamsa_update $_opt\n";
+		unset($_opt);
+	}
+	if(file_exists("$_ROOT_DIR/scripts/cron/config")) {
+		$_config .=mybox_fget_contents("$_ROOT_DIR/scripts/cron/config")."\n";
+	}
+	mybox_save_to_file("/var/spool/cron/crontabs/mfs","$_config");
+	mybox_db_close($db_id);
+	return 1;
+}
+
+function cron_status() {
+	global $_QUIET;
+	$pid=mybox_get_progpid("crond");
+	if($pid!='') {
+		if($_QUIET==0) echo "* crond (pid $pid) is running...\n";
+		return 0;
+	}
+	return 1;
+}
+
+function cron_start() {
+	global $_QUIET, $_ROOT_DIR;
+
+	if(file_exists("$_ROOT_DIR/scripts/cron/start")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/cron/start");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/cron/pre-start")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/cron/pre-start");
+	}
+
+	if(@cron_config()==1 && @cron_status()==1) {
+		$opt="-L /dev/null";
+		if(file_exists("/var/sys/log_setting/cron") || file_exists("/var/sys/log_setting/cron")) {
+			$opt="-S";
+		}
+		if(mybox_exec_cmd("crond $opt")==0) {
+			mybox_init_echo($_QUIET,"INFO","Starting CRON service");
+			@touch("/var/sys/chk_crond");
+			if(file_exists("$_ROOT_DIR/scripts/cron/post-start")) {
+				mybox_execq_cmd("$_ROOT_DIR/scripts/cron/post-start");
+			}
+			return 0;
+		}
+	} 
+	@touch("/var/sys/chk_crond");
+	mybox_init_echo($_QUIET,"ERROR","Starting CRON service failed");
+	mybox_alert_queue_limit("[ERROR] Service start failed","Starting CRON service failed",15);
+	return 1;
+}
+
+function cron_stop() {
+	global $_QUIET, $_ROOT_DIR;
+	@unlink("/var/sys/chk_crond");
+
+	if(file_exists("$_ROOT_DIR/scripts/cron/stop")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/cron/stop");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/cron/pre-stop")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/cron/pre-stop");
+	}
+
+	if(mybox_killall("crond")==0) {
+		mybox_init_echo($_QUIET,"INFO","Shutting down CRON service");
+		if(file_exists("$_ROOT_DIR/scripts/cron/post-stop")) {
+			mybox_execq_cmd("$_ROOT_DIR/scripts/cron/post-stop");
+		}
+		return 0;
+	}
+	@touch("/var/sys/chk_crond");
+	mybox_init_echo($_QUIET,"ERROR","Shutting down CRON service failed");
+	mybox_alert_queue_limit("[ERROR] Service stop failed","Shutting down CRON service failed",13);
+	return 1;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=cron_start();
+		break;
+	case 'stop':
+		$ret=cron_stop();
+		break;
+	case 'restart':
+		$ret=cron_stop();
+		sleep(2);
+		$ret=cron_start();
+		break;
+	case 'status':
+		$ret=cron_status();
+		break;
+	case 'config':
+		$ret=cron_config();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/status/config]\n";
+		break;
+}
+exit($ret);
+?>

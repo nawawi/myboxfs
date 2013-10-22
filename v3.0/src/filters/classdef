@@ -1,0 +1,621 @@
+#!/usr/bin/perl
+
+$version="0.5";
+
+=head1 NAME
+
+classdef - the classdef compiler
+
+=head1 SYNOPSIS
+
+I<In a source file:>
+
+ #include "classes.th"
+ typedef statements;
+ classdef(newtype, supertype, ({
+     fields;
+ }))
+ #define FILE_C
+ #include "classes.dh"
+ Ddef(newtype) {
+     destructor statements;
+ }
+
+I<To call before compiling:>
+
+B<classdef> [I<-o headerfile>] [I<-s>] [I<-a>] [I<-v>] [I<-c>] [I<-c>]
+I<sourcefile...>
+
+=head1 DESCRIPTION
+
+This is a very simple framework for using "inheritance" on structures,
+facilitating object-oriented application design in C. A I<class> is a
+C struct which inherits all of the fields from its I<superclass>,
+adding its own fields. A class has a I<destructor>, which clears all
+its fields, deallocating any memory the class has allocated.
+
+A class is defined with the statement
+
+ classdef(newtype, supertype, ({
+     fields;
+ }))
+
+The syntax is dictated by the C preprocessor, which expects
+B<classdef> to be a macro with 3 arguments. In the complete program,
+this macro expands to nothing and the generated header file contains
+the structure definitions contained in the B<classdef>. The first
+argument to the B<classdef> macro is the name of the new type. The
+second is the name of its supertype. After that come the fields this
+type defines, like in a regular struct definition.
+
+If the newtype argument is prefixed with "I<private >" (with a blank
+in between), then the definition will only be visible in the defining
+file. For this each file has to define a macro indicating its
+filename, with all letters in uppercase and dots replaced by
+underscores.
+
+Inside the fields, the word B<class> as a type is substituted with the
+I<newtype> argument and the word B<super> is substituted with the
+I<supertype> argument of I<the type just being defined>, regardless
+whether it occurs in a field inherited from a supertype.
+
+Each classdef needs a I<destructor definition>. If no cleanup action
+is necessary, then define an empty destructor with
+
+ Ddef_none(newtype)
+
+If cleanup is needed, a destructor definition looks like a function definition:
+
+ Ddef(newtype) {
+     statements;
+ }
+
+Inside the function body, a pointer to the structure to be cleaned is
+available as B<this>.
+
+A I<global constructor> has to be defined somewhere in the program.
+This is a function with the signature
+
+ void *void_O_CTOR(size_t size, _DTOR dtor);
+
+(B<_DTOR> is defined in the generated include file; it is a pointer
+to a function taking a void* argument.)
+
+The global constructor has to allocate B<size> bytes for a new object
+and return the pointer to it. It also should store the destructor
+function pointer B<dtor> somewhere for later invocation.
+
+The macro
+
+ new(typ)
+
+where B<typ> was defined with the B<classdef> macro, calls the global
+constructor with the size and destructor of this type. Invoking a
+destructor calls the destructor of the supertype and recursively up to
+the I<global destructor>, which by default does B<free>(3).
+
+The B<classdef> program is called with all source files which contain
+classdef macro statements. It produces header files with all necessary
+definitions, which should be included by all affected source files in
+the order shown above.
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<-o> I<file>
+
+Write output into I<file>.
+
+=item B<-s>
+
+Write the output split into I<file>B<.th> and I<file>B<.dh>. Without
+this argument, a single output file is generated. Many programs need
+the split form to properly order typedef statements.
+
+=item B<-a>
+
+Annotate the generated files with comments about the class hierarchy.
+
+=item B<-v>
+
+Be verbose, show processing info on standard error.
+
+=item B<-c>
+
+Prepare for using cascaded constructors.
+
+=item B<-C>
+
+Omit the global constructor declaration.
+
+=back
+
+=head1 RETURN VALUE
+
+The B<classdef> program returns exit code 0 for success, non-0 on any error.
+
+The global constructor, and the B<new> macro which invokes it, return
+a pointer to a newly allocated structure of the right type.
+
+Destructors call their supertype's destructor, ultimately ending in a
+B<free> operation, returning nothing.
+
+=head1 ERRORS
+
+Errors in the source files are printed in a B<cc>-like format on
+standard error.
+
+=head1 EXAMPLES
+
+This source file, I<example.c>, demonstrates how to use inheritance.
+It defines a "string" class which holds a string, and a "stringchain"
+class which holds a list of strings.
+
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include "exclasses.th"
+
+ classdef(string,, ({
+     _DTOR destroy;      /* destructor */
+     char *str;          /* the string */
+ }))
+
+ classdef(stringchain, string, ({
+     stringchain *next;  /* next in chain */
+ }))
+
+ #define EXAMPLE_C
+ #include "exclasses.dh"
+
+ Ddef(string) {
+     /* free allocated memory */
+     free(this->str);
+ }
+
+ Ddef(stringchain) {
+     /* clear the chained elements too */
+     if (this->next)
+         this->next->destroy(this->next);
+ }
+
+ void *void_O_CTOR(size_t size, _DTOR destroy)
+ {
+     string *n = calloc(1, size);  /* alloc and set to zero */
+     n->destroy = destroy;         /* store the dtor */
+     return n;
+ }
+
+ int main(int argc, char *argv[])
+ {
+     stringchain *sc, *s0 = NULL;
+     while (argc-- > 0) {
+         /* link the arguments in reverse order */
+         sc = new(stringchain);
+         sc->str = strdup(*argv);
+         sc->next = s0;
+         s0 = sc;
+         argv++;
+     }
+     sc = s0;
+     while (sc) {
+         printf("%s\n", sc->str);
+         sc = sc->next;
+     }
+     s0->destroy(s0);
+ }
+
+To compile:
+
+ classdef -o exclasses -s example.c
+ cc -o example -I. example.c
+
+To get a feeling how it works, look at the following beautified,
+excerpted preprocessor output:
+
+ typedef struct _string string;
+ typedef struct _stringchain stringchain;
+
+ struct _string {
+     _DTOR destroy;
+     char *str;
+ };
+
+ struct _stringchain {
+     _DTOR destroy;
+     char *str;
+     stringchain *next;
+ };
+
+ static void string_O_DTOR_(string *this);
+ void string_O_DTOR(string *this)
+ {
+     string_O_DTOR_(this);
+     free((void *)this);
+ }
+ static void string_O_DTOR_(string *this) {
+     free(this->str);
+ }
+
+ static void stringchain_O_DTOR_(stringchain  *this);
+ void stringchain_O_DTOR(stringchain *this)
+ {
+     stringchain_O_DTOR_(this);
+     string_O_DTOR((string *)this);
+ }
+ static void stringchain_O_DTOR_(stringchain *this)
+ {
+     if (this->next)
+         this->next->destroy(this->next);
+ }
+
+=head1 FILES
+
+B<classdef> writes the files it generates, as specified by the B<-o>
+option, in a "move-if-change" fashion. It generates a lot of I<#line>
+statements telling exactly from which line in which source file a
+definition or declaration originates. While it can operate from
+standard input to standard output, this doesn't make much sense.
+
+=head1 SEE ALSO
+
+L<malloc(3)>, L<free(3)>
+
+=head1 NOTES
+
+In a header file with the usual include guard, a "private" classdef
+becomes visible to everyone who includes that header - i.e. it is more
+like "protected" than "private".
+
+=head1 CAVEATS
+
+The expected usage is that each structure somewhere contains a pointer
+to its own destructor, and that the global constructor stores it
+there. There currently is no macro for invoking it. Destructors take
+the object to be destroyed as their (only) argument.
+
+Typecasts between B<classdef>d structures are safe in the following
+situations:
+
+=over 8
+
+=item I<widening conversion>:
+
+The target is a direct or indirect supertype of the source.
+
+=item I<narrowing conversion>:
+
+The target is a direct or indirect subtype of the source, and the
+source was initially obtained via B<new> of the target or a direct or
+indirect subtype of it (and subsequently widening-converted).
+
+=back
+
+There is no general way to check for these rules at compile time.
+
+=head1 DIAGNOSTICS
+
+Diagnostics are written to standard error. With the B<-v> argument,
+some interesting or less interesting progress messages are written
+too.
+
+A forgotten B<Ddef> will only be found by the linker.
+
+=head1 BUGS
+
+Not all possible errors are detected. Syntax errors may result in
+incomprehensible error messages from the compiler. Any error messages
+involving names ending with B<O_DTOR> or B<O_CTOR> or B<O_SUPER> are
+probably due to wrong use of B<classdef> or B<Ddef> macros.
+
+Cascading constructors is not documented.
+
+The constructor/destructor scheme is not universal enough. Some ugly
+magic in the source files is still necessary. Handling of destructors
+needs aid from the implementation.
+
+=head1 RESTRICTIONS
+
+The syntax of the B<classdef> macro is critical, especially the
+placement of parentheses and newlines. Use only the order given in the
+example.
+
+Multiline comments inside B<classdef> macros are not allowed.
+
+There is no real access control, nor a split of public and private
+fields. Of all class definitions, at least the names become globally
+visible even when "private", so they must be distinct.
+
+=head1 VERSION
+
+0.4 as of 2002-04-14.
+
+=head1 AUTHOR
+
+Olaf Titz <olaf@bigred.inka.de>. This program is in the public domain.
+
+=head1 HISTORY
+
+April 2002: fixed Perl syntax bug.
+
+September 1999: first version written for the Squid-filters project.
+
+=cut
+
+require "getopts.pl";
+$opt_a=$opt_v=$opt_s=$opt_c=$opt_C=0;
+&Getopts("o:avscC");
+if ($opt_o) {
+    if ($opt_s) {
+	$outfilea="$opt_o.th$$";
+	$outfileb="$opt_o.dh$$";
+    } else {
+	$outfilea=$outfileb="$opt_o.$$";
+    }
+} else {
+    $outfilea=$outfileb="";
+    $opt_s="";
+}
+
+$state=0;
+$defn{""}="";
+
+while (<>) {
+    close ARGV if (eof);
+    if ($state==0) {
+	/^\s*classdef\(([^,()\{]+),\s*(\w+)?,\s*\(\s*\{\s*$/ && do {
+	    $newclass=$1;
+	    $parent=defined($2)?$2:"";
+	    if ($newclass=~s,^private\s+,,) {
+                if ($ARGV ne "-") {
+		    $private{$newclass}=$ARGV;
+        	    $private{$newclass}=~tr,a-z./,A-Z__,;
+                }
+	    }
+	    printf STDERR "classdef `%s' parent `%s' file %s%s\n",
+                   $newclass, $parent, $ARGV,
+                   ($private{$newclass}?" private":"")
+		     if ($opt_v);
+	    $parent{$newclass}=$parent;
+	    $wheref{$newclass}=$ARGV;
+	    $wherel{$newclass}=$.;
+	    $newdef="";
+	    $state=1;
+	    next;
+	};
+	/^\s*classdef/ && &err($ARGV, $., "syntax error in classdef", 1);
+    } else {
+	/^\s*\}\s*\)\s*\);?\s*$/ && do {
+	    $defn{$newclass}=$newdef;
+	    $state=0;
+	    next;
+	};
+	$newdef.=$_;
+    }
+}
+
+@classes=();
+print STDERR "Class hierarchy:\n" if ($opt_v);
+$hierarchy = "";
+&pushdeps("", -1);
+$e=0;
+foreach (keys %wheref) {
+    unless ($okay{$_}) {
+        &err($wheref{$_}, $wherel{$_},
+             "superclass not defined or circurlar dependency", 0);
+        $e=1;
+    }
+}
+exit 1 if ($e);
+
+$x="";
+@i = sort values %wheref;
+@inf = grep($_ ne $x && ($x=$_), @i);
+$inputfiles=join("\n   ", @inf);
+$inputfiles=~s,^(   )?-$,<standard input>,gm;
+$Pinputfiles = ($#inf>0 ? "s" : "");
+
+if ($outfilea) {
+    open(STDOUT, ">$outfilea") || die "open $outfilea: $!";
+    select STDOUT;
+    $outfilex=&fntom($outfilea);
+}
+
+&printhead;
+printf "/* Class hierarchy:\n%s*/\n", $hierarchy if ($opt_a);
+printf "#ifndef %s\n#define %s\n", $outfilex, $outfilex if ($outfilea);
+print
+ "\n#define classdef(class,parent,body)\ntypedef void (*_DTOR)(void *);\n";
+
+if ($opt_c) {
+    print <<'_END';
+
+#define Cdef(typ) static void typ##_O_CTOR_(typ *this, _DTOR dtor); \
+                  typ *typ##_O_CTOR(size_t size, _DTOR dtor) { \
+                           typ *this=(typ*)typ##_O_SCTOR(size, dtor); \
+                           typ##_O_CTOR_(this, dtor); return this; } \
+                  static void typ##_O_CTOR_(typ *this, _DTOR dtor)
+
+#define Cdef_none(typ) typ *typ##_O_CTOR(size_t size, _DTOR dtor) { \
+                           return (typ*)typ##_O_SCTOR(size, dtor); }
+
+#define void_O_CTOR(s,d) malloc(s)
+#define new(typ)      typ##_O_CTOR(sizeof(typ), (_DTOR)typ##_O_DTOR)
+
+_END
+} else {
+    print <<'_END';
+
+#define new(typ) (typ *)void_O_CTOR(sizeof(typ), (_DTOR)typ##_O_DTOR, typ)
+
+_END
+}
+
+print <<'_END';
+#define Ddef(typ) static void typ##_O_DTOR_(typ *this); \
+                  void typ##_O_DTOR(typ *this) { \
+                           typ##_O_DTOR_(this); \
+                           typ##_O_SDTOR((typ##_O_SUPER *)this); } \
+                  static void typ##_O_DTOR_(typ *this)
+
+#define Ddef_none(typ) void typ##_O_DTOR(typ *this) { \
+                            typ##_O_SDTOR((typ##_O_SUPER *)this); }
+
+#define void_O_DTOR(t)   free(t)
+
+/* TYPEDEFS */
+_END
+
+foreach (@classes) {
+    printf "%s\n", &where($_);
+    $x=sprintf "typedef struct _%s %s;", $_, $_;
+    printf "%s\n", &annotate($x, $parent{$_});
+}
+print "\n/* LINKS */\n";
+foreach (@classes) {
+    local($p)=$parent{$_};
+    $p="void" unless ($p);
+    printf "#define %s_O_SUPER %s\n", $_, $p;
+    printf "#define %s_O_SCTOR %s_O_CTOR\n", $_, $p if ($opt_c);
+    printf "#define %s_O_SDTOR %s_O_DTOR\n", $_, $p;
+}
+
+print "\n/* try this:*/\n";
+printf "#ifdef ADD_CLASSDEF\n";
+foreach (@classes) {
+    printf "    ADD_CLASSDEF(%s)\n", $_;
+}
+printf "#endif\n";
+
+if ($opt_s) {
+    print "\n#endif\n";
+    open(STDOUT, ">$outfileb") || die "open $outfileb: $!";
+    select STDOUT;
+    $outfilex=&fntom($outfileb);
+    &printhead;
+    printf "#ifndef %s\n#define %s\n", $outfilex, $outfilex if ($outfileb);
+}
+
+print "\n/* STRUCTS */\n";
+foreach (@classes) {
+    if ($private{$_}) {
+	printf "\n#ifdef %s", $private{$_};
+    }
+    printf "\n%s\nstruct _%s {\n", &where($_), $_;
+    &pdef($_, $_);
+    print "};\n";
+    if ($private{$_}) {
+	print "#endif\n";
+    }
+}
+print "\n/* CTOR/DTOR DECLS */\n";
+foreach (@classes) {
+    printf "%s\n", &where($_);
+    printf "extern %s *%s_O_CTOR(size_t, _DTOR);", $_, $_ if ($opt_c);
+    printf "extern void %s_O_DTOR(%s *);\n", $_, $_;
+}
+print "\nextern void *void_O_CTOR(size_t, _DTOR);\n" unless ($opt_c || $opt_C);
+print "\n#endif\n" if ($opt_o);
+close STDOUT;
+
+if ($opt_o) {
+    &mvifchg($outfilea);
+    &mvifchg($outfileb) unless ($outfilea eq $outfileb);
+}
+exit;
+
+sub pushdeps
+{
+    local($x,$l)=@_;
+    local($y,$z);
+    if ($x) {
+	$z = sprintf("   %s%s\n", "    " x $l, $x);
+	$hierarchy .= $z;
+	print STDERR $z if ($opt_v);
+    }
+    foreach $y (keys %defn) {
+	if ($y) {
+	    &pushdeps($y, $l+1) if (($parent{$y} eq $x));
+	}
+    }
+    if ($x) {
+	unshift(@classes, $x);
+	$okay{$x}=1;
+    }
+}
+
+sub pdef
+{
+    local($c,$d)=@_;
+    if ($parent{$c}) {
+	&pdef($parent{$c}, $d);
+    }
+    printf "%s\n", &where($c, 1);
+    local($_)=$defn{$c};
+    s~class~$d~g;
+    s~super~$parent{$d}~g;
+    s~[ \t]*/\*.*\*/[ \t]*~~gm;
+    s~^.*$~&annotate($&,$c)~gme;
+    print;
+}
+
+sub where
+{
+    local($c,$i)=@_;
+    $i=0 unless ($i);
+    sprintf '#line %d "%s"', $wherel{$c}+$i, $wheref{$c};
+}
+
+sub fntom
+{
+    local($x)=@_;
+    $x=~tr,a-z./,A-Z__,;
+    $x=~s,[0-9]*$,,;
+    $x;
+}
+
+sub annotate
+{
+    local($s,$x)=@_;
+    return $s unless ($opt_a);
+    local($n)=74-length($s)-length($x);
+    $s.=(" " x $n) if ($n>0);
+    sprintf "%s /*%s*/", $s, $x;
+}
+
+sub printhead
+{
+    print <<"_END";
+/* MACHINE GENERATED FILE - DO NOT EDIT */
+
+/* Produced by classdef $version from the source file$Pinputfiles:
+   $inputfiles
+*/
+_END
+}
+
+sub mvifchg
+{
+    local($f)=@_;
+    local($g)=$f;
+    $g=~s,[0-9]*$,,;
+    if (-f $g) {
+	$_=`cmp $f $g 2>/dev/null`;
+	if ($_) {
+	    unlink $g;
+	    rename $f, $g;
+	} else {
+	    unlink $f;
+	}
+    } else {
+	rename $f, $g;
+    }
+}
+
+sub err
+{
+    local($f,$l,$m, $e)=@_;
+    printf STDERR "%s:%d: %s\n", $f, $l, $m;
+    exit 1 if ($e);
+}

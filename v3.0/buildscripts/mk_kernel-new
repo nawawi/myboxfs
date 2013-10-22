@@ -1,0 +1,201 @@
+#!/bin/sh -e
+
+START=$(pwd)
+CONFIG="$START/configs/kernel.config-2.6.18"
+MYV="3.0"
+RELV=$(date +"%y.%m")
+
+strstr() {
+        [ "$1" = "$2" ] && return 0
+        slice=${1#*$2*}
+        [ "$slice" = "$1" ] && return 1
+        return 0
+}
+
+KERNEL_SOURCE=/usr/src/linux
+REL_DIR=$START/kernel_base
+REL_MOD=$REL_DIR/compiled
+
+if [ ! -d "$KERNEL_SOURCE" ]; then
+	echo "$KERNEL_SOURCE not found"
+	exit;
+fi
+
+if [ ! -f "$CONFIG" ]; then
+	echo "$CONFIG not found"
+	exit;
+fi
+
+MYBOX_INFO="
+#undef UTS_SYSNAME
+#define UTS_SYSNAME \"MyBoxOS\"
+#undef UTS_VERSION
+#define UTS_VERSION \"v$MYV $RELV\"
+#undef LINUX_COMPILE_BY
+#define LINUX_COMPILE_BY \"awie\"
+#undef LINUX_COMPILE_HOST 
+#define LINUX_COMPILE_HOST \"devel.mybox.net.my\"
+#undef LINUX_COMPILE_DOMAIN
+#define LINUX_COMPILE_DOMAIN \"mybox.net.my\"
+#undef UTS_MACHINE
+#define UTS_MACHINE \"i386\"
+"
+
+rm -rf $REL_DIR
+mkdir -p $REL_MOD
+
+cd $KERNEL_SOURCE
+make distclean
+make clean
+make mrproper
+sync
+cat $CONFIG > $KERNEL_SOURCE/.config
+echo "$MYBOX_INFO" > $KERNEL_SOURCE/include/linux/mybox.h
+sync
+make oldconfig
+
+make INSTALL_MOD_PATH=$REL_MOD
+make INSTALL_MOD_PATH=$REL_MOD modules_install
+
+cd $START
+
+K_VER=$(ls $REL_MOD/lib/modules)
+INSB_DIR="$REL_MOD/lib/modules";
+INS_DIR="$INSB_DIR/$K_VER";
+
+if [ ! -d "$INS_DIR/kernel" ]; then
+        echo "$INS_DIR/kernel Compiling kernel failed"
+        exit
+fi
+
+if [ -f "$KERNEL_SOURCE/arch/i386/boot/bzImage" ]; then
+	cp -v $KERNEL_SOURCE/arch/i386/boot/bzImage $REL_DIR/mfs-kernel
+	upx-kernel -9 $REL_DIR/mfs-kernel
+	du -hc $REL_DIR/$KVER
+fi
+
+
+cd $REL_MOD
+
+PPP=
+LCD=
+NET=
+
+for f in $(find $INS_DIR/kernel/drivers/net/* -name "*.ko"); do
+        #echo "$f";
+        L=
+        K=
+        P=
+        P=$(basename $f)
+        L=$(echo $REL_MOD |sed -e 's/\//\\\//g');
+        K=$(echo $f |sed -e "s/$L//g")
+        if strstr $P "ppp_";then
+                echo "$K" >> $INSB_DIR/ppp.txt
+                PPP="$PPP $(echo "$K" |sed -e 's/^\///g')"
+        fi
+        if strstr $P "bsd_comp";then
+                echo "$K" >> $INSB_DIR/ppp.txt
+                PPP="$PPP $(echo "$K" |sed -e 's/^\///g')"
+        fi
+        if strstr "$P" "pppoe";then
+                echo "$K" >> $INSB_DIR/ppp.txt
+                PPP="$PPP $(echo "$K" |sed -e 's/^\///g')"
+        fi
+        if strstr "$P" "pppox";then
+                echo "$K" >> $INSB_DIR/ppp.txt
+                PPP="$PPP $(echo "$K" |sed -e 's/^\///g')"
+        fi
+        if strstr "$P" "slip";then
+                echo "$K" >> $INSB_DIR/ppp.txt
+                PPP="$PPP $(echo "$K" |sed -e 's/^\///g')"
+        fi
+        if strstr "$P" "slhc";then
+                echo "$K" >> $INSB_DIR/ppp.txt
+                PPP="$PPP $(echo "$K" |sed -e 's/^\///g')"
+        fi
+        if strstr "$P" "hamachi";then
+                echo "$K" >> $INSB_DIR/lcd.txt
+                LCD="$LCD $(echo "$K" |sed -e 's/^\///g')"
+        fi
+        if strstr "$P" "mii";then
+                echo "$K" >> $INSB_DIR/lcd.txt
+                LCD="$LCD $(echo "$K" |sed -e 's/^\///g')"
+        fi
+done
+
+# ppp/pptp modules
+if [ "$PPP" != "" ]; then
+        tar -jcvf $REL_DIR/kmods_ppp.bz2 $PPP
+        rm -fv $PPP
+fi
+
+# hamachi paraller lcd modules
+if [ "$LCD" != "" ]; then
+        tar -jcvf $REL_DIR/kmods_lcd.bz2 $LCD
+        rm -fv $LCD
+fi
+
+for f in $(find $INS_DIR/kernel/drivers/net/* -name "*.ko"); do
+	L=
+        K=
+        L=$(echo $REL_MOD |sed -e 's/\//\\\//g');
+        K=$(echo $f |sed -e "s/$L//g")
+	echo "$K"  >> $INSB_DIR/nic.txt
+	NET="$NET $(echo "$K" |sed -e 's/^\///g')"
+done
+
+# network
+if [ "$NET" != "" ]; then
+        tar -jcvf $REL_DIR/kmods_nic.bz2 $NET
+        rm -fv $NET
+fi
+
+for f in $(find $INS_DIR/kernel/drivers/* -name "*.ko"); do
+	L=
+        K=
+        L=$(echo $REL_MOD |sed -e 's/\//\\\//g');
+        K=$(echo $f |sed -e "s/$L//g")
+	echo "$K"  >> $INSB_DIR/drivers.txt
+done
+
+rm -fv $INS_DIR/build 
+rm -fv $INS_DIR/source
+rm -fv $INS_DIR/modules.ccwmap
+rm -fv $INS_DIR/modules.ieee1394map
+rm -fv $INS_DIR/modules.inputmap
+rm -fv $INS_DIR/modules.usbmap
+
+
+# ipv4/iptables
+tar -jcvf $REL_DIR/kmods_iptables.bz2 lib/modules/$K_VER/kernel/net/ipv4 lib/modules/$K_VER/kernel/net/netfilter |sort
+rm -rfv lib/modules/$K_VER/kernel/net/ipv4 lib/modules/$K_VER/kernel/net/netfilter
+
+# Qos
+tar -jcvf $REL_DIR/kmods_qos.bz2 lib/modules/$K_VER/kernel/net/sched |sort
+rm -rfv lib/modules/$K_VER/kernel/net/sched
+
+# add 24/04/2006
+# scsi modules
+tar -jcvf $REL_DIR/kmods_scsi.bz2 lib/modules/$K_VER/kernel/drivers/scsi |sort 
+rm -rfv lib/modules/$K_VER/kernel/drivers/scsi
+
+# base
+tar -jcvf $REL_DIR/kmods_base.bz2 lib |sort
+
+cd $START
+if [ ! -f "$REL_DIR/iptables.bz2" ]; then
+	sh mk_iptables
+fi
+
+if [ ! -f "$REL_DIR/keymaps.bz2" ]; then
+	sh mk_keymaps
+fi
+
+if [ ! -f "$REL_DIR/zoneinfo.bz2" ]; then
+	sh mk_zoneinfo
+fi
+
+cp -v $KERNEL_SOURCE/System.map $REL_DIR
+
+cd $START
+echo "$MYV" >MYBOX_VERSION

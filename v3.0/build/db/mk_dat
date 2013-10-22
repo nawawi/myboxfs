@@ -1,0 +1,9 @@
+rm -rfv mybox
+mkdir -p mybox/db
+for f in *.txt; do
+	P=$(basename $f .txt);
+	echo "mybox/db/$P.db"
+	cat $f |sqlite mybox/db/$P.db
+done
+rm -f db.dat
+tar -zcvf db.dat mybox

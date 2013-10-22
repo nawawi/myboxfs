@@ -1,0 +1,46 @@
+#!/bin/bash
+#
+# POP3 Virus Scanner startup script
+#
+# usage: p3scan { start | stop | restart | status }
+#
+# Jaime Nebrera - jnebrera@eneotecnologia.com
+# Director de Organizacion - ENEO Tecnologia
+
+case "$1" in
+   start)
+      # Start p3scan
+      `which p3scan`
+      echo "P3Scan initiated"
+      ;;
+   stop)
+      # Stop p3scan
+      if [ -a /var/run/p3scan/p3scan.pid ]; then
+         kill `cat /var/run/p3scan/p3scan.pid` &>/dev/null
+         rm -f /var/run/p3scan/p3scan.pid
+         echo "P3Scan terminated"
+      else
+         echo "Error: cannot find p3scan.pid"
+         echo "Killing any p3scan daemon in the system ..."
+         echo
+         killall p3scan &>/dev/null
+      fi
+      ;;
+   status)
+      # P3Scan status
+      if [ -a /var/run/p3scan/p3scan.pid ]; then
+         PID=`cat /var/run/p3scan/p3scan.pid`
+         echo "P3Scan OK, running: $PID"
+      else
+         echo "P3Scan is stopped"
+      fi
+      ;;
+   restart)
+      $0 stop
+      $0 start
+      ;;
+   *)
+      echo "Usage: p3scan { start | stop | restart | status }"
+      exit 1
+esac
+exit 0

@@ -1,0 +1,245 @@
+<?php 
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+// updated: 22/11/2007
+
+function mybox_backup_cf_setting($file) {
+	global $_PAT_PATH, $_ROOT_DIR;
+	$_config=array();
+	$buff=mybox_dir2array("$_PAT_PATH/blacklist/*/stat");
+	if(count($buff)!=0) {
+		foreach($buff as $lx) {
+			$stat=mybox_fget_contents($lx);
+			if($stat=='') $stat=0;
+			$_config[$lx]=$stat;
+		}
+	}
+	$lx="$_PAT_PATH/blacklist/EXT_BLOCK";
+	if(file_exists($lx)) {
+		$ext_block=mybox_fget_contents($lx);
+		if($ext_block!='') $_config[$lx]="$ext_block";
+	}
+	$lx="$_PAT_PATH/blacklist/EXT_AV";
+	if(file_exists($lx)) {
+		$ext_block=mybox_fget_contents($lx);
+		if($ext_block!='') $_config[$lx]="$ext_block";
+	}
+	$lx="$_PAT_PATH/blacklist/EXT_AV_MIME";
+	if(file_exists($lx)) {
+		$ext_block=mybox_fget_contents($lx);
+		if($ext_block!='') $_config[$lx]="$ext_block";
+	}
+	$lx="$_PAT_PATH/blacklist/EXT_URL_MIME";
+	if(file_exists($lx)) {
+		$ext_block=mybox_fget_contents($lx);
+		if($ext_block!='') $_config[$lx]="$ext_block";
+	}
+	$lx="$_PAT_PATH/blacklist/SITE_REDIRECT";
+	if(file_exists($lx)) {
+		$ext_block=mybox_fget_contents($lx);
+		if($ext_block!='') $_config[$lx]="$ext_block";
+	}
+	$lx="$_PAT_PATH/blacklist/url_block/urls";
+	if(file_exists($lx)) {
+		$ext_block=mybox_fget_contents($lx);
+		if($ext_block!='') $_config[$lx]="$ext_block";
+	}
+	$lx="$_PAT_PATH/blacklist/FTP_EXT_BLOCK";
+	if(file_exists($lx)) {
+		$ext_block=mybox_fget_contents($lx);
+		if($ext_block!='') $_config[$lx]="$ext_block";
+	}
+
+	$lx="$_ROOT_DIR/sophos/BLACKLIST";
+	if(file_exists($lx)) {
+		$ext_block=mybox_fget_contents($lx);
+		if($ext_block!='') $_config[$lx]="$ext_block";
+	}
+	$lx="$_ROOT_DIR/sophos/WHITELIST";
+	if(file_exists($lx)) {
+		$ext_block=mybox_fget_contents($lx);
+		if($ext_block!='') $_config[$lx]="$ext_block";
+	}
+	if(count($_config)!=0) {
+		mybox_save_to_file($file,serialize($_config));
+		return 1;
+	}
+	return 0;
+}
+
+
+function mybox_restore_cf_setting($file) {
+	global $_PAT_PATH;
+	if(!file_exists($file)) return 0;
+	$_config=unserialize(mybox_fget_contents($file));
+	if(count($_config)==0) return 0;
+	foreach($_config as $lnx => $l_data) {
+		if(!file_exists($lnx)) {
+			continue;
+		}
+		if($l_data=='') continue;
+		mybox_save_to_file($lnx,"$l_data\n");
+	}
+	return 1;
+}
+
+function mybox_backup_ips_setting($file) {
+	global $_PAT_PATH;
+	$_config=array();
+	$buff=mybox_dir2array("$_PAT_PATH/rules/*/*");
+	if(count($buff)!=0) {
+		foreach($buff as $lx) {
+			if(preg_match("/\/stat$/",$lx)) {
+				$stat=mybox_fget_contents($lx);
+				if($stat=='') $stat=0;
+				$_config[$lx]['stat']=$stat;
+			}
+			if(preg_match("/\/rules$/",$lx)) {
+				$bx=array();
+				$bx=mybox_file2array($lx);
+				if(count($bx)==0) continue;
+				foreach($bx as $ln) {
+					$ln=trim($ln);
+					$stat=0;
+					if($ln=='') continue;
+					if($ln{0}!='#') $stat=1;
+					$sid='';
+					if(preg_match("/sid\:(\S+)\;/",$ln,$mm)) {
+                        			$sid=$mm[1];
+                			}
+					$_config[$lx][$sid]=$stat;
+				}
+			}
+		}
+	}
+	if(count($_config)!=0) {
+		mybox_save_to_file($file,serialize($_config));
+		return 1;
+	}
+	return 0;
+}
+
+function mybox_restore_ips_setting($file) {
+	global $_PAT_PATH;
+	if(!file_exists($file)) return 0;
+	$_config=unserialize(mybox_fget_contents($file));
+	if(count($_config)==0) return 0;
+	foreach($_config as $lnx => $l_array) {
+		if(!file_exists($lnx)) {
+			continue;
+		}
+		if(preg_match("/\/stat$/",$lnx)) {
+			foreach($l_array as $sid => $stat) {
+				if($sid!="stat") continue;
+				mybox_save_to_file($lnx,"$stat\n");
+			}
+		}
+		if(preg_match("/\/rules$/",$lnx)) {
+			$line='';
+			$bx=array();
+			$bx=mybox_file2array($lnx);
+			if(count($bx)==0) {
+				continue;
+			}
+			foreach($bx as $ln) {
+				$mm=array();
+				$ln=trim($ln);
+				if($ln=='') continue;
+				if(preg_match("/sid\:(\S+)\;/",$ln,$mm)) {
+                        		$_sid=$mm[1];
+					$stat=$l_array[$_sid];
+					if($stat==0) {
+						if($ln{0}!='#') {
+							$ln="#$ln";
+						}
+					}
+					if($stat==1) {
+						if($ln{0}=='#') {
+							$ln=ltrim($ln,"#");
+						}
+					}
+                		}
+				$ln=trim($ln);
+				if($ln!='') $line .="$ln\n";
+			}
+			if($line!='') mybox_save_to_file($lnx,"$line");
+		}
+	}
+	return 1;
+}
+
+function mybox_backup_delete(&$msg,$file) {
+	global $_BACKUP_PATH;
+	if(@unlink("$_BACKUP_PATH/$file")) {
+		$msg="Backup deleted successfully.";
+		return 1;
+	} else {
+		$msg="Deleting backup failed.";
+		return 0;
+	}
+}
+
+function mybox_backup_restore(&$msg,$opt,$file='',$note='') {
+	global $_DB_PATH, $_BACKUP_PATH, $_RTMP_PATH;
+	global $_DB_NAME;
+	if($opt==2) {
+		$ret=0;$ret1=0;
+		$msg="Backup restore failed.";
+		if(file_exists("$_BACKUP_PATH/$file")) {
+			if(rename("$_DB_PATH/$_DB_NAME","$_DB_PATH/{$_DB_NAME}.bak")) {
+				exec("tar -C $_DB_PATH -zxf $_BACKUP_PATH/$file $_DB_NAME",$out,$ret);
+				if($ret==0) {
+					exec("tar -C $_RTMP_PATH -zxf $_BACKUP_PATH/$file ips.set cf.set",$out,$ret);
+					$ret=mybox_restore_ips_setting("$_RTMP_PATH/ips.set");
+					@unlink("$_RTMP_PATH/ips.set");
+					$ret1=mybox_restore_cf_setting("$_RTMP_PATH/cf.set");
+					@unlink("$_RTMP_PATH/cf.set");
+					if($ret==1 && $ret1==1) {
+						$msg="Backup restored successfully.";
+						return 1;
+					}
+				}
+				@rename("$_DB_PATH/{$_DB_NAME}.bak","$_DB_PATH/$_DB_NAME");
+			}
+		}
+		return $ret;
+	} else {
+		$h=mybox_fget_contents("/proc/sys/kernel/hostname");
+		$v=mybox_show_firmware();
+		$v=preg_replace("/\s+/","_",$v);
+		$d=date('Y-m-d_H-i');
+		$filename="{$h}_{$v}_{$d}";
+		$msg="Failed to create backup.";
+		$ret=0;
+		if(file_exists("$_BACKUP_PATH/$filename.mbf")) {
+			$msg="Backup already created.";
+			return 0;
+		} else {
+			$tmpd="$_RTMP_PATH/$filename";
+			if(mybox_mkdirr($tmpd)) {
+				if(copy("$_DB_PATH/$_DB_NAME","$tmpd/$_DB_NAME")==1 &&
+					mybox_backup_ips_setting("$tmpd/ips.set")==1 &&
+					mybox_backup_cf_setting("$tmpd/cf.set")==1) {
+					if(chdir($tmpd)==TRUE) {
+						mybox_save_to_file("$tmpd/NOTE","$note");
+						exec("tar -zcf $_BACKUP_PATH/$filename.mbf *",$out,$ret);
+						if($ret==0) {
+							$msg="Backup created successfully.";
+							$ret=1;
+						} else {
+							$msg="Creating backup failed.";
+							$ret=0;
+						}
+					}
+				}
+			}
+			chdir($_RTMP_PATH);
+			@mybox_rmdir($tmpd);
+			return $ret;
+		}
+		return 0; 
+	}
+	return 0;
+}
+
+?>
+

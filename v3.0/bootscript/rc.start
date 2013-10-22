@@ -1,0 +1,241 @@
+#!/bin/sh
+# $Id: rc.start.sh,v 5.0 2007/09/24 02:18:00 nawawi Exp $
+
+trap : 1 2 3 15
+PATH="/bin"
+TERM=linux
+export PATH TERM
+umask 077
+cd /
+. /etc/init.boot/functions
+
+set_lcd;
+
+:> /etc/resolv.conf
+touch /var/sys/init_no_restart
+touch /var/sys/init_start
+
+SNMP_STAT=0;AUTH_AD=0;PPTP_STAT=0;DHCP_STAT=0;SHAPER_STAT=0;DDNS_STAT=0;
+CAPTIVE_STAT=0;SQUID_STAT=0;FROX_STAT=0;
+
+for f in $(php -f /service/init/initconf.init "init_chk_services_stat"); do
+	[ "$f" = "snmp" ] && SNMP_STAT=1;
+	[ "$f" = "auth_ad" ] && AUTH_AD=1;
+	[ "$f" = "pptp" ] && PPTP_STAT=1;
+	[ "$f" = "dhcp" ] && DHCP_STAT=1;
+	[ "$f" = "dhcp_relay" ] && DHCP_RELAY_STAT=1;
+	[ "$f" = "shaper" ] && SHAPER_STAT=1;
+	[ "$f" = "ddns" ] && DDNS_STAT=1;
+	[ "$f" = "captive" ] && CAPTIVE_STAT=1;
+	[ "$f" = "squid" ] && SQUID_STAT=1;
+	[ "$f" = "frox" ] && FROX_STAT=1;
+done
+pkill -f getkey >/dev/null 2>&1
+
+progress_bar() {
+	local msg="$1";
+	local ok=0;
+	while read buff; do
+		do_spin "$msg"
+		if strstr "$buff" "unlicensed" ; then
+			echo -n -e "\r* $msg Unlicensed.\n";
+			ok=1;
+			break;
+		elif strstr "$buff" "Internal error" ; then
+			echo -n -e "\r* $msg Internal error.\n";
+			ok=1;
+			break;
+		elif strstr "$buff" "failed" ; then
+			echo -n -e "\r* $msg Failed.\n";
+			ok=1;
+			break;
+		elif strstr "$buff" "Failed" ; then
+			echo -n -e "\r* $msg Failed.\n";
+			ok=1;
+			break;
+		elif strstr "$buff" "disabled" ; then
+			echo -n -e "\r* $msg Disabled.\n";
+			ok=1;
+			break;
+		elif strstr "$buff" "Timeout" ; then
+			echo -n -e "\r* $msg Timeout.\n";
+			ok=1;
+			break;
+		fi	
+    	done
+	[ "$ok" = "0" ] && echo -n -e "\r* $msg Done.\n"
+}
+
+wait_prog() {
+	local msg="$1";
+	local prog="$2";
+	php -f $prog | progress_bar "$msg"
+}
+
+# policy order
+iptables -P INPUT DROP >/dev/null 2>&1
+iptables -P FORWARD DROP >/dev/null 2>&1
+iptables -P OUTPUT DROP >/dev/null 2>&1
+
+iptables -A INPUT -i lo -s 127.0.0.1 -j ACCEPT >/dev/null 2>&1
+iptables -A INPUT -o lo -s 127.0.0.1 -j ACCEPT >/dev/null 2>&1
+
+if [ "$LCD_PROG" = "1" -a -f "/etc/lcreset" ]; then
+	echo "* Starting LCD services";
+	/etc/lcreset >/dev/null 2>&1 &
+fi
+
+if [ -f "/service/init/initconf.init" ]; then
+	/service/init/initconf.init keymap >/dev/null 2>&1
+	if [ $? = 0 ]; then
+		echo "* Setting keymap. Done."
+		lcdd_msg "SYSTEM SETTING.." "-> KEYMAP"
+	fi
+	/service/init/initconf.init clock >/dev/null 2>&1
+	if [ $? = 0 ]; then
+		echo "* Setting clock: $(date)"
+		lcdd_msg "SYSTEM SETTING.." "-> CLOCK"
+	fi
+	/service/init/initconf.init dnshost >/dev/null 2>&1
+	if [ $? = 0 ]; then
+		echo "* Setting system hostname: $(hostname)."
+		lcdd_msg "SYSTEM SETTING.." "-> HOSTNAME"
+	fi
+	/service/init/initconf.init init_set_passwd >/dev/null 2>&1
+fi
+
+
+if [ ! -f "/var/sys/nonetwork" ]; then
+	if [ -f "/service/init/network.init" ]; then
+		lcdd_msg "START SERVICES.." "-> NETWORKING"
+		wait_prog "Bringing up network interfaces." "/service/init/network.init start"
+	fi
+
+	if [ -f "/service/init/dns.init" ]; then
+		lcdd_msg "START SERVICES.." "-> DNS RESOLVER"
+		wait_prog "Starting DNS Resolver service." "/service/init/dns.init start"
+	fi
+
+	if [ -f "/bin/set_conntrack" ]; then
+		/bin/set_conntrack >/dev/null 2>&1
+	fi
+
+	if [ -f "/service/init/policy.init" ]; then
+		lcdd_msg "START SERVICES.." "-> PACKET FILTER"
+		wait_prog "Applying packet filter rules." "/service/init/policy.init start"
+	fi
+fi
+
+if [ -f "/service/init/syslog.init" ]; then
+	lcdd_msg "START SERVICES.." "-> SYSTEM LOGGER"
+	wait_prog "Starting Syslog." "/service/init/syslog.init start"
+fi
+
+
+if [ -f "/service/tools/mfs-query.exc" ]; then
+	lcdd_msg "START SERVICES.." "-> MYBOX"
+	echo -n "* Starting Mybox services. "
+	/service/tools/mfs-query.exc o >/dev/null 2>&1
+	echo -n -e " Done\n"
+fi
+
+if [ ! -f "/var/sys/nonetwork" ]; then
+	if [ -f "/service/init/snmp.init" -a "$SNMP_STAT" = "1" ]; then
+		lcdd_msg "START SERVICES.." "-> SNMP"
+		wait_prog "Starting SNMP service." "/service/init/snmp.init start"
+	fi
+
+	if [ -f "/service/init/ips.init" ]; then
+		lcdd_msg "START SERVICES.." "-> IPS"
+		wait_prog "Starting IPS service." "/service/init/ips.init start"
+	fi
+
+	if [ -f "/service/init/auth.init" -a "$AUTH_AD" = "1" ]; then
+		lcdd_msg "START SERVICES.." "-> AUTH AD"
+		wait_prog "Starting Auth AD service." "/service/init/auth.init ad_start"
+	fi
+
+	if [ -f "/service/init/pptp.init" -a "$PPTP_STAT" = "1" ]; then
+		lcdd_msg "START SERVICES.." "-> PPTP VPN"
+		wait_prog "Starting PPTP VPN service." "/service/init/pptp.init start"
+	fi
+
+	if [ -f "/service/init/dhcp.init" -a "$DHCP_STAT" = "1" ]; then
+		lcdd_msg "START SERVICES.." "-> DHCP"
+		wait_prog "Starting DHCP service." "/service/init/dhcp.init start"
+	fi
+
+	if [ -f "/service/init/dhcp_relay.init" -a "$DHCP_RELAY_STAT" = "1" ]; then
+		lcdd_msg "START SERVICES.." "-> DHCP RELAY"
+		wait_prog "Starting DHCP Relay service." "/service/init/dhcp_relay.init start"
+	fi
+
+	if [ -f "/service/init/captive.init" -a "$CAPTIVE_STAT" = "1" ]; then
+		lcdd_msg "START SERVICES.." "-> CAPTIVE PORTAL"
+		wait_prog "Starting Captive Portal service." "/service/init/captive.init start"
+	fi
+
+	if [ -f "/service/init/ntp.init" -a ! -f "/var/sys/nonetwork" ]; then
+		lcdd_msg "START SERVICES.." "-> NTP"
+		wait_prog "Starting NTP service." "/service/init/ntp.init start"
+	fi
+
+	if [ -f "/service/init/ddns.init" -a "$DDNS_STAT" = "1" ]; then
+		lcdd_msg "START SERVICES.." "-> DYNAMIC DNS"
+		wait_prog "Starting Dynamic DNS service." "/service/init/ddns.init start"
+	fi
+
+	if [ -f "/service/init/shaper.init" -a "$SHAPER_STAT" = "1" ]; then
+		lcdd_msg "START SERVICES.." "-> QOS"
+		wait_prog "Applying network QOS" "/service/init/shaper.init start"
+	fi
+
+	if [ -f "/service/init/initconf.init" ]; then
+		lcdd_msg "START SERVICES.." "-> STATIC ARP"
+		wait_prog "Applying static ARP." "/service/init/initconf.init staticarp"
+	fi
+
+	if [ -f "/service/init/http_proxy.init" -a "$SQUID_STAT" = "1" ]; then
+		lcdd_msg "START SERVICES.." "-> HTTP PROXY"
+		wait_prog "Starting HTTP Proxy." "/service/init/http_proxy.init start"
+	fi
+
+	if [ -f "/service/init/ftp_proxy.init" -a "$FROX_STAT" = "1" ]; then
+		lcdd_msg "START SERVICES.." "-> FTP PROXY"
+		wait_prog "Starting FTP Proxy." "/service/init/ftp_proxy.init start"
+	fi
+
+	if [ -f "/service/init/xinet.init" ]; then
+		lcdd_msg "START SERVICES.." "-> XINETD"
+		wait_prog "Starting xinetd service." "/service/init/xinet.init start"
+	fi
+fi
+
+if [ -f "/service/init/cron.init" ]; then
+	lcdd_msg "START SERVICES.." "-> CRON"
+	wait_prog "Starting CRON service." "/service/init/cron.init start"
+fi
+
+if [ -f "/service/tools/mfs-graph.exc" ]; then
+	lcdd_msg "START SERVICES.." "-> GRAPH"
+	echo "* Creating diagnostic graphs. Done";
+	/service/tools/mfs-graph.exc >/dev/null 2>&1
+fi
+
+if [ -f "/service/tools/mfs-query.exc" ]; then
+	lcdd_msg "SYSTEM SETTING.." "-> COMPRESS LOGS"
+	echo "* Compressing logs. Done";
+	/service/tools/mfs-query.exc bl >/dev/null 2>&1
+fi
+
+rm -f /var/sys/init_no_restart
+
+if [ ! -f "/var/sys/nonetwork" ]; then
+        if [ -f "/service/init/policy.init" ]; then
+                lcdd_msg "START SERVICES.." "-> POLICY FINAL"
+                wait_prog "Reloading packet filter rules" "/service/init/policy.init restart quiet"
+        fi
+
+fi
+
+exit 0

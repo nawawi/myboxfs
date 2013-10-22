@@ -1,0 +1,354 @@
+cat << EOF  > "$archname"
+#!/bin/sh
+# Mybox Firewall System
+
+CRCsum="$CRCsum"
+MD5="$MD5sum"
+TMPROOT=\${TMPDIR:=/tmp}
+
+label="$LABEL"
+script="$SCRIPT"
+scriptargs="$SCRIPTARGS"
+targetdir="$archdirname"
+filesizes="$filesizes"
+keep=$KEEP
+
+print_cmd_arg=""
+print_cmd="echo"
+
+unset CDPATH
+
+MS_Printf()
+{
+    \$print_cmd \$print_cmd_arg "\$1"
+}
+
+MS_Progress()
+{
+    while read a; do
+	echo -n "."
+    done
+	echo ""
+}
+
+MS_dd()
+{
+    blocks=\`expr \$3 / 1024\`
+    bytes=\`expr \$3 % 1024\`
+    dd if="\$1" ibs=\$2 skip=1 obs=1024 conv=sync 2> /dev/null | \\
+    { test \$blocks -gt 0 && dd ibs=1024 obs=1024 count=\$blocks ; \\
+      test \$bytes  -gt 0 && dd ibs=1 obs=1024 count=\$bytes ; } 2> /dev/null
+}
+
+MS_Help()
+{
+    cat << EOH >&2
+mypack version $MS_VERSION
+ 1) Getting help or info about \$0 :
+  \$0 --help   Print this message
+  \$0 --info   Print package info
+  \$0 --desc   Print package description
+  \$0 --list   Print the list of files in the package
+  \$0 --check  Checks integrity of the package
+ 
+ 2) Running \$0 :
+  \$0 [options] [--]
+  with following options (in that order)
+  --confirm             Ask before running package script
+  --noexec              Do not run package script
+  --keep                Do not erase target directory after running
+			the package script
+  --nochown             Do not give the extracted files to the current user
+  --target NewDirectory Extract in NewDirectory
+  --tar arg1 [arg2 ...] Access the contents of the package through the tar command
+  --                    Following arguments will be passed to the package script
+EOH
+}
+
+MS_Check()
+{
+    MD5_PATH=/bin/md5sum
+    MS_Printf "Verifying package integrity..."
+    if [ ! -x "/bin/uname" -a ! -x "\$MD5_PATH" ]; then
+	MS_Printf "Failed";
+	exit 1
+    fi
+    if [ "\$(cat /proc/sys/kernel/ostype)" != "MyBoxOS" ]; then
+	echo "Not running in MyboxOS"
+	exit 1
+    fi
+    offset=\`head -n $SKIP "\$1" | wc -c | tr -d " "\`
+    verb=\$2
+    i=1
+    for s in \$filesizes
+    do
+	crc=\`echo \$CRCsum | cut -d" " -f\$i\`
+	if test -x "\$MD5_PATH"; then
+	    md5=\`echo \$MD5 | cut -d" " -f\$i\`
+	    if test \$md5 = "00000000000000000000000000000000"; then
+		test x\$verb = xy && echo " \$1 does not contain an package MD5 checksum." >&2
+	    else
+		md5sum=\`MS_dd "\$1" \$offset \$s | "\$MD5_PATH" | cut -b-32\`;
+		if test "\$md5sum" != "\$md5"; then
+		    echo "Error in MD5 checksums: \$md5sum is different from \$md5" >&2
+		    exit 2
+		else
+		    test x\$verb = xy && MS_Printf " MD5 checksums are OK." >&2
+		fi
+		crc="0000000000"; verb=n
+	    fi
+	fi
+	if test \$crc = "0000000000"; then
+	    test x\$verb = xy && echo " \$1 does not contain a CRC checksum." >&2
+	else
+	    sum1=\`MS_dd "\$1" \$offset \$s | CMD_ENV=xpg4 cksum | awk '{print \$1}'\`
+	    if test "\$sum1" = "\$crc"; then
+		test x\$verb = xy && MS_Printf " CRC checksums are OK." >&2
+	    else
+		echo "Error in checksums: \$sum1 is different from \$crc"
+		exit 2;
+	    fi
+	fi
+	i=\`expr \$i + 1\`
+	offset=\`expr \$offset + \$s\`
+    done
+    echo " All good."
+}
+
+UnTAR()
+{
+    tar \$1vf - 2>&1 || { echo Extraction failed. > /dev/tty; kill -15 \$$; }
+}
+
+finish=true
+xterm_loop=
+copy=$COPY
+ownership=y
+verbose=n
+
+initargs="\$@"
+
+while true
+do
+    case "\$1" in
+    -h | --help)
+	MS_Help
+	exit 0
+	;;
+    --info)
+	echo Identification: "\$label"
+	echo Target directory: "\$targetdir"
+	echo Uncompressed size: $USIZE KB
+	echo Compression: $COMPRESS
+	echo Date of packaging: $DATE
+	exit 0
+	;;
+    --dumpconf)
+	echo LABEL=\"\$label\"
+	echo SCRIPT=\"\$script\"
+	echo SCRIPTARGS=\"\$scriptargs\"
+	echo archdirname=\"$archdirname\"
+	echo KEEP=$KEEP
+	echo COMPRESS=$COMPRESS
+	echo filesizes=\"\$filesizes\"
+	echo CRCsum=\"\$CRCsum\"
+	echo MD5sum=\"\$MD5\"
+	echo OLDUSIZE=$USIZE
+	echo OLDSKIP=`expr $SKIP + 1`
+	exit 0
+	;;
+    --desc)
+cat << EOLSM
+EOF
+eval "$DESC_CMD"
+cat << EOF  >> "$archname"
+EOLSM
+	exit 0
+	;;
+    --list)
+	echo Target directory: \$targetdir
+	offset=\`head -n $SKIP "\$0" | wc -c | tr -d " "\`
+	for s in \$filesizes
+	do
+	    MS_dd "\$0" \$offset \$s | eval "$GUNZIP_CMD" | UnTAR t
+	    offset=\`expr \$offset + \$s\`
+	done
+	exit 0
+	;;
+	--tar)
+	offset=\`head -n $SKIP "\$0" | wc -c | tr -d " "\`
+	arg1="\$2"
+	shift 2
+	for s in \$filesizes
+	do
+	    MS_dd "\$0" \$offset \$s | eval "$GUNZIP_CMD" | tar "\$arg1" - \$*
+	    offset=\`expr \$offset + \$s\`
+	done
+	exit 0
+	;;
+    --check)
+	MS_Check "\$0" y
+	exit 0
+	;;
+    --confirm)
+	verbose=y
+	shift
+	;;
+	--noexec)
+	script=""
+	shift
+	;;
+    --keep)
+	keep=y
+	shift
+	;;
+    --target)
+	keep=y
+	targetdir=\${2:-.}
+	shift 2
+	;;
+    --nochown)
+	ownership=n
+	shift
+	;;
+    --xwin)
+	finish="echo Press Return to close this window...; read junk"
+	xterm_loop=1
+	shift
+	;;
+    --phase2)
+	copy=phase2
+	shift
+	;;
+    --)
+	shift
+	break ;;
+    -*)
+	echo Unrecognized flag : "\$1" >&2
+	MS_Help
+	exit 1
+	;;
+    *)
+	break ;;
+    esac
+done
+
+case "\$copy" in
+copy)
+    tmpdir=\$TMPROOT/mypack.\$RANDOM.\`date +"%y%m%d%H%M%S"\`.\$\$
+    mkdir "\$tmpdir" || {
+	echo "Could not create temporary directory \$tmpdir" >&2
+	exit 1
+    }
+    SCRIPT_COPY="\$tmpdir/mypack"
+    echo "Copying to a temporary location..." >&2
+    cp "\$0" "\$SCRIPT_COPY"
+    chmod +x "\$SCRIPT_COPY"
+    cd "\$TMPROOT"
+    exec "\$SCRIPT_COPY" --phase2
+    ;;
+phase2)
+    finish="\$finish ; rm -rf \`dirname \$0\`"
+    ;;
+esac
+
+if test "\$nox11" = "n"; then
+    if tty -s; then                 # Do we have a terminal?
+	:
+    else
+        if test x"\$DISPLAY" != x -a x"\$xterm_loop" = x; then  # No, but do we have X?
+            if xset q > /dev/null 2>&1; then # Check for valid DISPLAY variable
+                GUESS_XTERMS="xterm rxvt dtterm eterm Eterm kvt konsole aterm"
+                for a in \$GUESS_XTERMS; do
+                    if type \$a >/dev/null 2>&1; then
+                        XTERM=\$a
+                        break
+                    fi
+                done
+                chmod a+x \$0 || echo Please add execution rights on \$0
+                if test \`echo "\$0" | cut -c1\` = "/"; then # Spawn a terminal!
+                    exec \$XTERM -title "\$label" -e "\$0" --xwin "\$initargs"
+                else
+                    exec \$XTERM -title "\$label" -e "./\$0" --xwin "\$initargs"
+                fi
+            fi
+        fi
+    fi
+fi
+
+if test "\$targetdir" = "."; then
+    tmpdir="."
+else
+    if test "\$keep" = y; then
+	echo "Creating directory \$targetdir" >&2
+	tmpdir="\$targetdir"
+	dashp="-p"
+    else
+	tmpdir="\$TMPROOT/selfgz\$\$\$RANDOM"
+	dashp=""
+    fi
+    mkdir \$dashp \$tmpdir || {
+	echo 'Cannot create target directory' \$tmpdir >&2
+	echo 'You should try option --target OtherDirectory' >&2
+	eval \$finish
+	exit 1
+    }
+fi
+
+location="\`pwd\`"
+if test x\$SETUP_NOCHECK != x1; then
+    MS_Check "\$0"
+fi
+offset=\`head -n $SKIP "\$0" | wc -c | tr -d " "\`
+
+if test x"\$verbose" = xy; then
+	MS_Printf "About to extract $USIZE KB in \$tmpdir ... Proceed ? [Y/n] "
+	read yn
+	if test x"\$yn" = xn; then
+		eval \$finish; exit 1
+	fi
+fi
+
+MS_Printf "Uncompressing \$label"
+res=3
+if test "\$keep" = n; then
+    trap 'echo Signal caught, cleaning up >&2; cd \$TMPROOT; /bin/rm -rf \$tmpdir; eval \$finish; exit 15' 1 2 3 15
+fi
+
+for s in \$filesizes
+do
+    if MS_dd "\$0" \$offset \$s | eval "$GUNZIP_CMD" | ( cd "\$tmpdir"; UnTAR x ) | MS_Progress; then
+		if test x"\$ownership" = xy; then
+			cd "\$tmpdir"; chown -R 0.0 .
+		fi
+    else
+		echo
+		echo "Unable to decompress \$0" >&2
+		eval \$finish; exit 1
+    fi
+    offset=\`expr \$offset + \$s\`
+done
+echo
+
+cd "\$tmpdir"
+res=0
+if test x"\$script" != x; then
+    if test x"\$verbose" = xy; then
+		MS_Printf "OK to execute: \$script \$scriptargs \$* ? [Y/n] "
+		read yn
+		if test x"\$yn" = x -o x"\$yn" = xy -o x"\$yn" = xY; then
+			eval \$script \$scriptargs \$*; res=\$?;
+		fi
+    else
+		eval \$script \$scriptargs \$*; res=\$?
+    fi
+    if test \$res -ne 0; then
+		test x"\$verbose" = xy && echo "The program '\$script' returned an error code (\$res)" >&2
+    fi
+fi
+if test "\$keep" = n; then
+    cd \$TMPROOT
+    /bin/rm -rf \$tmpdir
+fi
+eval \$finish; exit \$res
+EOF

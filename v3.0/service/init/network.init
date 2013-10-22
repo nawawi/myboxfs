@@ -1,0 +1,851 @@
+#!/bin/php -Cq
+<?php 
+// network.init - last update 30-Jun-2006
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="network";
+include_once('clib.exl');
+putenv("PATH=/bin:/service/tools:/service/init");
+
+$_QUIET=0;
+mybox_init_set_alarm(120);
+if(!file_exists("/bin/ip") || !file_exists("/bin/route") || !file_exists("/bin/ifconfig") || !file_exists("/bin/vconfig") || !file_exists("/bin/arping")) {
+	mybox_init_echo($_QUIET,"ERROR","Cannot execute network.init. Internal error!");
+	exit(1);
+}
+
+function other_app($name) {
+	if(file_exists("/var/sys/chk_$name")) return 1;
+	return 0;
+}
+
+function app_reload() {
+	if(other_app("snortd")) mybox_echo_query("ips-restart-quiet");
+	if(other_app("pptpd")) mybox_echo_query("pptp-restart-quiet");
+	if(other_app("dhcpd")) mybox_echo_query("dhcp-restart-quiet");
+	if(other_app("dhcp_relay")) mybox_echo_query("dhcp_relay-restart-quiet");
+	if(other_app("named")) mybox_echo_query("dns-restart-quiet");
+	if(other_app("ntpd")) mybox_echo_query("ntp-restart-quiet");
+	if(other_app("squid")) mybox_echo_query("http_proxy-restart-quiet");
+	if(other_app("frox")) mybox_echo_query("ftp_proxy-restart-quiet");
+	if(other_app("p3scan")) mybox_echo_query("mail_proxy-restart-quiet");
+	if(other_app("xinetd")) mybox_echo_query("xinet-reload-quiet");
+	mybox_echo_query("policy-restart-quiet");
+}
+
+function set_lcd_dev($dev) {
+	if(file_exists("/var/sys/lcd_dev")) mybox_save_to_file("/var/sys/lcdd_eth","$dev");
+}
+function set_wan_dev($dev,$db_id) {
+	mybox_save_to_file("/var/sys/wan_dev","$dev");
+	mybox_db_query("update pptp_vpn set bcrelay='$dev'",$db_id);
+}
+
+function clear_uplink_file() {
+	@unlink("/var/sys/uplink_start");
+	@unlink("/var/sys/uplink_stop");
+	@unlink("/var/sys/uplink_config");
+	@unlink("/var/sys/uplink_chk");
+	@unlink("/var/sys/uplink_list");
+	@unlink("/var/sys/uplink_status");
+}
+
+function clear_net_cache_file() {
+	@unlink("/var/sys/ipconfig.cache");
+	@unlink("/var/sys/routen.cache");
+	@unlink("/var/sys/ipname.cache");
+	@unlink("/var/sys/name2dev.cache");
+	@unlink("/var/sys/defnetwork.cache");
+	@unlink("/var/sys/deftime.cache");
+	@unlink("/var/sys/network_error");
+	@unlink("/var/sys/shaperclass.cache");
+	@unlink("/var/sys/defservice.cache");
+	@unlink("/var/sys/defservice4nat.cache");
+	@unlink("/var/sys/list_namedev.cache");
+	@unlink("/var/sys/route_static_del");
+	@unlink("/var/sys/route_policy_del");
+	@unlink("/var/sys/route_policy_pol");
+	@unlink("/var/sys/myipmac.cache");
+	@unlink("/var/sys/defname.cache");
+	@unlink("/var/sys/cipname.cache");
+}
+
+// 1=true, 0=false;
+function do_uplink($c_array,$db_id) {
+	global $_QUIET;
+	if(count($c_array)==0 || count($c_array)==1) {
+		clear_uplink_file();
+		return 0;
+	}
+	$_ustat=0;
+	$_umode='';$_uchkip='';$_uchkint='';
+	$result=mybox_db_query("select name,val from misc where name like \"uplink_%\"",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			if(trim($row['name'])=="uplink_stat") $_ustat=$row['val'];
+			if(trim($row['name'])=="uplink_mode") $_umode=$row['val'];
+			if(trim($row['name'])=="uplink_lst") $_uchkip=trim($row['val']);
+			if(trim($row['name'])=="uplink_int") $_uchkint=$row['val'];
+		}
+	}
+	if($_ustat==0 || $_uchkip=='') {
+		clear_uplink_file();
+		return 0;
+	}
+	$chk_array=preg_split("/\s+/",$_uchkip);
+	if(count($chk_array)!=0) {
+		foreach($chk_array as $ip) {
+			mybox_append_to_file("/var/sys/uplink_list","$ip\n");
+		}
+	} else {
+		mybox_save_to_file("/var/sys/uplink_list","$_uchkip\n");
+	}
+	mybox_save_to_file("/var/sys/uplink_config","$_umode|$_uchkint");
+	ksort($c_array);
+
+	$tcnt=201;
+	$table_del='';
+	$table_add='';
+	$table_last='';
+	$table_default='';
+	$table_ip='';
+	$table_del .="ip route del default\n";
+	$table_del .="ip rule del prio 50 table main\n";
+	foreach($c_array as $prio => $ln) {
+		list($_ipdev,$_ip,$_prefix,$_ip_network,$_isdefault,$_gateway,$_uplink)=preg_split("/\|/",$ln);
+		if($_uplink==0 || $_gateway=='') continue;
+		if($_isdefault==1) {
+			$table_default="ip route add default via $_gateway dev $_ipdev metric 0";
+		}
+		$table_ip .="$prio $_ipdev $_ip $_gateway\n";
+		$table_del .="ip rule del prio $tcnt from $_ip_network/$_prefix table $tcnt\n";
+		$tcnt++;
+	}
+	unset($_ipdev,$_ip,$_prefix,$_isdefault,$_gateway,$_uplink);
+	$table_del .="ip rule del prio 222 table 222\n";
+
+	$tcnt=201;
+	foreach($c_array as $prio => $ln) {
+		list($_ipdev,$_ip,$_prefix,$_ip_network,$_isdefault,$_gateway,$_uplink)=preg_split("/\|/",$ln);
+		if($_uplink==0 || $_gateway=='') continue;
+		$table_del .="ip route flush table $tcnt\n";
+		$tcnt++;
+	}
+	unset($_ipdev,$_ip,$_prefix,$_isdefault,$_gateway,$_uplink);
+	$table_del .="ip route flush table 222\n";
+
+	$tcnt=201;
+	foreach($c_array as $prio => $ln) {
+		list($_ipdev,$_ip,$_prefix,$_ip_network,$_isdefault,$_gateway,$_uplink)=preg_split("/\|/",$ln);
+		if($_uplink==0 || $_gateway=='') continue;
+		$table_del .="ip route del table $tcnt\n";
+		$tcnt++;
+	}
+	unset($_ipdev,$_ip,$_prefix,$_isdefault,$_gateway,$_uplink);
+	$table_del .="ip route del table 222\n";
+	$table_del .="ip route del default table main\n";
+	$table_add .="ip rule add prio 50 table main\n";
+
+
+	$tcnt=201;
+	foreach($c_array as $prio => $ln) {
+		list($_ipdev,$_ip,$_prefix,$_ip_network,$_isdefault,$_gateway,$_uplink)=preg_split("/\|/",$ln);
+		if($_uplink==0 || $_gateway=='') continue;
+		$table_add .="ip rule add prio $tcnt from $_ip_network/$_prefix table $tcnt\n";
+		$table_add .="ip route add default via $_gateway dev $_ipdev src $_ip proto static table $tcnt\n";
+		$table_add .="ip route append prohibit default table $tcnt metric 1 proto static\n";
+		$tcnt++;
+	}
+	unset($_ipdev,$_ip,$_prefix,$_isdefault,$_gateway,$_uplink);
+	$table_add .="ip rule add prio 222 table 222\n";
+	$table_add .="ip route add default table 222 proto static ";
+	$tcnt=201;
+	foreach($c_array as $prio => $ln) {
+		list($_ipdev,$_ip,$_prefix,$_ip_network,$_isdefault,$_gateway,$_uplink)=preg_split("/\|/",$ln);
+		if($_uplink==0 || $_gateway=='') continue;
+		$table_add .="nexthop via $_gateway dev $_ipdev ";
+		$tcnt++;
+	}
+
+	$table_last ="ip route flush cache\n";
+	mybox_save_to_file("/var/sys/uplink_start","$table_del\n$table_add\n$table_last\necho \"15\" > /proc/sys/net/ipv4/route/gc_interval\n");
+	mybox_save_to_file("/var/sys/uplink_stop","$table_del\n$table_default\n$table_last\necho \"60\" > /proc/sys/net/ipv4/route/gc_interval\n");
+	@chmod("/var/sys/uplink_start",0700);
+	@chmod("/var/sys/uplink_stop",0700);
+	mybox_save_to_file("/var/sys/uplink_chk","$table_ip");
+	mybox_init_echo($_QUIET,"INFO","Starting Uplink Redundancy");
+	mybox_exec_cmd("/bin/uplinkd");
+	return 1;
+}
+function update_arp($dev,$ip) {
+	mybox_exec_cmd("arping -q -A -c 1 -I $dev $ip");
+        sleep(2);
+	mybox_exec_cmd("arping -q -U -c 1 -I $dev $ip");
+	return 0;
+}
+
+function set_vip($dev,$mtu,$db_id) {
+	global $_QUIET;
+	if($dev=='') return 1;
+	$result=mybox_db_query("select * from ipalias where dev='$dev' and onboot='1'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		$xx=0;
+		mybox_init_echo($_QUIET,"INFO","Bringing up Virtual IP");
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_ip_ip=$row['ip'];
+			$_ip_prefix=$row['prefix'];
+			$devv="$dev:$xx";
+			$_ret=mybox_ipcalc($_ip_ip,$_ip_prefix);
+			if(count($_ret)==0) {
+				mybox_init_echo($_QUIET,"ERROR","---- Invalid $_ip_ip/$_ip_prefix");
+				continue;
+			}
+			$_ip_mask=$_ret['netmask'];
+			if(mybox_exec_cmd("ifconfig $devv $_ip_ip netmask $_ip_mask mtu $mtu")==0) {
+				mybox_init_echo($_QUIET,"INFO","---- $devv $_ip_ip/$_ip_prefix");
+				$xx++;
+			} else {
+				mybox_init_echo($_QUIET,"ERROR","Failed to bringing up $_ip_ip/$_ip_prefix.");
+			}
+		}
+	}
+	unset($result);
+	return 0;
+}
+
+function set_vlan($dev,$tag,$mtu,$db_id) {
+	global $_QUIET;
+	if($dev=='') return 1;
+	$result=mybox_db_query("select * from vlan where dev='$dev' and onboot='1'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		$xx=0;
+		mybox_init_echo($_QUIET,"INFO","Bringing up Virtual IP (VLAN $tag)");
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_ip_ip=$row['ip'];
+			$_ip_name=$row['name'];
+			$_ip_prefix=$row['prefix'];
+			$devv="$dev.$tag:$_ip_name";
+			$_ret=mybox_ipcalc($_ip_ip,$_ip_prefix);
+			if(count($_ret)==0) {
+				mybox_init_echo($_QUIET,"ERROR","---- Invalid $_ip_ip/$_ip_prefix");
+				continue;
+			}
+			$_ip_mask=$_ret['netmask'];
+			if(mybox_exec_cmd("ifconfig $devv $_ip_ip netmask $_ip_mask mtu $mtu")==0) {
+				mybox_init_echo($_QUIET,"INFO","---- $devv $_ip_ip/$_ip_prefix");
+				$xx++;
+			} else {
+				mybox_init_echo($_QUIET,"ERROR","Failed to bringing up Virtual IP (VLAN $tag) $_ip_ip/$_ip_prefix.");
+			}
+		}
+	}
+	unset($result);
+	return 0;
+}
+
+function list_ip_array($_defnet_array,$_name) {
+	$_ret_array=array();
+	$_type='';$_ip='';
+	if(isset($_defnet_array[$_name]['name']) && $_defnet_array[$_name]['name']!='') {
+		$_type=$_defnet_array[$_name]['type'];
+		$_ip=$_defnet_array[$_name]['ip'];
+		if($_type==1 || $_type==2) {
+			$_ret_array[]="$_ip";
+		}
+	} elseif(isset($_defnet_array[$_name]['group']) && $_defnet_array[$_name]['group']!='') {
+		foreach($_defnet_array[$_name] as $a => $b) {
+			if(!is_array($b)) continue;
+			$_type=$b['type'];
+			$_ip=$b['ip'];
+			if($_type==1 || $_type==2) {
+				$_ret_array[]="$_ip";
+			}
+		}
+	}
+	return $_ret_array;
+}
+
+// from policy.init
+function list_service_array($_defservice_array,$_name) {
+	global $_PROTO;
+	$_cmd_array=array();
+	$_proto='';$_dport='';$_sport='';$_etc='';
+	if(isset($_defservice_array[$_name]['name']) && $_defservice_array[$_name]['name']!='') {
+		$_proto=$_defservice_array[$_name]['proto'];
+		$_dport=$_defservice_array[$_name]['dport'];
+		$_sport=$_defservice_array[$_name]['sport'];
+		$_etc=$_defservice_array[$_name]['etc'];
+		$_proto=$_PROTO[$_proto];
+		if($_proto=="TCP") {
+			$_cmd_array[]="-p tcp -m tcp --sport $_sport --dport $_dport";
+		} elseif($_proto=="UDP") {
+			$_cmd_array[]="-p udp -m udp --sport $_sport --dport $_dport";
+		} elseif($_proto=="TCP/UDP") {
+			$_cmd_array[]="-p tcp -m tcp --sport $_sport --dport $_dport";
+			$_cmd_array[]="-p udp -m udp --sport $_sport --dport $_dport";
+		} elseif($_proto=="ICMP") {
+			$_cmd_array[]="-p icmp -m icmp --icmp-type $_etc";
+		} elseif($_proto=="IP") {
+			$_cmd_array[]="-p $_etc";
+		} elseif($_proto=="ESP") {
+			$_cmd_array[]="-p esp -m esp --espspi $_etc";
+		} elseif($_proto=="AH") {
+			$_cmd_array[]="-p ah -m ah --ahspi $_etc";
+		}
+	} elseif(isset($_defservice_array[$_name]['group']) && $_defservice_array[$_name]['group']!='') {
+		foreach($_defservice_array[$_name] as $a => $b) {
+			if(!is_array($b)) continue;
+			$_proto=$b['proto'];
+			$_dport=$b['dport'];
+			$_sport=$b['sport'];
+			$_etc=$b['etc'];
+			$_proto=$_PROTO[$_proto];
+			if($_proto=="TCP") {
+				$_cmd_array[]="-p tcp -m tcp --sport $_sport --dport $_dport";
+			} elseif($_proto=="UDP") {
+				$_cmd_array[]="-p udp -m udp --sport $_sport --dport $_dport";
+			} elseif($_proto=="TCP/UDP") {
+				$_cmd_array[]="-p tcp -m tcp --sport $_sport --dport $_dport";
+				$_cmd_array[]="-p udp -m udp --sport $_sport --dport $_dport";
+			} elseif($_proto=="ICMP") {
+				$_cmd_array[]="-p icmp -m icmp --icmp-type $_etc";
+			} elseif($_proto=="IP") {
+				$_cmd_array[]="-p $_etc";
+			} elseif($_proto=="ESP") {
+				$_cmd_array[]="-p esp -m esp --espspi $_etc";
+			} elseif($_proto=="AH") {
+				$_cmd_array[]="-p ah -m ah --ahspi $_etc";
+			}
+		}
+	}
+	return $_cmd_array;
+}
+
+function static_routes($_DEV_ROUTE,$db_id) {
+	$_defnet_array=mybox_defnetwork_array($db_id);
+	$namedev_array=mybox_name2dev_array($db_id);
+	$_rdel='';
+	$ok=1;
+	$result=mybox_db_query("select * from static_route where stat='1'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		$ok=0;
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_type=trim($row['type']);
+			$_dev=trim($row['dev']);
+			$_network=trim($row['network']);
+			$_gateway=trim($row['gateway']);
+			$_gw='';$_int='';
+			$_net_array=list_ip_array($_defnet_array,$_network);
+			$_net_aa=array();
+			$_gw_aa=array();
+			if($_type==1) {
+				$_int=$_DEV_ROUTE[$_dev];
+				if(isset($namedev_array[$_network])&&$namedev_array[$_network]!='') {
+					$_net_aa[]=$namedev_array[$_network];
+				} else {
+					if(count($_net_array)!=0) {
+						foreach($_net_array as $net) {
+							if($net=='') $continue;
+							$_net_aa[]="$net";
+						}
+					}
+					unset($net);
+				}
+				if(count($_net_aa)!=0) {
+					foreach($_net_aa as $net) {
+						if($net=='') continue;
+						mybox_exec_cmd("ip route add $net dev $_int");
+						$_rdel .="ip route del $net dev $_int\n";
+					}
+				}
+			} elseif($_type==2) {
+				if(isset($_defnet_array[$_gateway])&&$_defnet_array[$_gateway]!='') {
+					$_gw_a=array();
+					$_gw_a=list_ip_array($_defnet_array,$_gateway);
+					if(count($_gw_a)!=0) {
+						foreach($_gw_a as $_a) {
+							if($_a=='') continue;
+							$_gw_aa[]="$_a";
+						}
+						unset($_a);
+					}
+				}
+				if(isset($namedev_array[$_network])&&$namedev_array[$_network]!='') {
+					$_net_aa[]=$namedev_array[$_network];
+				} else {
+					if(count($_net_array)!=0) {
+						foreach($_net_array as $net) {
+							if($net=='') $continue;
+							$_net_aa[]="$net";
+						}
+					}
+					unset($net);
+				}
+				if(count($_net_aa)!=0 && count($_gw_aa)!=0) {
+					foreach($_net_aa as $net) {
+						foreach($_gw_aa as $_gw) {
+							$tt="-host";
+							if(preg_match("/^\d+\.\d+\.\d+\.\d+\/\d+$/",$net)) {
+								$tt="-net";
+							}
+							//if(strpos($net,"/")===TRUE) $tt="-net";
+							mybox_exec_cmd("route add $tt $net gw $_gw");
+							$_rdel .="route del $tt $net gw $_gw\n";
+						}
+					}
+				}
+			} elseif($_type==3) {
+				if(isset($namedev_array[$_network])&&$namedev_array[$_network]!='') {
+					$_net_aa[]=$namedev_array[$_network];
+				} else {
+					if(count($_net_array)!=0) {
+						foreach($_net_array as $net) {
+							if($net=='') $continue;
+							$_net_aa[]="$net";
+						}
+					}
+					unset($net);
+				}
+				if(count($_net_aa)!=0) {
+					foreach($_net_aa as $net) {
+						if($net=='') continue;
+						mybox_exec_cmd("ip route add blackhole $net");
+						$_rdel .="ip route del blackhole $net\n";
+					}
+				}
+			}
+		}
+		if($_rdel!='') {
+			mybox_save_to_file("/var/sys/route_static_del","$_rdel");
+			@chmod("/var/sys/route_static_del",0700);
+		}
+			
+	}
+	return $ok;
+}
+
+function policy_routes($_DEV_ROUTE,$db_id) {
+	$list_array1=mybox_list_devname($db_id);
+	$_defnet_array=mybox_defnetwork_array($db_id);
+	$namedev_array=mybox_name2dev_array($db_id);
+	$_defservice_array=mybox_defservices_array($db_id);
+	$_rdel='';
+	$ok=1;$_mark=1;
+	$result=mybox_db_query("select type,fwd,src,dst,service,dev from policy_route where stat='1'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		$ok=0;$_iptab=array();
+		while($row=mybox_db_fetch_assoc($result)) {
+			// reserve
+			if($_mark=='253') $_mark++;
+			if($_mark=='254') $_mark++;
+			if($_mark=='255') $_mark++;
+
+			$_type=trim($row['type']);
+			$_fwd=trim($row['fwd']);
+			$_dev=trim($row['dev']);
+			$_src=trim($row['src']);
+			$_dst=trim($row['dst']);
+			$_service=trim($row['service']);
+
+			$_gw='';$_intf='';
+			$_src_array=array();$_dst_array=array();
+			$_service_array=array();
+			if($_dev!='any') {
+				$_intf=$_DEV_ROUTE[$_dev];
+				$_intf="-i $_intf";
+			}
+			if($_src!='any') {
+				if(isset($namedev_array[$_src])&&$namedev_array[$_src]!='') {
+					$_src_array[]="{$namedev_array[$_src]}";
+				} else {
+					if(isset($_defnet_array[$_src])&&$_defnet_array[$_src]!='') {
+						$_src_array=list_ip_array($_defnet_array,$_src);
+					}
+				}
+			}
+
+			if($_dst!='any') {
+				if(isset($namedev_array[$_src])&&$namedev_array[$_dst]!='') {
+					$_dst_array[]="{$namedev_array[$_dst]}";
+				} else {
+					if(isset($_defnet_array[$_dst])&&$_defnet_array[$_dst]!='') {
+						$_dst_array=list_ip_array($_defnet_array,$_dst);
+					}
+				}
+			}
+			if($_service!='any') {
+				$_service_array=list_service_array($_defservice_array,$_service);
+			}
+
+			if(count($_src_array)!=0 && count($_dst_array)!=0) {
+				foreach($_src_array as $src) {
+					if($src=='') continue;
+					foreach($_dst_array as $dst) {
+						if($dst=='') continue;
+						if(count($_service_array)!=0) {
+							foreach($_service_array as $sr) {
+								if($sr=='') continue;
+								$_iptab[]="$sr -s $src -d $dst $_intf -m mark --mark 0x0 -j MARK --set-mark $_mark";
+							}
+						} else {
+							$_iptab[]="-s $src -d $dst $_intf -m mark --mark 0x0 -j MARK --set-mark $_mark";
+						}
+					}
+				}
+			} elseif(count($_src_array)!=0 && count($_dst_array)==0) {
+				foreach($_src_array as $src) {
+					if($src=='') continue;
+					if(count($_service_array)!=0) {
+						foreach($_service_array as $sr) {
+							if($sr=='') continue;
+							$_iptab[]="$sr -s $src $_intf -m mark --mark 0x0 -j MARK --set-mark $_mark";
+						}
+					} else {
+						$_iptab[]="-s $src $_intf -m mark --mark 0x0 -j MARK --set-mark $_mark";
+					}
+				}
+			} elseif(count($_src_array)==0 && count($_dst_array)!=0) {
+				foreach($_dst_array as $dst) {
+					if($dst=='') continue;
+					if(count($_service_array)!=0) {
+						foreach($_service_array as $sr) {
+							if($sr=='') continue;
+							$_iptab[]="$sr -d $dst $_intf -m mark --mark 0x0 -j MARK --set-mark $_mark";
+						}
+					} else {
+						$_iptab[]="-d $dst $_intf -m mark --mark 0x0 -j MARK --set-mark $_mark";
+					}
+				}
+			} elseif(count($_src_array)==0 && count($_dst_array)==0) {
+				if(count($_service_array)!=0) {
+					foreach($_service_array as $sr) {
+						if($sr=='') continue;
+						$_iptab[]="$sr $_intf -m mark --mark 0x0 -j MARK --set-mark $_mark";
+					}
+				} else {
+					$_iptab[]="$_intf -m mark --mark 0x0 -j MARK --set-mark $_mark";
+				}
+			}
+
+			if($_type==1) {
+				$_gw=$_DEV_ROUTE[$_fwd];
+			} else {
+				$_gw=$_defnet_array[$_fwd]['ip'];
+			}
+			if($_gw!='') {
+				mybox_exec_cmd("ip rule add prio $_mark fwmark $_mark table $_mark");
+				if($_type==1) {
+					mybox_exec_cmd("ip route add dev $_gw table $_mark");
+					$_rdel .="route del dev $_gw table $_mark\n";
+				} else {
+					mybox_exec_cmd("ip route add default via $_gw table $_mark");
+					$_rdel .="route del default via $_gw table $_mark\n";
+				}
+				$_rdel .="rule del prio $_mark fwmark $_mark table $_mark\n";
+			}
+			$_mark++;
+		}
+		if($_rdel!='') {
+			if(count($_iptab)!=0) {
+				$_iptt='';
+				$_iptt .="-A ACL1004-02 -m mark ! --mark 0x0 -j ACCEPT\n";
+				foreach($_iptab as $ipt) {
+					$_iptt .="-A ACL1004-02 $ipt\n";
+				}
+				unset($ipt);
+				$_iptt .="-A ACL1004-01 -m mark ! --mark 0x0 -j ACCEPT\n";
+				foreach($_iptab as $ipt) {
+					$_iptt .="-A ACL1004-01 $ipt\n";
+				}
+				unset($ipt);
+				mybox_save_to_file("/var/sys/route_policy_pol","$_iptt");
+			}
+			mybox_save_to_file("/var/sys/route_policy_del","$_rdel");
+			@chmod("/var/sys/route_policy_del",0700);
+		}
+	}
+	return $ok;
+}
+
+function network_start() {
+	global $_DB_NAME, $_QUIET, $_ROOT_DIR;
+
+	if(file_exists("$_ROOT_DIR/scripts/network/start")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/network/start");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/network/pre-start")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/network/pre-start");
+	}
+	$ret=1;
+	$_DEV_MAIN=array();
+	$_DEV_VLAN=array();
+	$_DEV_VIP=array();
+	$_DEV_PROXY=array();
+	$_DEV_UPDATE=array();
+	$_DEV_ROUTE=array();
+	$_NET_GRAPH=array();
+	$_NET_UPLINK=array();
+	$_DEFAULT_GATEWAY_IP='';
+	$_DEFAULT_GATEWAY_DEV='';
+	$_isweup=0;
+	$_hostname='';
+	$_hostname=mybox_fget_contents("/proc/sys/kernel/hostname");
+	if($_hostname=='' || $_hostname=='(none)') $_hostname="mfs.mybox.lo";
+	list($host,)=preg_split("/\./",$_hostname);
+	mybox_save_to_file("/etc/hosts","127.0.0.1\t\tlocalhost\n");
+	$db_id=mybox_db_connect($_DB_NAME);
+	$result=mybox_db_query("select * from ipaddr where onboot='1'",$db_id);
+	if(mybox_db_num_rows($result)==0) {
+		mybox_init_echo($_QUIET,"INFO","Networking disabled");
+		exit(1);
+	}
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_ip_name=$row['name'];
+		$_ip_dev=$row['dev'];
+		$_ip_ip=$row['ip'];
+		$_ip_prefix=$row['prefix'];
+		$_ip_mtu=$row['mtu'];
+		$_ip_isdefault=$row['isdefault'];
+		$_uplink=$row['uplink'];
+		$_upprio=$row['upprio'];
+		$_ip_gateway=$row['gateway'];
+		$_ip_proxyarp=$row['proxyarp'];
+		$_ip_type=$row['type'];
+		$_ip_vid=$row['vid'];
+		$_ret=mybox_ipcalc($_ip_ip,$_ip_prefix);
+		if(count($_ret)==0) {
+			mybox_init_echo($_QUIET,"ERROR","Invalid $_ip_ip/$_ip_prefix");
+			continue;
+		}
+		$_ip_netmask=$_ret['netmask'];
+		$_ip_network=$_ret['network'];
+		$_ip_bcast=$_ret['broadcast'];
+		$_DEV_ROUTE[$_ip_name]=$_ip_dev;
+		$_DEV_MAIN[$_ip_dev]="$_ip_ip|$_ip_prefix|$_ip_netmask|$_ip_bcast|$_ip_name|$_ip_network|$_ip_mtu|$_ip_isdefault|$_ip_gateway|$_ip_proxyarp|$_ip_type|$_ip_vid";
+		$_NET_UPLINK[$_upprio]="$_ip_dev|$_ip_ip|$_ip_prefix|$_ip_network|$_ip_isdefault|$_ip_gateway|$_uplink";
+		$_NET_GRAPH[$_ip_dev]['name']=$_ip_name;
+		$_NET_GRAPH[$_ip_dev]['ip']="$_ip_ip/$_ip_prefix";
+		//mybox_append_to_file("/etc/hosts","$_ip_ip\t\t$host $host\n");
+	}
+
+	if(count($_DEV_MAIN)==0) {
+		mybox_init_echo($_QUIET,"INFO","Networking failed");
+		exit(1);
+	}
+
+	mybox_init_echo($_QUIET,"INFO","Bringing up network interfaces");
+	mybox_save_to_file("/proc/sys/net/ipv4/ip_forward","1\n");
+
+	foreach($_DEV_MAIN as $dev => $val) {
+		list($ip,$prefix,$mask,$brd,$name,$network,$mtu,$isdefault,$gateway,$proxyarp,$type,$vid)=preg_split("/\|/",$val);
+		if(mybox_exec_cmd("ip link set $dev up mtu $mtu")==0) {
+			if($_isweup==1 && mybox_isip_alive($dev,$ip)==1) {
+				$xmac=mybox_get_arp_ip_mac($dev,$ip);
+				if($xmac!='') {
+					$xmac="machine ($xmac)";
+				} else {
+					$xmac="machine";
+				}
+				mybox_init_echo($_QUIET,"WARNING","---- Some other $xmac already uses address $ip");
+				mybox_append_to_file("/var/sys/network_error","$txt<br>\n");
+				continue;
+			}
+			mybox_exec_cmd("ip addr flush dev $dev");
+			if($type==1) {
+				if(mybox_exec_cmd("ip addr add $ip/$prefix brd $brd dev $dev scope global label $dev")==0) {
+					mybox_init_echo($_QUIET,"INFO","---- $dev $ip/$prefix");
+					$_DEV_UPDATE[$dev]=$ip;
+					$ret=0;$_isweup=1;
+					$_DEV_VIP[]="$dev|$mtu";
+					if(file_exists("/proc/sys/net/ipv4/conf/$dev/rp_filter")) {
+						mybox_save_to_file("/proc/sys/net/ipv4/conf/$dev/rp_filter","1\n");
+					}
+				} else {
+					mybox_init_echo($_QUIET,"ERROR","---- $dev $ip/$prefix failed");
+				}
+			}
+			if($type==2) {
+				mybox_exec_cmd("vconfig set_name_type DEV_PLUS_VID_NO_PAD");
+				mybox_exec_cmd("vconfig rem $dev.$vid");
+				if(mybox_exec_cmd("vconfig add $dev $vid")==0) {
+					mybox_exec_cmd("vconfig set_flag $dev.$vid 1 1");
+					if(mybox_exec_cmd("ifconfig $dev.$vid $ip netmask $mask mtu $mtu")==0) {
+						mybox_init_echo($_QUIET,"INFO","---- $dev (VLAN $vid) $ip/$prefix");
+						$ret=0;$_isweup=1;
+						$_DEV_VLAN[]="$dev|$vid|$mtu";
+					} else {
+						mybox_init_echo($_QUIET,"ERROR","---- $dev $ip/$mask failed");
+					}
+				}
+			}
+			if($isdefault==1 && $gateway!='') {
+				$_DEFAULT_GATEWAY_IP="$gateway";
+				$_DEFAULT_GATEWAY_DEV="$dev";
+			}
+			if($proxyarp==1) $_DEV_PROXY[]=$dev;
+		} else {
+			mybox_init_echo($_QUIET,"ERROR","Bringing up interface $dev failed");
+		}
+		unset($ip,$prefix,$mask,$brd,$name,$network,$mtu,$isdefault,$gateway,$proxyarp,$type,$vid);
+	}
+	unset($dev,$val);
+	if(count($_DEV_VIP)!=0) {
+		foreach($_DEV_VIP as $dev1) {
+			if($dev1=='') continue;
+			list($dev,$mtu)=preg_split("/\|/",$dev1);
+			set_vip($dev,$mtu,$db_id);
+		}
+		unset($dev,$dev1,$mtu);
+	}
+	if(count($_DEV_VLAN)!=0) {
+		foreach($_DEV_VLAN as $dev1) {
+			if($dev1=='') continue;
+			list($dev,$tag,$mtu)=preg_split("/\|/",$dev1);
+			set_vlan($dev,$tag,$mtu,$db_id);
+		}
+		unset($dev,$tag,$dev1,$mtu);
+	}
+	if($_DEFAULT_GATEWAY_IP!='' && $_DEFAULT_GATEWAY_DEV!='') {
+		if(mybox_exec_cmd("ip route add default via $_DEFAULT_GATEWAY_IP dev $_DEFAULT_GATEWAY_DEV metric 0")==0) {
+			mybox_init_echo($_QUIET,"INFO","Setting default gateway: $_DEFAULT_GATEWAY_IP via $_DEFAULT_GATEWAY_DEV");
+			set_wan_dev($_DEFAULT_GATEWAY_DEV,$db_id);
+			set_lcd_dev($_DEFAULT_GATEWAY_DEV);
+			mybox_save_to_file("/var/sys/gw_ip","$_DEFAULT_GATEWAY_IP");
+		}
+	}
+	if(mybox_exec_cmd("ip link set lo up")==0) {
+		if(mybox_exec_cmd("ip addr add 127.0.0.1/8 brd 127.255.255.255 dev lo scope host label lo")==0) {
+			mybox_init_echo($_QUIET,"INFO","Setting loopback 127.0.0.1/255.0.0.0");
+		}
+	}
+
+	if(static_routes($_DEV_ROUTE,$db_id)==0) {
+		mybox_init_echo($_QUIET,"INFO","Applying static routing");
+	}
+	if(policy_routes($_DEV_ROUTE,$db_id)==0) {
+		mybox_init_echo($_QUIET,"INFO","Applying policy route");
+	}
+	// proxy arp
+	if(count($_DEV_PROXY)!=0) {
+		foreach($_DEV_PROXY as $dev) {
+			if($dev=='') continue;
+			if(file_exists("/proc/sys/net/ipv4/conf/$dev/proxy_arp")) {
+				mybox_save_to_file("/proc/sys/net/ipv4/conf/$dev/proxy_arp","1\n");
+			}
+		}
+	}
+	// update arp
+	if(count($_DEV_UPDATE)!=0) {
+		mybox_init_echo($_QUIET,"INFO","Updating ARP cache");
+		foreach($_DEV_UPDATE as $dev => $ip) {
+			update_arp($dev,$ip);
+		}
+		unset($dev,$ip);
+	}
+	if(!file_exists("/var/sys/init_no_restart")) {
+		mybox_init_echo($_QUIET,"INFO","Restarting related application service");
+		app_reload();
+	}
+	mybox_save_to_file("/var/sys/net_graph",serialize($_NET_GRAPH));
+	// uplink
+	do_uplink($_NET_UPLINK,$db_id);
+	// ip2country
+	mybox_set_cipname_file($db_id);
+
+	mybox_db_close($db_id);
+	@shell_exec("ifconfig > /var/sys/ipconfig.cache");
+	@shell_exec("route -n > /var/sys/routen.cache");
+	if(file_exists("$_ROOT_DIR/scripts/network/post-start")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/network/post-start");
+	}
+	return $ret;
+}
+
+function network_stop() {
+	global $_QUIET, $_ROOT_DIR;
+
+	if(file_exists("$_ROOT_DIR/scripts/network/stop")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/network/stop");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/network/pre-stop")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/network/pre-stop");
+	}
+
+	@mybox_unlink_f("/var/spool/account");
+	$ret=1;
+	mybox_init_echo($_QUIET,"INFO","Shutting down network interfaces");
+	if(file_exists("/var/sys/uplink_stop")) mybox_exec_cmd("/var/sys/uplink_stop");
+	if(file_exists("/var/sys/route_static_del")) mybox_exec_cmd("/var/sys/route_static_del");
+	if(file_exists("/var/sys/route_policy_del")) mybox_exec_cmd("ip -batch /var/sys/route_policy_del");
+
+	clear_uplink_file();
+	$ipconfig=mybox_get_ipconfig_cache();
+        if(count($ipconfig)!=0) {
+		$a=array();$b=array();$c=array();
+                foreach($ipconfig as $eth => $val) {
+			if(preg_match("/^eth(\d+)\.(\S+)$/",$eth)) $a[]="$eth";
+			if(preg_match("/^eth(\d+)\:(\S+)$/",$eth)) $b[]="$eth";
+			if(preg_match("/^eth(\d+)$/",$eth)) $c[]="$eth";
+		}
+		unset($eth,$val);
+		if(count($a)!=0) {
+			foreach($a as $eth) {
+				mybox_init_echo($_QUIET,"INFO","---- $eth");
+				mybox_exec_cmd("ip addr flush dev $eth");
+				mybox_exec_cmd("ip link set $eth down");
+				mybox_exec_cmd("vconfig rem $eth");
+			}
+			unset($eth);
+		}
+		if(count($b)!=0) {
+			foreach($b as $eth) {
+				mybox_init_echo($_QUIET,"INFO","---- $eth");
+				mybox_exec_cmd("ip addr flush dev $eth");
+				mybox_exec_cmd("ip link set $dev down");
+			}
+			unset($eth);
+		}
+		if(count($c)!=0) {
+			foreach($c as $eth) {
+				mybox_exec_cmd("ip addr flush dev $eth");
+				if(mybox_exec_cmd("ip link set $eth down")==0) {
+					mybox_init_echo($_QUIET,"INFO","---- $eth");
+				}
+			}
+			unset($eth);
+		}
+	}
+	mybox_exec_cmd("ip link set lo down");
+	mybox_exec_cmd("ip addr flush dev lo");
+	mybox_exec_cmd("ip route flush cache");
+	mybox_save_to_file("/proc/sys/net/ipv4/ip_forward","0\n");
+	clear_net_cache_file();
+	@mybox_killall("uplinkd");
+	@mybox_killall("mfs-watch.exc");
+	if(file_exists("$_ROOT_DIR/scripts/network/post-stop")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/network/post-stop");
+	}
+	return $ret;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=network_start();
+		break;
+	case 'stop':
+		$ret=network_stop();
+		break;
+	case 'restart':
+		$ret=network_stop();
+		sleep(1);
+		$ret=network_start();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart]\n";
+		break;
+}
+exit($ret);
+?>

@@ -1,0 +1,47 @@
+#!/bin/sh
+trap : 1 2 3 15
+PATH="/bin"
+TERM=linux
+export PATH TERM
+cd /
+lcdd_msg() {
+	[ -f "/bin/lcdd" -a -c "/dev/lcd" ] && /bin/lcdd "$1" "$2"	
+}
+
+echo "0" > /proc/sys/kernel/printk
+:>/etc/resolv.conf
+
+DDATE=$(date +"%d/%m/%Y %T")
+LOGNAME="system-$(date +%Y%m%d).log"
+lcdd_msg "SYSTEM SHUTDOWN." "-> KILL PROCESS"
+[ -d "/strg/mybox/logs" ] && echo "[$DDATE] TYPE=INFO MSG=****** SYSTEM SHUTDOWN ******" >> /strg/mybox/logs/$LOGNAME
+
+if [ -d "/firmware" ]; then
+	umount -r /firmware >/dev/null 2>&1
+fi
+
+lcdd_msg "SYSTEM SHUTDOWN." "-> REMOVE TMP"
+rm -f /strg/.mount_strg >/dev/null 2>&1
+rm -f /strg/mybox/db/system.db-* >/dev/null 2>&1
+rm -f /strg/mybox/db/blacklist.db-* >/dev/null 2>&1
+rm -f /strg/mybox/db/ips.db-* >/dev/null 2>&1
+umount /config/download >/dev/null 2>&1
+umount /config/logs >/dev/null 2>&1
+umount /config/localsave >/dev/null 2>&1
+umount -r /strg >/dev/null 2>&1
+lcdd_msg "SYSTEM SHUTDOWN." "-> STORAGE OFF"
+wait
+swapoff -a >/dev/null 2>&1
+lcdd_msg "SYSTEM SHUTDOWN." "-> SWAP OFF"
+NET_DEVICE=$(awk -F: '/eth.:/{print $1}' /proc/net/dev)
+lcdd_msg "SYSTEM SHUTDOWN." "-> NETWORK OFF"
+if [ -n "$NET_DEVICE" ]; then
+	for x in $NET_DEVICE; do
+		ip link set $x down >/dev/null 2>&1
+	done
+	ip route flush cache >/dev/null 2>&1
+	ip route flush table main >/dev/null 2>&1
+fi
+lcdd_msg "SYSTEM SHUTDOWN." "POWEROFF/REBOOT"
+sleep 1
+exit 0

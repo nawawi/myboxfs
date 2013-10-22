@@ -1,0 +1,2 @@
+./configure --without-nmapfe --prefix=/usr --disable-nsl --build=i386-mybox-linux --host=i386-mybox-linux
+make

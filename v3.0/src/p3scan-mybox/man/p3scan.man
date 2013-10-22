@@ -1,0 +1,154 @@
+.TH p3scan  "January 9, 2006" ":version"
+.SH NAME
+\fB
+\fBp3scan
+\fB
+.SH SYNOPSIS
+.nf
+.fam C
+
+\fBp3scan\fP [\fIoptions\fP]
+.fam T
+.fi
+.SH DESCRIPTION
+p3scan is a fully transparent proxy scanning server for POP3, SMTP, and limited
+POP3S email clients.
+
+It implements a centralized email scanning point, transparently inspecting
+messages fetched by internal network hosts from servers "in the wild"
+(the Internet) for viruses, worms, trojans, spam and potentially dangerous
+attachments. Since HTML email can be used by spammers to validate the recipient
+address (via Web Bugs) p3scan can also provide HTML stripping by using the
+associated p3pmail (or other) program.
+
+It can also inspect outgoing SMTP messages for virus's.
+
+p3scan can help you in protecting your "Other OS" LAN especially if used
+synergically with a firewall and other proxy servers.
+
+.fam T
+.fi
+.SH SIGNALS
+If you send an HUP to p3scan, it will re-read it's configuration file:
+kill -HUP <p3scan pid>
+.RE
+.PP
+
+.SH OPTIONS
+.TP
+.B
+-c, --configfile=FILE
+Specify a configfile.
+Default is :sysconfdir/p3scan/p3scan.conf
+Can be configured with ./configure option '--sysconfdir='
+.TP
+.B
+-d, --debug
+Turn on debugging. See :sysconfdir/p3scan/p3scan.conf for recommended
+debug procedure.
+.TP
+.B
+-h, --help
+Prints this text
+.TP
+.B
+-s, --settings
+Display current settings
+.TP
+.B
+-v, --version
+Prints version information
+.RE
+.PP
+.SH DIRECTORIES/FILES
+
+.nf
+.fam C
+:bindir/p3scan
+:sysconfdir/p3scan
+:localstatedir/run/p3scan
+:localstatedir/spool/p3scan
+:localstatedir/spool/p3scan/children
+:localstatedir/spool/p3scan/notify
+:P3DOCS/p3scan-:version/AUTHORS
+:P3DOCS/p3scan-:version/CONTRIBUTERS
+:P3DOCS/p3scan-:version/ChangeLog
+:P3DOCS/p3scan-:version/LICENSE
+:P3DOCS/p3scan-:version/NEWS
+:P3DOCS/p3scan-:version/README
+:P3DOCS/p3scan-:version/README-emergency
+:P3DOCS/p3scan-:version/README-ripmime
+:P3DOCS/p3scan-:version/README-rpm
+:P3DOCS/p3scan-:version/TODO
+:P3DOCS/p3scan-:version/spamfaq.html
+:mandir/man8/p3scan.8.gz
+:mandir/man8/p3scan_readme.8.gz
+
+:sysconfdir/p3scan/p3scan.conf
+  Configuration file
+:sysconfdir/p3scan/*.mail
+  Email templates for specific languages.
+  The one used is set by :sysconfdir/p3scan/p3scan.conf
+  File template to be used to generate the virus warning message to
+  be sent to client when a virus is found.
+  If you translate a mail file into your own language, please
+  consider contributing it to the project so that others may enjoy
+  your work.
+:sysconfdir/p3scan/p3scan.footer (optional)
+  This file is used to add the virus definition info from your scanner
+  to an smtp message. It will only be added as a footer if the message
+  is not signed cryptographically and is only a text message.
+  It is used in conjunction with the "footer" option in the
+  following fashion:
+
+  1) If file does not exist and "footer" is defined:
+     No footer information will added to outgoing messages, but the p3scan
+     version and scanner info will be added to the header.
+
+  2) If file exists but blank and "footer" is defined:
+     P3Scan version/host info and scanner info will be added to end of
+     message and header.
+
+  3) If file contains information and "footer" is defined:
+     All lines of this file will be added to the end of the smtp message and
+     then p3scan version/host info and scanner info will be appended.
+
+  4) If file does not exist and "footer" is not defined:
+     P3Scan will only insert p3scan version info into the header.
+:sysconfdir/p3scan/p3scan.blacklist
+  Email addresses listed one per line. If matching an incoming 'From:' field,
+  will be marked as blacklisted and a virus notification message will be sent
+  with "Not a virus! Found in BlackList!" in place of the 'Virus name'.
+:sysconfdir/p3scan/p3scan.whitelist
+  Email addresses listed one per line. If matching an incoming 'From:' field,
+  will bypass all scanning and p3scan will not even modify the header.
+
+:bindir/p3scan
+  Executable program file
+:localstatedir/run/p3scan/p3scan.pid
+  This file is written when p3scan is running.
+:localstatedir/spool/p3scan/children/$FILES
+  Each email scanned is manipulated in this directory
+:localstatedir/spool/p3scan/notify/$FILES
+  When a virus is found, the email sent to the client is generated here.
+
+.fam T
+.fi
+.SH SEE ALSO
+.TP
+.B
+p3scan_readme :sysconfdir/p3scan/p3scan.conf :sysconfdir/p3scan/p3scan-en.mail dspam spamc spamd renattach kill p3pmail
+.SH BUGS/SUPPORT
+.nf
+.fam C
+Please report any bugs to the \fBp3scan\fP support mailing list accessable through:
+http://sourceforge.net/projects/\fBp3scan\fP
+.fam T
+.fi
+.SH AUTHORS
+.nf
+.fam C
+Jack S. Lai <laitcg at gmail dot com>
+and contributers (see CONTRIBUTERS file).
+.fam T
+.fi

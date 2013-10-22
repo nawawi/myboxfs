@@ -1,0 +1,316 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="manage_av";
+include_once('page.exl');
+include_once('av.exl');
+mybox_chk_session();
+mybox_send_nocache();
+
+
+
+$db_id=mybox_db_connect($_DB_NAME);
+
+if($tab==1) {
+	if(isset($do_id)&&$do_id=='apply_chg') {
+		$msg="<script>waitcount();</script>";
+		mybox_echo_query("sophos-restart");
+		mybox_echo_query("cron-restart-quite");
+	}
+	if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+		if(isset($do_save)&&$do_save==1) {
+			mybox_db_query("update cf set val='$cf_sophos_stat' where name='cf_sophos_stat'",$db_id);
+			mybox_db_query("update cf set val='$cf_sophos_autoupdate' where name='cf_sophos_autoupdate'",$db_id);
+			$msg="Configuration saved";
+		}
+		if(isset($do_save)&&$do_save==10) {
+			if(file_exists("/usr/local/sav/$filename_name")) {
+				@unlink("/usr/local/sav/$filename_name");
+			}
+			if(move_uploaded_file("$filename","/usr/local/sav/$filename_name")===FALSE) {
+				$msg="Uploading file failed";
+			} else {
+				if(chdir("/usr/local/sav")==TRUE) {
+					if(mybox_exec_cmd("/bin/unzip -oq $filename_name")==0) {
+						$msg="IDEs file updated successfully";
+						mybox_exec_cmd("/bin/sophos_info");
+						@unlink("/var/sys/sophos_ide_data");
+					} else {
+						$msg="Updating IDE file failed";
+					}
+				} else {
+					$msg="Updating IDEs file failed";
+				}
+			}
+			if($msg!='') {
+				mybox_exec_cmd("logger -t sophos $msg");
+			}
+		}
+		if(isset($do_save)&&$do_save==11) {
+			mybox_echo_query("sophos-update");
+			$msg="Updating task added in queue, please check log for more details";
+		}
+	} else {
+		if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+			$msg="Permission denied";
+		}
+	}
+}
+if(!isset($tab)||$tab=='') $tab=1;
+$_error=0;
+?>
+<html>
+<head>
+<title>MyAdmin</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<script type='text/javascript' src="/j/mybox_func.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?php echo $_LOGIN['auth_id'];?>";
+	page_load();
+	function do_changes() {
+		self.location.href='<?php echo "/manage_av.exh?tab=$tab&col=$col&f=$f&do_id=apply_chg";?>';	
+	};
+	function waitcount() {
+		page_reload('700','<?php echo "/manage_av.exh?tab=$tab&do_tab=$do_tab&col=$col&col2=$col2&f=$f";?>');
+	};
+</script>
+</head>
+<body onload="load_menu('sub3','t3d7','s3i7');" scroll="auto">
+<form name=f method=post action="/manage_av.exh" enctype="multipart/form-data">
+<input type=hidden name="UPLOAD_METTER_ID" value='<?php echo rand().'.'.time();?>'>
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 0px;'>
+<tr>
+<td>
+<?php mybox_page_section("Management / AntiVirus");?>
+<br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="/manage_av.exh?tab=1" <?php if($tab==1){?>class="tabact"<?php }?>>SOPHOS AV</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td> 
+<?php mybox_page_msg($msg);?>
+<br>
+
+<!-- tab container -->
+<?php if($tab==1) {
+$result=mybox_db_query("select * from cf where name like \"cf_sophos_%\"",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_name=trim($row['name']);
+		$_val=trim($row['val']);
+		$_name="_$_name";
+		$$_name="$_val";
+	}
+}
+sophos_info(&$_info,&$_ide);
+?>
+<script type='text/javascript'>
+	function do_submit() {
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	};
+	function enab_ec(val,cnt) {
+		if(val!=0) {
+			for(var x=1; x <= cnt; x++) { 
+				do_show('e'+x);
+			}
+		} else {
+			for(var x=1; x <= cnt; x++) { 
+				do_hide('e'+x);
+			}
+		}
+	};
+function winupload() {
+	var LeftPosition = (screen.width) ? (screen.width-375)/2 : 0;
+	var TopPosition = (screen.height) ? (screen.height-95)/2 : 0;
+	var settings='width=375,height=95,top='+TopPosition+',left='+LeftPosition+',scrollbars=0,status=0,resizable=0';
+	var file=basename(document.f.filename.value);
+	var rrid=Trim(document.f.UPLOAD_METTER_ID.value);
+	var url='/pg.exh?mid='+rrid+'&mf='+file;
+	win=window.open(url,'aa<?php echo time();?>',settings);
+	if(!win) {
+		pop_msg("Please allow window popup");
+		return false;
+	}
+	win.focus();
+	return true;
+};
+
+function do_update(val) {
+	<?php if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {?>
+	document.f.do_save.value=val;
+	document.f.submit();
+	return true;
+	<?php } else {?>
+	pop_msg("Permission denied");
+	return false;
+	<?php }?>
+}
+function do_upload() {
+	<?php if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {?>
+	if(!chk_filename(document.f.filename.value)) { return false; }
+	winupload();
+	error("Please wait while uploading package..");
+	do_hide('pkgu');
+	document.f.do_save.value='10';
+	document.f.submit();
+	return true;
+	<?php } else {?>
+	pop_msg("Permission denied");
+	return false;
+	<?php }?>
+};
+function chk_filename(file) {                                                    
+        var m=/<?php echo $_info['u'];?>$/;
+	var ff=basename(file);
+	if(ff==false) {
+		ff=file;
+	};
+	var ret=file.match(m);                                                                          
+        if(ret==null) { pop_msg("Invalid file "+ff+""); return false; }       
+        return true;                                                                                                                
+};
+</script>
+<table class="data" width="100%">
+<tbody>
+
+<tr> 
+<td valign="middle" class="tdname">Enable SOPHOS AV Service</td>
+<td valign="middle" class="tdvalue" colspan='2'>
+<?php 
+$data_a=array("On"=>"1","Off"=>"0");
+if(!isset($_cf_sophos_stat)||$_cf_sophos_stat=='') $_cf_sophos_stat=0;
+$set_a=array("act"=>"enab_ec('b','6')");
+echo mybox_select_box('hpsel1',$data_a,$_cf_sophos_stat,'cf_sophos_stat',$set_a);
+?>
+</td>
+</tr>
+
+<tr id='e6' style='display: none;'>  
+<td valign="middle" class="tdname">Enable IDE Auto update</td>
+<td valign="middle" class="tdvalue" colspan='2'>
+<?php 
+$data_a=array("On"=>"1","Off"=>"0");
+if(!isset($_cf_sophos_autoupdate)||$_cf_sophos_autoupdate=='') $_cf_sophos_autoupdate=0;
+echo mybox_select_box('hpsel2',$data_a,$_cf_sophos_autoupdate,'cf_sophos_autoupdate');
+?>
+</td>
+</tr>
+
+<tr>
+<td valign="middle" class="tdname">&nbsp;</td>
+<td valign="middle" class="tdvalue" colspan='2'>
+<a name="sini"><a class="btns" href="#sini" onclick="return do_submit();return false;">Save</a>
+&nbsp;<a name="sini"><a class="btns" href="#sini" onclick="return do_changes();return false;">Reload</a>
+</td>
+</tr>
+
+<tr id='e1' style='display: none;'>  
+<td valign="middle" class="tdname">Engine version</td>
+<td valign="middle" class="tdvalue" style='width: 15%;'> 
+<?php 
+echo $_info['e'];
+?>
+</td>
+<td valign="middle" class="tdvalue" rowspan=3>
+<img src="/i/sophos.gif">
+</td>
+</tr>
+<tr id='e2' style='display: none;'> 
+<td valign="middle" class="tdname">IDE version</td>
+<td valign="middle" class="tdvalue" style='width: 15%;'> 
+<?php 
+echo $_info['i'];
+?>
+</td>
+</tr>
+<tr id='e3' style='display: none;'> 
+<td valign="middle" class="tdname">Virus detection</td>
+<td valign="middle" class="tdvalue" style='width: 15%;'> 
+<?php 
+echo $_info['v'];
+?>
+</td>
+</tr>
+<tr id='e4' style='display: none;'> 
+<td valign="middle" class="tdname">&nbsp;</td>
+<td class="tdvalue" colspan='2'> 
+<?php 
+$txt="
+<table style='border: 0px; margin: 0px; padding: 0px;'>
+<tr><td style='border: 0px;'><input type=file class='filebox' size='35' name=filename></td></tr>
+<tr><td style='border: 0px;'><a class='btns' href='#' onclick='return do_upload();return false;'>Upload</a></td></tr>
+</table>";
+echo mybox_defwin('pkgu','330px','#ebebeb','#999999','#336699','#ffffff','Manual Update IDEs file upload','#ebebeb','70px','hidden','hidden',$txt);?>
+<a name="sini"><a class="btns" href="#sini" onclick="document.f.filename.value='';dohide_show_def('pkgu');return false;">Upload IDEs file</a>
+&nbsp;<a class="btns" href="#sini" onclick="do_update('11');return false;">Update IDEs file</a>
+</td>
+</tr
+<tr id='e5' style='display: none;'> 
+<td valign="top" class="tdname">Data files</td>
+<td valign="top" class="tdvalue" colspan='2'>
+<div style='background: #ffffff; table-layout: fixed; white-space: nowrap; border: 1px solid #ccc; padding: 0px; margin-top: 5px; margin-bottom: 5px; overflow-x: hidden; overflow-y: auto; width: 300px; height: 200px;''>
+<table class='datanb' style='background: #ffffff; border: 0px; margin-top: 0em; margin-bottom: 0em; padding: 0px; width: 285px;'> 
+<tr>
+<td class='linedot_b' style='font-weight: bold; table-layout: fixed;'>File name</td>
+<td class='linedot_b' style='font-weight: bold; table-layout: fixed;'>File date</td>
+</tr>
+<?php 
+if(file_exists("/var/sys/sophos_ide_data")) {
+	$data=mybox_fget_contents("/var/sys/sophos_ide_data");
+} else {
+	sort($_ide,SORT_NUMERIC);
+	foreach($_ide as $ln) {
+		$ln=trim($ln);
+		if($ln=='') continue;
+		list($a,$b)=preg_split("/\|/",$ln);
+		$data .="<tr><td class='linedot_b' style='font-weight: normal; table-layout: fixed;'>$a</td>
+			<td class='linedot_b' style='font-weight: normal; table-layout: fixed;'>$b</td></tr>";
+	}
+	mybox_save_to_file("/var/sys/sophos_ide_data","$data");
+}
+echo $data;
+unset($data);
+?>
+</table>
+</div>
+</td>
+</tr>
+
+</tbody>
+</table>
+<script type="text/javascript">
+enab_ec('<?php echo $_cf_sophos_stat;?>','6');
+</script>
+<?php }//tab==1?>
+
+<!-- end tab container -->
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?php echo $tab;?>>
+</form>
+<script type='text/javascript'>page_kill();</script>
+</body>
+</html>
+
+<?php mybox_db_close($db_id);?>

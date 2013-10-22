@@ -1,0 +1,67 @@
+<?php 
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+
+function sophos_info(&$info,&$ide) {
+	global $_ROOT_DIR;
+	$info=array();
+	$ide=array();
+	$_eversion=mybox_fget_contents("$_ROOT_DIR/sophos/EVERSION");
+	$_iversion=mybox_fget_contents("$_ROOT_DIR/sophos/IVERSION");
+	$_vcnt=mybox_fget_contents("$_ROOT_DIR/sophos/VICNT");
+	$_ufile=mybox_fget_contents("$_ROOT_DIR/sophos/IDEUPDATE");
+	$ide=mybox_file2array("$_ROOT_DIR/sophos/IDEINFO");
+	$info['e']="$_eversion";
+	$info['i']="$_iversion";
+	$info['v']="$_vcnt";
+	$info['u']="$_ufile";
+}
+
+
+function mybox_av_scan($file,&$virus,$del=0) {
+	if(file_exists("/bin/sophos_scan")) {
+		exec("/bin/sophos_scan $file",$buff,$ret);
+		if($ret==1) {
+			$virus=$buff[0];
+			@unlink($file);
+			return 1;
+		}
+	}
+	if(file_exists("/bin/sweep")) {
+		exec("/bin/sweep -archive -di -remove -nc $file",$buff,$ret);
+		if(count($buff)!=0) {
+			if(scan_search('1',$buff,&$virus)==1) {
+				@unlink($file);
+				return 1;
+			}
+		}
+	}
+	if(file_exists("/bin/clamscan")) {
+		exec("/bin/clamscan $file",$buff,$ret);
+		if(count($buff)!=0) {
+			if(scan_search('2',$buff,&$virus)==1) {
+				@unlink($file);
+				return 1;
+			}
+		}
+	}
+	if($del==1) @unlink($file);
+	return 0;
+}
+
+function scan_search($opt,$buff,&$virus) {
+	foreach($buff as $ln) {
+		$ln=trim($ln);
+		if($ln=='') continue;
+		if($opt==1 && preg_match("/Virus\s+\'(.*?)\'\s+found/",$ln,$mm)) {
+			$virus=$mm[1];
+			return 1;
+		}
+		if($opt==2 && preg_match("/\:\s+(.*?)\s+FOUND/",$ln,$mm)) {
+			$virus=$mm[1];
+			return 1;
+		}
+	}
+	return 0;
+}
+
+?>

@@ -1,0 +1,101 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="index_bottom";
+include_once('page.exl');
+mybox_chk_session(1);
+//mybox_send_nocache();
+?>
+<html>
+<head>
+<title>MyAdmin</title>
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<script type='text/javascript' src="/j/mybox_func.js"></script>
+<script type='text/javascript' src="/j/mybox_ajax.js"></script>
+<style type="text/css">
+html {overflow-x: hidden;overflow-y: hidden;}
+body {overflow-x: hidden; overflow-y: hidden;}
+</style>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?php echo $_LOGIN['auth_id'];?>";
+	function load() {
+		update_Session('<?php echo "/index_bottom.exh?_NOLOGIN=1&chksess=".time()."";?>');
+	};
+	<?php if($_LOGIN['page_check']!='') {?>
+	window.setTimeout(load, '<?php echo $_LOGIN['page_check'];?>');
+	<?php  } else {?>
+	window.setTimeout(load, '1800000');
+	<?php  } ?>
+
+var sec=0;var min=0;
+var hour=0;
+var txt='';
+function do_idle() {
+	var page_ok=1;
+	if(parent.left_frame || parent.right_frame) {
+		if(!parent.left_frame.page_idle_chk || !parent.right_frame.page_idle_chk) { 
+			page_ok=0;
+		} else {
+			page_ok=1;
+		}
+	} else {
+		page_ok=0;
+	};
+	if(page_ok==1) {
+		sec++;
+		txt=hour+"h "+min+"m "+sec+"s";
+		if(sec >= 60) {
+			sec=1;
+			min++;
+			txt=hour+"h "+min+"m "+sec+"s";
+		}
+		if(min >= 60) {
+			min=0;
+			hour++;
+			txt=hour+"h "+min+"m "+sec+"s";
+		}
+		document.getElementById('s').innerHTML=txt;
+	};
+	setTimeout(do_idle,1000);
+};
+function shell_win() {
+	var LeftPosition = (screen.width) ? (screen.width-590)/2 : 0;
+	var TopPosition = (screen.height) ? (screen.height-360)/2 : 0;
+	var settings='width=595,height=370,top='+TopPosition+',left='+LeftPosition+',scrollbars=1,status=0,resizable=1,menubar=0';
+	var index="console.exh";
+	win=window.open(index,"shellwin<?php echo time();?>",settings);
+	if(!win) {
+		pop_msg("Please allow window popup");
+		return false;
+	}
+	if(parseInt(navigator.appVersion) >= 4){win.window.focus();}
+	return false;
+};
+</script>
+</head>
+<body style='background: #ffffff; color: #000000; border: 0px;' scroll=no>
+<div id='pgi' style='position: absolute; left:0px; bottom: 0px;'>
+<table width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #336699;">
+<tr><td style='table-layout:fixed;white-space: nowrap; width: 35%; color: #cccccc; vertical-align: middle;margin-bottom:0px; background: url(/i/menu/header_bg.gif);'>
+&nbsp;Copyright &copy; 2003-2008 Tracenetwork Corporation Sdn. Bhd. All Rights Reserved
+</td>
+<td style='table-layout:fixed;white-space: nowrap; width: 38px; background: #FFFFFF url(/i/menu/header_cbg.gif) no-repeat;'>
+&nbsp;
+</td>
+<td width="*" style='table-layout:fixed;white-space: nowrap; background-color: #FFFFFF; vertical-align: middle;'>
+&nbsp;<b>Session Idle:</b> <span id='s'>0</span>
+</td>
+<td style='width: 18px; table-layout:fixed;white-space: nowrap; background-color: #FFFFFF; vertical-align: middle;text-align: right;'>
+<a href='#' onclick='return shell_win();return false;'><img src='/i/menu/terminal.gif' border='0' alt='Terminal' title='Terminal'></a>
+</td>
+<td style='width: 18px; table-layout:fixed;white-space: nowrap; background-color: #FFFFFF; vertical-align: middle;text-align: right;'>
+<a href='/login.exh?just_logout=1' target=_top><img src='/i/menu/logout.gif' border='0' alt='Logout' title='Logout'></a>
+</td>
+</tr>
+</table>
+</div>
+<script type='text/javascript'>
+do_idle();
+</script>
+</body>
+</html>

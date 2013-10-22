@@ -1,0 +1,6 @@
+sh mk_fs
+sh mk_img
+rm -fv /boot/mybox*.bin
+cp -v build/myboxsys.bin build/myboxos.bin /boot
+rm -rfv /strg/mybox/pkg
+cp -av build/pkg /strg/mybox

@@ -1,0 +1,553 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="manage_update";
+
+include_once('page.exl');
+mybox_chk_session();
+mybox_send_nocache();
+if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+	if(isset($do_save)&&$do_save==10) {
+		if($tab==1) {
+			mybox_echo_query("mfs-firmware-update");
+			$msg="Updating task added in queue, please check log for more details";
+			@touch("/var/sys/firm_update");
+		}
+	}
+	if(isset($do_save)&&$do_save==10) {
+		if($tab==1) {
+			mybox_echo_query("mfs-firmware-download");
+			$msg="Downloading task added in queue, please check log for more details";
+		}
+	}
+	if(isset($do_save)&&$do_save==1) {
+		if($tab==1) {
+			if(move_uploaded_file("$filename","$_UPDATE_PATH/files_part/$filename_name")===FALSE) {
+				$msg="Uploading file failed";
+			} else {
+				mybox_update_dl_chk();
+			}
+		}
+		if($tab==2) {
+			$db_id=mybox_db_connect($_DB_NAME);
+			mybox_db_query("update misc set val='$update_firmware' where name='update_firmware'",$db_id);
+			mybox_db_query("update misc set val='$update_pattern' where name='update_pattern'",$db_id);
+			mybox_db_query("update misc set val='$update_save' where name='update_save'",$db_id);
+			mybox_db_query("update misc set val='$update_speed' where name='update_speed'",$db_id);
+			mybox_db_query("update misc set val='$update_proxy_stat' where name='update_proxy_stat'",$db_id);
+			mybox_db_query("update misc set val='$update_proxy_host' where name='update_proxy_host'",$db_id);
+			mybox_db_query("update misc set val='$update_proxy_port' where name='update_proxy_port'",$db_id);
+			mybox_db_query("update misc set val='$update_proxy_user_stat' where name='update_proxy_user_stat'",$db_id);
+			mybox_db_query("update misc set val='$update_proxy_user' where name='update_proxy_user'",$db_id);			
+			if($update_proxy_pass!=$update_proxy_pass_old) {
+				$passx=mybox_str_encrypt($update_proxy_pass);			
+				mybox_db_query("update misc set val='$passx' where name='update_proxy_pass'",$db_id);
+				unset($passx);
+			}			
+			mybox_db_close($db_id);
+			mybox_update_del_cacheset();
+			$msg="Configuration saved";
+		}
+	}
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied";
+	}
+}
+if(!isset($tab)||$tab=='') $tab=1;
+
+?>
+<html>
+<head>
+<title>MyAdmin</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<script type='text/javascript' src="/j/mybox_func.js"></script>
+<script type='text/javascript' src="/j/mybox_overlib.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?php echo $_LOGIN['auth_id'];?>";
+</script>
+<?php if($tab==1){?>
+<script type='text/javascript'>
+function winupload() {
+	var LeftPosition = (screen.width) ? (screen.width-375)/2 : 0;
+	var TopPosition = (screen.height) ? (screen.height-95)/2 : 0;
+	var settings='width=375,height=95,top='+TopPosition+',left='+LeftPosition+',scrollbars=0,status=0,resizable=0';
+	var file=basename(document.f.filename.value);
+	var rrid=Trim(document.f.UPLOAD_METTER_ID.value);
+	var url='/pg.exh?mid='+rrid+'&mf='+file;
+	win=window.open(url,'aa<?php echo time();?>',settings);
+	if(!win) {
+		pop_msg("Please allow window popup");
+		return false;
+	}
+	win.focus();
+	return true;
+};
+
+function do_update(val) {
+	<?php if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {?>
+	document.f.do_save.value=val;
+	document.f.submit();
+	return true;
+	<?php } else {?>
+	pop_msg("Permission denied");
+	return false;
+	<?php }?>
+}
+function do_upload() {
+	<?php if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {?>
+	if(!chk_filename(document.f.filename.value)) { return false; }
+	winupload();
+	error("Please wait while uploading package..");
+	do_hide('pkgu');
+	document.f.do_save.value='1';
+	document.f.submit();
+	return true;
+	<?php } else {?>
+	pop_msg("Permission denied");
+	return false;
+	<?php }?>
+};
+function chk_filename(file) {                                                    
+        var m=/update-(\d\d)\.(\d\d)(\d\d)(\d\d)\.mpu$/;
+	var ff=basename(file);
+	if(ff==false) {
+		ff=file;
+	};
+	var ret=file.match(m);                                                                          
+        if(ret==null) { pop_msg("Invalid file '"+ff+"'"); return false; }
+	<?php $dd=date('Y');?>
+	var yf='<?php echo "{$dd{0}}{$dd{1}}";?>';
+	var year=yf+''+ret[1];
+	var month=ret[2];
+	var hour=ret[3];
+	var day=ret[4];
+	var tm=datetounixtime(day,month,year,hour,0,0);  
+	var cver='<?php echo mybox_update_version_convert(mybox_fget_contents("/etc/firmware"));?>';
+	if(cver >= tm) {
+		pop_msg("Firmware already up to date");
+		return false;
+	}                    
+        return true;                                                                                                                
+};
+</script>
+<?php }?>
+
+</head>
+<body scroll="auto" onload="load_menu('sub3','t3d5','s3i5');">
+<form name=f method=post action="/manage_update.exh" enctype="multipart/form-data">
+<?php if($tab==1){
+$rrid=rand().'.'.time();
+?>
+<input type=hidden name="UPLOAD_METTER_ID" value='<?php echo $rrid;?>'>
+<?php }?>
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 0px;'>
+<tr>
+<td>
+<?php mybox_page_section("Management / System Update");?>
+<br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="/manage_update.exh?tab=1" <?php if($tab==1){?>class="tabact"<?php }?>>Update Overview</a></li>
+<li><a href="/manage_update.exh?tab=2" <?php if($tab==2){?>class="tabact"<?php }?>>Setting</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td>
+<?php mybox_page_msg($msg);?>
+<br>
+<!-- tab container -->
+<?php if($tab==1) {
+mybox_update_setting(&$_update_firmware,&$_update_pattern,&$_update_save,
+				&$_update_speed,&$_update_proxy_stat,&$_update_proxy_host,
+				&$_update_proxy_port,&$_update_proxy_user_stat,
+				&$_update_proxy_user,&$_update_proxy_pass);
+	$_firm_is_ok=1;
+	$_firm_dl_is_ok=1;
+	if($_update_firmware==0 && file_exists("/var/sys/firm_download")) {
+		$_firm_dl_is_ok=0;
+		$msg="Downloading firmware in progress, please check log for more details";
+		echo "<script type='text/javascript'>error('$msg');</script>";
+	}
+	if(file_exists("/var/sys/firm_update")) {
+		$_firm_is_ok=0;
+		$msg="Updating firmware in progress, please check log for more details";
+		echo "<script type='text/javascript'>error('$msg');</script>";
+	}
+?>
+<table class="datanb" width="100%">
+<tbody>
+<tr>
+<td>
+<p class="subtitle" style='width: 98%; font-weight: bold;'><img src='/i/menu/sub_sep.gif'> Firmware</p>
+<table class="data" width="100%">
+<tbody>
+<tr style='border: 1px solid #ccc;'> 
+<td valign="middle" class="tdname">Current firmware version</td>
+<td valign="middle" class="tdvalue">
+<div style='background: #ffffff; border: 0px; margin-top: 0em; margin-bottom: 0em; padding: 0px; padding-top: 2px; padding-bottom: 2px; width: 285px;'>
+&nbsp;<b><?php echo mybox_show_firmware();?></b>
+</div>
+</td>
+</tr>
+<tr style='border: 1px solid #ccc;'> 
+<td valign="top" class="tdname">Available firmware updates</td>
+<td valign="top" class="tdvalue">
+<?php 
+$pkgok=1;
+$buff=mybox_dir2array("$_UPDATE_PATH/files/*.mpu");
+if(count($buff)!=0) {
+	echo "
+	<table class='data' style='background: #ffffff; border: 0px; margin-top: 0em; margin-bottom: 0em; padding: 0px; width: 285px;'>
+	";
+	foreach($buff as $lnx) {
+		$ln=basename(trim($lnx));
+		if(preg_match("/update-(.*?)\.mpu/",$ln,$mm)) {
+			if(mybox_update_version_check($mm[1])==0) continue;
+			$pkgok=0;
+			$_pkginfo='';$_options='';
+			$_pkginfo=mybox_update_get_pkg_info($lnx);
+			$_pkginfo=preg_replace("/\n/",'<br>',$_pkginfo);
+			$_pkginfo=preg_replace("/\s+/",'&nbsp;',$_pkginfo);
+			$_options=mybox_update_get_pkg_options($lnx);
+			if($_options=='') $_options="no action required";
+			echo "<tr>
+			<td style='width: 60px;'>&nbsp;<b>{$mm[1]}</b></td>
+			<td style='width: 5px;'><a href='#' onclick=\"overlib('<b>$_pkginfo</b>',STICKY,WIDTH,250,BGCOLOR,'#336699',FGCOLOR,'#ffffff',CLOSECOLOR,'#ffffff',CAPTION,'Package Info',CLOSECLICK); return false;\"><img src='{$_PNG['info']}' border=0 alt='' title=''></a></td<td><b>($_options)</b></td>
+			</tr>";
+			$mm=array();
+		}
+	}
+	echo "</table>";
+}
+if($pkgok==1) {
+	$ok=0;
+	$fv=mybox_fget_contents("/etc/firmware");
+	$fv="update-{$fv}.mpu";
+	$fn=mybox_fget_contents("$_UPDATE_PATH/FIRMWARE.NEW");
+	$fn_a=explode(",",$fn);
+	if(count($fn_a)!=0) {
+		sort($fn_a);
+		if($fn_a[0]=="$fv") $ok=1;
+	} else {
+		if($fn=="$fv") $ok=1;
+	}
+	if($ok==0 && file_exists("$_UPDATE_PATH/FIRMWARE-DL.DONE")) {
+		$fd=mybox_fget_contents("$_UPDATE_PATH/FIRMWARE-DL.DONE");
+		if(($fn!='' && $fd!='')&&($fn==$fd)) $ok=1;
+	}
+	if($ok==1) {
+		$txt="Your firmware is up to date";
+	} else {
+		$txt="New firmware update available";
+		if($_update_firmware==0 && $firm_is_ok==1) $txt .=" for download &nbsp;<input type=button class=button value='Download' onclick='return do_update(11);'>";
+	}
+	echo "<div style='background: #ffffff; border: 0px; margin-top: 0em; margin-bottom: 0em; padding: 0px; padding-top: 2px; padding-bottom: 2px; width: 285px;'>
+	      &nbsp;<b>$txt</b>
+		</div>	
+	";
+}
+?>
+</td>
+</tr>
+<tr style='border: 0px; padding: 0px; margin: 0px;'>
+<td style='border: 0px; padding: 0px; margin: 0px;'>
+&nbsp;
+</td>
+<td style='border: 0px; padding: 0px; padding-top: 5px; padding-bottom: 5px;'>
+<?php 
+$txt="
+<table style='border: 0px; margin: 0px; padding: 0px;'>
+<tr><td><input type=file class='filebox' size='35' name=filename></td></tr>
+<tr><td><a class='btns' href='#' onclick='return do_upload();return false;'>Upload</a></td></tr>
+</table>";
+echo mybox_defwin('pkgu','330px','#ebebeb','#999999','#336699','#ffffff','Manual Update package upload','#ebebeb','70px','hidden','hidden',$txt);?>
+<a name="sini"><a class="btns" href="#sini" onclick="document.f.filename.value='';dohide_show_def('pkgu');return false;">Package Upload</a>
+<?php if($pkgok==0 && $_firm_dl_is_ok==1){?>
+&nbsp;
+<a name="sini"><a class="btns" href="#sini" onclick="return do_update(10);return false;">Applying Update</a>
+<?php }?>
+</td>
+</tr>
+</tbody>
+</table>
+<p class="subtitle" style='width: 98%; font-weight: bold;'><img src='/i/menu/sub_sep.gif'> Pattern</p>
+<table class="data" width="100%">
+<tbody>
+<tr style='border: 1px solid #ccc;'> 
+<td valign="middle" class="tdname">Current pattern version</td>
+<td valign="middle" class="tdvalue">
+<div style='background: #ffffff; border: 0px; margin-top: 0em; margin-bottom: 0em; padding: 0px; padding-top: 2px; padding-bottom: 2px; width: 285px;'>
+&nbsp;<b><?php echo mybox_fget_contents("$_PAT_PATH/version");?></b>
+</div>
+</td>
+</tr>
+<tr style='border: 1px solid #ccc;'> 
+<td valign="middle" class="tdname">Available pattern version</td>
+<td valign="middle" class="tdvalue">
+<div style='background: #ffffff; border: 0px; margin-top: 0em; margin-bottom: 0em; padding: 0px; padding-top: 2px; padding-bottom: 2px; width: 285px;'>
+&nbsp;<b><?php 
+$pv=mybox_update_chk_pat_ver();
+if($pv==0) {
+	echo "Your pattern is up to date";
+} else {
+	echo "$pv";
+}
+?></b>
+</div>
+</td>
+</tr>
+
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+
+<?php  } // tab==1 ?>
+<?php if($tab==2) {
+$_update_firmware=0;
+$_update_pattern=0;
+$_update_save=0;
+$_update_speed=10;
+$db_id=mybox_db_connect($_DB_NAME);
+$result=mybox_db_query("select * from misc where name like \"update_%\"",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		if(trim($row['name'])=='update_firmware') $_update_firmware=trim($row['val']);
+		if(trim($row['name'])=='update_pattern') $_update_pattern=trim($row['val']);
+		if(trim($row['name'])=='update_save') $_update_save=trim($row['val']);
+		if(trim($row['name'])=='update_speed') $_update_speed=trim($row['val']);
+		if(trim($row['name'])=='update_proxy_stat') $_update_proxy_stat=trim($row['val']);
+		if(trim($row['name'])=='update_proxy_host') $_update_proxy_host=trim($row['val']);
+		if(trim($row['name'])=='update_proxy_port') $_update_proxy_port=trim($row['val']);
+		if(trim($row['name'])=='update_proxy_user_stat') $_update_proxy_user_stat=trim($row['val']);
+		if(trim($row['name'])=='update_proxy_user') $_update_proxy_user=trim($row['val']);
+		if(trim($row['name'])=='update_proxy_pass') $_update_proxy_pass=trim($row['val']);
+	}
+}
+$list_array=array();
+$list_array1=mybox_ipname_array($db_id);
+$list_array2=mybox_defnetwork_array($db_id);
+$list_array3=array();
+$list_array4=array();
+$list_array=$list_array1;
+if(count($list_array1)!=0) {
+	foreach($list_array1 as $a) {
+		if(strpos($a,"(Network)")!==FALSE || strpos($a,"(Broadcast)")!==FALSE) continue;
+		$list_array3[]="$a";	
+	}
+}
+unset($a);
+$list_array4=$list_array3;
+if(count($list_array2)!=0) {
+	foreach($list_array2 as $a => $b) {
+		if($tab==1 && $a=='any') continue;
+		if(is_array($b)) {
+			if($b['type'] == 2) $list_array4[]="$a";
+		} 
+	}
+}
+?>
+<script type='text/javascript'>
+function do_submit() {
+	<?php if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {?>
+	var update_speed=Trim(document.f.update_speed.value);
+	if(!isnum(update_speed) || update_speed=='') {
+		pop_msg("Invalid value for bandwidth");
+		return false;
+	};
+	if(document.f.update_proxy_stat.value==1) {
+		update_proxy_host=Trim(document.f.update_proxy_host.value);
+		update_proxy_port=Trim(document.f.update_proxy_port.value);
+		if(update_proxy_host=='') {
+			pop_msg("No proxy host defined");
+			return false;
+		}
+		if(!isnum(update_proxy_port) || update_proxy_port=='') {
+			pop_msg("Invalid value for proxy port");
+			return false;
+		}
+	};
+	if(document.f.update_proxy_user_stat.value==1) {
+		update_proxy_user=Trim(document.f.update_proxy_user.value);
+		update_proxy_pass=Trim(document.f.update_proxy_pass.value);
+		if(update_proxy_user=='') {
+			pop_msg("No proxy user defined");
+			return false;
+		}
+		if(update_proxy_pass=='') {
+			pop_msg("No proxy password defined");
+			return false;
+		}
+	};
+	document.f.do_save.value='1';
+	document.f.submit();
+	return true;
+	<?php } else {?>
+	pop_msg("Permission denied");
+	return false;
+	<?php }?>
+	
+};
+	function enab_c(val,sid) {
+		if(val==1) {
+			do_show(sid);
+			if(sid=="s3") {
+				do_show('s4');
+			}
+		} else {
+			do_hide(sid);
+			if(sid=="s3") {
+				do_hide('s4');
+			}
+		}
+	};
+</script>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td valign="middle" class="tdname">Enable automatic firmware download</td>
+<td valign="middle" class="tdvalue"> 
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+echo mybox_select_box('sysupsel1',$data_a,$_update_firmware,'update_firmware');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Enable automatic pattern installation</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+echo mybox_select_box('sysupsel2',$data_a,$_update_pattern,'update_pattern');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Keep update files</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("Yes"=>"1","No"=>"0");
+echo mybox_select_box('sysupsel3',$data_a,$_update_save,'update_save');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Limit bandwidth (KBytes/second)</td>
+<td valign="middle" class="tdvalue">
+<input name="update_speed" type="text" class="valbox2" size="5" value="<?php echo $_update_speed;?>">
+</td>
+</tr>
+
+<tr> 
+<td valign="top" class="tdname">Use Parent Proxy</td>
+<td valign="top" class="tdvalue"> 
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+if(!isset($_update_proxy_stat)||$_update_proxy_stat=='') $_update_proxy_stat=0;
+$set_a=array("act"=>"enab_c('b','s2')");
+echo mybox_select_box('sysupsel4',$data_a,$_update_proxy_stat,'update_proxy_stat',$set_a);
+?>
+<div id='s2' style='display: none;'>
+<table class="data" style='border: 0px; margin-bottom: 0em;'>
+<tr>
+<td valign=top style='border: 0px; width: 100px;'> 
+<b>Host</b>
+</td>
+<td valign=top style='border: 0px;'> 
+<?php 
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($list_array4,'update_proxy_host',"$_update_proxy_host",'sysupsel5','sysupsel5a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+echo mybox_defwin('sysupsel5','200px','#ffffff','#999999','#336699','#ffffff','Host','#ffffff','100px','hidden','auto',$txt);
+?>
+</td></tr>
+<tr>
+<td valign=top style='border: 0px; width: 100px;'> 
+<b>Port</b>
+</td>
+<td valign=top style='border: 0px;'> 
+<input name="update_proxy_port" type="text" class="valbox2" value="<?php echo $_update_proxy_port;?>">
+</td></tr>
+<tr><td valign=top style='border: 0px;' colspan=2>
+<hr size=1 class=notehr>
+</td></tr>
+<tr>
+<td valign=top style='border: 0px; width: 100px;'> 
+<b>Authentication</b>
+</td>
+<td valign=top style='border: 0px;'>
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+if(!isset($_update_proxy_user_stat)||$_update_proxy_user_stat=='') $_update_proxy_user_stat=0;
+$set_a=array("act"=>"enab_c('b','s3')");
+echo mybox_select_box('sysupsel6',$data_a,$_update_proxy_user_stat,'update_proxy_user_stat',$set_a);
+?>
+</td></tr>
+<tr id='s3'>
+<td valign=top style='border: 0px; width: 100px;'> 
+<b>User</b>
+</td>
+<td valign=top style='border: 0px;'> 
+<input name="update_proxy_user" type="text" class="valbox2" value="<?php echo $_update_proxy_user;?>">
+</td></tr>
+<tr id='s4'>
+<td valign=top style='border: 0px; width: 100px;'> 
+<b>Password</b>
+</td>
+<td valign=top style='border: 0px;'> 
+<input name="update_proxy_pass" type="password" class="valbox2" size="30" value="<?php echo $_update_proxy_pass;?>">
+<input name="update_proxy_pass_old" type="hidden" value="<?php echo $_update_proxy_pass;?>">
+</td></tr>
+</table>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+<table width='100%' class=datanb style='text-align: right;'>
+<tbody>
+<tr>
+<td style='text-align: right;'>
+<a name="sini"><a class="btn" href="#sini" onclick="return do_submit();return false;">Save</a>
+</td>
+</tbody>
+</table>
+<script type='text/javascript'>
+enab_c('<?php echo $_update_proxy_stat;?>','s2');
+enab_c('<?php echo $_update_proxy_user_stat;?>','s3');
+</script>
+<?php 
+mybox_db_close($db_id);
+}// tab==2?>
+
+<!-- end tab container -->
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value='<?php echo $tab;?>'>
+</form>
+</body>
+</html>
+

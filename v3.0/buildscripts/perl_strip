@@ -1,0 +1,29 @@
+#!/usr/bin/perl -w
+use Pod::Strip;
+
+sub trim {
+    @_ = @_ ? @_ : $_ if defined wantarray;
+    for (@_ ? @_ : $_) { s/\A\s+//; s/\s+\z//;}
+    return wantarray ? @_ : "@_";
+}
+
+my $file=$ARGV[0] if( @ARGV && -e $ARGV[0]) ||  die("no file name");
+my $code;
+open(KKK,"$file"); 
+while(<KKK>) {
+	trim;
+	if (! /^#\!/) {
+		s/^#.*//;
+	}
+	next if($_ eq '');
+	$code .="$_\n";
+}
+close(KKK);
+my $p=Pod::Strip->new();
+my $podless;
+$p->output_string(\$podless);
+$p->parse_string_document($code);
+open(KKK,">$file");
+print KKK $podless;
+close(KKK);
+exit 0;

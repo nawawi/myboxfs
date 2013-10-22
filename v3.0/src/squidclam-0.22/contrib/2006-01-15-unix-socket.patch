@@ -1,0 +1,73 @@
+# contribution from Steve-o
+diff -NuarwbB squidclam-0.18.orig/squidclam.c squidclam-0.18/squidclam.c
+--- squidclam-0.18.orig/squidclam.c	2005-10-29 21:10:15.000000000 +0800
++++ squidclam-0.18/squidclam.c	2006-01-13 21:17:56.000000000 +0800
+@@ -34,6 +34,8 @@
+ #include <curl/curl.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
++#include <sys/socket.h>
++#include <sys/un.h>
+ #include <fcntl.h>
+ #include <ctype.h>
+ 
+@@ -54,6 +56,9 @@
+ /* to avoid DoS through very big files uncomment the following */
+ #define HEADERCHECK
+ 
++
++static struct cfg cfg;
++
+ /* open config file */
+ FILE * 
+ opencfg (void)
+@@ -78,6 +83,27 @@
+ }
+ 
+ int 
++call_unix_socket (char *socket_name)
++{
++	struct sockaddr_un sa;
++	int s;
++
++	memset(&sa, 0, sizeof(sa));
++	sa.sun_family=AF_UNIX;
++	strcpy(sa.sun_path, socket_name);
++	if ((s=socket(AF_UNIX, SOCK_STREAM, 0)) < 0 ) {
++		return(-1);
++	}
++
++	if (connect(s, (struct sockaddr *) & sa, sizeof(sa)) < 0 ) {
++		close(s);
++		return(-1);
++	}
++
++	return(s);
++}
++
++int 
+ call_socket (char *hostname, unsigned short portnum)
+ {
+ 	struct sockaddr_in sa;
+@@ -371,7 +397,11 @@
+ 
+  	snprintf(buf,SBUFM, "SCAN %.255s\n", file);
+ 
+-	s=call_socket(CLAMDSERVER,CLAMDPORT);
++	if (cfg.cip[0] == '/') {	/* guess at unix socket instead of tcp socket */
++		s=call_unix_socket(cfg.cip);
++	} else {
++		s=call_socket(cfg.cip,cfg.cp);
++	}
+ 
+ 	if (s < 0) {
+ 		syslog(LOG_ERR, "Failed to connect to clamd server");
+@@ -416,8 +446,6 @@
+ {
+     char virname[256];
+ 
+-	struct cfg cfg;
+-
+     struct request {
+         char url[10000]; /* don't forget to also change scanf if you tweak this */
+         char src[255];   /* don't forget to also change scanf if you tweak this */

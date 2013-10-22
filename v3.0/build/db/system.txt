@@ -1,0 +1,440 @@
+BEGIN TRANSACTION;
+create table alarm (
+email varchar not null,
+ips int not null,
+policy int not null,
+system int not null,
+note varchar not null
+);
+create table auth_login (
+name varchar not null,
+pass varchar not null
+);
+INSERT INTO auth_login VALUES('console','e2e1362fdaaae831d470e998f33d6f43');
+INSERT INTO auth_login VALUES('admin','0192023a7bbd73250516f069df18b500');
+INSERT INTO auth_login VALUES('look','163ae89f27d4215b671480e136581274');
+create table crontab (
+name varchar not null,
+val varchar not null
+);
+INSERT INTO crontab VALUES('compresslog','02 1 * * * /service/tools/mfs-query.exc l');
+INSERT INTO crontab VALUES('graphs','*/5 * * * * /service/tools/mfs-graph.exc');
+INSERT INTO crontab VALUES('flushapp','05 2 * * * /service/tools/mfs-query.exc x');
+INSERT INTO crontab VALUES('purgelog','02 1 * * * /service/tools/mfs-query.exc p');
+create table dns_name (
+id integer primary key,
+name varchar not null
+);
+INSERT INTO dns_name VALUES(1,'202.188.1.5');
+INSERT INTO dns_name VALUES(2,'161.142.2.17');
+INSERT INTO dns_name VALUES(3,'202.162.24.5');
+INSERT INTO dns_name VALUES(4,'203.121.16.85');
+create table hosts (
+id integer primary key,
+ip varchar not null,
+host varchar not null
+);
+create table ipaddr (
+id integer primary key,
+name varchar not null,
+dev varchar not null,
+ip varchar not null,
+mask varchar not null,
+mtu int not null,
+type int not null,
+onboot int not null,
+note varchar not null
+);
+INSERT INTO ipaddr VALUES(1,'WAN','eth2','0.0.0.0','255.255.255.0',1500,1,0,'Internet');
+INSERT INTO ipaddr VALUES(2,'DMZ','eth3','0.0.0.0','255.255.255.0',1500,2,0,'DMZ');
+INSERT INTO ipaddr VALUES(3,'LAN','eth0','192.168.3.1','255.255.255.0',1500,3,1,'LAN');
+INSERT INTO ipaddr VALUES(4,'WAN2','eth1','0.0.0.0','255.255.255.0',1500,1,0,'Backup');
+create table ipalias (
+id integer primary key,
+pid int not null,
+dev varchar not null,
+ip varchar not null,
+mask varchar not null,
+onboot int not null,
+note varchar not null
+);
+create table logger (
+id integer primary key,
+ip varchar not null,
+proto varchar not null,
+port int not null
+);
+INSERT INTO logger VALUES(1,'192.168.3.5','udp',514);
+create table misc (
+name varchar not null,
+val varchar not null
+);
+INSERT INTO misc VALUES('db_version','04012007');
+INSERT INTO misc VALUES('hostname','fw.mybox.lo');
+INSERT INTO misc VALUES('ntp_server','pool.ntp.org');
+INSERT INTO misc VALUES('ntp_time',120);
+INSERT INTO misc VALUES('time_zone','Asia/Kuala_Lumpur');
+INSERT INTO misc VALUES('time_utc',0);
+INSERT INTO misc VALUES('kbdmap','us');
+INSERT INTO misc VALUES('www_session',60);
+INSERT INTO misc VALUES('ids_timeout',60);
+INSERT INTO misc VALUES('ids_stat',1);
+INSERT INTO misc VALUES('ids_exclude','127.0.0.1');
+INSERT INTO misc VALUES('ids_mode',3);
+INSERT INTO misc VALUES('pscan_stat',1);
+INSERT INTO misc VALUES('pscan_mode',3);
+INSERT INTO misc VALUES('logger_stat',0);
+INSERT INTO misc VALUES('logger_facility',1);
+INSERT INTO misc VALUES('logger_priority',6);
+INSERT INTO misc VALUES('ftp_server','0.0.0.0');
+INSERT INTO misc VALUES('ftp_pass','sssss');
+INSERT INTO misc VALUES('ftp_user','ftp');
+INSERT INTO misc VALUES('ftp_path','mybox_backup');
+INSERT INTO misc VALUES('ftp_passive','TRUE');
+INSERT INTO misc VALUES('local_logs',0);
+INSERT INTO misc VALUES('local_logs_purge',0);
+INSERT INTO misc VALUES('local_news',0);
+INSERT INTO misc VALUES('blacklist_block',3);
+INSERT INTO misc VALUES('blacklist_line',50);
+INSERT INTO misc VALUES('update_stat',1);
+INSERT INTO misc VALUES('update_date',2);
+INSERT INTO misc VALUES('update_do',5);
+INSERT INTO misc VALUES('update_speed',10);
+INSERT INTO misc VALUES('blacklist_block_s',1);
+INSERT INTO misc VALUES('blacklist_block_c',1);
+INSERT INTO misc VALUES('singlelogin',1);
+INSERT INTO misc VALUES('ids_acl',0);
+INSERT INTO misc VALUES('fa_mode',2);
+create table service_ssh (
+port int not null,
+stat int not null,
+pass varchar not null
+);
+INSERT INTO service_ssh VALUES(5052,1,'sss9reRMz8WpQ');
+create table vlan (
+id integer primary key,
+vid int not null,
+dev varchar not null,
+ip varchar not null,
+mask varchar not null,
+flag int not null,
+mtu int not null,
+onboot int not null,
+note varchar not null
+);
+create table alert_email (
+id integer primary key,
+email varchar not null,
+stat int not null,
+note varchar not null
+);
+create table alert_setting (
+stat int not null,
+report_min int not null,
+report_title varchar not null,
+report_logs int not null,
+report_strg int not null,
+report_mem int not null,
+report_sys int not null,
+report_names varchar not null,
+usesmtp int not null,
+smtphost varchar not null,
+pophost varchar not null,
+user varchar not null,
+pass varchar not null,
+mailfrom varchar not null
+);
+INSERT INTO alert_setting VALUES(0,120,'Mybox System Notification',1,1,1,1,'auth,system,firewall,httpsd,sshd,ips,portscan,dhcpd',1,'smtp.tracenetwork.com.my','pop.tracenetwork.com.my','nawawi@tracenetwork.com.my','xg5LGa50juqE8Q==','admin@mybox.net.my');
+create table htb_client (
+id integer primary key,
+cname varchar not null,
+bandwidth int not null,
+climit int not null,
+burst int not null,
+priority int not null,
+mark int not null,
+src varchar not null,
+srcp varchar not null,
+dst varchar not null,
+dstp varchar not null,
+note varchar not null,
+stat int not null
+);
+create table htb_class (
+id integer primary key,
+cname varchar not null,
+dev varchar not null, 
+bandwidth int not null,
+climit int not null,
+burst int not null,
+priority int not null,
+note varchar not null,
+stat int not null 
+);
+create table route (  
+id integer primary key,
+ip varchar not null,
+mask varchar not null,
+gateway varchar not null,                                      
+note varchar not null,                                                                
+stat int not null,
+type int not null                                                              
+);
+create table dhcp_hosts (
+id integer primary key,
+ip varchar not null,
+mac varchar not null,
+note varchar not null,
+stat int not null
+);
+create table service_ftp (
+port int not null,
+dport int not null,
+stat int not null
+);
+INSERT INTO service_ftp VALUES(5053,5054,0);
+create table accesslist (                                                             
+id integer primary key,                                                               
+ip varchar not null,                                                                  
+ssh int not null,                                                                     
+https int not null,
+ftp int not null,                                                            
+stat int not null,                                                                    
+note varchar not null                                                                 
+);
+INSERT INTO accesslist VALUES(1,'192.168.3.2',1,1,1,1,'admin');
+INSERT INTO accesslist VALUES(2,'192.168.3.3',1,1,1,1,'admin');
+create table service_snmp (
+port int not null,
+stat int not null,
+comm varchar not null,
+location varchar not null,
+contact varchar not null,
+astat int not null,
+alist varchar not null
+);
+INSERT INTO service_snmp VALUES(161,0,'mybox','mybox','mybox@mybox.lo',0,'');
+create table static_arp (
+id integer primary key,
+ip varchar not null,
+mac varchar not null,
+note varchar not null,
+stat int not null
+);
+create table ipscan_hosts (
+id integer primary key,
+ip varchar not null,
+mac varchar not null,
+host varchar not null,
+note varchar not null,
+stat int not null
+);
+create table auth_ad (
+domain varchar not null,
+ip varchar not null,
+admin varchar not null,
+pass varchar not null,
+stat int not null
+);
+INSERT INTO auth_ad VALUES('ad.mybox.lo','0.0.0.0','administrator','ssss',0);
+create table auth_user (
+id integer primary key,
+name varchar not null,
+passwd varchar not null,
+stat int not null
+);
+create table pptp_vpn (
+listen varchar not null,
+localip varchar not null,
+ipstart varchar not null,
+ipend varchar not null,
+bcrelay varchar not null,
+mswins varchar not null,
+dnswin varchar not null,
+mtu varchar not null,
+grp varchar not null,
+usead int not null,
+stat int not null
+);
+INSERT INTO pptp_vpn VALUES('','192.168.0.100','192.168.0.245',254,'eth2','192.168.0.10 192.168.0.5','192.168.0.5',1400,'',0,0);
+create table service_dhcp (
+stat int not null,
+dev varchar not null,
+range_start varchar not null,
+range_end varchar not null,
+default_lease varchar not null,
+max_lease varchar not null,
+deny int not null
+);
+INSERT INTO service_dhcp VALUES(1,'LAN','192.168.3.2','192.168.3.3',7200,86400,0);
+create table service_https (
+port int not null,
+stat int not null
+);
+INSERT INTO service_https VALUES(5051,1);
+create table site_certificate (
+country varchar not null,
+state varchar not null,
+city varchar not null,
+organization varchar not null,
+section varchar not null,
+email varchar not null,
+hostname varchar not null,
+certstat int not null,
+cert varchar not null
+);
+INSERT INTO site_certificate VALUES('my','selangor d.e','p.j','tracenetwork','tracenetwork','admin@tracenetwork.com.my','192.168.3.1','0','');
+create table def_services (
+id integer primary key,
+name varchar not null,
+val varchar not null,
+note varchar not null,
+stat int not null
+);
+INSERT INTO def_services VALUES(0,'any','any','matches any port',1);
+INSERT INTO def_services VALUES(1,'HTTP',80,'HTTP port',1);
+INSERT INTO def_services VALUES(2,'HTTPS',443,'HTTPS port',1);
+INSERT INTO def_services VALUES(3,'FTP',21,'FTP port',1);
+INSERT INTO def_services VALUES(4,'FTP-DATA',20,'FTP-DATA port',1);
+INSERT INTO def_services VALUES(5,'SSH',22,'SSH port',1);
+INSERT INTO def_services VALUES(6,'TELNET',23,'TELNET port',1);
+INSERT INTO def_services VALUES(7,'SMTP',25,'SMTP port',1);
+INSERT INTO def_services VALUES(8,'POP3',110,'POP3 port',1);
+INSERT INTO def_services VALUES(9,'IMAP',143,'IMAP port',1);
+INSERT INTO def_services VALUES(10,'SNMP',161,'SNMP port',1);
+INSERT INTO def_services VALUES(11,'PPTP',1723,'PPTP port',1);
+INSERT INTO def_services VALUES(12,'NETBIOS','137:139','NETBIOS port',1);
+INSERT INTO def_services VALUES(13,'AD-LDAP',389,'AD-LDAP port',1);
+INSERT INTO def_services VALUES(14,'AD-AUTHENTICATION',10260,'AD-Authentication port',1);
+INSERT INTO def_services VALUES(15,'DNS',53,'DNS port',1);
+INSERT INTO def_services VALUES(16,'NTP',123,'NTP port',1);
+INSERT INTO def_services VALUES(17,'KERBEROS',88,'KERBEROS port',1);
+INSERT INTO def_services VALUES(18,'DCOM','5000:5500','DCOM port',1);
+INSERT INTO def_services VALUES(19,'MICROSOFT DS',445,'MICROSOFT DS port',1);
+INSERT INTO def_services VALUES(20,'KPASSWORD',464,'KPassword port',1);
+INSERT INTO def_services VALUES(21,'PRINTER',515,'Printer port',1);
+INSERT INTO def_services VALUES(22,'LDAP-SSL',636,'LDAP-SSL port',1);
+INSERT INTO def_services VALUES(23,'LOTUS-NOTES',1352,'Lotus-Notes port',1);
+INSERT INTO def_services VALUES(24,'MICROSOFT-SQL',1433,'Microsoft-SQL port',1);
+INSERT INTO def_services VALUES(25,'MICROSOFT-SQL-MONITOR',1434,'Microsoft-SQL-Monitor port',1);
+INSERT INTO def_services VALUES(26,'PRINTING-PORT',9100,'Printing-Port port',1);
+create table def_networks (
+id integer primary key,
+name varchar not null,
+val varchar not null,
+note varchar not null,
+stat int not null
+);
+INSERT INTO def_networks VALUES(0,'any','any','matches any ip/network',1);
+create table def_times (
+id integer primary key,
+name varchar not null,
+val varchar not null,
+val2 varchar not null,
+val3 varchar not null,
+note varchar not null,
+stat int not null
+);
+INSERT INTO def_times VALUES(0,'any','any','','','matches any times/dates/days',1);
+INSERT INTO def_times VALUES(1,'WORK DAYS','','09:00','18:34','work days',1);
+create table policy_inbound (
+id int not null,
+proto varchar not null,
+srcn int not null,
+src varchar not null,
+srcp varchar not null,
+dstn int not null,
+dst varchar not null,
+dstp varchar not null,
+action varchar not null,
+usetime int not null,
+timet varchar not null,
+timeday varchar not null,
+timestart varchar not null,
+timeend varchar not null,
+log int not null,
+stat int not null,
+note varchar not null
+);
+INSERT INTO policy_inbound VALUES(3,'any',0,'any','any',0,'any','any','PASS',0,'','','','',0,1,'');
+INSERT INTO policy_inbound VALUES(2,'IPP2P',0,'any','any',0,'any','any','DROP',0,'','','','',0,1,'');
+create table policy_outbound (
+id int not null,
+proto varchar not null,
+srcn int not null,
+src varchar not null,
+srcp varchar not null,
+dstn int not null,
+dst varchar not null,
+dstp varchar not null,
+action varchar not null,
+usetime int not null,
+timet varchar not null,
+timeday varchar not null,
+timestart varchar not null,
+timeend varchar not null,
+log int not null,
+stat int not null,
+note varchar not null
+);
+INSERT INTO policy_outbound VALUES(3,'any',0,'any','any',0,'any','any','PASS',0,'','','','',0,1,'');
+INSERT INTO policy_outbound VALUES(2,'IPP2P',0,'any','any',0,'any','any','DROP',0,'','','','',0,1,'');
+create table policy_dnat (
+id int not null,
+proto varchar not null,
+src varchar not null,
+dst varchar not null,
+dstp varchar not null,
+fwd varchar not null,
+fwdp varchar not null,
+usetime int not null,
+timet varchar not null,
+timeday varchar not null,
+timestart varchar not null,
+timeend varchar not null,
+log int not null,
+stat int not null,
+note varchar not null
+);
+create table policy_snat (
+id int not null,
+proto varchar not null,
+src varchar not null,
+dst varchar not null,
+dstp varchar not null,
+fwd varchar not null,
+fwdp varchar not null,
+usetime int not null,
+timet varchar not null,
+timeday varchar not null,
+timestart varchar not null,
+timeend varchar not null,
+log int not null,
+stat int not null,
+note varchar not null
+);
+create table policy_netmap (
+id int not null,
+type int not null,
+src varchar not null,
+dst varchar not null,
+fwd varchar not null,
+usetime int not null,
+timet varchar not null,
+timeday varchar not null,
+timestart varchar not null,
+timeend varchar not null,
+stat int not null,
+note varchar not null
+);
+create table gateway (
+id int not null,
+dev varchar not null,
+ip varchar not null,
+link varchar not null,
+note varchar not null,
+stat int not null
+);
+INSERT INTO gateway VALUES(0,'WAN','192.168.3.10','','Primary',0);
+INSERT INTO gateway VALUES(1,'WAN2','0.0.0.0','204.152.191.5','Load balancing',0);
+COMMIT;

@@ -1,0 +1,431 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="network_shaper";
+include_once('page.exl');
+mybox_chk_session();
+mybox_send_nocache();
+
+
+$db_id=mybox_db_connect($_DB_NAME);
+
+if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+	if(isset($do_id)&&$do_id=='apply_chg') {
+		$msg='<script>waitcount();</script>';
+		mybox_echo_query("policy-lb");
+	}
+	if($tab==1) {
+		if($do_save==1) {
+			$note=mybox_escape_str($note);
+			if($do_id!='edit') {
+				mybox_db_query("insert into server_balancing (service,server,target1,target2,stat,note) values ('$service','$server','$target1','$target2','$stat','$note');",$db_id);
+				$msg='Configuration saved';
+			} else {
+				mybox_db_query("update server_balancing set service='$service',server='$server',target1='$target1',target2='$target2',stat='$stat',note='$note' where id='$id';",$db_id);				
+				$msg='Configuration saved';
+				$col=1;$do_id='';
+			}
+		}
+	}
+
+	if($col==1) {
+		if($do_id=='stat') {
+			if($stat==1) { $stat=0; } else { $stat=1; }
+			mybox_db_query("update server_balancing set stat='$stat' where id='$id'",$db_id);
+		}
+		if($do_id=='del') {
+			mybox_db_query("delete from server_balancing where id='$id'",$db_id);
+		}
+		if(isset($do_save)&&$do_save==2) {
+			if(is_array($del) && count($del)!=0) {
+				foreach($del as $x) {
+					if($x!='') mybox_db_query("delete from server_balancing where id='$x'",$db_id);
+				}
+			} else {
+				if($del!='') mybox_db_query("delete from server_balancing where id='$del'",$db_id);
+			}
+		}
+	}
+
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied";
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+if(!isset($col)||$col=='') $col=1;
+
+?>
+<html>
+<head>
+<title>MyAdmin</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<script type='text/javascript' src="/j/mybox_func.js"></script>
+<script type='text/javascript' src="/j/mybox_overlib.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?php echo $_LOGIN['auth_id'];?>";
+	page_load();
+</script>
+<script type='text/javascript'>
+	function do_changes() {
+		self.location.href='<?php echo "/network_lb.exh?tab=$tab&col=1&do_id=apply_chg";?>';	
+	};
+	function do_submit() {
+		var service=Trim(document.f.service.value);
+		var server=Trim(document.f.server.value);
+		var target1=Trim(document.f.target1.value);
+		var target2=Trim(document.f.target2.value);
+		if(service=='') {
+			pop_msg("No service defined");
+			return false;	
+		};
+		if(server=='') {
+			pop_msg("No Pre-Balance target host defined");
+			return false;	
+		};
+		if(target1=='' || target2=='') {
+			pop_msg("No Post-Balance target host defined");
+			return false;	
+		};
+		if(target1==target2) {
+			pop_msg("Target host cannot be same");
+			return false;
+		};
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	};
+</script>
+<script type='text/javascript'>
+function waitcount() {
+	page_reload('200','<?php echo "/network_lb.exh?tab=$tab&col=$col";?>');
+};
+</script>
+</head>
+<body onload="load_menu('sub4','t4d6','s4i6');" scroll="auto">
+<form name=f method=post action="/network_lb.exh">
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 0px;'>
+<tr>
+<td>
+<?php mybox_page_section("Network / Server Load Balancing");?>
+<br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="/network_lb.exh?tab=1" <?php if($tab==1){?>class="tabact"<?php }?>>Balancing Rules</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td>
+<?php mybox_page_msg($msg);?>
+<br>
+
+<!-- tab container -->
+<?php if($tab==1) { ?>
+<table width="100%" border="0" cellpadding="0" cellspacing="0">
+<tr><td>
+<ul id="tabnav">
+<li class="<?php if($col==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=1) { echo "<a href=\"/network_lb.exh?tab=$tab&col=1\">"; }?>Rules<?php if($col!=1) { echo "</a>"; }?></li>
+<li class="<?php if($col==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=2) { echo "<a href=\"/network_lb.exh?tab=$tab&col=2\">"; }?><?php if($do_id=='edit') { echo "Edit"; } else { echo "Add new"; }?> balancing rule<?php if($col!=2) { echo "</a>"; }?></li>
+</ul>
+</td></tr>
+<tr> 
+<td class="tabcont">
+
+<?php if($col==1) {
+
+// counting
+$currentPage = $HTTP_SERVER_VARS["PHP_SELF"];
+$maxRows_Recordset=50;
+if(!isset($pageNum_Recordset)) $pageNum_Recordset=0;
+$startRow_Recordset=@($pageNum_Recordset * $maxRows_Recordset);
+if(isset($str)&&$str!='') {
+	$strn=mybox_escape_str($str);
+	$query_Recordset="select * from server_balancing where domain like \"%$str%\" or server like \"%$str%\" or note like \"%$strn%\" order by id ASC";
+} else {
+	$query_Recordset="select * from server_balancing order by id ASC";
+}
+$query_limit_Recordset=sprintf("%s LIMIT %d, %d", $query_Recordset, $startRow_Recordset, $maxRows_Recordset);
+$Recordset=mybox_db_query($query_limit_Recordset, $db_id);
+if(!isset($totalRows_Recordset) || $totalRows_Recordset=='') {
+	$all_Recordset=mybox_db_query($query_Recordset,$db_id);
+	$totalRows_Recordset=mybox_db_num_rows($all_Recordset);
+}
+
+$totalPages_Recordset=@ceil($totalRows_Recordset/$maxRows_Recordset)-1;
+$queryString_Recordset=null;
+if(!empty($_SERVER['QUERY_STRING'])) {
+	$params=explode("&", $_SERVER['QUERY_STRING']);
+  	$newParams=array();
+  	foreach ($params as $param) {
+		if(stristr($param, "pageNum_Recordset")==true) continue;
+		if(stristr($param, "totalRows_Recordset")==true) continue;
+		if(stristr($param, "maxRows_Recordset")==true) continue;
+		if(stristr($param, "tab")==true) continue;
+		if(stristr($param, "col")==true) continue;
+		if(stristr($param, "do_id")==true) continue;
+		array_push($newParams, $param);
+  	}
+  	if(count($newParams) != 0) {
+    		$queryString_Recordset="&" . implode("&", $newParams);
+  	}
+}
+$queryString_Recordset=sprintf("&totalRows_Recordset=%d%s&tab=$tab&col=$col&do_id=$do_id",$totalRows_Recordset,$queryString_Recordset);
+if($pageNum_Recordset > 0) { 
+	$pagefirst=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, 0, $queryString_Recordset);
+	$pageprev=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, max(0, $pageNum_Recordset - 1), $queryString_Recordset);
+	$button1="<a href='$pagefirst'><img src='{$_PNG['first']}' border=0 alt='' title=''></a>\n";
+	$button2="<a href='$pageprev'><img src='{$_PNG['prev']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button1="<img src='{$_PNG['first']}' border=0 alt='' title=''>\n";
+	$button2="<img src='{$_PNG['prev']}' border=0 alt='' title=''>\n";
+}
+if($pageNum_Recordset < $totalPages_Recordset) {
+	$pagenext=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, min($totalPages_Recordset, $pageNum_Recordset + 1), $queryString_Recordset);
+	$pagelast=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, $totalPages_Recordset, $queryString_Recordset);
+	$button3="<a href='$pagenext'><img src='{$_PNG['next']}' border=0 alt='' title=''></a>\n";
+	$button4="<a href='$pagelast'><img src='{$_PNG['last']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button3="<img src='{$_PNG['next']}' border=0 alt='' title=''>\n";
+	$button4="<img src='{$_PNG['last']}' border=0 alt='' title=''>\n";
+}
+unset($pagefirst,$pageprev,$pagenext,$pagelast);
+$_cnum=1;
+if(!isset($pageNum_Recordset)||$pageNum_Recordset==''||$pageNum_Recordset==0) {
+	$_cnum=1;
+} else {
+	$_cnum=($pageNum_Recordset * $maxRows_Recordset);
+	if($_cnum <= 0) {
+		$_cnum=1;
+	} else {
+		$_cnum +=1;
+	}
+}
+if($totalRows_Recordset >0 && mybox_db_num_rows($Recordset)!=0) {
+	echo "<table width='100%' class=data>
+	<thead class='blue'>
+      	<tr>
+        <td style='font-weight: bold; width: 2%; border-right: 0px;'>#</td> 
+	<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Service</td>
+	<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Setting</td>
+	<td style='font-weight: bold;  border-right: 0px;border-left: 0px;text-align: center; width: 5%;'>Active</td>
+        <td style='width: 5%; font-weight: bold; text-align: right; border-left: 0px;'>&nbsp;</td>
+      	</tr>
+	</thead>
+	<tbody>";
+	do {
+		$_id=$row['id'];
+		if($_id=='') continue;
+		$_service=mybox_get_defname(trim($row['service']),2,0,$db_id);
+		$_server=mybox_get_defname(trim($row['server']),2,0,$db_id);
+		$_target1=mybox_get_defname(trim($row['target1']),2,0,$db_id);
+		$_target2=mybox_get_defname(trim($row['target2']),2,0,$db_id);
+		$_stat=trim($row['stat']);
+		$_note=mybox_unescape_str($row['note']);
+		if($_note!='') $_note=mybox_print_note($_note);
+		$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff;'";
+		$lo="onclick=\"self.location.href='/network_lb.exh?tab=$tab&col=2&id=$_id&do_id=edit';\" ";
+		echo "
+			<tr $lt>
+        		<td $lo style='text-align: right; vertical-align: top;'>$_cnum</td>
+			<td $lo style='vertical-align: top;'><font color='darkred'><b>$_service</b></font></td>
+			<td $lo style='vertical-align: top; font-weight: bold;'>
+			$_server <img src='{$_PNG['arrow_right_s']}' border=0 alt='' title=''> $_target1,$_target2
+			$_note
+			</td>
+			<td style='text-align: center;' align=center valign=middle><a href='/network_lb.exh?tab=$tab&col=1&id=$_id&stat=$_stat&do_id=stat'><img src='{$_PNG_YESNO[$_stat]}' border=0 alt='' title=''></a></td>
+			<td style='text-align: right; vertical-align: bottom; table-layout: fixed; white-space: nowrap;' align=right>
+			<a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='/network_lb.exh?tab=$tab&col=$col&do_save=2&del=$_id&pageNum_Recordset=$pageNum_Recordset&totalPages_Recordset=$totalPages_Recordset';return false;\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a>
+			<input type=checkbox name=del[] value=$_id>
+			</td>
+			</tr>
+		";
+		$_cnum++;
+	} while($row=mybox_db_fetch_assoc($Recordset));
+
+	if($_cnum >= 1) {
+		echo "
+			<tr>
+			<td style='text-align: right; background: #ffffff;' align=right valign=top colspan=5>
+			<a href='#' onclick='do_delete(2);return false;'>Delete</a> / <a href='#' onclick='dotoggle();return false;'>Toggle</a> <img src='{$_PNG['arrow_rtr']}' border=0 alt='' title=''></td>
+			</tr>
+		";
+	}
+	echo mybox_print_nextpage($pageNum_Recordset,$totalPages_Recordset,$totalRows_Recordset,$maxRows_Recordset,$queryString_Recordset,$currentPage,'5',$button1,$button2,$button3,$button4);
+	echo "</tbody></table>";
+} else {
+	echo "
+	<br>
+	<span class='notedef'>
+	There are no load balancing rules defined.
+	</span>
+	<br><br>
+	";$_error=1;
+}?>
+
+<?php }//col=1?>
+
+<?php if($col==2) {
+$list_array1=mybox_ipname_array($db_id);
+$list_array2=mybox_defnetwork_array($db_id);
+$list_array3=array();
+if(count($list_array2)!=0) {
+	foreach($list_array2 as $a => $b) {
+		if($a=='any') continue;
+		if(isset($b['group'])) continue;
+		if(is_array($b)) {
+			if($b['type'] == 2) $list_array3[]="$a";
+		} 
+	}
+};
+$list_array4=mybox_defservices_array($db_id);
+$list_array5=array();
+if(count($list_array4)!=0) {
+	foreach($list_array4 as $a => $b) {
+		if($a=='any') continue;
+		if($b['proto']!=1) continue;
+		$list_array5[]="$a";
+	}
+}
+unset($a,$b);
+
+if($do_id=='edit') {
+	$result=mybox_db_query("select * from server_balancing where id='$id'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_id=$row['id'];
+			$_service=$row['service'];
+			$_server=$row['server'];
+			$_target1=$row['target1'];
+			$_target2=$row['target2'];
+			$_stat=$row['stat'];
+			$_note=mybox_unescape_str($row['note']);
+		}
+	}
+}
+
+?>
+
+<table width="100%" class="data">
+<tbody>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Balance service</td>
+<td width="70%" valign="middle" class="tdvalue">
+<?php 
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($list_array5,'service',"$_service",'nlb1','nlb1a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+echo mybox_defwin('nlb1','200px','#ffffff','#999999','#336699','#ffffff','Balance service','#ffffff','100px','hidden','auto',$txt);
+?>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Pre-Balance target host</td>
+<td width="70%" valign="middle" class="tdvalue">
+<?php 
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($list_array1,'server',"$_server",'nlb2','nlb2a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+echo mybox_defwin('nlb2','200px','#ffffff','#999999','#336699','#ffffff','Pre-Balance target host','#ffffff','100px','hidden','auto',$txt);
+?>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="top" class="tdname">Post-Balance target hosts</td>
+<td width="70%" valign="top" class="tdvalue">
+<table style='border: 0px; padding: 0px; margin 0px;'>
+<td style='border: 0px; padding: 0px; margin 0px;'><b>Host (#1)</b></td></tr><tr>
+<td style='border: 0px; padding: 0px; margin 0px;'>
+<?php 
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($list_array3,'target1',"$_target1",'nlb3','nlb3a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+echo mybox_defwin('nlb3','200px','#ffffff','#999999','#336699','#ffffff','Pre-Balance target host','#ffffff','100px','hidden','auto',$txt);
+?>
+</td></tr>
+<td style='border: 0px; padding: 0px; margin 0px;'>
+<b>Host (#2)</b></td></tr><tr>
+<td style='border: 0px; padding: 0px; margin 0px;'>
+<?php 
+$txt='';
+$txt_a=array();
+$txt_a=mybox_definput($list_array3,'target2',"$_target2",'nlb4','nlb4a',$db_id);
+$txt=$txt_a[0];
+echo $txt_a[1];
+echo mybox_defwin('nlb4','200px','#ffffff','#999999','#336699','#ffffff','Pre-Balance target host','#ffffff','100px','hidden','auto',$txt);
+?>
+</td></tr></table>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Active this setting</td>
+<td width="70%" valign="middle" class="tdvalue">
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+if(!isset($_stat)||$_stat=='') $_stat=0;
+echo mybox_select_box('nrsel4',$data_a,$_stat,'stat');
+?>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Comment</td>
+<td width="70%" valign="middle" class="tdvalue">
+<input name="note" type="text" class="valbox" size="30" style='width: 200px;' value="<?php echo $_note;?>">
+</td>
+</tr>
+</tbody>
+</table>
+<?php  } // col ?>
+
+</td>
+</tr>
+</table>
+
+<?php }//tab==1?>
+
+
+<table align=right>
+<tbody>
+<tr>
+<?php if($col==1){?><td><a name="sini"><a class="btn" href="#sini" onclick="return do_changes();return false;">Reload</a></td><?php }?>
+<?php if($_error!=1 && $col==2){?><td><a name="sini"><a class="btn" href="#sini" onclick="return do_submit();return false;"><?php if($do_id=='edit') { echo "Update"; } else { echo "Save";}?></a></td><?php }?>
+</tr> 
+</tbody>
+</table>
+
+<!-- end tab container -->
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?php echo $tab;?>>
+<input type=hidden name=col value=<?php echo $col;?>>
+<input type=hidden name=do_id value='<?php echo $do_id;?>'>
+<input type=hidden name=id value='<?php echo $id;?>'>
+</form><br><br>
+<script type='text/javascript'>page_kill();</script>
+</body>
+</html>
+
+<?php mybox_db_close($db_id);?>

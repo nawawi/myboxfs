@@ -1,0 +1,44 @@
+#!/bin/bash -e
+
+START_POINT=$(pwd)
+cd $START_POINT
+ROOT_DIR=/tmp/zoneinfo
+KERNEL_BASE=$START_POINT/kernel_base
+ZONE_INFO=/usr/share/zoneinfo
+LZMAC="/mfs-gcc/bin/lzmacomp"
+
+if [ -d "$ZONE_INFO" ]; then
+	mkdir -p $ROOT_DIR/usr/share/zoneinfo
+	cd /usr/share/zoneinfo
+	LS=$(find . -type f -or -type l | grep '^./[A-Z]' | sort)
+	for x in $LS; do
+		_dir=$(dirname $x)
+		if [ "$_dir" != "." ]; then
+			mkdir -p $ROOT_DIR/usr/share/zoneinfo/$_dir
+			cp -av $x $ROOT_DIR/usr/share/zoneinfo/$_dir
+		else
+			cp -av $x $ROOT_DIR/usr/share/zoneinfo
+		fi
+		_dir=
+	done
+	cd $ROOT_DIR/usr/share
+	chmod -R 600 zoneinfo
+	echo "creating zoneinfo list"
+	cd $ROOT_DIR/usr/share/zoneinfo
+	rm -f $ROOT_DIR/usr/share/zoneinfo/ZONELIST.TXT /tmp/ZONELIST.TXT
+	for f in $(find . -type f -or -type l | grep '^./[A-Z]' | sort);do
+		echo $f |sed -e 's/\.\///g' >> /tmp/ZONELIST.TXT
+		#gzip -9 $f
+		$LZMAC $f > $f.gz
+		rm -f $f
+	done
+	mv -v /tmp/ZONELIST.TXT $ROOT_DIR/usr/share/zoneinfo/ZONELIST.TXT
+	chmod 600 $ROOT_DIR/usr/share/zoneinfo/ZONELIST.TXT
+	cd $ROOT_DIR
+	tar -cvf zoneinfo.tar * |sort
+	$LZMAC zoneinfo.tar > zoneinfo.mpk
+	rm -fv zoneinfo.tar
+	wait
+	mv -v zoneinfo.mpk $KERNEL_BASE
+fi
+rm -rfv $ROOT_DIR

@@ -1,0 +1,877 @@
+<?php 
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+// updated: 21/05/2007
+
+function mybox_escape_str($str) {
+	if($str!='') {
+		return htmlentities($str,ENT_QUOTES);
+	}
+	return $str;
+}
+
+function mybox_unescape_str($str) {
+	if($str!='') {
+		return str_replace(array('\&#039','\&quot','\&amp;#039','\&amp;quot'),array('&#039','&quot','&#039','&quot'),$str);
+	}
+	return $str;
+}
+
+function mybox_uptime() {
+	if(!file_exists("/proc/uptime")) {
+		return("unknown");
+	}
+	$dirty=file("/proc/uptime");
+	$ticks=trim(strtok($dirty[0], " "));
+	$minutes=$ticks / 60;
+	$hours=$minutes  / 60; 
+	$days=floor($hours / 24);
+	$hours=floor($hours - ($days * 24));
+	$minutes=floor($minutes  - ($days * 60 * 24) - ($hours * 60));
+	if($days <= 1) {$writeDays = "day";} else {$writeDays = "days";}
+	if($hours <= 1) {$writeHours = "hour"; } else {$writeHours = "hours";}
+	if($minutes <= 1) {$writeMins = "minute";} else {$writeMins = "minutes";}
+	if($days!=0) {
+		$since=date('D M d Y',strtotime("-$days days"));
+		$since="Since $since";
+	}
+	return	"$days $writeDays, $hours $writeHours, $minutes $writeMins. $since";
+}
+function mybox_space_used($dir) {
+	$_strglogstotal=0;
+	if(is_dir($dir)) {
+ 		if($dh=opendir($dir)) {
+  			while(($file = readdir($dh)) !== false) {
+   				if(is_dir($dir.$file) && $file != '.' && $file != '..') {
+    					mybox_space_used($dir.$file.'/');
+   				} else {
+    					$_strglogstotal += sprintf("%u", filesize($dir.$file));
+					clearstatcache();
+   				}
+  			}
+ 			closedir($dh);
+		 }
+	}
+	return $_strglogstotal;
+}
+
+function mybox_size_readable($size, $unit = null, $retstring = null) {
+	$sizes = array('B', 'KB', 'MB', 'GB', 'TB');
+	$ii = count($sizes) - 1;
+	$unit = array_search((string) $unit, $sizes);
+	if($unit === null || $unit === false) {
+		$unit = $ii;
+	}
+    	if($retstring === null) {
+		$retstring = '%01.2f %s';
+	}
+	$i = 0;
+	while ($unit != $i && $size >= 1024 && $i < $ii) {
+		$size /= 1024;
+		$i++;
+	}
+	return sprintf($retstring, $size, $sizes[$i]);
+}
+
+function mybox_convert_byte($size) {
+ 	$len=strlen($size);
+	if($len < 4) {
+		return sprintf("%d Byte", $size);
+	}
+	if($len >= 4 && $len <=6) {
+		return sprintf("%0.2f KB", $size/1024);
+	}
+ 	if($len >= 7 && $len <=9) {
+		return sprintf("%0.2f MB", $size/1024/1024);
+ 	}
+	return sprintf("%0.2f GB", $size/1024/1024/1024);                         
+}
+
+// updated: 24-Nov-2006
+function mybox_save_to_file($filename,$text) {
+	if(extension_loaded('dio')) {
+		if($fp=dio_open($filename, O_RDWR | O_CREAT | O_TRUNC)) {
+ 			dio_write($fp,$text,strlen($text));
+			dio_close($fp);
+			@chmod($filename,0600);
+		}
+	} else {
+		if($fp=fopen($filename,"w")) {
+ 			fwrite($fp,$text);
+			fclose($fp);
+		}
+	}
+}
+
+// updated: 24-Nov-2006
+function mybox_append_to_file($filename,$text) {
+	if(extension_loaded('dio')) {
+		if($fp=dio_open($filename, O_RDWR | O_CREAT | O_APPEND)) {
+ 			dio_write($fp,$text,strlen($text));
+			dio_close($fp);
+			@chmod($filename,0600);
+		}
+	} else {
+		if($fp=fopen($filename,"a")) {
+ 			fwrite($fp,$text);
+			fclose($fp);
+		}
+	}
+}
+
+function mybox_copydir($src,$new) {
+	if($src==$new) return 0;
+	if(!is_dir($new)) mybox_mkdirr($new);
+	$d=dir($src);
+        while(($entry=$d->read())) {
+                if(is_file("$src/$entry")) {
+			copy("$src/$entry", "$new/$entry");
+                }
+        }
+        $d->close();
+	return 1;
+}
+
+function mybox_rmdir($dirname,$dirr='') {
+	if(!file_exists($dirname)) {
+		return 1;
+	}
+    	if(is_file($dirname)) {
+        	return unlink($dirname);
+    	}
+	if(!is_dir($dirname)) return 1;
+   	$dir = dir($dirname);
+	while(false !== $entry = $dir->read()) {
+        	if($entry == '.' || $entry == '..') {
+			continue;
+		}
+		mybox_rmdir("$dirname/$entry",$dirr);
+	}
+	$dir->close();
+	if($dirname!=$dirr) return rmdir($dirname);
+}
+
+function mybox_str_add_break($txt,$length) {
+	// html must use stylesheet table-layout: fixed;
+	if(preg_match("/^(\S+)$/",$txt)) {
+		$txt=chunk_split($txt, $length, " ");
+	} else {
+		$txx=preg_split("/\s+/",$txt);
+		if(count($txx)!=0) {
+			$txt1='';
+			foreach($txx as $tx) {
+				$txt1 .=chunk_split($tx, $length, " ");
+			}
+			$txt=$txt1;
+		}
+	}
+	return $txt;
+}
+
+function mybox_file2array($file) {
+	if(!file_exists($file)) return array();
+	$lines=array();
+	if(strpos($file,".gz") !== FALSE) {
+		if($fd=fopen("compress.zlib://$file", "r")) {
+			while(!feof($fd)) {
+  				$buffer=fgets($fd, 4096);
+				$buffer=trim($buffer);
+				if($buffer!='') $lines[]=$buffer;
+			}
+			fclose($fd);
+			return $lines;
+		}
+	} else {
+		if($fd=fopen($file, "r")) {
+			while(!feof($fd)) {
+  				$buffer=fgets($fd, 4096);
+				$buffer=trim($buffer);
+				if($buffer!='') $lines[]=$buffer;
+			}
+			fclose($fd);
+			return $lines;
+		}
+	}
+	return array();
+}
+
+// used at fw_rules
+function mybox_reorder_policy($db_id,$_table) {
+	mybox_db_query("update $_table set id = id+1 where 1 > 0",$db_id);
+	$_res=mybox_db_query("select * from $_table order by id ASC",$db_id);
+	if(mybox_db_num_rows($_res)!=0) {
+		$x=1;
+		while($row=mybox_db_fetch_assoc($_res)) {
+			$_id=$row['id'];
+			mybox_db_query("update $_table set id='$x' where id='$_id'",$db_id);
+			$x++;
+		}
+	}
+}
+
+function mybox_utc2local($time) {
+	$o=date('O');
+	$z=date('Z');
+	$o1=$o{0};
+	switch($o1) {
+		case "-": $zone=$time - $z;
+		break;
+		case "+": $zone=$time + $z;
+		break;
+	} 
+	return $zone;
+}
+
+/*
+mybox_ipname_array($db_id):
+Array
+(
+    [0] => streamyx1 (Address)
+    [1] => streamyx1 (Network)
+    [2] => streamyx1 (Broadcast)
+    [3] => dmz (Address)
+    [4] => dmz (Network)
+    [5] => dmz (Broadcast)
+    [6] => LAN (Address)
+    [7] => LAN (Network)
+    [8] => LAN (Broadcast)
+)
+*/
+function mybox_ipname_array($db_id) {
+	if(file_exists("/var/sys/ipname.cache")) {
+		return unserialize(mybox_fget_contents("/var/sys/ipname.cache"));
+	}
+	$result=mybox_db_query("select name from ipaddr",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			$list_array[]="$_name (Address)";
+			$list_array[]="$_name (Network)";
+			$list_array[]="$_name (Broadcast)";
+		}
+	}
+	unset($result,$_name);
+	$result=mybox_db_query("select name from ipalias",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			$list_array[]="$_name (Address)";
+			$list_array[]="$_name (Network)";
+			$list_array[]="$_name (Broadcast)";
+		}
+	}
+	unset($result,$_name);
+	$result=mybox_db_query("select name from vlan",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			$list_array[]="$_name (Address)";
+			$list_array[]="$_name (Network)";
+			$list_array[]="$_name (Broadcast)";
+		}
+	}
+	unset($result,$_name);
+	if(count($list_array)!=0) file_put_contents("/var/sys/ipname.cache",serialize($list_array));
+	return $list_array;
+}
+
+/*
+mybox_name2dev_array($db_id):
+Array
+(
+    [streamyx1 (Network)] => 219.94.106.0/24
+    [streamyx1 (Broadcast)] => 219.94.106.255
+    [streamyx1 (Address)] => 219.94.106.174
+    [dmz (Network)] => 192.168.3.0/24
+    [dmz (Broadcast)] => 192.168.3.255
+    [dmz (Address)] => 192.168.3.1
+    [LAN (Network)] => 192.168.0.0/24
+    [LAN (Broadcast)] => 192.168.0.255
+    [LAN (Address)] => 192.168.0.1
+)
+*/
+function mybox_name2dev_array($db_id) {
+	if(file_exists("/var/sys/name2dev.cache")) {
+		return unserialize(mybox_fget_contents("/var/sys/name2dev.cache"));
+	}
+	$list_array=array();
+	$result=mybox_db_query("select * from ipaddr",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_ipaddrname=$row['name'];
+			$_ipaddrip=$row['ip'];
+			$_ipaddrprefix=$row['prefix'];
+			$_ipname="$_ipaddrname (Address)";
+			$_name="$_ipaddrname (Network)";
+			$_nameb="$_ipaddrname (Broadcast)";
+			$ret=mybox_ipcalc($_ipaddrip,$_ipaddrprefix);
+			$_ipnet=$ret['network'];
+			$_bcast=$ret['broadcast'];
+			$list_array[$_name]="$_ipnet/$_ipaddrprefix";
+			$list_array[$_nameb]="$_bcast";
+			$list_array[$_ipname]="$_ipaddrip";
+		}
+	}
+	unset($result,$_ipaddrname,$_ipaddrip,$_ipaddrprefix,$_name,$ret,$_ipnet,$_nameb,$_bcast,$_ipname);
+	$result=mybox_db_query("select * from ipalias",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_ipaddrname=$row['name'];
+			$_ipaddrip=$row['ip'];
+			$_ipaddrprefix=$row['prefix'];
+			$_ipname="$_ipaddrname (Address)";
+			$_name="$_ipaddrname (Network)";
+			$_nameb="$_ipaddrname (Broadcast)";
+			$ret=mybox_ipcalc($_ipaddrip,$_ipaddrprefix);
+			$_ipnet=$ret['network'];
+			$_bcast=$ret['broadcast'];
+			$list_array[$_name]="$_ipnet/$_ipaddrprefix";
+			$list_array[$_nameb]="$_bcast";
+			$list_array[$_ipname]="$_ipaddrip";
+		}
+	}
+	unset($result,$_ipaddrname,$_ipaddrip,$_ipaddrprefix,$_name,$ret,$_ipnet,$_nameb,$_bcast,$_ipname);
+	$result=mybox_db_query("select * from vlan",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_ipaddrname=$row['name'];
+			$_ipaddrip=$row['ip'];
+			$_ipaddrprefix=$row['prefix'];
+			$_ipname="$_ipaddrname (Address)";
+			$_name="$_ipaddrname (Network)";
+			$_nameb="$_ipaddrname (Broadcast)";
+			$ret=mybox_ipcalc($_ipaddrip,$_ipaddrprefix);
+			$_ipnet=$ret['network'];
+			$_bcast=$ret['broadcast'];
+			$list_array[$_name]="$_ipnet/$_ipaddrprefix";
+			$list_array[$_nameb]="$_bcast";
+			$list_array[$_ipname]="$_ipaddrip";
+		}
+	}
+	unset($result,$_ipaddrname,$_ipaddrip,$_ipaddrprefix,$_name,$ret,$_ipnet,$_nameb,$_bcast,$_ipname);
+	if(count($list_array)!=0) file_put_contents("/var/sys/name2dev.cache",serialize($list_array));
+	return $list_array;
+}
+
+function mybox_shaperclass_array($db_id) {
+	if(file_exists("/var/sys/shaperclass.cache")) {
+		return unserialize(mybox_fget_contents("/var/sys/shaperclass.cache"));
+	}
+	$list_array=array();
+	$result=mybox_db_query("select dev from htb_class where stat='1'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_dev=trim($row['dev']);
+			$list_array[]="$_dev";
+		}
+		file_put_contents("/var/sys/shaperclass.cache",serialize($list_array));
+	}
+	unset($result);
+	return $list_array;	
+}
+
+function mybox_isdomainresolves($domain) {
+	return gethostbyname($domain)!=$domain;
+}
+
+// 09-Nov-2006
+function mybox_send_hup($prog) {
+	$pid='';$ret=1;
+	$pid=mybox_get_progpid($prog);
+	if($pid!='') $ret=mybox_kill("$pid","1");
+	return $ret;
+}
+
+// 24-Nov-2006
+function mybox_dir2array($dir,$opt=GLOB_BRACE) {
+	if(glob($dir,$opt)!=FALSE) return glob($dir,$opt);
+	return array();
+}
+
+// 24-Nov-2006
+function mybox_str2array($str,$dem) {
+	return preg_split("/$dem/",$str);
+}
+
+// 18-Dec-2006
+function mybox_deftimes_array($db_id) {
+	$list_array=array();
+	if(file_exists("/var/sys/deftime.cache")) {
+		$list_array=unserialize(mybox_fget_contents("/var/sys/deftime.cache"));
+		if(count($list_array)!=0) return $list_array;
+		@unlink("/var/sys/deftime.cache");
+	}
+	$list_array=array();
+	$result=mybox_db_query("select * from deftimes",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			$_val=$row['val'];
+			$_val2=$row['val2'];
+			$_val3=$row['val3'];
+			$list_array[$_name]['name']="$_name";
+			$list_array[$_name]['day']="$_val";
+			$list_array[$_name]['start']="$_val2";
+			$list_array[$_name]['stop']="$_val3";
+		}
+		file_put_contents("/var/sys/deftime.cache",serialize($list_array));
+	}
+	return $list_array;
+}
+
+function mybox_defservices_array($db_id) {
+	$list_array=array();
+	if(file_exists("/var/sys/defservice.cache")) {
+		$list_array=unserialize(mybox_fget_contents("/var/sys/defservice.cache"));
+		if(count($list_array)!=0) return $list_array;
+		@unlink("/var/sys/defservice.cache");
+	}
+	$list_array=array();
+	@unlink("/var/sys/defservice4nat.cache");
+	@unlink("/var/sys/defservice4qos.cache");
+	$result=mybox_db_query("select * from defservices",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			$_proto=$row['protocol'];
+			$_dport=$row['dport'];
+			$_sport=$row['sport'];
+			$_etc=$row['etc'];
+			$list_array[$_name]['name']="$_name";
+			$list_array[$_name]['proto']="$_proto";
+			$list_array[$_name]['dport']="$_dport";
+			$list_array[$_name]['sport']="$_sport";
+			$list_array[$_name]['etc']="$_etc";
+		}	
+	}
+	unset($result);
+	$result=mybox_db_query("select * from defservices_grp",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			$_members=$row['members'];
+			$list_array[$_name]['group']="$_name";
+			$_grp=array();
+			$_grp=preg_split("/,/",$_members);
+			if(count($_grp)!=0) {
+				foreach($_grp as $a) {
+					if(isset($list_array[$a])) {
+						$list_array[$_name][$a]['proto']=$list_array[$a]['proto'];
+						$list_array[$_name][$a]['dport']=$list_array[$a]['dport'];
+						$list_array[$_name][$a]['sport']=$list_array[$a]['sport'];
+						$list_array[$_name][$a]['etc']=$list_array[$a]['etc'];
+					}
+				}
+			}
+			unset($a);
+		}	
+	}
+	file_put_contents("/var/sys/defservice.cache",serialize($list_array));
+	return $list_array;
+}
+function mybox_defservices_4nat_array($db_id) {
+	$list_array=array();
+	if(file_exists("/var/sys/defservice4nat.cache")) {
+		$list_array=unserialize(mybox_fget_contents("/var/sys/defservice4nat.cache"));
+		if(count($list_array)!=0) return $list_array;
+		@unlink("/var/sys/defservice4nat.cache");
+	}
+	$list_array=array();
+	$result=mybox_db_query("select * from defservices",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			$_proto=$row['protocol'];
+			if($_proto > 3) continue;
+			$_dport=$row['dport'];
+			$_dport=preg_replace("/:/","-",$_dport);
+			$list_array[$_name]['name']="$_name";
+			$list_array[$_name]['proto']="$_proto";
+			$list_array[$_name]['dport']="$_dport";
+		}	
+	}
+	unset($result);
+	$result=mybox_db_query("select * from defservices_grp",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			$_members=$row['members'];
+			$list_array[$_name]['group']="$_name";
+			$_grp=array();
+			$_grp=preg_split("/,/",$_members);
+			if(count($_grp)!=0) {
+				foreach($_grp as $a) {
+					if(isset($list_array[$a])) {
+						$list_array[$_name][$a]['proto']=$list_array[$a]['proto'];
+						$list_array[$_name][$a]['dport']=$list_array[$a]['dport'];
+					}
+				}
+			}
+			unset($a);
+		}	
+	}
+	file_put_contents("/var/sys/defservice4nat.cache",serialize($list_array));
+	return $list_array;	
+}
+
+function mybox_defnetwork_array($db_id) {
+	$list_array=array();
+	if(file_exists("/var/sys/defnetwork.cache")) {
+		$list_array=unserialize(mybox_fget_contents("/var/sys/defnetwork.cache"));
+		if(count($list_array)!=0) return $list_array;
+		@unlink("/var/sys/defnetwork.cache");
+	}
+	$list_array=array();
+	$result=mybox_db_query("select * from defnetworks",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			$_type=$row['type'];
+			$_ip=$row['ip'];
+			$list_array[$_name]['name']="$_name";
+			$list_array[$_name]['type']="$_type";
+			$list_array[$_name]['ip']="$_ip";
+		}
+	}
+	unset($result);
+	$result=mybox_db_query("select * from defnetworks_grp",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			$_members=$row['members'];
+			$list_array[$_name]['group']="$_name";
+			$_grp=array();
+			$_grp=preg_split("/,/",$_members);
+			if(count($_grp)!=0) {
+				foreach($_grp as $a) {
+					if(isset($list_array[$a])) {
+						$list_array[$_name][$a]['type']=$list_array[$a]['type'];
+						$list_array[$_name][$a]['ip']=$list_array[$a]['ip'];
+					}
+				}
+			}
+			unset($a);
+		}
+	}
+	file_put_contents("/var/sys/defnetwork.cache",serialize($list_array));
+	return $list_array;
+}
+
+function mybox_defservices_4qos_array($db_id) {
+	$list_array=array();
+	if(file_exists("/var/sys/defservice4qos.cache")) {
+		$list_array=unserialize(mybox_fget_contents("/var/sys/defservice4qos.cache"));
+		if(count($list_array)!=0) return $list_array;
+		@unlink("/var/sys/defservice4qos.cache");
+	}
+	$list_array=array();
+	$result=mybox_db_query("select * from defservices",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			$_proto=$row['protocol'];
+			if($_proto > 3) continue;
+			$_dport=$row['dport'];
+			if(strpos($_dport,":")!==FALSE) continue;
+			$list_array[$_name]['name']="$_name";
+			$list_array[$_name]['proto']="$_proto";
+			$list_array[$_name]['dport']="$_dport";
+		}	
+	}
+	unset($result);
+	$result=mybox_db_query("select * from defservices_grp",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			$_members=$row['members'];
+			$list_array[$_name]['group']="$_name";
+			$_grp=array();
+			$_grp=preg_split("/,/",$_members);
+			if(count($_grp)!=0) {
+				foreach($_grp as $a) {
+					if(isset($list_array[$a])) {
+						$list_array[$_name][$a]['proto']=$list_array[$a]['proto'];
+						$list_array[$_name][$a]['dport']=$list_array[$a]['dport'];
+					}
+				}
+			}
+			unset($a);
+		}	
+	}
+	file_put_contents("/var/sys/defservice4qos.cache",serialize($list_array));
+	return $list_array;	
+}
+
+
+function mybox_gzip($file) {
+	if(file_exists("$file")) {
+		if(copy($file, "compress.zlib://$file.gz")) {
+			@unlink($file);
+			return 1;
+		}
+	}
+	return 0;
+}
+
+
+/* 0=get, 1=update
+	$_IPS_CNT['drop']=0;
+	$_IPS_CNT['alert']=0;
+
+*/
+function mybox_ips_cnt($opt=0,$data=array()) {
+	global $_PAT_PATH;
+	$_IPS_CNT=array();
+	$_IPS_CNT['drop']=0;
+	$_IPS_CNT['alert']=0;
+	if($opt==0) {
+		if(file_exists("$_PAT_PATH/ips_cnt.cache")) {
+			$_IPS_CNT=unserialize(mybox_fget_contents("$_PAT_PATH/ips_cnt.cache"));
+		}
+		return $_IPS_CNT;
+	}
+	if($opt==1) {
+		file_put_contents("$_PAT_PATH/ips_cnt.cache",serialize($data));
+	}
+	if($opt==2) {
+		@unlink("$_PAT_PATH/ips_cnt.cache");
+	}
+}
+
+/* 0=get, 1=update
+	$_IPS_CNT['drop']=0;
+	$_IPS_CNT['pass']=0;
+
+*/
+function mybox_pscan_cnt($opt=0,$data=array()) {
+	global $_PAT_PATH;
+	$_PSCAN_CNT=array();
+	$_PSCAN_CNT['drop']=0;
+	$_PSCAN_CNT['pass']=0;
+	if($opt==0) {
+		if(file_exists("$_PAT_PATH/pscan_cnt.cache")) {
+			$_PSCAN_CNT=unserialize(mybox_fget_contents("$_PAT_PATH/pscan_cnt.cache"));
+		}
+		return $_PSCAN_CNT;
+	}
+	if($opt==1) {
+		file_put_contents("$_PAT_PATH/pscan_cnt.cache",serialize($data));
+	}
+	if($opt==2) {
+		@unlink("$_PAT_PATH/pscan_cnt.cache");
+	}
+}
+
+function mybox_get_defname_array($db_id='') {
+	global $_DB_NAME, $_PROTO, $_ICMP;
+
+	$list_array=array();
+	if(file_exists("/var/sys/defname.cache")) {
+		$list_array=unserialize(mybox_fget_contents("/var/sys/defname.cache"));
+		if(count($list_array)!=0) return $list_array;
+		@unlink("/var/sys/defname.cache");
+	}
+	$list_array=array();
+	$close_db=0;
+	if($db_id=='') {
+		$db_id=mybox_db_connect($_DB_NAME);
+	}
+	$list_array=array();
+	$result=mybox_db_query("select * from ipaddr",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_ipaddrname=$row['name'];
+			$_ipaddrdev=$row['dev'];
+			$_ipaddrip=$row['ip'];
+			$_ipaddrprefix=$row['prefix'];
+			$_ipname="$_ipaddrname (Address)";
+			$_name="$_ipaddrname (Network)";
+			$_nameb="$_ipaddrname (Broadcast)";
+			$ret=mybox_ipcalc($_ipaddrip,$_ipaddrprefix);
+			$_ipnet=$ret['network'];
+			$_bcast=$ret['broadcast'];
+			$list_array[$_ipaddrname]="$_ipaddrdev";
+			$list_array[$_name]="$_ipnet/$_ipaddrprefix";
+			$list_array[$_nameb]="$_bcast";
+			$list_array[$_ipname]="$_ipaddrip";
+		}
+	}
+	unset($result,$_ipaddrname,$_ipaddrip,$_ipaddrprefix,$_name,$ret,$_ipnet,$_nameb,$_bcast,$_ipname);
+	$result=mybox_db_query("select * from ipalias",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_ipaddrname=$row['name'];
+			$_ipaddrip=$row['ip'];
+			$_ipaddrprefix=$row['prefix'];
+			$_ipname="$_ipaddrname (Address)";
+			$_name="$_ipaddrname (Network)";
+			$_nameb="$_ipaddrname (Broadcast)";
+			$ret=mybox_ipcalc($_ipaddrip,$_ipaddrprefix);
+			$_ipnet=$ret['network'];
+			$_bcast=$ret['broadcast'];
+			$list_array[$_name]="$_ipnet/$_ipaddrprefix";
+			$list_array[$_nameb]="$_bcast";
+			$list_array[$_ipname]="$_ipaddrip";
+		}
+	}
+	unset($result,$_ipaddrname,$_ipaddrip,$_ipaddrprefix,$_name,$ret,$_ipnet,$_nameb,$_bcast,$_ipname);
+	$result=mybox_db_query("select * from vlan",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_ipaddrname=$row['name'];
+			$_ipaddrip=$row['ip'];
+			$_ipaddrprefix=$row['prefix'];
+			$_ipname="$_ipaddrname (Address)";
+			$_name="$_ipaddrname (Network)";
+			$_nameb="$_ipaddrname (Broadcast)";
+			$ret=mybox_ipcalc($_ipaddrip,$_ipaddrprefix);
+			$_ipnet=$ret['network'];
+			$_bcast=$ret['broadcast'];
+			$list_array[$_name]="$_ipnet/$_ipaddrprefix";
+			$list_array[$_nameb]="$_bcast";
+			$list_array[$_ipname]="$_ipaddrip";
+		}
+	}
+	$result=mybox_db_query("select * from defservices",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=trim($row['name']);
+			$_proto=trim($row['protocol']);
+			$_dport=trim($row['dport']);
+			$_sport=trim($row['sport']);
+			$_etc=trim($row['etc']);
+			if($_proto <= 3) {
+				$list_array[$_name]="{$_PROTO[$_proto]} $_sport -> $_dport";
+			}
+			if($_proto == 4) {
+				$list_array[$_name]="{$_PROTO[$_proto]} {$_ICMP[$_etc]}";
+			}
+			if($_proto == 5 || $_proto == 6) {
+				$list_array[$_name]="{$_PROTO[$_proto]} $_etc";
+			}
+		}	
+	}
+	unset($result);
+	$result=mybox_db_query("select * from defservices_grp",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			$_members=$row['members'];
+			$list_array[$_name]="$_members";
+			unset($a);
+		}	
+	}
+	$result=mybox_db_query("select * from defnetworks",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			$_type=$row['type'];
+			$_ip=$row['ip'];
+			$list_array[$_name]="$_ip";
+		}
+	}
+	unset($result);
+	$result=mybox_db_query("select * from defnetworks_grp",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			$_members=$row['members'];
+			$list_array[$_name]="$_members";
+		}
+	}
+	$result=mybox_db_query("select * from deftimes",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			$_val=$row['val'];
+			$_val2=trim($row['val2']);
+			$_val3=trim($row['val3']);
+			$_val=trim(trim($_val),",");
+			if($_val!='') $_val=" on $_val";
+
+			if($_val2!='' && $_val3!='') {
+				$_val="From $_val2 until $_val3 $_val";
+			} else {
+				if($_val2!='') $_val="From $_val2 $_val";
+				if($_val3!='') $_val="From $_val3 $_val";
+			}
+			$_val=trim($_val);
+			$list_array[$_name]="$_val";
+		}
+	}
+	unset($result);
+	$result=mybox_db_query("select name,members from group_user",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			$_members=$row['members'];
+			$list_array[$_name]="$_members";
+		}
+	}
+	if($close_db==1) {
+		mybox_db_close($db_id);
+	}
+	unset($result,$_ipaddrname,$_ipaddrip,$_ipaddrprefix,$_name,$ret,$_ipnet,$_nameb,$_bcast,$_ipname);
+	if(count($list_array)!=0) file_put_contents("/var/sys/defname.cache",serialize($list_array));
+	return $list_array;
+}
+
+function mybox_get_defname($name,$opt,$id,$db_id='') {
+	if(trim($name)=='') return;
+	$list_array=mybox_get_defname_array($db_id);
+	$data='';
+	$data=$list_array[$name];
+	if($opt==1) {
+		if($data=='') $data=$name;
+		$data=wordwrap($data, 40, "<br />",true);
+		$in="this.style.backgroundColor='#fae5b0';this.style.fontWeight='bold';document.getElementById('$id').style.display='';document.getElementById('$id').innerHTML='$data';document.getElementById('$id').style.left=pointerx;document.getElementById('$id').style.top=pointery;";
+		$out="this.style.backgroundColor='#ffffff';this.style.fontWeight='normal';document.getElementById('$id').innerHTML='';document.getElementById('$id').style.display='none';";
+		return "onmouseover=\"$in\" onmouseout=\"$out\"";
+	}
+	if($opt==2) {
+		if($name=='<< Not set >>' || $name=='<< Not Set >>') $data="Not set";
+		if($data=='') $data="$name";
+		if($name==$data) $data=$name;
+		$data=wordwrap($data, 40, "<br />",true);
+		return "<span style='' onmouseover=\"return overlib('$data',HAUTO,VAUTO,WIDTH,-1,BGCOLOR,'#ff6600',FGCOLOR,'#fae5b0',TEXTSIZE, '12px');\" onmouseout=\"return nd();\">$name</span>";
+	}
+	if($opt==3) {
+		if($name=='<< Not set >>' || $name=='<< Not Set >>') $data="Not set";
+		if($data=='') $data="$name";
+		$data=wordwrap($data, 40, "<br />",true);
+		$ret_a=array();
+		$ret_a[0]="style='cursor: pointer;' onmouseover=\"this.style.backgroundColor='#fae5b0';this.style.fontWeight='bold'; return overlib('$data',HAUTO,VAUTO,WIDTH,-1,BGCOLOR,'#ff6600',FGCOLOR,'#fae5b0',TEXTSIZE, '12px');\" onmouseout=\"this.style.backgroundColor='#ffffff';this.style.fontWeight='normal'; return nd();\"";
+		$ret_a[1]="$data";
+		return $ret_a;	
+	}
+	return "$data";
+}
+
+function mybox_str_chop($string, $length = 60, $center = false, $append = null) {
+	if($append === null) {
+		$append = ($center === true) ? ' ... ' : ' ...';
+	}
+	$len_string = strlen($string);
+	$len_append = strlen($append);
+    	if($len_string > $length) {
+        	if($center === true) {
+			$len_start = $length / 2;
+			$len_end = $len_start - $len_append;
+			$seg_start = substr($string, 0, $len_start);
+			$seg_end = substr($string, $len_string - $len_end, $len_end);
+			$string = $seg_start . $append . $seg_end;
+	        } else {
+ 			$string = substr($string, 0, $length - $len_append) . $append;
+		}
+	}
+	return $string;
+}
+
+function mybox_show_firmware() {
+	list($ver,$cur)=explode(" ",mybox_fget_contents("/proc/sys/kernel/version"));
+	if(file_exists("/etc/firmware")) {
+		$cur=mybox_fget_contents("/etc/firmware");
+	}
+	return "$ver $cur";
+}
+
+?>

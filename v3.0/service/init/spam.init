@@ -1,0 +1,251 @@
+#!/bin/php -Cq
+<?php 
+// spam.init
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="spam";
+include_once('clib.exl');
+include_once('av.exl');
+putenv("PATH=/bin:/service/tools:/service/init");
+
+$_QUIET=0;
+mybox_init_set_alarm(30);
+
+if(!file_exists("/bin/spamd")) {
+	mybox_init_echo($_QUIET,"ERROR","Cannot execute spam.init. Internal error!");
+	exit(1);
+}
+
+function spam_rules($_cf_spamsa_heuristic) {
+	global $_ROOT_DIR, $_QUIET;
+	if(is_dir("$_ROOT_DIR/spamsa/sa")) {
+		mybox_copydir("$_ROOT_DIR/spamsa/sa","/usr/share/spamassassin");
+	} else {
+		mybox_mkdirr("$_ROOT_DIR/spamsa/sa");
+	}
+	if(is_dir("$_ROOT_DIR/spamsa/custom")) {
+		mybox_copydir("$_ROOT_DIR/spamsa/custom","/usr/share/spamassassin");
+	} else {
+		mybox_mkdirr("$_ROOT_DIR/spamsa/custom");
+	}
+	if($_cf_spamsa_heuristic==1) {
+		if(is_dir("$_ROOT_DIR/spamsa/heuristic")) {
+			mybox_copydir("$_ROOT_DIR/spamsa/heuristic","/usr/share/spamassassin");
+		} else {
+			mybox_mkdirr("$_ROOT_DIR/spamsa/heuristic");
+		}
+	}
+}
+
+function spam_config() {
+	global $_DB_NAME, $_ROOT_DIR, $_QUIET;
+	$db_id=mybox_db_connect($_DB_NAME);
+
+	$result=mybox_db_query("select * from cf where name like \"cf_spamsa_%\"",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=trim($row['name']);
+			$_val=trim($row['val']);
+			$_name="_$_name";
+			$$_name="$_val";
+		}
+		unset($_name,$_val);
+	}
+	if($_cf_spamsa_stat=='') $_cf_spamsa_stat=0;
+
+	if($_cf_spamsa_stat==0) {
+		mybox_db_close($db_id);
+		@unlink("/var/sys/chk_spamd");
+		mybox_init_echo($_QUIET,"INFO","SPAM filter service disabled");
+		exit(0);
+	}
+	unset($result);
+	mybox_db_close($db_id);
+
+	$_version=mybox_show_firmware();
+	$_footer='';
+	$_footer .="report \n";
+	$_footer .="report \n";
+	$_footer .="report -- \n";
+	$_footer .="report Mybox Firewall System\n";
+	$_footer .="report Firmware Version     : $_version\n";
+
+	$_fw_admin=mybox_fget_contents("/var/sys/fw_admin");
+	if($_fw_admin=='') $_fw_admin="admin@mybox";
+	$_config='';
+	$_config .="whitelist_from $_fw_admin\n";
+	//$_config .="blacklist_from nawawi@ronggeng.net\n";
+	$_config .="lock_method flock\n";
+	if($_cf_spamsa_subject!='') {
+		$_config .="rewrite_header Subject $_cf_spamsa_subject\n";
+	} else {
+		$_config .="rewrite_header Subject [ SPAM ]\n";
+	}
+	if($_cf_spamsa_score!='') {
+		$_config .="required_score $_cf_spamsa_score\n";
+	} else {
+		$_config .="required_score 7.5\n";
+	}
+	if($_cf_spamsa_bayes==1) {
+		$_config .="use_bayes 1\n";
+		$_config .="bayes_auto_learn 1\n";
+		$_config .="bayes_ignore_header X-Bogosity\n";
+		$_config .="bayes_ignore_header X-Spam-Flag\n";
+		$_config .="bayes_ignore_header X-Spam-Status\n";
+		$_config .="bayes_min_ham_num 50\n";
+		$_config .="bayes_min_spam_num 50\n";
+	}
+	$_config .="clear_headers\n";
+	$_config .="report_safe 1\n";
+	$_config .="clear_unsafe_report_template\n";
+	$_config .="clear_report_template\n";
+	$_config .="report Mybox Firewall SPAM detector has identified this incoming email as possible spam.\n";
+	$_config .="report The original message has been attached for your review.\n";
+	$_config .="report \n";
+	$_config .="report If you have any questions please email to $_fw_admin.\n";
+	$_config .="report \n";
+	$_config .="report Content preview:\n";
+	$_config .="report \"   _PREVIEW_\"\n";
+	$_config .="report \n";
+	$_config .="report Content analysis details:\n";
+	$_config .="report \"   _SCORE_ points (Pts), _REQD_ required\"\n";
+	$_config .="report \n";
+	$_config .="report  ---- ---------------------- --------------------------------------------------\n";
+	$_config .="report \" Pts Rule name              Description\"\n";
+	$_config .="report  ---- ---------------------- --------------------------------------------------\n";
+	$_config .="report _SUMMARY_\n";
+	$_config .="report  ---- ---------------------- --------------------------------------------------\n";
+	$_config .="$_footer\n";
+	if(!is_dir("/etc/spamd")) @mybox_mkdirr("/etc/spamd");
+	mybox_save_to_file("/etc/spamd/local.cf",$_config);
+	if(!is_dir("$_ROOT_DIR/spamsa")) {
+		@mybox_mkdirr("$_ROOT_DIR/spamsa");
+	}
+	if(!is_link("/config/.spamassassin")) {
+		@unlink("/config/.spamassassin");
+		@symlink("$_ROOT_DIR/spamsa","/config/.spamassassin");
+	}
+	if(file_exists("/etc/spamd/local.cf")) {
+		spam_rules($_cf_spamsa_heuristic);
+		return 1;
+	}
+	return 0;
+}
+
+function spam_status() {
+	global $_QUIET;
+	$pid=mybox_get_progpid("spamd");
+	if($pid!='') {
+		if($_QUIET==0) echo "* spamd (pid $pid) is running...\n";
+		return 0;
+	}
+	return 1;
+}
+
+function spam_start() {
+	global $_QUIET, $_ROOT_DIR;
+
+	@unlink("/var/spool/spam");
+
+	if(file_exists("$_ROOT_DIR/scripts/spam/start")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/spam/start");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/spam/pre-start")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/spam/pre-start");
+	}
+
+	if(@spam_config()==1 && @spam_status()==1) {
+		if(mybox_exec_cmd("spamd -d -r /var/run/spam.pid")==0) {
+			mybox_init_echo($_QUIET,"INFO","Starting SPAM filter service");
+			@touch("/var/sys/chk_spamd");
+			if(file_exists("$_ROOT_DIR/scripts/spam/post-start")) {
+				mybox_execq_cmd("$_ROOT_DIR/scripts/spam/post-start");
+			}
+			if(!file_exists("/var/sys/init_no_restart") && file_exists("/var/sys/chk_p3scan")) {
+				mybox_echo_query("mail_proxy-restart-quiet");
+			}
+			return 0;
+		}
+	} 
+	@touch("/var/sys/chk_spamd");
+	mybox_init_echo($_QUIET,"ERROR","Starting SPAM filter service failed");
+	return 1;
+}
+
+function spam_stop() {
+	global $_QUIET, $_ROOT_DIR;
+	@unlink("/var/sys/chk_spamd");
+	if(file_exists("$_ROOT_DIR/scripts/spam/stop")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/spam/stop");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/spam/pre-stop")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/spam/pre-stop");
+	}
+	if(mybox_killall("spamd")==0) {
+		mybox_init_echo($_QUIET,"INFO","Shutting down SPAM filter service");
+		if(file_exists("$_ROOT_DIR/scripts/spam/post-stop")) {
+			mybox_execq_cmd("$_ROOT_DIR/scripts/spam/post-stop");
+		}
+		@unlink("/var/spool/spam");
+		@mybox_unlink("/tmp/spamd-*-init");
+		return 0;
+	}
+	@touch("/var/sys/chk_spamd");
+	mybox_init_echo($_QUIET,"ERROR","Shutting down SPAM filter service failed");
+	return 1;
+}
+
+function spam_reload() {
+	global $_QUIET, $_ROOT_DIR;
+
+	if(file_exists("$_ROOT_DIR/scripts/spam/reload")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/spam/reload");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/spam/pre-reload")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/spam/pre-reload");
+	}
+
+	if(@spam_config()==1 && @spam_status()==0) {
+		@exec("pkill -HUP -f spamd",$out,$ret);
+		if($ret==0) {
+			mybox_init_echo($_QUIET,"INFO","Reloading SPAM filter service");
+			if(file_exists("$_ROOT_DIR/scripts/spam/post-reload")) {
+				mybox_execq_cmd("$_ROOT_DIR/scripts/spam/post-reload");
+			}
+			return 0;
+		}
+	}
+	mybox_init_echo($_QUIET,"ERROR","Reloading SPAM filter service failed");
+	return 1;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=spam_start();
+		break;
+	case 'stop':
+		$ret=spam_stop();
+		break;
+	case 'restart':
+		$ret=spam_stop();
+		sleep(2);
+		$ret=spam_start();
+		break;
+	case 'status':
+		$ret=spam_status();
+		break;
+	case 'reload':
+		$ret=spam_reload();
+		break;
+	case 'config':
+		$ret=spam_config();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/reload/status]\n";
+		break;
+}
+exit($ret);
+?>

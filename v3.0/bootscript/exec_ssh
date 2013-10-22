@@ -1,0 +1,15 @@
+#!/bin/sh
+# $Id: exec_ssh.sh,v 1.0 2008/01/24 12:39:00 nawawi Exp $
+# iosh ssh helper
+HOST=$1
+USER=$2
+PORT=$3
+
+if [ "x$HOST" = "x" -a "x$USER" = "x" ]; then
+        echo "% Invalid options";
+        exit 1;
+fi
+[ "x$PORT" != "x" ] && PORT="-p $PORT";
+/bin/ssh $USER@$HOST $PORT
+exit $?
+

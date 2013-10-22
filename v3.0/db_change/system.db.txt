@@ -1,0 +1,801 @@
+
+# 20-Mar-2007 - mybox3.0
+
+delete from misc where name='singlelogin';
+update misc set val='3' where name='db_version';
+delete from misc where name='fa_mode';
+delete from misc where name='ids_timeout';
+delete from misc where name='ids_stat';
+delete from misc where name='ids_exclude';
+delete from misc where name='ids_mode';
+delete from misc where name='pscan_stat';
+delete from misc where name='pscan_exclude';
+delete from misc where name='pscan_mode';
+delete from misc where name='ids_acl';
+delete from misc where name='local_news';
+
+drop table gateway;
+drop table def_times;
+drop table def_networks;
+drop table def_services;
+drop table policy_inbound;
+drop table policy_outbound;
+drop table policy_dnat;
+drop table policy_snat;
+drop table policy_netmap;
+drop table service_dhcp;
+
+insert into misc (name,val) values ('uplink_stat',0);
+insert into misc (name,val) values ('uplink_mode',1);
+insert into misc (name,val) values ('uplink_lst','202.157.186.194');
+insert into misc (name,val) values ('uplink_int',60);
+INSERT INTO crontab VALUES('taskq','* * * * * /etc/taskreset');
+
+drop table service_ftp;
+create table service_ftp (
+port int not null,
+stat int not null
+);
+INSERT INTO service_ftp VALUES(5053,1);
+
+drop table ipaddr;
+create table ipaddr (
+id integer primary key,
+name varchar not null,
+dev varchar not null,
+ip varchar not null,
+prefix varchar not null,
+isdefault int not null,
+uplink int,
+upprio int,
+gateway varchar not null,
+proxyarp int not null,
+vid int not null,
+mtu int not null,
+type int not null,
+onboot int not null,
+note varchar not null
+);
+ 
+drop table ipalias;
+create table ipalias (
+id integer primary key,
+name varchar not null,
+dev varchar not null,
+ip varchar not null,
+prefix varchar not null,
+onboot int not null,
+note varchar not null
+);
+
+drop table vlan;
+create table vlan (
+id integer primary key,
+name varchar not null,
+dev varchar not null,
+ip varchar not null,
+prefix varchar not null,
+onboot int not null,
+note varchar not null
+);
+
+drop table defservices;
+create table defservices (
+id integer primary key,
+name varchar not null,
+protocol int not null,
+dport varchar,
+sport varchar,
+etc varchar,
+note varchar not null
+);
+INSERT INTO defservices VALUES(0,'any','any','any','','','matches any IP protocol');
+INSERT INTO defservices VALUES(1,'HTTP',1,80,'1:65535','','Hypertext Transfer Protocol');
+INSERT INTO defservices VALUES(2,'HTTP Proxy',1,8080,'1:65535','','HTTP-Proxy service');
+INSERT INTO defservices VALUES(3,'HTTPS',1,443,'1:65535','','Hypertext Transfer Protocol over SSL');
+INSERT INTO defservices VALUES(4,'SMTP',1,25,'1:65535','','Simple Mail Transfer Protocol');
+INSERT INTO defservices VALUES(5,'SMTPS',1,465,'1:65535','','Simple Mail Transfer Protocol over SSL');
+INSERT INTO defservices VALUES(6,'IMAP',1,143,'1:65535','','Internet Message Access Protocol');
+INSERT INTO defservices VALUES(7,'IMAP SSL',1,993,'1:65535','','Internet Message Access Protocol over SSL');
+INSERT INTO defservices VALUES(8,'POP3',1,110,'1:65535','','POP3 Service');
+INSERT INTO defservices VALUES(9,'FTP',1,21,'1:65535','','File Transfer Protocol');
+INSERT INTO defservices VALUES(10,'FTP Data',3,20,'1:65535','','FTP data');
+INSERT INTO defservices VALUES(11,'TFTP',1,69,'1:65535','','TFTP Service');
+INSERT INTO defservices VALUES(12,'MySQL',1,3306,'1:65535','','MySQL service');
+INSERT INTO defservices VALUES(13,'GRE',5,'','1:65535',47,'Generic Routing Encapsulation used by PPTP and other procols');
+INSERT INTO defservices VALUES(14,'DNS',2,53,'1:65535','','Domain Name Service');
+INSERT INTO defservices VALUES(15,'H323',3,'1719:1720','1:65535','','H.323 voice over ip and multimedia conferencing');
+INSERT INTO defservices VALUES(16,'SQUID Web Cache',1,3128,'1:65535','','Squid Web Proxy Cache');
+INSERT INTO defservices VALUES(17,'ICQ IM',1,5190,'1:65535','','ICQ instant messenger using the OSCAR protocol (might also work over HTTP)');
+INSERT INTO defservices VALUES(18,'IRC IM',1,'6667:6668','1:65535','','Internet Relay Chat');
+INSERT INTO defservices VALUES(19,'Jabber IM',1,5222,'1:65535','','Jabber Instant Messaging protocol');
+INSERT INTO defservices VALUES(20,'Yahoo IM',1,5050,'1:65535','','Protocol for Yahoo Messenger (might also work over HTTP)');
+INSERT INTO defservices VALUES(21,'AOL IM',1,5190,'1:65535','','AOL Instant Messenger using the OSCAR protocol (might also work over HTTP)');
+INSERT INTO defservices VALUES(22,'NTP',1,123,'1:65535','','Network Time Protocol');
+INSERT INTO defservices VALUES(23,'SNMP',2,161,'1:65535','','Simple Network Management Protocol (receive queries)');
+INSERT INTO defservices VALUES(24,'SNMP-Traps',1,162,'1:65535','','Simple Network Management Protocol (send trap/notification)');
+INSERT INTO defservices VALUES(25,'IPP',1,631,'1:65535','','Internet Printing Protocol - network print service');
+INSERT INTO defservices VALUES(26,'IPsec - AH',5,'','1:65535',51,'Authentication Header, IP protocol used by IPsec');
+INSERT INTO defservices VALUES(27,'IPsec - ESP',5,'','1:65535',50,'Encapsulating Security Payload, ip protocol used by IPsec');
+INSERT INTO defservices VALUES(28,'IPsec - IKE',3,500,'1:65535',500,'Internet Key Exchange protoco, used by IPsec');
+INSERT INTO defservices VALUES(29,'IPsec - NAT-T',2,4500,'1:65535','','PSec using NAT-Traversal to work through NAT devices');
+INSERT INTO defservices VALUES(30,'KERBEROS',1,88,'1:65535','','Kerberos computer network authenticaion protocol');
+INSERT INTO defservices VALUES(31,'L2TP',1,1701,'1:65535','','Layer 2 Tunneling Protocol');
+INSERT INTO defservices VALUES(32,'LDAP',1,389,'1:65535','','Lightweight Directory Access Protocol');
+INSERT INTO defservices VALUES(33,'LDAP-SSL',1,639,'1:65535','','Lightweight Directory Access Protocol over SSL');
+INSERT INTO defservices VALUES(34,'LPD',1,515,'1:65535','','Line Printer Daemon Protocol - network print service');
+INSERT INTO defservices VALUES(35,'Microsoft Remote Desktop (RDP)',1,3389,'1:65535','','Microsoft Windows Remote Desktop Service');
+INSERT INTO defservices VALUES(36,'MMS',1,1755,'1:65535','','Microsoft Media Streaming');
+INSERT INTO defservices VALUES(37,'MS SQL',1,'1433:1434','1:65535','','Microsoft SQL Server and Monitor');
+INSERT INTO defservices VALUES(38,'NETBIOS LS',3,135,'1:65535','','Windows Networking Location Service');
+INSERT INTO defservices VALUES(39,'NETBIOS NS',3,137,'1:65535','','NETBIOS Name Service');
+INSERT INTO defservices VALUES(40,'NETBIOS SSN',1,139,'1:65535','','NETBIOS Session Service');
+INSERT INTO defservices VALUES(41,'NETBIOS-DGM',1,138,'1:65535','','NETBIOS Datagram Service');
+INSERT INTO defservices VALUES(42,'NNTP',1,119,'1:65535','','Network News Transport Protocol');
+INSERT INTO defservices VALUES(43,'NNTP SSL',1,563,'1:65535','','Network News Transport Protocol over SSL');
+INSERT INTO defservices VALUES(44,'PPTP',1,1723,'1:65535','','Point to Point Tunneling Protocol - Windows VPN');
+INSERT INTO defservices VALUES(45,'Real Audio',1,7070,'1:65535','','Real Audio Streaming Control Protocol');
+INSERT INTO defservices VALUES(46,'RADIUS',3,1812,'1:65535','','Remote Authentication Dial-In User Service');
+INSERT INTO defservices VALUES(47,'PING REQUEST',4,'','1:65535','echo-request','ping');
+INSERT INTO defservices VALUES(48,'PING REPLY',4,'','1:65535','echo-reply','ping reply');
+INSERT INTO defservices VALUES(49,'SSH',1,22,'1:65535','','ssh protocol');
+
+
+
+drop table defservices_grp;
+create table defservices_grp (
+id integer primary key,
+name varchar not null,
+members varchar not null,
+note varchar not null
+);
+INSERT INTO defservices_grp VALUES(1,'Instant Messaging (IM)','ICQ IM,Jabber IM,Yahoo IM,IRC IM,AOL IM','Common services used for Instant Messaging');
+
+
+drop table defnetworks;
+create table defnetworks (
+id integer primary key,
+name varchar not null,
+type int not null,
+ip varchar not null,
+note varchar not null
+);
+INSERT INTO defnetworks VALUES(0,'any',0,'any','Matches any IP address');
+INSERT INTO defnetworks VALUES(1,'NTP_SERVER1',2,'212.244.104.2','pool.ntp.org (1)');
+INSERT INTO defnetworks VALUES(2,'NTP_SERVER2',2,'213.2.4.80','pool.ntp.org (2)');
+INSERT INTO defnetworks VALUES(3,'NTP_SERVER3',2,'72.1.138.113','pool.ntp.org (3)');
+INSERT INTO defnetworks VALUES(4,'NTP_SERVER4',2,'81.20.150.42','pool.ntp.org (4)');
+INSERT INTO defnetworks VALUES(5,'NTP_SERVER5',2,'82.225.155.84','pool.ntp.org (5)');
+INSERT INTO defnetworks VALUES(6,'NTP_SERVER6',2,'89.220.8.18','pool.ntp.org (6)');
+INSERT INTO defnetworks VALUES(7,'NTP_SERVER7',2,'91.121.3.188','pool.ntp.org (7)');
+INSERT INTO defnetworks VALUES(8,'NTP_SERVER8',2,'193.201.52.56','pool.ntp.org (8)');
+INSERT INTO defnetworks VALUES(9,'NTP_SERVER9',2,'194.117.9.136','pool.ntp.org (9)');
+INSERT INTO defnetworks VALUES(10,'NTP_SERVER10',2,'195.139.204.141','pool.ntp.org (10)');
+INSERT INTO defnetworks VALUES(11,'NTP_SERVER11',2,'212.24.114.159','pool.ntp.org (11)');
+
+drop table defnetworks_grp;
+create table defnetworks_grp (
+id integer primary key,
+name varchar not null,
+members varchar not null,
+note varchar not null
+);
+
+drop table deftimes;
+create table deftimes (
+id integer primary key,
+name varchar not null,
+val varchar not null,
+val2 varchar not null,
+val3 varchar not null,
+note varchar not null
+);
+
+drop table pf_inbound;
+create table pf_inbound (
+id int not null,
+srcn int not null,
+src varchar not null,
+dstn int not null,
+dst varchar not null,
+action varchar not null,
+service varchar not null,
+event varchar not null,
+log int not null,
+stat int not null,
+note varchar not null
+);
+
+drop table pf_outbound;
+create table pf_outbound (
+id int not null,
+srcn int not null,
+src varchar not null,
+dstn int not null,
+dst varchar not null,
+action varchar not null,
+service varchar not null,
+event varchar not null,
+log int not null,
+stat int not null,
+note varchar not null
+);
+
+drop table pf_dnat;
+create table pf_dnat (
+id int not null,
+src varchar not null,
+dst varchar not null,
+service varchar not null,
+fwd varchar not null,
+fwdp varchar not null,
+event int not null,
+log int not null,
+stat int not null,
+note varchar not null
+);
+
+drop table pf_snat;
+create table pf_snat (
+id int not null,
+src varchar not null,
+dst varchar not null,
+service varchar not null,
+fwd varchar not null,
+fwdp varchar not null,
+event int not null,
+log int not null,
+stat int not null,
+note varchar not null
+);
+
+drop table pf_map;
+create table pf_map (
+id int not null,
+type int not null,
+src varchar not null,
+dst varchar not null,
+fwd varchar not null,
+event int not null,
+stat int not null,
+note varchar not null
+);
+
+insert into misc (name,val) values ('ips_stat',1);
+insert into misc (name,val) values ('ips_net','');
+insert into misc (name,val) values ('ips_drop','');
+insert into misc (name,val) values ('ips_http_server','');
+insert into misc (name,val) values ('ips_smtp_server','');
+insert into misc (name,val) values ('ips_dns_server','');
+insert into misc (name,val) values ('ips_sql_server','');
+insert into misc (name,val) values ('ips_pscan_stat',0);
+insert into misc (name,val) values ('ips_pscan_drop',0);
+insert into misc (name,val) values ('ips_pscan_log',0);
+insert into misc (name,val) values ('ips_dos_tcp_stat',0);
+insert into misc (name,val) values ('ips_dos_tcp_mode',1);
+insert into misc (name,val) values ('ips_dos_tcp_log',0);
+insert into misc (name,val) values ('ips_dos_tcp_src_rate',0);
+insert into misc (name,val) values ('ips_dos_tcp_dst_rate',0);
+insert into misc (name,val) values ('ips_dos_udp_stat',0);
+insert into misc (name,val) values ('ips_dos_udp_log',0);
+insert into misc (name,val) values ('ips_dos_udp_mode',1);
+insert into misc (name,val) values ('ips_dos_udp_src_rate',0);
+insert into misc (name,val) values ('ips_dos_udp_dst_rate',0);
+insert into misc (name,val) values ('ips_dos_icmp_stat',0);
+insert into misc (name,val) values ('ips_dos_icmp_log',0);
+insert into misc (name,val) values ('ips_dos_icmp_mode',1);
+insert into misc (name,val) values ('ips_dos_icmp_src_rate',0);
+insert into misc (name,val) values ('ips_dos_icmp_dst_rate',0);
+insert into misc (name,val) values ('sysctl_ping',0);
+insert into misc (name,val) values ('sysctl_traceroute',0);
+insert into misc (name,val) values ('sysctl_ftpcon_stat',0);
+insert into misc (name,val) values ('sysctl_irccon_stat',0);
+insert into misc (name,val) values ('sysctl_pptpcon_stat',0);
+insert into misc (name,val) values ('sysctl_tftpcon_stat',0);
+insert into misc (name,val) values ('sysctl_sctpcon_stat',0);
+insert into misc (name,val) values ('sysctl_mmscon_stat',0);
+insert into misc (name,val) values ('sysctl_sipcon_stat',0);
+insert into misc (name,val) values ('sysctl_netbioscon_stat',0);
+insert into misc (name,val) values ('sysctl_h323con_stat',0);
+insert into misc (name,val) values ('captive_portal_stat',0);
+insert into misc (name,val) values ('captive_portal_network',' ');
+insert into misc (name,val) values ('captive_portal_port',6061);
+insert into misc (name,val) values ('captive_portal_htimeout',720);
+insert into misc (name,val) values ('captive_portal_stimeout',60);
+insert into misc (name,val) values ('captive_portal_log',0);
+
+drop table ips_exclude;
+create table ips_exclude (
+id integer primary key,
+name varchar not null,
+src varchar not null,
+dst varchar not null,
+ips int not null,
+tcpf int not null,
+udpf int not null,
+icmpf int not null,
+pscan int not null
+);
+
+drop table htb_class;
+create table htb_class (
+id integer primary key,
+dev varchar not null, 
+bandwidth int not null,
+climit int not null,
+priority int not null,
+note varchar not null,
+stat int not null 
+);
+
+drop table htb_client;
+create table htb_client (
+id integer primary key,
+name varchar not null,
+dev varchar not null,
+bandwidth int not null,
+climit int not null,
+priority int not null,
+src varchar not null,
+service varchar not null,
+dst varchar not null,
+note varchar not null,
+stat int not null
+);
+
+drop table dhcp_servers;
+create table dhcp_servers (
+id integer primary key,
+dev varchar not null,
+range_start varchar not null,
+range_end varchar not null,
+dns1 varchar not null,
+dns2 varchar not null,
+gateway varchar not null,
+domain varchar not null,
+wins varchar not null,
+wins_node int not null,
+deny int not null,
+stat int not null,
+note varchar not null
+);
+
+insert into misc (name,val) values ('dhcp_relay_server',' ');
+insert into misc (name,val) values ('dhcp_relay_dev',' ');
+insert into misc (name,val) values ('dhcp_relay_stat',0);
+
+drop table dhcp_hosts;
+create table dhcp_hosts (
+id integer primary key,
+dev varchar not null,
+ip varchar not null,
+mac varchar not null,
+note varchar not null,
+stat int not null
+);
+INSERT INTO dhcp_hosts VALUES(1,'WAN','192.168.0.2','00:11:09:CA:16:AD','Admin LAN',1);
+INSERT INTO dhcp_hosts VALUES(2,'WAN','192.168.0.3','00:02:B3:CC:2F:3E','hiband',1);
+
+insert into misc (name,val) values ('dns_acl',' ');
+insert into misc (name,val) values ('dns_forward',' ');
+
+drop table dns_routing;
+create table dns_routing (
+id integer primary key,
+domain varchar not null,
+server varchar not null,
+note varchar not null,
+stat int not null
+);
+
+drop table dns_static;
+create table dns_static (
+id integer primary key,
+hostname varchar not null,
+ip varchar not null,
+note varchar not null,
+stat int not null,
+serial varchar not null
+);
+
+drop table service_ddns;
+drop table dns_ddns;
+create table dns_ddns (
+provider varchar not null,
+user varchar not null,
+pass varchar not null, 
+hostname varchar not null,
+stat int not null
+);
+INSERT INTO dns_ddns VALUES('default@no-ip.com','anon@anon.com','dddd','anon.no-ip.info',0);
+
+drop table site_certificate;
+create table site_certificate (
+country varchar not null,
+city varchar not null,
+organization varchar not null,
+hostname varchar not null,
+certstat int not null,
+cert varchar not null
+);
+INSERT INTO site_certificate VALUES('my','p.j','tracenetwork','192.168.0.1',0,'-----BEGIN RSA PRIVATE KEY-----
+MIICXgIBAAKBgQCfN8yFWWuu1EEnTU/TQLV+XDJn3vmieaccfVtj8aDa1eRCs3PK
+ysXvuyVZ18lmnvR7J8CxD+YaXrrvjw4tf3VJc4ZT5C1GVNM7cQ/o02P60qmXw3ix
+ii9Mzoa19CQz6Gsl0YFYGGVzq7i837Wa4OttxaB6px+gONHHP6KD1NfubQIDAQAB
+AoGAU2ZuGle5wU1rh4PG0ZiuuS7gNGqnBsWElLbRXWvfX2H0/D914v8OacH1Eben
+xrpyw+QR2m3CkYOXlg6wVYLTUz+y/Orjc+enAo475awOF5LollnBQ9+R7SpjUU8q
+WerFBfdGdh/70RoT4A0V6feBedxFYmbRKB+apkCU7Ww5qaECQQDQhNozrZSyWMxJ
+uvfAkv3Xbad4svBNjo3F3Yq5BrV52JIRFkFxVjQpL7ml7xBbHEHPVIP/8zazaHfO
+TP7M/VXlAkEAw3kOJFJzyJAl7dcpMnd5YDRBeBukjM1lD0tOg9krf7mFWXXWv4E/
+F9Rd/uLJ7bcejkvLXqALdvBD6X3NvsWt6QJBAMzPIM+PmDUQ+R8WUNDK0B9wKgVo
+pJVZBrGpZ99S0p8qdFXqKT9cL4GgydVNGiCTgaRWXAzjZAAWBU8R21eXIW0CQQCG
+XuH8z/0towGfxKdaPMzf+CwFH6N28v6Ei/T2J8SCMYrcW2f7DyLLA751p3q+AYJs
+uOedLZGT+kgE6ukTOhp5AkEAutBYVxESAFtRx2h4gYwdK16XnkomLQ2OY0ZnQZNN
+8a3nuW+LcAauOHA2h59mV+nzq1+5hpR2nso3DjC2THUmjA==
+-----END RSA PRIVATE KEY-----
+-----BEGIN CERTIFICATE-----
+MIIC1TCCAj6gAwIBAgIJAPpXaAcbI2tfMA0GCSqGSIb3DQEBBQUAMIGgMQswCQYD
+VQQGEwJteTEVMBMGA1UECBMMc2VsYW5nb3IgZC5lMQwwCgYDVQQHEwNwLmoxFTAT
+BgNVBAoTDHRyYWNlbmV0d29yazEVMBMGA1UECxMMdHJhY2VuZXR3b3JrMRQwEgYD
+VQQDEwsxOTIuMTY4LjAuMTEoMCYGCSqGSIb3DQEJARYZYWRtaW5AdHJhY2VuZXR3
+b3JrLmNvbS5teTAeFw0wNjEyMTMxMDA4MjJaFw0wNzEyMTMxMDA4MjJaMIGgMQsw
+CQYDVQQGEwJteTEVMBMGA1UECBMMc2VsYW5nb3IgZC5lMQwwCgYDVQQHEwNwLmox
+FTATBgNVBAoTDHRyYWNlbmV0d29yazEVMBMGA1UECxMMdHJhY2VuZXR3b3JrMRQw
+EgYDVQQDEwsxOTIuMTY4LjAuMTEoMCYGCSqGSIb3DQEJARYZYWRtaW5AdHJhY2Vu
+ZXR3b3JrLmNvbS5teTCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEAnzfMhVlr
+rtRBJ01P00C1flwyZ975onmnHH1bY/Gg2tXkQrNzysrF77slWdfJZp70eyfAsQ/m
+Gl66748OLX91SXOGU+QtRlTTO3EP6NNj+tKpl8N4sYovTM6GtfQkM+hrJdGBWBhl
+c6u4vN+1muDrbcWgeqcfoDjRxz+ig9TX7m0CAwEAAaMVMBMwEQYJYIZIAYb4QgEB
+BAQDAgZAMA0GCSqGSIb3DQEBBQUAA4GBAFs7kwve2G504+xej+E6Nbf++NObdg3i
+d8sSwKBZrOYiOUjIvXfpJApzVnNTAKmIJFr/OhQGhlAxAUSXC1pOLBmOHXMV4pI8
++CQK1m1D/bv+6dVF0c6LCzeeECgY61XRBA9h23V9swP8KlZgzrduD8cSA0p1so8f
+3R89ARVjMGka
+-----END CERTIFICATE-----');
+
+drop table server_balancing;
+create table server_balancing (
+id integer primary key,
+service varchar not null,
+server varchar not null,
+target1 varchar not null,
+target2 varchar not null,
+note varchar not null,
+stat int not null
+);
+
+drop table auth_user;
+create table auth_user (
+id integer primary key,
+name varchar not null,
+rname varchar not null,
+email varchar not null,
+passwd varchar not null,
+passwdc varchar not null,
+note varchar not null,
+stat int not null
+);
+
+# 23/05/2007
+
+drop table route;
+drop table static_route;
+create table static_route (  
+id integer primary key,
+type int not null,
+dev varchar not null,
+network varchar not null,
+gateway varchar not null,                         
+note varchar not null,                                                                
+stat int not null                                                             
+);
+
+drop table service_snmp;
+create table service_snmp (
+port int not null,
+stat int not null,
+comm varchar not null,
+sysname varchar not null,
+location varchar not null,
+contact varchar not null,
+alist varchar not null
+);
+INSERT INTO service_snmp VALUES(161,0,'mybox','mybox','mybox','mybox@mybox.lo','');
+
+delete from crontab where name='flushapp';
+delete from misc where name='ntp_time';
+delete from misc where name='ntp_server';
+delete from misc where name='ntp_acl';
+delete from misc where name='ntp_acl_stat';
+INSERT INTO misc VALUES('ntp_server',' ');
+INSERT INTO misc VALUES('ntp_acl',' ');
+INSERT INTO misc VALUES('ntp_acl_stat',0);
+
+create table policy_route (  
+id integer primary key,
+type int not null,
+dev varchar not null,
+src varchar not null,
+service varchar not null,
+dst varchar not null,
+fwd varchar not null,                                      
+note varchar not null,                                         
+stat int not null                                                             
+);
+
+# 15-Jun-2007
+delete from misc where name like "ftp_%";
+INSERT INTO misc VALUES('backup_int','3');
+INSERT INTO misc VALUES('backup_max','10');
+INSERT INTO misc VALUES('backup_stat','1');
+
+delete from misc where name like "pptp_vpn_%";
+INSERT INTO misc VALUES('pptp_vpn_stat',0);
+INSERT INTO misc VALUES('pptp_vpn_auth',1);
+INSERT INTO misc VALUES('pptp_vpn_user','');
+INSERT INTO misc VALUES('pptp_vpn_auth_grp',0);
+INSERT INTO misc VALUES('pptp_vpn_debug',0);
+INSERT INTO misc VALUES('pptp_vpn_pool_type',1);
+INSERT INTO misc VALUES('pptp_vpn_pool_net','pptp-vpn-pool');
+INSERT INTO misc VALUES('pptp_vpn_dhcp_server','web server');
+INSERT INTO misc VALUES('pptp_vpn_dhcp_dev','LAN');
+
+drop table pptp_vpn;
+
+# 19-Jun-2007 // already on update installer < update-07.060021.mpu
+drop table crontab;
+
+# new: 25/06/2007 // already on update installer < update-07.060028.mpu
+delete from misc where name like "im_%";
+INSERT INTO misc VALUES('im_stat',0);
+INSERT INTO misc VALUES('im_aim',0);
+INSERT INTO misc VALUES('im_icq',0);
+INSERT INTO misc VALUES('im_msn',0);
+INSERT INTO misc VALUES('im_yahoo',0);
+INSERT INTO misc VALUES('im_irc',0);
+INSERT INTO misc VALUES('im_jabber',0);
+INSERT INTO misc VALUES('im_skype',0);
+
+delete from misc where name like "p2p_%";
+INSERT INTO misc VALUES('p2p_stat',0);
+INSERT INTO misc VALUES('p2p_ares',0);
+INSERT INTO misc VALUES('p2p_bittorrent',0);
+INSERT INTO misc VALUES('p2p_direct',0);
+INSERT INTO misc VALUES('p2p_ed2k',0);
+INSERT INTO misc VALUES('p2p_edonkey',0);
+INSERT INTO misc VALUES('p2p_gnutella',0);
+INSERT INTO misc VALUES('p2p_kazaa',0);
+INSERT INTO misc VALUES('p2p_limewire',0);
+INSERT INTO misc VALUES('p2p_manolito',0);
+INSERT INTO misc VALUES('p2p_morpheus',0);
+INSERT INTO misc VALUES('p2p_napster',0);
+INSERT INTO misc VALUES('p2p_soulseek',0);
+INSERT INTO misc VALUES('p2p_winmx',0);
+INSERT INTO misc VALUES('p2p_winny',0);
+
+# new: 10/07/2007 // already on update installer < update-07.112202.mpu
+drop table cf;
+create table cf (
+name varchar not null,
+val varchar not null
+);
+INSERT INTO cf VALUES('cf_http_stat',0);
+INSERT INTO cf VALUES('cf_http_port','8080');
+INSERT INTO cf VALUES('cf_http_auth',1);
+INSERT INTO cf VALUES('cf_http_cache_stat',0);
+INSERT INTO cf VALUES('cf_http_cache_size',1024);
+INSERT INTO cf VALUES('cf_http_cache_mem_size',10);
+INSERT INTO cf VALUES('cf_http_networks',' ');
+INSERT INTO cf VALUES('cf_http_ext_block_stat',0);
+INSERT INTO cf VALUES('cf_http_filter',0);
+INSERT INTO cf VALUES('cf_http_filter_c',0);
+INSERT INTO cf VALUES('cf_http_js',0);
+INSERT INTO cf VALUES('cf_http_image',0);
+INSERT INTO cf VALUES('cf_http_object',0);
+INSERT INTO cf VALUES('cf_http_download',2);
+INSERT INTO cf VALUES('cf_http_av_stat',0);
+INSERT INTO cf VALUES('cf_http_av_min_size',4);
+INSERT INTO cf VALUES('cf_http_av_max_size',1024);
+INSERT INTO cf VALUES('cf_http_redirect',0); 
+INSERT INTO cf VALUES('cf_http_proxy_stat',0);
+INSERT INTO cf VALUES('cf_http_proxy_host',' ');
+INSERT INTO cf VALUES('cf_http_proxy_port','8080');
+INSERT INTO cf VALUES('cf_http_proxy_user_stat',0);
+INSERT INTO cf VALUES('cf_http_proxy_user',' ');
+INSERT INTO cf VALUES('cf_http_proxy_pass',' ');
+
+drop table cf_exclude;
+create table cf_exclude (
+id integer primary key,
+name varchar not null,
+src varchar not null,
+dst int not null,
+user varchar not null,
+user_stat int not null,
+auth int not null,
+av int not null,
+ext int not null,
+urlf int not null,
+urlc int not null,
+urls int not null,
+hd int not null,
+hdc varchar not null,
+trans int not null
+);
+
+delete from misc where name like "logger_%";
+INSERT INTO misc VALUES('fwadmin','admin@tracenetwork.com.my');
+INSERT INTO misc VALUES('local_logs_log',' ');
+INSERT INTO misc VALUES('logger_log',' ');
+INSERT INTO misc VALUES('logger_server',' ');
+INSERT INTO misc VALUES('logger_port','SYSLOG');
+INSERT INTO defservices (name,protocol,dport,sport,note) VALUES('SYSLOG',2,514,'1:65535','Syslog service');
+drop table logger;
+
+drop table cf_user;
+create table cf_user (
+id integer primary key,
+name varchar not null
+);
+
+# old bugs, why we not check this, wtf
+drop table service_ftp;
+create table service_ftp (
+port int not null,
+stat int not null,
+pass varchar not null
+);
+INSERT INTO service_ftp VALUES(5053,1,'ftcW0Qy8fCXNc');
+
+INSERT INTO misc VALUES('local_logs_log','');
+
+delete from misc where name like 'update_%';
+INSERT INTO misc VALUES('update_firmware',1);
+INSERT INTO misc VALUES('update_pattern',1);
+INSERT INTO misc VALUES('update_save',1);
+INSERT INTO misc VALUES('update_speed',10);
+INSERT INTO misc VALUES('update_proxy_stat',0);
+INSERT INTO misc VALUES('update_proxy_host','');
+INSERT INTO misc VALUES('update_proxy_port','8080');
+INSERT INTO misc VALUES('update_proxy_user_stat',0);
+INSERT INTO misc VALUES('update_proxy_user','');
+INSERT INTO misc VALUES('update_proxy_pass','');
+
+delete from misc where name='ips_spyware';
+insert into misc (name,val) values ('ips_spyware',0);
+drop table ipscan_hosts;
+# end new 10/07/2007
+
+
+# new 07/11/2007
+drop table group_user;
+create table group_user (
+id integer primary key,
+name varchar not null,
+members varchar not null,
+note varchar not null
+);
+
+drop table cf_exclude;
+create table cf_exclude (
+id integer primary key,
+name varchar not null,
+src varchar not null,
+dst int not null,
+user varchar not null,
+user_stat int not null,
+auth int not null,
+av int not null,
+ext int not null,
+urlf int not null,
+urlc int not null,
+urls int not null,
+hd int not null,
+hdc varchar not null,
+trans int not null,
+domains varchar not null
+);
+
+drop table cf_ad_user;
+create table cf_ad_user (
+id integer primary key,
+name varchar not null,
+user varchar not null
+);
+
+INSERT INTO cf VALUES('cf_http_upload',2);
+INSERT INTO misc VALUES('dns_proxy',0);
+
+INSERT INTO cf VALUES('cf_ftp_stat',0);
+INSERT INTO cf VALUES('cf_ftp_network',' ');
+INSERT INTO cf VALUES('cf_ftp_upload',0);
+INSERT INTO cf VALUES('cf_ftp_download',0);
+INSERT INTO cf VALUES('cf_ftp_av_stat',0);
+INSERT INTO cf VALUES('cf_ftp_ext_stat',0);
+
+drop table cf_ftp_exclude;
+create table cf_ftp_exclude (
+id integer primary key,
+name varchar not null,
+src varchar not null,
+dst varchar not null,
+av int not null,
+ext int not null,
+trans int not null
+);
+
+INSERT INTO misc VALUES('packet_bad_flag,0);
+INSERT INTO misc VALUES('packet_bad_ip',0);
+INSERT INTO misc VALUES('packet_small',0);
+INSERT INTO misc VALUES('packet_bogus',0);
+
+drop table alert_email;
+create table alert_email (
+id integer primary key,
+email varchar not null
+);
+
+drop table alert_setting;
+create table alert_setting (
+name varchar not null,
+val varchar not null
+);
+INSERT INTO alert_setting VALUES('stat',0);
+INSERT INTO alert_setting VALUES('sender','do-not-reply@mybox-notify.net');
+INSERT INTO alert_setting VALUES('smtpstat',0);
+INSERT INTO alert_setting VALUES('smtphost',' ');
+INSERT INTO alert_setting VALUES('smtpuser',' ');
+INSERT INTO alert_setting VALUES('smtppass',' ');
+INSERT INTO alert_setting VALUES('popstat',0);
+INSERT INTO alert_setting VALUES('pophost',' ');
+INSERT INTO alert_setting VALUES('alert1',0);
+INSERT INTO alert_setting VALUES('alert2',0);
+INSERT INTO alert_setting VALUES('alert3',0);
+INSERT INTO alert_setting VALUES('alert4',0);
+INSERT INTO alert_setting VALUES('alert5',0);
+INSERT INTO alert_setting VALUES('alert6',0);
+INSERT INTO alert_setting VALUES('alert7',0);
+INSERT INTO alert_setting VALUES('alert8',0);
+INSERT INTO alert_setting VALUES('alert9',0);
+INSERT INTO alert_setting VALUES('alert10',0);
+INSERT INTO alert_setting VALUES('alert11',0);
+INSERT INTO alert_setting VALUES('alert12',0);
+INSERT INTO alert_setting VALUES('alert13',0);
+INSERT INTO alert_setting VALUES('alert14',0);
+INSERT INTO alert_setting VALUES('alert15',0);
+INSERT INTO alert_setting VALUES('alert16',0);
+INSERT INTO alert_setting VALUES('alert17',0);
+
+delete from misc where name like 'blacklist_%';
+delete from misc where name='blacklist_block_s';
+delete from misc where name='blacklist_block_c';
+INSERT INTO misc VALUES('blacklist_block',3);
+INSERT INTO misc VALUES('blacklist_stat',0);
+INSERT INTO misc VALUES('blacklist_drop',1);
+INSERT INTO misc VALUES('blacklist_spyware_stat',0);
+INSERT INTO misc VALUES('blacklist_spyware_block',3);
+INSERT INTO misc VALUES('blacklist_spyware_log',0);
+INSERT INTO misc VALUES('blacklist_spyware_drop',1);
+
+delete from cf where name like "cf_mail%";
+INSERT INTO cf VALUES('cf_mail_pop3_stat',0);
+INSERT INTO cf VALUES('cf_mail_pop3_network',' ');
+INSERT INTO cf VALUES('cf_mail_mail_stat',0);
+INSERT INTO cf VALUES('cf_mail_av_stat',0);
+INSERT INTO cf VALUES('cf_mail_av_subject','[ VIRUS-DETECTED ] ');
+INSERT INTO cf VALUES('cf_mail_spam_stat',0);
+INSERT INTO cf VALUES('cf_mail_spam_subject','[ SPAM-DETECTED ]');
+INSERT INTO cf VALUES('cf_mail_spam_isp_subject','*** SPAM ***');
+INSERT INTO cf VALUES('cf_mail_imap_stat',0);
+INSERT INTO cf VALUES('cf_mail_blk_stat',0);
+INSERT INTO cf VALUES('cf_mail_spam_score','7.5');
+INSERT INTO cf VALUES('cf_mail_spam_bayes',0);
+
+create table cf_mail_exclude (
+id integer primary key,
+name varchar not null,
+src varchar not null,
+dst varchar not null,
+pop3 int not null,
+smtp int not null,
+imap int not null
+);

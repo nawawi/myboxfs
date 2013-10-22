@@ -1,0 +1,7 @@
+patch -p1 < squid-2.5.STABLE5-pipe.patch
+patch -p1 < squid-2.5.STABLE12-fd-config.patch
+patch -p1 < squid-2.5.STABLE12-fd-config-fix.patch
+patch -p1 < squid-2.5.STABLE12-follow-xff.patch
+patch -p1 < squid-2.5.STABLE12-libbind.patch
+patch -p1 < squid-2.5.STABLE14-ftp.patch
+patch -p1 < squid-2.5.STABLE14-httpReplyDestroy.patch

@@ -1,0 +1,550 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="manage_alert";
+include_once('page.exl');
+mybox_chk_session();
+mybox_send_nocache();
+
+
+
+$db_id=mybox_db_connect($_DB_NAME);
+
+if($tab==1) {
+	if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+		if(isset($do_save)&&$do_save==1) {
+			@mybox_db_query("delete from alert_email",$db_id);
+			if(count($email)!=0) {
+				foreach($email as $em) {
+					$em=trim($em);
+					if($em=='') continue;
+					mybox_db_query("insert into alert_email (email) values ('$em')",$db_id);
+				}
+			}
+			if($smtpstat=='') $smtpstat=0;
+			mybox_db_query("update alert_setting set val='$stat' where name='stat'",$db_id);
+			mybox_db_query("update alert_setting set val='$sender' where name='sender'",$db_id);
+			mybox_db_query("update alert_setting set val='$smtpstat' where name='smtpstat'",$db_id);
+			mybox_db_query("update alert_setting set val='$smtphost' where name='smtphost'",$db_id);
+			mybox_db_query("update alert_setting set val='$smtpuser' where name='smtpuser'",$db_id);
+			if($smtppass!="$smtppassold") {
+				$smtppassx=mybox_str_encrypt($smtppass);
+				mybox_db_query("update alert_setting set val='$smtppassx' where name='smtppass'",$db_id);
+			}
+			if($popstat=='') $popstat=0;
+			mybox_db_query("update alert_setting set val='$popstat' where name='popstat'",$db_id);
+			mybox_db_query("update alert_setting set val='$pophost' where name='pophost'",$db_id);
+			$msg="Configuration saved";
+			@unlink("/var/sys/alert.set");@unlink("/var/sys/alert.email");
+			@unlink("/var/sys/alert_do_chk");
+			mybox_alert_config(&$alertconf,&$alertemail,$db_id);
+		}
+	} else {
+		if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+			$msg="Permission denied";
+		}
+	}
+}
+if($tab==2) {
+	if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+		if(isset($do_save)&&$do_save==1) {
+			for($x=1;$x < 19;$x++) {
+				$nn="alert$x";
+				eval($nv=$$nn);
+				mybox_db_query("update alert_setting set val='$nv' where name='$nn'",$db_id);
+			}
+			$msg="Configuration saved";
+			@unlink("/var/sys/alert.set");
+			@unlink("/var/sys/alert_do_chk");
+			mybox_alert_config(&$alertconf,&$alertemail,$db_id);
+		}
+	} else {
+		if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+			$msg="Permission denied";
+		}
+	}
+}
+if(!isset($tab)||$tab=='') $tab=1;
+$_error=0;
+?>
+<html>
+<head>
+<title>MyAdmin</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<script type='text/javascript' src="/j/mybox_func.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?php echo $_LOGIN['auth_id'];?>";
+	page_load();
+</script>
+</head>
+<body onload="load_menu('sub3','t3d6','s3i6');" scroll="auto">
+<form name=f method=post action="/manage_alert.exh">
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 0px;'>
+<tr>
+<td>
+<?php mybox_page_section("Management / Notification");?>
+<br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="/manage_alert.exh?tab=1" <?php if($tab==1){?>class="tabact"<?php }?>>Setting</a></li>
+<li><a href="/manage_alert.exh?tab=2" <?php if($tab==2){?>class="tabact"<?php }?>>Notifications</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td> 
+<?php mybox_page_msg($msg);?>
+<br>
+
+<!-- tab container -->
+<?php if($tab==1) {
+$_email=array();
+$result=mybox_db_query("select * from alert_email",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_email[]=$row['email'];
+	}
+}
+$_smtpstat=0;
+$_stat=0;$_popstat=0;
+$result=mybox_db_query("select * from alert_setting",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		if(trim($row['name'])=="stat") $_stat=trim($row['val']);
+		if(trim($row['name'])=="sender") $_sender=trim($row['val']);
+		if(trim($row['name'])=="smtpstat") $_smtpstat=trim($row['val']);
+		if(trim($row['name'])=="smtphost") $_smtphost=trim($row['val']);
+		if(trim($row['name'])=="smtpuser") $_smtpuser=trim($row['val']);
+		if(trim($row['name'])=="smtppass") $_smtppass=trim($row['val']);
+		if(trim($row['name'])=="popstat") $_popstat=trim($row['val']);
+		if(trim($row['name'])=="pophost") $_pophost=trim($row['val']);
+	}
+	if($_pophost=='') $_pophost=$_smtphost;
+}
+?>
+<script type='text/javascript'>
+	function do_submit() {
+		var sender=Trim(document.f.sender.value);
+		if(sender=='') {
+			pop_msg("Notification sender no defined");
+			return false;
+		};
+		if(document.f.smtpstat.value==1) {
+			var smtphost=Trim(document.f.smtphost.value);
+			var smtpuser=Trim(document.f.smtpuser.value);
+			var smtppass=Trim(document.f.smtppass.value);
+			if(smtphost=='') {
+				pop_msg("SMTP Host no defined");
+				return false;
+			};
+			if(smtpuser=='') {
+				pop_msg("SMTP user no defined");
+				return false;
+			};
+			if(smtppass=='') {
+				pop_msg("SMTP password no defined");
+				return false;
+			};
+			if(document.f.popstat.value==1) {
+				var pophost=Trim(document.f.pophost.value);
+				if(pophost=='') {
+					document.f.pophost.value=smtphost;
+				}
+			}
+		};
+		if(chk_dup_email()==true) {
+			return false;
+		};
+		document.f.do_save.value=1;
+		document.f.submit();
+		return true;
+	};
+	function chk_dup_email() {
+		var p1='';
+		for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='text') {
+			    	if( document.f.elements[i].name.substr( 0, 5 ) == 'email') {
+					p1=Trim(document.f.elements[i].value);
+					if((p1!='') && (check_valid_email(p1)==false)) {
+						pop_msg("Invalid email '"+p1+"' detected");
+						return true;
+					};
+					if(p1!='') {
+						if(chk_dup_search(i,p1,'5','email','text')==true) {
+							return true;
+						}
+					};
+    				}	
+			}
+  		};
+		return false;
+	};
+	function add_newemail() {
+		if(chk_dup_email()==true) {
+			return false;
+		};
+		var i=document.getElementById('emtab').rows.length;
+		var tab=document.getElementById('emtab').insertRow(0);
+		tab.insertCell(0).innerHTML="<input type=text name=email[] value='' size=30 class='urlbox'>";
+		tab.insertCell(1).innerHTML="<a href='#' id='em"+i+"' onclick=\"delete_row_a('em"+i+"','emtab');return false;\"><img src='<?php echo $_PNG['delete'];?>' border=0 alt='' title=''></a>";
+		i=null;tab=null;
+	};
+	function enab_smtp(val) {
+		if(val!=0) {
+			do_show('smtp2');
+		} else {
+			do_hide('smtp2');
+		}
+	};
+</script>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td valign="middle" class="tdname">Enable notification</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+if(!isset($_stat)||$_stat=='') $_stat=0;
+echo mybox_select_box('stat1',$data_a,$_stat,'stat');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Sender</td>
+<td valign="middle" class="tdvalue">
+<input name="sender" type="text" class="valbox2" value="<?php echo $_sender;?>">
+</td>
+</tr>
+<tr> 
+<td valign="top" class="tdname">Notification recipients</td>
+<td valign="top" class="tdvalue">
+<div>
+<a name="sini"><a class="btns" href="#sini" onclick="return add_newemail();return false;">Add new</a>
+</div>
+<div style='background: #ffffff; table-layout: fixed; white-space: nowrap; border: 1px solid #ccc; padding: 0px; margin-top: 5px; margin-bottom: 5px; overflow-x: hidden; overflow-y: auto; width: 250px; height: 100px;'>
+<table id='emtab' class='datanb' style='background: #ffffff; border: 0px; margin-top: 0em; margin-bottom: 0em; padding: 0px; width: 100%;'>
+<col width="*">
+<col style='border: 0px; width: 5px; text-align: right;'>
+<?php 
+if(count($_email)!=0) {
+	$i=0;
+	foreach($_email as $i => $n) {
+		echo "
+			<tr>
+			<td><input type=text name=email[] value='$n' size=30 class='urlbox'></td>
+			<td><a href='#' id='em$i' onclick=\"delete_row_a('em$i','emtab');return false;\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a></td>
+			</tr>
+		";
+		$i++;
+	}
+}
+?>
+</table>
+</div>
+</td>
+</tr>
+<tr> 
+<td valign="top" class="tdname">Remote SMTP</td>
+<td valign="top" class="tdvalue">
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+if(!isset($_smtpstat)||$_smtpstat=='') $_smtpstat=0;
+$set_a=array("act"=>"enab_smtp('b')");
+echo mybox_select_box('smtp1',$data_a,$_smtpstat,'smtpstat',$set_a);
+?>
+<div id='smtp2' style='display: none;'>
+<table class="data" style='border: 0px; margin-bottom: 0em;'>
+<tr>
+<td valign=middle style='border: 0px; width: 100px;'><b>SMTP Host</b></td>
+<td valign=middle style='border: 0px;'><input name="smtphost" type="text" class="valbox2" value="<?php echo $_smtphost;?>"></td>
+</tr>
+<tr>
+<td valign=middle style='border: 0px; width: 100px;'><b>SMTP User</b></td>
+<td valign=middle style='border: 0px;'><input name="smtpuser" type="text" class="valbox2" value="<?php echo $_smtpuser;?>"></td>
+</tr>
+<tr>
+<td valign=middle style='border: 0px; width: 100px;'><b>SMTP Password</b></td>
+<td valign=middle style='border: 0px;'>
+<input name="smtppass" type="password" class="valbox2" value="<?php echo $_smtppass;?>">
+<input name="smtppassold" type="hidden" value="<?php echo $_smtppass;?>">
+</td>
+<tr><td valign=top style='border: 0px;' colspan=2>
+<hr size=1 class=notehr>
+</td></tr>
+<tr> 
+<td valign=top style='border: 0px;'><b>POP-BEFORE-SMTP</b></td>
+<td valign=top style='border: 0px;'>
+<?php 
+$data_a=array("Enable"=>"1","Disable"=>"0");
+if(!isset($_popstat)||$_popstat=='') $_popstat=0;
+echo mybox_select_box('popstat1',$data_a,$_popstat,'popstat');
+?>
+</td>
+</tr>
+<tr>
+<td valign=top style='border: 0px; width: 100px;'><b>POP3 Host</b></td>
+<td valign=top style='border: 0px;'><input name="pophost" type="text" class="valbox2" value="<?php echo $_pophost;?>"></td>
+</tr>
+</table>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+<script type='text/javascript'>
+enab_smtp('<?php echo $_smtpstat;?>');
+</script>
+<?php }//tab==1?>
+<?php if($tab==2) {
+$result=mybox_db_query("select * from alert_setting where name like \"alert%\"",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_dbname=trim($row['name']);
+		$_dbval=trim($row['val']);
+		if($_dbval=='') $_dbval=0;
+		$_name="_$_dbname";
+		$$_name="$_dbval";
+		unset($_name);
+	}
+}
+$data_a=array("Enable"=>"1","Disable"=>"0");
+?>
+<script type='text/javascript'>
+	function do_submit() {
+		document.f.do_save.value=1;
+		document.f.submit();
+		return true;
+	};
+</script>
+<table class="datanb" width="100%">
+<tbody>
+<tr>
+<td>
+<p class="subtitle" style='width: 98%; font-weight: bold;'><img src='/i/menu/sub_sep.gif'> System</p>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td valign="middle" class="tdname">System reboot</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if(!isset($_alert1)||$_alert1=='') $_alert1=0;
+echo mybox_select_box('la1',$data_a,$_alert1,'alert1');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">System shutdown</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if(!isset($_alert2)||$_alert2=='') $_alert2=0;
+echo mybox_select_box('la2',$data_a,$_alert2,'alert2');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">System bootup</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if(!isset($_alert18)||$_alert18=='') $_alert18=0;
+echo mybox_select_box('la18',$data_a,$_alert18,'alert18');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Password incorrect</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if(!isset($_alert3)||$_alert3=='') $_alert3=0;
+echo mybox_select_box('la3',$data_a,$_alert3,'alert3');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Password Accepted</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if(!isset($_alert4)||$_alert4=='') $_alert4=0;
+echo mybox_select_box('la4',$data_a,$_alert4,'alert4');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Session logout</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if(!isset($_alert5)||$_alert5=='') $_alert5=0;
+echo mybox_select_box('la5',$data_a,$_alert5,'alert5');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Invalid login request</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if(!isset($_alert6)||$_alert6=='') $_alert6=0;
+echo mybox_select_box('la6',$data_a,$_alert6,'alert6');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Authorization Required</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if(!isset($_alert7)||$_alert7=='') $_alert7=0;
+echo mybox_select_box('la7',$data_a,$_alert7,'alert7');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Link Up</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if(!isset($_alert8)||$_alert8=='') $_alert8=0;
+echo mybox_select_box('la8',$data_a,$_alert8,'alert8');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Link Down</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if(!isset($_alert9)||$_alert9=='') $_alert9=0;
+echo mybox_select_box('la9',$data_a,$_alert9,'alert9');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Auto backup</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if(!isset($_alert10)||$_alert10=='') $_alert10=0;
+echo mybox_select_box('la10',$data_a,$_alert10,'alert10');
+?>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<p class="subtitle" style='width: 98%; font-weight: bold;'><img src='/i/menu/sub_sep.gif'> Taskquery</p>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td valign="middle" class="tdname">Service down</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if(!isset($_alert11)||$_alert11=='') $_alert11=0;
+echo mybox_select_box('la11',$data_a,$_alert11,'alert11');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Service stop</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if(!isset($_alert12)||$_alert12=='') $_alert12=0;
+echo mybox_select_box('la12',$data_a,$_alert12,'alert12');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Service stop failed</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if(!isset($_alert13)||$_alert13=='') $_alert13=0;
+echo mybox_select_box('la13',$data_a,$_alert13,'alert13');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Service start</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if(!isset($_alert14)||$_alert14=='') $_alert14=0;
+echo mybox_select_box('la14',$data_a,$_alert14,'alert14');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Service start failed</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if(!isset($_alert15)||$_alert15=='') $_alert15=0;
+echo mybox_select_box('la15',$data_a,$_alert15,'alert15');
+?>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<p class="subtitle" style='width: 98%; font-weight: bold;'><img src='/i/menu/sub_sep.gif'> Logging/Reporting</p>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td valign="middle" class="tdname">Daily log file archive</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if(!isset($_alert16)||$_alert16=='') $_alert16=0;
+echo mybox_select_box('la16',$data_a,$_alert16,'alert16');
+?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Log files have been deleted</td>
+<td valign="middle" class="tdvalue">
+<?php 
+if(!isset($_alert17)||$_alert17=='') $_alert17=0;
+echo mybox_select_box('la17',$data_a,$_alert17,'alert17');
+?>
+</td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<?php }//tab==2?>
+
+<?php if($_error!=1){?>
+<table align=right>
+<tbody>
+<tr>
+<td>
+<a name="sini"><a class="btn" href="#sini" onclick="return do_submit();return false;">Save</a>
+</td>
+</tr> 
+</tbody>
+</table>
+<?php }?>
+<!-- end tab container -->
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?php echo $tab;?>>
+</form>
+<script type='text/javascript'>page_kill();</script>
+</body>
+</html>
+
+<?php mybox_db_close($db_id);?>

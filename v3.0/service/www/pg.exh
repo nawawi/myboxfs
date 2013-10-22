@@ -1,0 +1,143 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="pg";
+include_once('page.exl');
+mybox_chk_session();
+
+$_fname=$_GET["mf"];
+echo "<body style='margin-left: 1px; margin-right: 1px; margin-top: 1px; margin-bottom: 0px; background: #eee;'>";
+function read_progress_metter() {
+	$X=array (
+		"time_start" => 0,
+		"time_last"  => 0,
+		"speed_average" => 0,
+		"speed_last" => 0,
+		"bytes_uploaded" => 0,
+		"bytes_total" => 1,
+		"files_uploaded" => 0,
+		"eta" => 0
+	);
+
+	$file=get_progress_metter_file();
+	$F=@fopen($file, "r");
+        if(!$F) return $X;
+        while(!feof ($F)) {
+                $buffer=fgets($F, 100);
+                if(preg_match('/(\w+)=(\d+)/', $buffer, $matches)) {
+                        $X[$matches[1]]=$matches[2];
+                }
+        }
+        fclose($F);
+	return $X;
+}
+
+
+function remove_progress_metter_file() {
+	$file=get_progress_metter_file();
+	if($file!=0 && file_exists($file)) @unlink($file);
+}
+
+function get_progress_metter_file() {
+	$id=$_GET["mid"];
+	$dir=ini_get('upload_metter_dir');
+	if($id=='' || $dir=='')  return 0;
+   	$file="$dir/$id";
+	if(!is_dir($dir)) @mybox_mkdirr("$dir");
+	if(file_exists($file)) return $file;
+      	return 0;
+}
+function nice_value($x) {
+	if($x < 100)  $x;
+	if($x < 10000)  return sprintf("%.2fKB", $x/1000);
+	if($x < 900000) return sprintf("%dKB", $x/1000);
+	return sprintf("%.2fMB", $x/1000/1000);
+}
+$X=read_progress_metter();
+if(!$X) {
+	echo "<html><head><title>Uploading files</title>
+	<style type='text/css'>
+	html {overflow-x: auto;font-family: Arial, Helvetica, sans-serif;}
+	body {margin-left: 1px; margin-right: 1px; margin-top: 1px; margin-bottom: 0px; background: #eee; }
+	</style>
+	</head><body onload='window.close();'>Error!</body></html>";
+} else {
+
+	$metter=sprintf("%.2f", $X['bytes_uploaded'] / $X['bytes_total'] * 100);
+	$sp=$X['speed_last'];
+	if($sp < 10000) {
+		$speed =sprintf("%.2f", $sp / 1000);
+  	} else {
+		$speed =sprintf("%d", $sp / 1000);
+	}
+	$eta=sprintf("%02d:%02d", $X['eta'] / 60, $X['eta'] % 60 );
+
+	$upl=nice_value($X['bytes_uploaded']);
+	$total=nice_value($X['bytes_total']);
+
+	if($X['bytes_total'] > 1 && $X['bytes_uploaded'] >= $X['bytes_total'] && $X['eta'] == 0) {
+		echo "<html><head><title>Uploading files</title>
+		<style type='text/css'>
+		html {overflow-x: auto;font-family: Arial, Helvetica, sans-serif;}
+		body {margin-left: 1px; margin-right: 1px; margin-top: 1px; margin-bottom: 0px; background: #eee; }
+		</style>
+		</head>
+		<body onload='window.close();'>UPLOAD completed!</body></html>";
+		remove_progress_metter_file();
+	 } else {
+?>
+<html>
+<head>
+<meta http-equiv="refresh" content="1">
+<title>Uploading files</title>
+<style type="text/css">
+html {overflow-x: auto;font-family: Arial, Helvetica, sans-serif;}
+td {font-size: 10pt; font-family: verdana,tahoma; }
+body {margin-left: 1px; margin-right: 1px; margin-top: 1px; margin-bottom: 0px; background: #eee; }
+</style>
+<script type='text/javascript'>
+function mybox_js_ontop() {setTimeout('self.focus()',1);}
+</script>
+</head>
+<body oncontextmenu="return false" scroll=no style='border-width: 0px' onblur='mybox_js_ontop();' onload='self.focus();'>
+<table with="100%" border=0 style='table-layout: fixed;'>
+<tr>
+<td>
+Uploading files...<?php echo $_fname;?>
+</td>
+</tr>
+<tr>
+<td>
+<table border=1 width="100%" cellpadding=0 cellspacing=0 style='table-layout: fixed; white-space: nowrap; background-color: #fff; border-bottom: 0px inset; border-left: 0px inset; border-right: 0px inset; border-top: 0px inset'> 
+<tr><td>
+<table border=0 width="100%" cols="34"><tr>
+<?php 
+for($i=0; $i<100; $i+=3) {
+	$color=($i<$metter) ? "#00007F" : '';
+	$width=($i+3<100) ? "3" : 100-$i;
+	echo "<td style='background-color: $color; font-size: 6pt; height: 12px;' width='$width%'>&nbsp;</td>";
+	
+}
+?>
+</tr></table>
+</td></tr>
+</table>
+
+<table width=100%>
+<tr><td>
+<?php echo $eta;?> left (at <?php echo $speed;?>KB/sec)
+</td>
+<td align=right>
+<?php echo $upl;?>/<?php echo $total;?>(<?php echo $metter;?>%)
+</table>
+</td>
+</tr>
+</table>
+
+</body>
+</html>
+<?php   	} 
+} 
+
+?>
+

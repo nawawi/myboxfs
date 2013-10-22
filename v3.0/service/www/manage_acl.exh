@@ -1,0 +1,450 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="manage_acl";
+include_once('page.exl');
+mybox_chk_session();
+mybox_send_nocache();
+
+
+
+$db_id=mybox_db_connect($_DB_NAME);
+
+if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+	if($tab==1) {
+		if(isset($do_save)&&$do_save==1) {
+			@unlink("/var/sys/ftp_ssh_console.cache");
+			if($ptype!='' && $passwd2!='' && $passwd1!='') {
+				$_ssh_pass='';
+				$_ssh_pass2=crypt($passwd2,$passwd1);
+
+				$result=mybox_db_query("select pass from service_ssh",$db_id);
+				if(mybox_db_num_rows($result)!=0) {
+					$_ssh_pass=mybox_db_fetch_single($result);
+				}
+
+				$_ftp_pass='';
+				$_ftp_pass2=crypt($passwd2,$passwd1);
+
+				$result=mybox_db_query("select pass from service_ftp",$db_id);
+				if(mybox_db_num_rows($result)!=0) {
+					$_ftp_pass=mybox_db_fetch_single($result);
+				}
+
+				$_console_pass='';
+				$_console_pass2=crypt($passwd2,$passwd1);
+
+				$result=mybox_db_query("select pass from auth_login where name='console'",$db_id);
+				if(mybox_db_num_rows($result)!=0) {
+					$_console_pass=mybox_db_fetch_single($result);
+				}
+
+				if($ptype==1) {
+					$result=mybox_db_query("select * from auth_login where pass=md5('$passwd2') and name!='admin'",$db_id);
+					if(mybox_db_num_rows($result)==0 && ($_ssh_pass!=$_ssh_pass2) && ($_ftp_pass!=$_ftp_pass2) && ($_console_pass!=$_console_pass2)) {
+						mybox_db_query("update auth_login set pass=md5('$passwd2') where name='admin'",$db_id);
+						$msg="Password for Admin access updated";
+					} else {
+						$msg="Password already used";
+					}
+				}
+				if($ptype==2) {
+					$result=mybox_db_query("select * from auth_login where pass=md5('$passwd2') and name!='look'",$db_id);
+					if(mybox_db_num_rows($result)==0 && ($_ssh_pass!=$_ssh_pass2) && ($_ftp_pass!=$_ftp_pass2) && ($_console_pass!=$_console_pass2)) {
+						mybox_db_query("update auth_login set pass=md5('$passwd2') where name='look'",$db_id);
+						$msg="Password for Look access updated";
+					} else {
+						$msg="Password already used";
+					}
+				}
+				if($ptype==3) {
+					$result=mybox_db_query("select * from auth_login where pass=md5('$passwd2') and name!='console'",$db_id);
+					if(mybox_db_num_rows($result)==0 && ($_ssh_pass!=$_ssh_pass2) && ($_ftp_pass!=$_ftp_pass2)) {
+						mybox_db_query("update auth_login set pass=php('crypt','$passwd2','$passwd1') where name='console'",$db_id);
+						$msg="Password for Console access updated";
+					} else {
+						$msg="Password already used";
+					}
+				}
+				if($ptype==4) {
+					$result=mybox_db_query("select pass from auth_login where pass=md5('$passwd2')",$db_id);
+					if(mybox_db_num_rows($result)==0 && ($_ftp_pass!=$_ftp_pass2) && ($_console_pass!=$_console_pass2)) {
+						mybox_db_query("update service_ssh set pass=php('crypt','$passwd2','$passwd1')",$db_id);
+						$msg="Password for SSH access with user mfs updated";
+						mybox_ftp_ssh_console_reset_password();
+					} else {
+						$msg="Password already used";
+					}
+				}
+				if($ptype==5) {
+					$result=mybox_db_query("select pass from auth_login where pass=md5('$passwd2')",$db_id);
+					if(mybox_db_num_rows($result)==0 && ($_ssh_pass!=$_ssh_pass2) && ($_console_pass!=$_console_pass2)) {
+						mybox_db_query("update service_ftp set pass=php('crypt','$passwd2','$passwd1')",$db_id);
+						$msg="Password for FTP access with user ftp1 updated";
+						mybox_ftp_ssh_console_reset_password();
+					} else {
+						$msg="Password already used";
+					}
+				}
+			}
+		}
+	}
+	if($tab==2) {
+		if(isset($do_save)&&$do_save==1) {
+			if(count($aid)!=0) {
+				mybox_db_query("delete from accesslist",$db_id);
+				foreach($aid as $id) {
+					$ip=$aip[$id];
+					if($ip=='' || mybox_check_ipv4($ip)==0) continue;
+					$https=$ahttps[$id];
+					$ssh=$assh[$id];
+					$ftp=$aftp[$id];
+					$stat=$astat[$id];
+					$note=mybox_escape_str($anote[$id]);
+					if($https=='') { $https=0;} else { $https=1; }
+					if($ssh=='') { $ssh=0; } else { $ssh=1; }
+					if($ftp=='') { $ftp=0; } else { $ftp=1; }
+					if($stat=='') { $stat=0; } else { $stat=1; }
+					//if(preg_match("/^\d+/",$id)) {
+					//	mybox_db_query("update accesslist set https='$https',ssh='$ssh',ftp='$ftp',stat='$stat',ip='$ip',note='$note' where id='$id'",$db_id);
+					//} else {
+						$result=mybox_db_query("select * from accesslist where ip='$ip'",$db_id);
+						if(mybox_db_num_rows($result)==0) {
+							mybox_db_query("insert into accesslist (ip,ssh,https,ftp,stat,note) values ('$ip','$ssh','$https','$ftp','$stat','$note')",$db_id);
+						} else {
+							$msg="IP Address already exist";
+						}
+					//}
+				}
+			}
+		}
+		if(isset($do_save)&&$do_save==2) {
+			if(isset($do_id)&&$do_id==apply_chg) {
+				$msg="<script>waitcount();</script>";
+				mybox_echo_query("policy-acl");
+			}
+		}
+		if(isset($do_save)&&$do_save==3) {
+			if(count($del)!=0) {
+				foreach($del as $id) {
+					if($id!='') mybox_db_query("delete from accesslist where id='$id'",$db_id);
+				}
+			}
+		}
+		if(isset($do_save)&&$do_save==4) {
+			if(isset($do_id)&&$do_id==del) {
+				if($id!='') mybox_db_query("delete from accesslist where id='$id'",$db_id);
+			}
+		}
+
+	}
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied";
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+?>
+<html>
+<head>
+<title>MyAdmin</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<script type='text/javascript' src="/j/mybox_func.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?php echo $_LOGIN['auth_id'];?>";
+	page_load();
+</script>
+<script type='text/javascript'>
+function do_submit() {
+	<?php if($tab==2) {?>
+	if(!chkvalidip()) { return false; }
+	<?php  } ?>
+	<?php if($tab==1) {?>
+		var passwd1=document.f.passwd1.value;
+		var passwd2=document.f.passwd2.value;
+		if(passwd1=='' || passwd2=='') {
+			pop_msg("Password empty");
+			document.f.passwd1.focus();
+			return false;
+		}
+		if(passwd1!=passwd2) {
+			document.f.passwd1.value='';
+			document.f.passwd2.value='';
+			document.f.passwd1.focus();
+			pop_msg("Password not match");
+			return false;
+		}
+		if(passwd1.length < 6 || passwd2.length < 6) {
+			document.f.passwd1.value='';
+			document.f.passwd2.value='';
+			document.f.passwd1.focus();
+			pop_msg("Password must greater than 6 character length");
+			return false;
+		}
+	<?php  } ?>
+	document.f.do_save.value=1;
+	document.f.submit();
+}
+<?php if($tab==2){?>
+	function do_changes() {
+		if(!chkvalidip()) { return false; }
+		self.location.href='<?php echo "/manage_acl.exh?tab=$tab&do_save=2&do_id=apply_chg";?>';	
+	};
+
+	function chkvalidip() {
+		var ip1='';
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='text') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'aip') {
+					ip1=Trim(document.f.elements[i].value);
+					if(ip1!='' && miipr(ip1)) {
+						pop_msg("Sorry range ip '"+ip1+"' not allowed");
+						return false;
+					}
+					if(ip1!='' && !mip1(ip1)) {
+						pop_msg("Invalid Address '"+ip1+"'");
+						return false;
+					}
+					if(ip1!='') {
+						if(chk_dup_search(i,ip1,'3','aip','text')==true) {
+							return false;
+						}
+					}
+    				}	
+			}
+  		}
+		return true;
+	};
+	function delete_acl(val) {
+		var ar=document.getElementById('acltab').getElementsByTagName("a");
+		for(var i=0; i<ar.length; i++) {
+			if(ar[i].id) {
+				if(ar[i].id==val) {
+					var x=i;
+					x=x+1;
+					document.getElementById('acltab').deleteRow(x);
+				}
+			}
+		};
+		i=null;
+	};
+	function add_new_acl() {
+		if(chkvalidip()==false) {
+			return false;
+		}
+		var x=document.getElementById('acltab').rows.length;
+		if(x >= 2) {
+			var i=x - 1;
+		};
+		if(document.getElementById('op1')) {
+			var i=x - 2;
+		};
+		var tab=document.getElementById('acltab').insertRow(i);
+		tab.insertCell(0).innerHTML="<input type=hidden name=aid[new"+i+"] value='new"+i+"'>"+i;
+		tab.insertCell(1).innerHTML="<input type=text name=aip[new"+i+"] value='' size=20 class='valbox3'>";
+		tab.insertCell(2).innerHTML="<center><input type=checkbox name=ahttps[new"+i+"]></center>";
+		tab.insertCell(3).innerHTML="<center><input type=checkbox name=assh[new"+i+"]></center>";
+		tab.insertCell(4).innerHTML="<center><input type=checkbox name=aftp[new"+i+"]></center>";
+		tab.insertCell(5).innerHTML="<center><input type=checkbox name=astat[new"+i+"]></center>";
+		tab.insertCell(6).innerHTML="<img src='<?php echo $_PNG['note'];?>' border=0 alt='' title=''>&nbsp;<input type=text name=anote[new"+i+"] value='' size=30 class='valbox3'>";		
+		tab.insertCell(7).innerHTML="<div style='text-align: right;'><a href='#' id='t"+i+"' onclick=\"delete_acl('t"+i+"');return false;\"><img src='<?php echo $_PNG['delete'];?>' border=0 alt='' title=''></a><input type=checkbox name=del[new"+i+"] value=new"+i+"></div>";
+		i=null;tab=null;
+	};
+	function waitcount() {
+		page_reload('400','<?php echo "/manage_acl.exh?tab=$tab";?>');
+	}
+<?php  } //tab==2 ?>
+</script>
+</head>
+<body onload="load_menu('sub3','t3d2','s3i2');" scroll="auto">
+<form name=f method=post action="/manage_acl.exh">
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 0px;'>
+<tr>
+<td>
+<?php mybox_page_section("Management / Access control");?>
+<br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="/manage_acl.exh?tab=1" <?php if($tab==1){?>class="tabact"<?php }?>>Access Password</a></li>
+<li><a href="/manage_acl.exh?tab=2" <?php if($tab==2){?>class="tabact"<?php }?>>Address Allowed</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td> 
+<?php mybox_page_msg($msg);?>
+<br>
+
+<!-- tab container -->
+<?php if($tab==1) {?>
+<script type='text/javascript'>
+function enab_ua(pid) {
+	if(pid==4) {
+		do_show('ua1');
+		document.getElementById("ua2").innerHTML='<input name="user" type="text" class="valbox2" value="mfs" readonly>';
+	} else if(pid==5) {
+		do_show('ua1');
+		document.getElementById("ua2").innerHTML='<input name="user" type="text" class="valbox2" value="ftp1" readonly>';
+	} else {
+		do_hide('ua1');
+	}
+}
+</script>
+<table class="data" width="100%">
+<tbody>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Access Type</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<?php 
+if(!isset($ptype)||$ptype=='') $ptype=1;
+$data_a=array("Admin"=>"1","Look"=>"2","Console"=>"3","SSH"=>"4","FTP"=>"5");
+$set_a=array("act"=>"enab_ua('b')");
+echo mybox_select_box('macs1',$data_a,$ptype,'ptype',$set_a);
+?>
+</td>
+</tr>
+<tr id='ua1' style='display: none;'> 
+<td width="30%" valign="middle" class="tdname">Access User</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<span id='ua2' style='font-size: 12px;'></span>
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">New Password</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="passwd1" type="password" class="valbox2" value=""> 
+</td>
+</tr>
+<tr> 
+<td width="30%" valign="middle" class="tdname">Retype New Password</td>
+<td width="70%" valign="middle" class="tdvalue"> 
+<input name="passwd2" type="password" class="valbox2" value=""> 
+</td>
+</tr>
+</tbody>
+</table>
+<?php }//tab==1?>
+<?php if($tab==2) {?>
+<table id='acltab' class="data" width="100%">
+<thead class="blue"> 
+<tr>
+<td style='font-weight: bold; border-right: 0px;'>#</td> 
+<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>IP Address</td>
+<td style='font-weight: bold; border-right: 0px;border-left: 0px;width: 3px; text-align: center;'>HTTPS</td>
+<td style='font-weight: bold; border-right: 0px;border-left: 0px;width: 3px; text-align: center;'>SSH</td>
+<td style='font-weight: bold; border-right: 0px;border-left: 0px;width: 3px; text-align: center;'>FTP</td>
+<td style='font-weight: bold; border-right: 0px;border-left: 0px;width: 3px; text-align: center;'>Active</td>
+<td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Comment</td>
+<td style='width: 5%; border-left: 0px;'>&nbsp;</td>
+</tr></thead>
+<tbody>
+<?php 
+$x=1;
+$result=mybox_db_query("select * from accesslist",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_id=$row['id'];
+		$_ip=$row['ip'];
+		$_ssh=$row['ssh'];
+		$_https=$row['https'];
+		$_ftp=$row['ftp'];
+		$_stat=$row['stat'];
+		$_note=mybox_unescape_str($row['note']);
+		if($_note=='') $_note="From $_ip";
+		if($_ssh==1) { 
+			$_ssh1='checked';
+		} else {
+			$_ssh='';
+			$_ssh1='';
+		}	
+		if($_https==1) { 
+			$_https1='checked';
+		} else {
+			$_https='';
+			$_https1='';
+		}
+		if($_ftp==1) { 
+			$_ftp1='checked';
+		} else {
+			$_ftp='';
+			$_ftp1='';
+		}
+		if($_stat==1) { 
+			$_stat1='checked';
+		} else {
+			$_stat='';
+			$_stat1='';
+		}
+	echo "
+      	<tr>
+        <td><input type=hidden name=aid[$_id] value='$_id'>$x</td>
+        <td><input type=text name=aip[$_id] value='$_ip' size=20 class='valbox3'></td>
+        <td><center><input type=checkbox name=ahttps[$_id] $_https1></center></td>
+        <td><center><input type=checkbox name=assh[$_id] $_ssh1></center></td>
+        <td><center><input type=checkbox name=aftp[$_id] $_ftp1></center></td>
+        <td><center><input type=checkbox name=astat[$_id] $_stat1></center></td>
+        <td><img src='{$_PNG['note']}' border=0 alt='' title=''>&nbsp;<input type=text name=anote[$_id] value='$_note' size=30 class='valbox3'></td>
+        <td valign=middle style='text-align: right; table-layout: fixed; white-space: nowrap;'>
+	<a href='#' id='t$x' onclick=\"delete_acl('t$x');return false;\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a><input type=checkbox name=del[$_id] value='$_id'></td>
+      	</tr>";
+	$x++;
+	}
+}
+
+
+if($x > 1) {
+?>
+<tr id='op1'>
+<td style='text-align: right;' valign=top colspan=8><a href='#' onclick='do_delete(3);return false;'>Delete</a> / <a href='#' onclick='dotoggle();return false;'>Toggle</a> <img src='<?php echo $_PNG['arrow_rtr'];?>' border=0 alt='' title=''></td>
+</tr>
+<?php  } ?>
+<tr><td style='text-align: right;' valign=middle colspan=8>
+<div style='padding: 2px;'>
+<a name="sini"><a class="btns" href="#sini" onclick="return add_new_acl();return false;">Add New</a>
+</div>
+</td></tr>
+</tbody>
+</table>
+<?php  } //tab==2 ?>
+<table align=right>
+<tbody>
+<tr>
+<?php if($tab==2){?>
+<td>
+<a name="sini"><a class="btn" href="#sini" onclick="return do_changes();return false;">Reload</a>
+</td>
+<?php }?>
+<td>
+<a name="sini"><a class="btn" href="#sini" onclick="return do_submit();return false;">Save</a>
+</td>
+</tr> 
+</tbody>
+</table>
+<input type=hidden name=do_save value=''>
+<input type=hidden name=tab value='<?php echo $tab;?>'>
+
+<!-- end tab container -->
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+</form>
+<script type='text/javascript'>page_kill();</script>
+</body>
+</html>
+
+<?php mybox_db_close($db_id);?>

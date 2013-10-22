@@ -1,0 +1,64 @@
+#!/bin/php -f
+<?php 
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="mfs-graph";
+include_once("clib.exl");
+putenv("PATH=/bin:/service/tools:/service/init");
+
+function _backup_cf_rules_setting($_file='') {
+	global $_PAT_PATH, $_RTMP_PATH;
+	if($_file=='') $_file="$_RTMP_PATH/cfrules.bck";
+	$_config=array();
+	$buff=mybox_dir2array("$_PAT_PATH/blacklist/*/stat");
+	if(count($buff)!=0) {
+		foreach($buff as $lx) {
+			$stat=0;
+			$stat=mybox_fget_contents($lx);
+			$_config[$lx]=$stat;
+		}
+	}
+	if(count($_config)!=0) mybox_save_to_file("$_file",serialize($_config));
+	if(file_exists("$_file")) {
+		echo "BACKUP FILe -> $_file\n";
+	}
+}
+
+function _restore_cf_rules_setting($_file='') {
+	global $_PAT_PATH, $_RTMP_PATH;
+	if($_file=='') $_file="$_RTMP_PATH/cfrules.bck";
+	if(!file_exists($_file)) exit(0);
+	$_config=unserialize(mybox_fget_contents($_file));
+	if(count($_config)==0) exit(0);
+	$error=0;
+	foreach($_config as $lnx => $stat) {
+		if(!file_exists($lnx)) {
+			$error++;
+			continue;
+		}
+		mybox_save_to_file($lnx,"$stat\n");
+	}
+	echo "RESTORE FILe -> $_file : ERROR $error\n";
+}
+
+$_app=basename($_SERVER["argv"][0]);
+$_case=$_SERVER["argv"][1];
+$_file=$_SERVER["argv"][2];
+if($_case!='') {
+	$_case=strtolower($_case);
+	if($_case=="backup" || $_case=="b") {
+		_backup_cf_rules_setting($_file);
+		exit(1);
+	}
+	if($_case=="restore" || $_case=="r") {
+		_restore_cf_rules_setting($_file);
+		exit(1);
+	}
+	if($_case=="help" || $_case=="h") {
+		echo "Usage: $_app [backup,b <file>] [restore,r <file>]\n";
+		exit(1);
+	}
+}
+_backup_cf_rules_setting();
+exit(1);
+?>

@@ -1,0 +1,112 @@
+#!/bin/php -f
+<?php 
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+
+// mfs-query.exc - last update 14-Oct-2005
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="mfs-query";
+include_once('clib.exl');
+include_once('captive.exl');
+putenv("PATH=/bin:/service/tools:/service/init");
+
+function chk_timeoutcmd() {
+	$_dirarray=mybox_dir2array("/tmp/timeout.*");
+	if(count($_dirarray)!=0) {
+		foreach($_dirarray as $file) {
+			if(filesize($file) < 1) continue;
+			$file1=basename($file);
+			list($name,$time)=preg_split("/\./",$file1);
+			if(time() > $time) {
+				$cmd=mybox_fget_contents($file);
+				@mybox_killall("$cmd");
+				@unlink($file);
+			}
+		}
+	}
+	unset($_dirarray);
+	clearstatcache();
+	return 1;
+}
+
+function chk_policy_load() {
+	global $_INIT_DIR;
+	$file="/var/sys/policy_load";
+	if(!file_exists($file) || filesize($file) < 1) return;
+	$_time=mybox_fget_contents($file);
+	if(time() > $_time) {
+		mybox_exec_cmd("$_INIT_DIR/policy.init restart quiet");
+		@unlink($file);
+	}
+	return;
+}
+
+function query_other() {
+	if(mybox_daemon()==0) {
+		mybox_slog("ERROR","mfs-query.exc (query_other) running in background failed.");
+		exit;
+	}
+	@touch("/var/sys/chk_mfs-query-o");
+	proc_nice(-1);
+	for(;;) {
+		@chdir("/");
+		chk_policy_load();
+		chk_timeoutcmd();
+		chk_captive_timeout("/var/cache/captive");
+		if(file_exists("/var/sys/chk_ftpd")) mybox_chk_ftp_logout(2);
+		mybox_alert_send();
+		sleep(1);
+	}
+	exit;
+}
+
+function delete_arp() {
+	if(mybox_daemon()==0) {
+		mybox_slog("ERROR","mfs-query.exc (delete_arp) running in background failed.");
+		exit;
+	}
+	mybox_arp_flush();
+	exit;
+}
+
+function init_mybox_compress_log() {
+	if(mybox_daemon()==0) {
+		exit;
+	}
+	mybox_compress_log();
+	exit(1);
+}
+
+$_app=basename($_SERVER["argv"][0]);
+$_opt=basename($_SERVER["argv"][2]);
+$_quiet=1;
+if($_opt=="debug") $_quiet=0;
+switch($_SERVER["argv"][1]) {
+	case 'o':
+		@unlink("/var/sys/chk_mfs-query-o");
+		$ret=query_other();
+		break;
+	case 'f':
+		$ret=delete_arp();
+		break;
+	case 'l':
+		mybox_compress_log();
+		break;
+	case 'bl':
+		init_mybox_compress_log();
+		break;
+	case 'p':
+		mybox_purge_log();
+		break;
+	case 'sc':
+		mybox_session_print(1);
+		break;
+	default:
+		echo "Usage: $_app [o:f:l:u:x:p]\n";
+		echo "------ o: check query other\n";
+		echo "------ f: flush ARP cache\n";
+		echo "------ l: compress logs\n";
+		echo "------ p: purge logs\n";
+		break;
+}
+exit(0);
+?>

@@ -1,0 +1,260 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="cf_index.exh";
+include_once('page.exl');
+include_once('av.exl');
+
+if(isset($dl)&&$dl!='' && isset($of)&&$of!='') {
+	if(file_exists("$_ROOT_DIR/avscan/$dl")) {
+		send_file("$_ROOT_DIR/avscan/$dl",$of);
+	}
+	exit;
+}
+
+if(!isset($u)||$u=='') exit;
+if(!isset($a)||$a=='') exit;
+
+$ip=$a;
+$url=$u;
+$auth=$i;
+if($auth=="" || $auth=="-") $auth="none";
+if($ip=="" || $ip=="0.0.0.0") $ip=trim($_SERVER['REMOTE_ADDR']);
+$sc=mybox_url_get_country($url);
+
+$myport=mybox_fget_contents("/var/sys/http-filter");
+$myurl="mybox.internal.proxy:$myport";
+$myof=basename($url);
+
+$back=trim($_SERVER['HTTP_REFERER']);
+
+function do_log($msg) {
+	global $url, $sc, $ip, $auth;
+	$ldate=time();
+	$txt="URL=$url UC=$sc HOST=$ip AUTH=$auth MSG=$msg";
+	mybox_write_log($ldate,"httpproxy_av","HTTP-PROXY-AV",$txt);
+}
+function send_file($file,$name) {
+	@session_write_close();
+	@ob_end_clean();
+	if(!is_file($file) || connection_status()!=0) return(FALSE);
+	set_time_limit(0);
+	if(strstr($_SERVER['HTTP_USER_AGENT'], "MSIE")) {
+		$name = preg_replace('/\./', '%2e', $name, substr_count($name, '.') - 1);
+	}
+	header("Cache-Control: ");
+	header("Pragma: ");
+	header("Content-Type: application/octet-stream");
+	header("Content-Length: " .(string)(filesize($file)) );
+	header('Content-Disposition: attachment; filename="'.$name.'"');
+	header("Content-Transfer-Encoding: binary\n");
+
+	if($fp=fopen($file, 'rb')){
+        	while((!feof($fp)) && (connection_status()==0) ){
+            		print(fread($fp, 1024*8));
+            		flush();
+        	}
+        	fclose($fp);
+		@unlink($file);
+	}
+    	return((connection_status()==0) and !connection_aborted());
+}
+
+function js_msg($id,$msg) {
+	echo "<script>pop_msg(\"$msg\",\"$id\");</script>";
+}
+function js_dohide($id) {
+	echo "<script>document.getElementById('$id').style.display='none';</script>";
+}
+function js_doshow($id) {
+	echo "<script>document.getElementById('$id').style.display='';</script>";
+}
+function get_info($url,&$contenttype,&$contentlength) {
+	if($fi=@fopen("$url","rb")) {
+		if(!isset($http_response_header)) return 0;
+		$contenttype="Unknown";
+		$contentlength="Unknown";
+		if(count($http_response_header)!=0) {
+			$ok=0;
+			$http_response_header=array_reverse($http_response_header);
+			foreach($http_response_header as $n) {
+				$n=trim($n);
+				if($n=='') continue;
+				list($a,$b)=preg_split("/:/",$n,2);
+				$a=trim($a);$b=trim($b);
+				if($a=='') continue;
+				if($b=='') continue;
+				if($a=="Content-Type") {
+					$contenttype="$b";
+					$ok++;
+				}
+				if($a=="Content-Length") {
+					$contentlength=$b;
+					$ok++;
+				}
+				if($ok >= 2) break;
+			}
+		}
+		return $fi;
+	}
+	return 0;
+}
+function create_id($ip,$url) {
+	$time=time();
+	$url=md5($url);
+	$file="$ip.$url";
+	return $file;
+}
+function get_dl_size($file) {
+	clearstatcache();
+	if(!file_exists($file)) return 0;
+	$filesize=sprintf("%u", filesize($file));
+	if($filesize < 0) $filesize=0;
+	return $filesize;
+}
+
+function do_download($po,$ip,$url,$size) {
+	global $back, $myport, $myof, $_ROOT_DIR;
+	$id=create_id($ip,$url);
+	$file="$_ROOT_DIR/avscan/$id";
+	$skip=0;
+	if(file_exists($file)) {
+		$osize=sprintf("%u", filesize($file));
+		if($osize < 0) @unlink($file);
+		if($size!=$osize) {
+			@unlink($file);
+		} else {
+			@touch($file);
+			$skip=1;
+			$bsize=mybox_convert_byte($osize);
+		}
+	}
+	$size=mybox_convert_byte($size);
+	$fo=fopen("$file","wb");
+	js_msg("msg","Stage 1 of 3.. downloading");
+	js_doshow('s1');
+	$cx=0;
+	if($skip==0) {
+		while(!feof($po)) {
+			$cx++;
+   			$temp=fread($po,1024);
+   			fwrite($fo, $temp);
+			$bsize='';
+			$bsize=get_dl_size($file);
+			$bsize=mybox_convert_byte($bsize);
+			if($cx >= 10) {
+				js_msg("dp1","$bsize of $size");
+				$cx=0;
+			}
+			flush();		
+ 		}
+	}
+	js_msg("dp1","$bsize of $size");
+	fclose($fo);
+	if(file_exists($file)) {
+		js_msg("msg","Stage 2 of 3.. scanning");
+		js_doshow('s2');
+		js_msg("dp2","please wait..");
+		$ff=basename($file);
+		do_log("Checking file '$myof' for virus");
+		if(mybox_av_scan($file,&$virus)==1) {
+			js_msg("dp2","Virus found $virus");
+			js_dohide('msg');
+			do_log("Virus found $virus");
+		} else {
+			js_msg("dp2","No virus found");
+			js_doshow('s3');
+			js_msg("dp3","<input type=button value='Download' onclick=\\\"return do_download('$myport','$myof','$id');\\\">");
+			js_dohide('msg');
+			do_log("No virus found");
+		}
+	}
+	return $file;
+}
+
+// clean memory
+@session_write_close();
+@ob_end_clean();
+?>
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html><head><meta http-equiv="content-type" content="text/html; charset=iso-8859-1">
+<title>
+MYBOX FIREWALL SYSTEM - Virus scanning
+</title>
+<link href="http://mybox.internal.proxy:6062/c/default.css" rel="stylesheet" type="text/css">
+<script type='text/javascript'>
+<?php /* original:
+function do_download(port,of,file) {
+	location.href="http://mybox.internal.proxy:"+port+"/avcheck.exh?dl="+file+"&of="+of;
+	return false;
+}
+// compress from http://dean.edwards.name/packer/
+*/?>
+if ( top != self ) top.location.href = unescape(window.location.pathname);
+function pop_msg(str,id) {if(document.getElementById(id)) {document.getElementById(id).style.display='';document.getElementById(id).innerHTML=str;}else{alert(str);}};
+eval(function(p,a,c,k,e,r){e=function(c){return c.toString(a)};if(!''.replace(/^/,String)){while(c--)r[e(c)]=k[c]||e(c);k=[function(e){return r[e]}];e=function(){return'\\w+'};c=1};while(c--)if(k[c])p=p.replace(new RegExp('\\b'+e(c)+'\\b','g'),k[c]);return p}('f 2(a,b,c){1.d="4://3.5.0:"+a+"/7.8?9="+c+"&6="+b;e g}',17,17,'proxy|location|do_download|mybox|http|internal|of|avcheck|exh|dl||||href|return|function|false'.split('|'),0,{}))
+</script>
+</head>
+<body scroll=auto>
+<table align="center" cellpadding=0 cellspacing=0 width="80%">
+
+<tr>
+<td>
+<table border=0 cellpadding=0 cellspacing=0>
+<tr>
+<td>
+<img src="http://mybox.internal.proxy:6062/i/mybox-logo.gif" alt="">
+</td>
+</tr>
+<tr>
+<td>
+<h1>Virus scanning</h1>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+
+<tr>
+<td>
+<span id=msg class="notice" style='display: none;'></span>
+</td>
+</tr>
+
+<tr>
+<td>
+<table class="tb">
+<tr><td class="t1">URL</td><td class="t2"><?php echo wordwrap($url, 500, "<br />",true);?></td></tr>
+<tr><td class="t1">Content type</td><td id='c1' class="t2">--</td></tr>
+<tr><td class="t1">Content size</td><td id='c2' class="t2">--</B></td></tr>
+<tr id='s1' style='display: none;'>
+<td class="t1">Downloading</td>
+<td class="t2" id='dp1'></td>
+</tr>
+<tr id='s2' style='display: none;'>
+<td class="t1">Scanning</td>
+<td class="t2" id='dp2'></td>
+</tr>
+</table>
+</tr>
+</td>
+
+<tr id='s3' style='display: none;'>
+<td id='dp3'>
+</td>
+</tr>
+</table>
+</body>
+</html>
+<?php 
+js_msg("msg","Getting info..");
+$po=get_info($url,&$contenttype,&$contentlength);
+$nsize=mybox_convert_byte($contentlength);
+js_msg("c1","$contenttype");
+js_msg("c2","$nsize");
+js_dohide("msg");
+$file=do_download($po,$ip,$url,$contentlength);
+@fclose($po);
+exit;
+?>
+

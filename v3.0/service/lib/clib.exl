@@ -1,0 +1,15 @@
+<?php 
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+include_once('global.exl');
+include_once('confarray.exl');
+include_once('tools.exl');
+include_once('utils.exl');
+include_once('backup.exl');
+include_once('sessions.exl');
+include_once('update.exl');
+include_once('db.exl');
+include_once('net.exl');
+include_once('logs.exl');
+include_once('graph.exl');
+include_once('alert.exl');
+?>

@@ -1,0 +1,434 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="system_nettools";
+include_once('page.exl');
+mybox_chk_session();
+mybox_send_nocache();
+
+
+$db_id=mybox_db_connect($_DB_NAME);
+
+if(mybox_chk_level($_LOGIN['auth_id'],2)==1 && isset($do_save)&&$do_save!='') {
+	if($do_save==1) {
+		if(isset($do_cmd)&&$do_cmd=='') {
+			exit;
+		} elseif(isset($do_cmd)&&$do_cmd!='') {
+			echo "<html><head><title>$do_cmd</title>";
+			echo "<META HTTP-EQUIV='Pragma' CONTENT='no-cache'>";
+			echo "<META HTTP-EQUIV='Cache-Control' CONTENT='no-store, no-cache, must-revalidate'>";
+			echo "<script language='javascript'>";
+			echo "function do_scroll() {";
+			echo "if (scrolling) { window.scroll(1,500000);}";
+			echo "window.setTimeout('do_scroll()', 100);";
+			echo "}";
+			echo "scrolling = true;";
+			echo "do_scroll();";
+			echo "</script>";
+			echo "</head>";
+			echo "<body scroll='auto' onfocus='scrolling=false' onblur='scrolling=true;self.focus();' style='border: 0px; background: #000000;white-space: pre; font-size: 11px;font-family: courier new, courier;table-layout: fixed;'>";
+			echo "<pre style='border: 0px; background: #000000; color: #FFFF00; white-space: pre; font-size: 11px;font-family: courier new, courier; table-layout: fixed;'>";		
+			$do_cmd=escapeshellcmd($do_cmd);
+			if(isset($tr)&&$tr==1) $do_cmd="$do_cmd |sed -e 's/>/ /g' -e 's/</ /g'";
+			if(isset($tout)&&$tout!='') {
+				$tout +=5;
+				$tout=time() + $tout;
+				$filename="/tmp/timeout.$tout";
+				mybox_save_to_file($filename,"$do_cmd");
+			}
+			system("$do_cmd 2>&1",$ret);
+			if($ret==1 || $ret==9) echo "\nTimeout";
+			
+			echo "</pre>";
+			echo "<script>scrolling=false;</script>";
+			echo "</body></html>";
+			exit;
+		}
+	}
+	if($do_save==2) {
+		echo "<html><head><title>$do_cmd</title>";
+		echo "<META HTTP-EQUIV='Pragma' CONTENT='no-cache'>";
+		echo "<META HTTP-EQUIV='Cache-Control' CONTENT='no-store, no-cache, must-revalidate'>";
+		echo "<LINK REL=StyleSheet HREF='/c/mybox_style.css' TYPE='text/css'>";
+		echo "</head>";
+		echo "<body scroll=no>";
+		echo "<table class=data style='margin: 0px;'>";
+		$_cal_array=array();
+		$_cal_array=mybox_ipcalc($ip,$mask);
+		if(count($_cal_array)!=0) {
+			unset($_cal_array['type']);
+			$_aa['ip']="IP Address";
+			$_aa['netmask']="Netmask";
+			$_aa['wildcard']="Wildcard";
+			$_aa['broadcast']="Broadcast";
+			$_aa['network']="Network";
+			$_aa['hostmin']="IP min.";
+			$_aa['hostmax']="IP max.";
+			$_aa['total']="Total IP";
+			$_aa['prefix']="Network prefix";
+			foreach($_cal_array as $a => $b) {
+				echo "<tr><td class=tdname>{$_aa[$a]}</td><td class=tdvalue>$b</td></tr>";
+			}
+			unset($_aa);
+		}
+		
+		echo "</table>";
+		echo "</body></html>";
+		exit;
+	}
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied";
+	}
+}
+
+$_int=mybox_if_dev_up_array();
+if(!isset($tab)||$tab=='') $tab=1;
+
+?>
+<html>
+<head>
+<title>MyAdmin</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<script type='text/javascript' src="/j/mybox_func.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?php echo $_LOGIN['auth_id'];?>";
+	page_load();
+</script>
+<script type='text/javascript'>
+function do_submit() {
+	<?php if($tab==1 || $tab==2){?>
+	var ip=Trim(document.f.ip.value);
+	var tout=Trim(document.f.tout.value);
+	if(!isnum(tout)) {
+		pop_msg("Invalid timeout");
+		return false;
+	}
+	if(!mip1(ip)) {
+		pop_msg("Invalid IP Address");
+		return false;
+	}
+	<?php  } ?>
+	<?php if($tab==1) {?>
+	var cnt=Trim(document.f.cnt.value);
+	if(!isnum(cnt)) {
+		pop_msg("Invalid count number");
+		return false;
+	}
+	var url='/system_nettools.exh?do_save=1&do_cmd=ping -c '+cnt+' -w '+cnt+' -W '+cnt+' '+ip+'&tout='+cnt;
+	<?php } // tab==1
+	if($tab==2) {?>
+	var opt='';
+	for(var i = 0; i < document.f.elements.length; i++) {
+		if(document.f.elements[i].type=='checkbox') {
+		    	if( document.f.elements[i].name.substr( 0, 3 ) == 'oop') {
+				if(document.f.elements[i].checked) {
+					var op='-' + document.f.elements[i].value;
+					opt +=op+' ';
+				}
+    			}	
+		}
+  	}
+	opt=Trim(opt);
+	var url='/system_nettools.exh?do_save=1&do_cmd=traceroute -n '+opt+' '+ip+' &tout='+tout;
+	<?php }//tab==2?>
+	<?php if($tab==3){?>
+	var host=Trim(document.f.host.value);
+	if(host=='') {
+		pop_msg("Hostname no defined");
+		return false;
+	}
+	var srv=Trim(document.f.srv.value);
+	var tout=Trim(document.f.tout.value);
+	if(!isnum(tout)) {
+		pop_msg("Invalid timeout");
+		return false;
+	}
+	var url='/system_nettools.exh?do_save=1&do_cmd=nslookup '+host+' '+srv+'&tout='+tout;
+	<?php }//tab==3?>
+	<?php if($tab==4){?>
+	var ip=Trim(document.f.ip.value);
+	var tout=Trim(document.f.tout.value);
+	var cnt=Trim(document.f.cnt.value);
+	var dev=Trim(document.f.dev.value);
+	if(!isnum(tout)) {
+		pop_msg("Invalid timeout");
+		return false;
+	}
+	if(!mip1(ip)) {
+		pop_msg("Invalid IP Address");
+		return false;
+	}
+	if(!isnum(cnt)) {
+		pop_msg("Invalid count number");
+		return false;
+	}
+	var opt='';
+	for(var i = 0; i < document.f.elements.length; i++) {
+		if(document.f.elements[i].type=='checkbox') {
+		    	if( document.f.elements[i].name.substr( 0, 3 ) == 'oop') {
+				if(document.f.elements[i].checked) {
+					var op='-' + document.f.elements[i].value;
+					opt +=op+' ';
+				}
+    			}	
+		}
+  	}
+	opt=Trim(opt);
+	if(dev!='') {
+		var cmd =' '+opt+' -w '+tout+' -c '+cnt+' -I '+dev+' '+ip;
+	} else {
+		var cmd =' '+opt+' -w '+tout+' -c '+cnt+' '+ip;
+	};
+	cmd=Trim(cmd);
+	var url='/system_nettools.exh?do_save=1&do_cmd=arping '+cmd+' &tout='+tout;;
+	<?php }//tab==4?>
+	<?php if($tab==5){?>
+	var host=Trim(document.f.host.value);
+	if(host=='') {
+		pop_msg("Source address no defined");
+		return false;
+	}
+	var tout=Trim(document.f.tout.value);
+	if(!isnum(tout)) {
+		pop_msg("Invalid timeout");
+		return false;
+	}
+	var url='/system_nettools.exh?do_save=1&do_cmd=nbtscan '+host+'&tr=1&tout='+tout;
+	<?php }//tab==5?>
+	<?php if($tab==6){?>
+	var ip=Trim(document.f.ip.value);
+	if(ip=='' || !mip1(ip)) {
+		pop_msg("Invalid address");
+		return false;
+	}
+	var mask=Trim(document.f.mask.value);
+	var url='/system_nettools.exh?do_save=2&ip='+ip+'&mask='+mask+'';
+	<?php }//tab==6?>
+	do_show('run1');
+	document.getElementById('run2').src=url;
+	return true;
+}
+</script>
+</head>
+<body onload="load_menu('sub1','t1d3','s1i3');" scroll="auto">
+<form name=f method=post action="/system_nettools.exh">
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 0px;'>
+<tr>
+<td>
+<?php mybox_page_section("System / IP Tools");?>
+<br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="/system_nettools.exh?tab=1" <?php if($tab==1){?>class="tabact"<?php }?>>Ping</a></li>
+<li><a href="/system_nettools.exh?tab=2" <?php if($tab==2){?>class="tabact"<?php }?>>Traceroute</a></li>
+<li><a href="/system_nettools.exh?tab=3" <?php if($tab==3){?>class="tabact"<?php }?>>NSlookup</a></li>
+<li><a href="/system_nettools.exh?tab=4" <?php if($tab==4){?>class="tabact"<?php }?>>ARPing</a></li>
+<li><a href="/system_nettools.exh?tab=5" <?php if($tab==5){?>class="tabact"<?php }?>>Netbios probe</a></li>
+<li><a href="/system_nettools.exh?tab=6" <?php if($tab==6){?>class="tabact"<?php }?>>IP Calculator</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td> 
+<?php mybox_page_msg($msg);?>
+<br>
+
+<!-- tab container -->
+<?php if($tab==1) {?>
+<table class="data">
+<tbody>
+<tr>
+<td valign="top" class="tdname">IP Address</td>
+<td valign="top" class="tdvalue"><input name="ip" type="text" class="valbox2" value=""></td>
+</tr>
+<tr>
+<td valign="top" class="tdname">Count</td>
+<td valign="top" class="tdvalue"><input name="cnt" type="text" class="valbox" size="5" value="3"> Send only COUNT pings</td>
+</tr>
+<tr>
+<td valign="top" class="tdname">Timeout</td>
+<td valign="top" class="tdvalue"><input name="tout" type="text" class="valbox" size="5" value="3"> Pings timeout in (n) second(s)</td>
+</tr>
+</tbody>
+</table>
+<?php  } //tab==1?>
+<?php if($tab==2) {?>
+<table class="data">
+<tbody>
+<tr>
+<td valign="top" class="tdname">IP Address</td>
+<td valign="top" class="tdvalue"><input name="ip" type="text" class="valbox2" value=""></td>
+</tr>
+<tr>
+<td valign="top" class="tdname">Timeout</td>
+<td valign="top" class="tdvalue"><input name="tout" type="text" class="valbox" size="5" value="60"> Traceroute timeout in (n) second(s)</td>
+</tr>
+<tr>
+<td valign="top" class="tdname">Additional Options</td>
+<td valign="top" class="tdvalue">
+<table width="60%" style='border: 0px; margin-bottom: 0px;'>
+<tr>
+<td style='border: 0px;'><input name='oop[]' type='checkbox' value="F"> Set the don't fragment bit</td>
+<td style='border: 0px;'><input name='oop[]' type='checkbox' value="I"> Use ICMP ECHO</td>
+</tr>
+<tr>
+<td style='border: 0px;'><input name='oop[]' type='checkbox' value="l"> Display the ttl</td>
+<td style='border: 0px;'><input name='oop[]' type='checkbox' value="r"> Send directly to a host
+</td>
+</tr>
+<tr>
+<td style='border: 0px;' colspan=2><input name='oop[]' type='checkbox' value="v"> Verbose output</td>
+</td>
+</tr>
+</table>
+</tbody>
+</table>
+<?php  } //tab==2?>
+<?php if($tab==3) {?>
+<table class="data">
+<tbody>
+<tr>
+<td valign="top" class="tdname">Hostname</td>
+<td valign="top" class="tdvalue"><input name="host" type="text" class="valbox2" value=""> Hostname to lookup</td> 
+</tr>
+<tr>
+<td valign="top" class="tdname">Server</td>
+<td valign="top" class="tdvalue"><input name="srv" type="text" class="valbox2" value=""> DNS Server to use. (Optional)</td>
+</tr>
+<tr>
+<td valign="top" class="tdname">Timeout</td>
+<td valign="top" class="tdvalue"><input name="tout" type="text" class="valbox" size="5" value="60"> Nslookup timeout in (n) second(s)</td>
+</tr>
+</tbody>
+</table>
+<?php  } //tab==3?>
+<?php if($tab==4) {?>
+<table class="data">
+<tbody>
+<tr>
+<td valign="top" class="tdname">IP Address</td>
+<td valign="top" class="tdvalue"><input name="ip" type="text" class="valbox2" value=""></td>
+</tr>
+<tr>
+<td valign="top" class="tdname">Count</td>
+<td valign="top" class="tdvalue"><input name="cnt" type="text" class="valbox" size="5" value="3"> Stop after sending count ARP request packets</td>
+</tr>
+<tr>
+<td valign="top" class="tdname">Timeout</td>
+<td valign="top" class="tdvalue"><input name="tout" type="text" class="valbox" size="5" value="20"> ARPing timeout in (n) second(s)</td>
+</tr>
+<tr>
+<td valign="top" class="tdname">Device</td>
+<td valign="top" class="tdvalue">
+<?php 
+$data_a=array();
+foreach(mybox_list_devname($db_id) as $dev => $name) {
+	if($_int[$dev]!=1) continue;
+	$data_a[$name]=$dev;
+}
+echo mybox_select_box('snsel1',$data_a,"",'dev');
+?>
+Outgoing interface name. (Optional)
+</td>
+</tr>
+<tr>
+<td valign="top" class="tdname">Additional Options</td>
+<td valign="top" class="tdvalue">
+<table class="data" style='border: 0px; margin-bottom: 0px; width: 400px;'>
+<tr>
+<td style='border: 0px;'><input name='oop[]' type='checkbox' value="f"> Quit on first ARP reply</td>
+<td style='border: 0px;'><input name='oop[]' type='checkbox' value="b"> Keep broadcasting</td>
+</tr>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+<?php  } //tab==4?>
+
+<?php if($tab==5) {?>
+<table class="data">
+<tbody>
+<tr>
+<td valign="top" class="tdname">Source Address</td>
+<td valign="top" class="tdvalue"><input name="host" type="text" class="valbox2" value=""> IP/Network to scan</td> 
+</tr>
+<tr>
+<td valign="top" class="tdname">Timeout</td>
+<td valign="top" class="tdvalue"><input name="tout" type="text" class="valbox" size="5" value="60"> Scan timeout in (n) second(s)</td>
+</tr>
+</tbody>
+</table>
+<?php  } //tab==5?>
+<?php if($tab==6) {?>
+<table class="data">
+<tbody>
+<tr>
+<td valign="middle" class="tdname">Address (Host or Network)</td>
+<td valign="middle" class="tdvalue"><input name="ip" type="text" class="valbox2" value=""></td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Netmask</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array();
+if(count($_CLASSIP)!=0) {
+	foreach($_CLASSIP as $_pprefix => $_mmask) {
+		$data_a["/$_pprefix ($_mmask)"]="$_pprefix";
+	}
+}
+$set_a=array("height"=>"150px");
+echo mybox_select_box('snsel2',$data_a,"24",'mask',$set_a);
+?>
+</td>
+</tr>
+</tbody>
+</table>
+<?php  } //tab==6?>
+<table width="100%" align=center>
+<tbody>
+<tr>
+<td colspan=2 align='right'>
+<a name="sini"><a class="btn" href="#sini" onclick="return do_submit();return false;"><?php if($tab==6){?>Calculate<?php }else{?>Execute<?php }?></a>
+</tr>
+</tbody>
+</table>
+<br>
+<table width="100%" style='margin-top: 10px;'>
+<tbody>
+<tr id='run1' style='display: none;'>
+<td colspan=2>
+<iframe id="run2" src="system_nettools.exh?do_save=1&do_cmd=" scrolling="auto" frameborder="0" marginwidth='0' marginheight='0' noresize width="610" height="200" style='border-style: solid;border-width: 0px; table-layout: fixed; overflow-x: hidden;'></iframe>
+<br>
+<a href='#' onclick="document.getElementById('run2').src='system_nettools.exh?do_save=1&do_cmd=';do_hide('run1');"><b>Close</b></a>
+</td></tr>
+</tbody>
+</table>
+<!-- end tab container -->
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?php echo $tab;?>>
+</form>
+<script type='text/javascript'>page_kill();</script>
+</body>
+</html>
+
+<?php mybox_db_close($db_id);?>

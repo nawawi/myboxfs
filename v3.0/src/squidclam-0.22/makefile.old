@@ -1,0 +1,21 @@
+ifndef $(DESTDIR)
+        DESTDIR="/usr/local/bin"
+endif
+
+CFLAGS=-lbz2 -lclamav -lcrypto -lcurl -ldl -lgmp -lpthread -lssl -L/usr/lib -lz 
+
+all:    squidclam.c
+	gcc -Wall -lbz2 -lclamav -lcrypto -lcurl -ldl -lgmp -lpthread -lssl -L/usr/lib -lz  -s -o squidclam squidclam.c
+
+debug:    squidclam.c
+	gcc -Wall -DDEBUG -lbz2 -lclamav -lcrypto -lcurl -ldl -lgmp -lpthread -lssl -L/usr/lib -lz  -g -O2 -o squidclam squidclam.c
+
+clean: 
+	rm -f squidclam Makefile
+
+install: squidclam
+	cp squidclam $(DESTDIR)/.
+
+tar: clean
+	tar --owner=nobody --group=nobody -cvzC .. -f ../release/squidclam-0.11.tar.gz squidclam-0.11 
+	md5sum ../release/squidclam-0.11.tar.gz | tee ../release/squidclam-0.11.md5

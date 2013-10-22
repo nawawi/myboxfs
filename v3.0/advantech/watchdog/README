@@ -1,0 +1,30 @@
+Linux Kernel Version 2.4 Watchdog Setting Guide
+===============================================
+1. compile watchdog driver
+  - cd drv-2.4
+  - modify following of ../Rules.make if needed
+      KERNELDIR = /usr/src/linux-2.4 
+  - make
+2. insert watchdog module and set timeout to 10 seconds
+  - insmod wdt.o timeout=10
+3. install watchdog daemon
+  - cd ../utils
+  - ./watchdogd
+4. panic the system, and check the system will reboot after 10 seconds
+  - cd ../panic
+  - make -f Makefile-2.4
+  - insmod panic.o 
+
+Linux Kernel Version 2.6 Watchdog Setting Guide
+===============================================
+1. compile driver
+  - Kernel 2.6 has watchdog driver 
+2. insert module and set watchdog timeout to 10 seconds
+  - insmod /lib/modules/2.6.8-2-686/kernel/drivers/char/watchdog/w83627hf_wdt.ko timeout=10
+3. install watchdog daemon
+  - cd utils
+  - ./watchdogd
+4. panic the system, and check the system will reboot after 10 seconds
+  - cd ../panic
+  - make 
+  - insmod panic.ko 

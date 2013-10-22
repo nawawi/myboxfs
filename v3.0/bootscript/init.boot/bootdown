@@ -1,0 +1,17 @@
+#!/bin/sh
+# $Id: bootdown.sh,v 7.0 2008/01/21 03:29:00 nawawi Exp $
+
+trap : 1 2 3 15
+PATH="/bin"
+TERM=linux
+export PATH TERM
+umask 077
+cd /
+. /etc/init.boot/functions
+
+if [ -f "/var/sys/strg_mount" ]; then
+	for f in $(cat /var/sys/strg_mount); do
+		umount -r $f >/dev/null 2>&1
+	done
+fi
+exit 0;

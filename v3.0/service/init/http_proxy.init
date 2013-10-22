@@ -1,0 +1,1185 @@
+#!/bin/php -Cq
+<?php 
+// cf.init - last update 16-Jul-2007
+//http_proxy.init - last update 23-Aug-2007
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="http_proxy";
+include_once('clib.exl');
+include_once('policy.exl');
+putenv("PATH=/bin:/service/tools:/service/init");
+
+$_QUIET=0;
+
+mybox_init_set_alarm(60);
+
+if(!file_exists("/bin/squid") || !file_exists("/bin/urlfilter")) {
+	mybox_init_echo($_QUIET,"ERROR","Cannot execute http_proxy.init. Internal error!");
+	exit(1);
+}
+
+function do_clean_file() {
+	@unlink("/var/sys/http_proxy_trans.set");
+	@unlink("/var/sys/http-filter");
+	@unlink("/var/sys/http_proxy_networks");
+	@unlink("/var/sys/http_proxy_port");
+}
+
+function cf_write_user_auth($db_id) {
+	$txt='';
+	$_datau=array();
+	$result=mybox_db_query("select * from auth_user where stat='1'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			$_passwd=mybox_str_decrypt($row['passwd']);
+			$_passwd=crypt($_passwd);
+			$_datau[$_name]="$_name:$_passwd\n";
+		}
+	}
+	unset($_name,$_passwd);
+	$result=mybox_db_query("select name,members from group_user",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			$_members=$row['members'];
+			$lst_a=explode(",",$_members);
+			if(count($lst_a)!=0) {
+				foreach($lst_a as $nm) {
+					if($_datau[$nm]!='') {
+						$_datau[$_name] .=$_datau[$nm];
+					}
+				}
+			} else {
+				if($_datau[$_members]!='') $_datau[$_name] .=$_datau[$_members];
+			}
+		}
+	}
+	unset($_name,$_members,$lst_a,$nm);
+	$result=mybox_db_query("select name from cf_user",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$name=$row['name'];
+			if($name=='') continue;
+			if($_datau[$name]!='') {
+				$txt .=$_datau[$name];
+			}
+		}
+	}
+	$_cf_user_chk=array();
+	$txt_a=explode("\n",$txt);
+	$txt='';
+	if(count($txt_a)!=0) {
+		foreach($txt_a as $p) {
+			$p=trim($p);
+			if($p=='') continue;
+			if($_cf_user_chk[$p]==1) continue;
+			$txt .="$p\n";
+			$_cf_user_chk[$p]=1;
+			unset($p);
+		}
+	}
+	if($txt!='') {
+		mybox_save_to_file("/etc/cf/proxy_auth",$txt);
+		return 1;
+	}
+	mybox_init_echo($_QUIET,"ERROR","HTTP Proxy service, user not found for 'Basic user authentication' mode. Change to Standard mode");
+	return 0;
+}
+
+$_trans_exp=array();
+function cf_networks($db_id,$name) {
+	$_defnet_array=mybox_defnetwork_array($db_id);
+	$namedev_array=mybox_name2dev_array($db_id);
+	$_networks='';
+	if(stripos($name,",")===FALSE) $name="$name,";
+
+	$_nml=preg_split("/,/",$name);
+	if(count($_nml)!=0) {
+		foreach($_nml as $_a) {
+			if($_a=='') continue;
+			if(isset($namedev_array[$_a])&&$namedev_array[$_a]!='') {
+				if(strpos($namedev_array[$_a],"/")===FALSE) {
+					$_networks .="{$namedev_array[$_a]}/32 ";
+				} else {
+					$_networks .="{$namedev_array[$_a]} ";
+				}
+			} else {
+				if(isset($_defnet_array[$_a]['name']) && $_defnet_array[$_a]['name']!='') {
+					if($_defnet_array[$_a]['type']==2) {
+						$_networks .="{$_defnet_array[$_a]['ip']} ";
+					}
+				} elseif(isset($_defnet_array[$_a]['group']) && $_defnet_array[$_a]['group']!='') {
+					foreach($_defnet_array[$_a] as $a1 => $_b) {
+						if(!is_array($_b)) continue;
+						if($_b['type']==1) {
+							$_networks .="{$_b['ip']} ";
+						} elseif($_b['type']==2) {
+							$_networks .="{$_b['ip']}/32 ";
+						}
+					}
+				}
+			}
+		}
+	} else {
+		if(isset($namedev_array[$_a])&&$namedev_array[$_a]!='') {
+			if(strpos($namedev_array[$_a],"/")===FALSE) {
+				$_networks .="{$namedev_array[$_a]}/32 ";
+			} else {
+				$_networks .="{$namedev_array[$_a]} ";
+			}
+		} else {
+			if(isset($_defnet_array[$_list_array]['name']) && $_defnet_array[$_list_array]['name']!='') {
+				if($_defnet_array[$_list_array]['type']==2) {
+					$_networks .="{$_defnet_array[$_list_array]['ip']} ";
+				}
+			} elseif(isset($_defnet_array[$_list_array]['group']) && $_defnet_array[$_list_array]['group']!='') {
+				foreach($_defnet_array[$_list_array] as $a1 => $_b) {
+					if(!is_array($_b)) continue;
+					if($_b['type']==1) {
+						$_networks .="{$_b['ip']} ";
+					} elseif($_b['type']==2) {
+						$_networks .="{$_b['ip']}/32 ";
+					}
+				}
+			}
+		}
+	}
+	unset($a);
+	$_networks=trim($_networks);
+	return $_networks;
+}
+
+function cf_url_filter($_cf_http_filter,$_cf_http_filter_c,$_cf_http_ext_block_stat,$_cf_http_redirect,$_cf_http_av_stat) {
+	global $_PAT_PATH, $_PAT_PATH;
+	$list=mybox_dir2array("$_PAT_PATH/blacklist/*");
+	$url_conf='';$pass='';$conf='';
+	$url_pass='';$src_allow='';$url_acl='';$ext_acl='';
+	$conf .="dbhome $_PAT_PATH/blacklist\n";
+	//$conf .="logdir /var/log\n";
+	@unlink("/etc/cf/urlfilter.conf");
+	if(count($list)!=0) {
+		foreach($list as $dir) {
+			if(!is_dir($dir)) continue;
+			$_stat=mybox_fget_contents("$dir/stat");
+			$_dx=basename($dir);
+			if($_cf_http_filter_c==0 && $_dx=="url_block") continue;
+			if($_cf_http_filter==0 && $_dx!="url_block") continue;
+			if($_cf_http_filter==1) { // allow everything except selection
+				if($_stat==1) {
+					$url_conf .=mybox_fget_contents("$dir/ACL")."\n";
+					$url_pass .="!{$_dx} ";
+					$src_allow .="{$_dx} ";
+				}
+			} elseif($_cf_http_filter==2) {// block everything except selection
+				if($_stat==0) {
+					$url_conf .=mybox_fget_contents("$dir/ACL")."\n";
+					$url_pass .="!{$_dx} ";
+					$src_allow .="{$_dx} ";
+				}
+			}
+			unset($_stat,$_dx);
+		}
+		$url_pass=trim($url_pass);
+		$url_conf=trim($url_conf);
+		if($url_conf!='') $conf .="$url_conf\n";
+		unset($_dx,$_stat);
+	}
+	
+	if($_cf_http_filter_c==1 && $_cf_http_filter==0) {
+		$url_conf .=mybox_fget_contents("$_PAT_PATH/blacklist/url_block/ACL")."\n";
+		$url_pass .="!url_block ";
+		$src_allow .="url_block ";
+		$url_pass=trim($url_pass);
+		$url_conf=trim($url_conf);
+		if($url_conf!='') $conf .="$url_conf\n";
+	}
+	if(file_exists("/etc/cf/dst_url_exp")) {
+		$conf .="dest domain_allow_url {\n";
+		$conf .="\tdomainlist /etc/cf/dst_url_exp\n";
+		$conf .="}\n";
+		$url_pass_allow .="domain_allow_url ";
+	}
+	if(file_exists("/etc/cf/src_url_exp")) {
+		$conf .="src src_allow_url {\n";
+		$conf .="\tiplist /etc/cf/src_url_exp\n";
+		$conf .="}\n";
+		$src_allow=trim($src_allow);
+		if($src_allow!='') {
+			$url_acl .="\tsrc_allow_url {\n";
+			$url_acl .="\t\tpass $src_allow none\n";
+			$url_acl .="\t}\n";
+		}
+	}
+	if(file_exists("/etc/cf/usr_url_exp")) {
+		$conf .="src user_allow_url {\n";
+		$conf .="\tuserlist /etc/cf/usr_url_exp\n";
+		$conf .="}\n";
+		$url_pass_allow .="user_allow_url ";
+	}
+	$url_pass_allow=trim($url_pass_allow);
+
+	$ext_pass='';$ext_conf='';
+	if($_cf_http_ext_block_stat==1) {
+		if(file_exists("/etc/cf/dst_ext_exp")) {
+			$ext_conf .="dest domain_allow_ext {\n";
+			$ext_conf .="\tdomainlist /etc/cf/dst_ext_exp\n";
+			$ext_conf .="}\n";
+			$ext_pass .="domain_allow_ext ";
+		}
+		if(file_exists("/etc/cf/src_ext_exp")) {
+			$ext_conf .="src src_allow_ext {\n";
+			$ext_conf .="\tiplist /etc/cf/src_ext_exp\n";
+			$ext_conf .="}\n";
+			$ext_acl .="\tsrc_allow_ext {\n";
+			$ext_acl .="\t\t pass ext_block none\n";
+			$ext_acl .="\t}\n";
+		}
+		if(file_exists("/etc/cf/usr_ext_exp")) {
+			$ext_conf .="src user_allow_ext {\n";
+			$ext_conf .="\tuserlist /etc/cf/usr_ext_exp\n";
+			$ext_conf .="}\n";
+			$ext_pass .="user_allow_ext ";
+		}
+		$ext_pass=trim($ext_pass);
+		$ext_conf=trim($ext_conf);
+		$ext_block='';
+		@unlink("/etc/cf/ext_list");
+		if(file_exists("$_PAT_PATH/blacklist/EXT_BLOCK")) {
+			$ext='';
+			$buff=mybox_file2array("$_PAT_PATH/blacklist/EXT_BLOCK");
+			if(count($buff)!=0) {
+				foreach($buff as $lx) {
+					$lx=trim($lx);
+					if($lx{0}=="#") continue;
+					$lx=trim($lx,".");
+					$ext .="\.{$lx}\$|";
+				}
+				$ext=trim(trim($ext,"|"));
+				if($ext!='') {
+					mybox_save_to_file("/etc/cf/ext_list","/[^&?]+($ext)\n");
+					if(file_exists("/etc/cf/ext_list")) {
+						if($ext_conf!='') $conf .="$ext_conf\n";
+						$conf .="dest ext_block {\n";
+						$conf .="\texpressionlist /etc/cf/ext_list\n";
+						$conf .="\tredirect http://mybox.internal.proxy:6062/?t=ext&c=ERR_EXTENTION&a=%a&i=%i&u=%u\n";
+						$conf .="}\n";
+						$ext_block="!ext_block";
+					}
+				} else {
+					$ext_pass='';
+				}
+			}
+			unset($buff,$ext);
+		}
+		if(file_exists("$_PAT_PATH/blacklist/EXT_URL_MIME")) {
+			$ext='';
+			$buff=mybox_file2array("$_PAT_PATH/blacklist/EXT_URL_MIME");
+			if(count($buff)!=0) {
+				foreach($buff as $lx) {
+					$lx=trim($lx);
+					if($lx{0}=="#") continue;
+					$ext .="$lx\n";
+				}
+				$ext=trim($ext);
+				if($ext!='') mybox_save_to_file("/etc/cf/ext_mime_list","$ext\n");
+			}
+			unset($buff,$ext);
+		}
+	}
+
+	$av_pass='';$av_conf='';
+	if($_cf_http_av_stat==1) {
+		if(file_exists("/etc/cf/dst_av_exp")) {
+			$av_conf .="dest domain_allow_av {\n";
+			$av_conf .="\tdomainlist /etc/cf/dst_av_exp\n";
+			$av_conf .="}\n";
+			$av_pass .="domain_allow_av ";
+		}
+		if(file_exists("/etc/cf/src_av_exp")) {
+			$av_conf .="src src_allow_av {\n";
+			$av_conf .="\tiplist /etc/cf/src_av_exp\n";
+			$av_conf .="}\n";
+			$av_acl .="\tsrc_allow_av {\n";
+			$av_acl .="\t\t pass ext_av none\n";
+			$av_acl .="\t}\n";
+		}
+		if(file_exists("/etc/cf/usr_av_exp")) {
+			$av_conf .="src user_allow_av {\n";
+			$av_conf .="\tuserlist /etc/cf/usr_av_exp\n";
+			$av_conf .="}\n";
+			$av_pass .="user_allow_av ";
+		}
+		$av_pass=trim($av_pass);
+		$av_conf=trim($av_conf);
+		$av_scan='';
+		@unlink("/etc/cf/av_list");
+		if(file_exists("$_PAT_PATH/blacklist/EXT_AV")) {
+			$ext='';
+			$buff=mybox_file2array("$_PAT_PATH/blacklist/EXT_AV");
+			if(count($buff)!=0) {
+				foreach($buff as $lx) {
+					$lx=trim($lx);
+					if($lx{0}=="#") continue;
+					$lx=trim($lx,".");
+					$ext .="\.{$lx}\$|";
+				}
+				$ext=trim(trim($ext,"|"));
+				if($ext!='') {
+					mybox_save_to_file("/etc/cf/av_list","/[^&?]+($ext)\n");
+					if(file_exists("/etc/cf/av_list")) {
+						if($av_conf!='') $conf .="$av_conf\n";
+						$conf .="dest ext_av {\n";
+						$conf .="\texpressionlist /etc/cf/av_list\n";
+						$conf .="\tredirect http://mybox.internal.proxy:6062/avcheck.exh?a=%a&i=%i&u=%u\n";
+						$conf .="}\n";
+						$av_scan="!ext_av";
+					}
+				} else {
+					$av_pass='';
+				}
+			}
+			unset($buff,$ext);
+		}
+		@unlink("/etc/cf/av_mime_list");
+		if(file_exists("$_PAT_PATH/blacklist/EXT_AV_MIME")) {
+			$ext='';
+			$buff=mybox_file2array("$_PAT_PATH/blacklist/EXT_AV_MIME");
+			if(count($buff)!=0) {
+				foreach($buff as $lx) {
+					$lx=trim($lx);
+					if($lx{0}=="#") continue;
+					$ext .="$lx\n";
+				}
+				$ext=trim($ext);
+				if($ext!='') mybox_save_to_file("/etc/cf/av_mime_list","$ext\n");
+			}
+			unset($buff,$ext);
+		}
+	}
+
+	$conf .="acl {\n";
+	if($url_acl!='') $conf .="$url_acl";
+	if($ext_acl!='') $conf .="$ext_acl";
+	if($av_acl!='') $conf .="$av_acl";
+        $conf .="\tdefault {\n";
+	$conf .="\t\tpass";
+	if($url_pass_allow!='') $conf .=" $url_pass_allow";
+	if($url_pass!='') $conf .=" $url_pass";
+	if($ext_pass!='') $conf .=" $ext_pass";
+	if($ext_block!='') $conf .=" $ext_block";
+	if($av_pass!='') $conf .=" $av_pass";
+	if($av_scan!='') $conf .=" $av_scan";
+	$conf .=" all\n";
+	$conf .="\t}\n";
+	$conf .="}\n";
+
+	if($conf!='') mybox_save_to_file("/etc/cf/urlfilter.conf","$conf");
+	if(file_exists("/etc/cf/urlfilter.conf")) return 1;
+	return 0;
+}
+
+$_IS_AUTH=0;
+function cf_set_exeption($db_id) {
+	global $_PAT_PATH, $_IS_AUTH, $_trans_exp;
+	@unlink("/etc/cf/domain.allow");
+	@unlink("/etc/cf/content.allow");
+	@unlink("/etc/cf/redirect");
+	@unlink("/etc/cf/src_auth_exp");
+	@unlink("/etc/cf/src_ext_exp");
+	@unlink("/etc/cf/src_url_exp");
+	@unlink("/etc/cf/src_av_exp");
+	@unlink("/etc/cf/dst_auth_exp");
+	@unlink("/etc/cf/dst_ext_exp");
+	@unlink("/etc/cf/dst_ext_exp2");
+	@unlink("/etc/cf/dst_url_exp");
+	@unlink("/etc/cf/dst_av_exp");
+	@unlink("/etc/cf/dst_av_exp2");
+	@unlink("/etc/cf/usr_ext_exp");
+	@unlink("/etc/cf/usr_url_exp");
+	@unlink("/etc/cf/usr_av_exp");
+	$_src_auth_exp='';
+	$_src_ext_exp='';
+	$_src_url_exp='';
+	$_src_av_exp='';
+	$_dst_auth_exp='';
+	$_dst_ext_exp='';
+	$_dst_url_exp='';
+	$_dst_av_exp='';
+	$_dst_av_exp2='';
+	$_usr_ext_exp='';
+	$_usr_url_exp='';
+	$_usr_av_exp='';
+	$_urlc_exp='';
+	$_urls_exp='';
+	$_datau=array();$_datab=array();
+	$_trans_exp=array();
+	$result=mybox_db_query("select name from auth_user where stat='1'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			$_datau[$_name]="$_name";
+		}
+	}
+	unset($_name);
+	$result=mybox_db_query("select name,members from group_user",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			$_members=$row['members'];
+			$lst_a=explode(",",$_members);
+			if(count($lst_a)!=0) {
+				foreach($lst_a as $nm) {
+					if($_datau[$nm]!='') {
+						$_datab[$_name] .="{$_datau[$nm]} ";
+					}
+				}
+			} else {
+				if($_datau[$_members]!='') $_datab[$_name] .="{$_datau[$_members]} ";
+			}
+		}
+	}
+	$result=mybox_db_query("select * from cf_exclude",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=trim($row['name']);
+			$_src=$row['src'];
+			$_dst=$row['dst'];
+			$_user=trim($row['user']);
+			$_user_stat=trim($row['user_stat']);
+			$_auth=trim($row['auth']);
+			$_av=trim($row['av']);
+			$_ext=trim($row['ext']);
+			$_urlf=trim($row['urlf']);
+			$_urlc=trim($row['urlc']);
+			$_urls=trim($row['urls']);
+			//$_hd=trim($row['hd']);
+			//$_hdc=trim($row['hdc']);
+			$_trans=trim($row['trans']);
+			$_domains=trim($row['domains']);
+			
+			$_src_a='';
+			if($_src!='any' && $_src!='') {
+				$_src_a=cf_networks($db_id,$_src);
+				if($_src_a!='') {
+					$_src_b=preg_split("/\s+/",$_src_a);
+					if(count($_src_b)!=0) {
+						foreach($_src_b as $ln) {
+							if($_auth==1) $_src_auth_exp .="$ln\n";
+							if($_ext==1) $_src_ext_exp .="$ln\n";
+							if($_urlf==1) $_src_url_exp .="$ln\n";
+							if($_av==1) $_src_av_exp .="$ln\n";
+							if($_urlc==1) $_urlc_exp .="$ln\n";
+							if($_urls==1) $_urls_exp .="%{$ln}\n";
+							if($_trans==1) $_trans_exp[]="$ln";
+						}
+					}
+				}
+			}
+			unset($_src_a,$_src_b,$ln);
+			$_dst_a='';
+			if($_dst==1 && $_domains!='') {
+				$_dst_a=preg_split("/\s+/",$_domains);
+				if(count($_dst_a)!=0) {
+					foreach($_dst_a as $ln) {
+						if($_auth==1) $_dst_auth_exp .=".{$ln}\n";
+						if($_ext==1) $_dst_ext_exp .="{$ln}\n";
+						if($_urlf==1) $_dst_url_exp .="{$ln}\n";
+						if($_av==1) {
+							$_dst_av_exp .="$ln\n";
+							$_dst_av_exp2 .=".{$ln}\n";
+						}
+						if($_urlc==1) $_urlc_exp .="$ln\n";
+						if($_urls==1) $_urls_exp .="%{$ln}\n";
+					}
+				}
+			}
+			unset($_dst_a,$ln);
+			if($_user_stat==1 && $_user!='') {
+				$_datax=array();
+				$_user_a=preg_split("/,/",$_user);
+				if(count($_user_a)!=0) {
+					foreach($_user_a as $ax) {
+						if($ax=='') continue;
+						if($_datau[$ax]!='') {
+							$_datax[]=$_datau[$ax];
+						}
+						if($_datab[$ax]!='') {
+							$lsx=preg_split("/\s+/",$_datab[$ax]);
+							if(count($lsx)!=0) {
+								foreach($lsx as $pn) {
+									$_datax[]=$pn;	
+								}
+							}
+						}
+					}
+				}
+				$chk_u=array();
+				if(count($_datax)!=0) {
+					foreach($_datax as $us) {
+						if($us=='') continue;
+						if($chk_u[$us]==1) continue;
+						if($_av==1) $_usr_av_exp .="$us\n";
+						if($_urlc==1) $_urlc_exp .="$us\n";
+						if($_urls==1) $_urls_exp .="%{$us}\n";
+						if($_ext==1) $_usr_ext_exp .="$us\n";
+						if($_urlf==1) $_usr_url_exp .="$us\n";
+						$chk_u[$us]=1;
+					}
+				}
+			}
+			$_ad_user='';
+			$result2=mybox_db_query("select user from cf_ad_user where name='$_name'",$db_id);
+			if(mybox_db_num_rows($result)!=0) {
+				$_ad_user=mybox_db_fetch_single($result2);
+				$_ad_user=str_replace("\\\\\\\\",'\\',$_ad_user);
+				$_ad_user=str_replace("\\\\",'\\',$_ad_user);
+				if($_ad_user!='') {
+					$_ad_usert_a=preg_split("/,/",$_ad_user);
+					if(count($_ad_usert_a)!=0) {
+						foreach($_ad_usert_a as $_us) {
+							if($_us=='') continue;
+							if($_av==1) $_usr_av_exp .="$_us\n";
+							if($_urlc==1) $_urlc_exp .="$_us\n";
+							if($_urls==1) $_urls_exp .="%{$_us}\n";
+							if($_ext==1) $_usr_ext_exp .="$_us\n";
+							if($_urlf==1) $_usr_url_exp .="$_us\n";
+						}
+					}
+				}
+			}
+			unset($result2);
+		}
+	}
+
+	if($_src_auth_exp!='' && $_IS_AUTH==1) mybox_save_to_file("/etc/cf/src_auth_exp","$_src_auth_exp");
+	if($_src_ext_exp!='') mybox_save_to_file("/etc/cf/src_ext_exp","$_src_ext_exp");
+	if($_src_url_exp!='') mybox_save_to_file("/etc/cf/src_url_exp","$_src_url_exp");
+	if($_src_av_exp!='') mybox_save_to_file("/etc/cf/src_av_exp","$_src_av_exp");
+	if($_dst_auth_exp!='' && $_IS_AUTH==1) mybox_save_to_file("/etc/cf/dst_auth_exp","$_dst_auth_exp");
+	if($_dst_ext_exp!='') mybox_save_to_file("/etc/cf/dst_ext_exp","$_dst_ext_exp");
+	if($_dst_ext_exp2!='') mybox_save_to_file("/etc/cf/dst_ext_exp","$_dst_ext_exp2");
+	if($_dst_url_exp!='') mybox_save_to_file("/etc/cf/dst_url_exp","$_dst_url_exp");
+	if($_dst_av_exp!='') mybox_save_to_file("/etc/cf/dst_av_exp","$_dst_av_exp");
+	if($_dst_av_exp2!='') mybox_save_to_file("/etc/cf/dst_av_exp2","$_dst_av_exp2");
+	if($_urlc_exp!='') mybox_save_to_file("/etc/cf/content.allow","$_urlc_exp");
+	if($_urls_exp!='') mybox_save_to_file("/etc/cf/redirect","$_urls_exp");
+	if($_usr_ext_exp!='' && $_IS_AUTH==1) mybox_save_to_file("/etc/cf/usr_ext_exp","$_usr_ext_exp");
+	if($_usr_av_exp!='' && $_IS_AUTH==1) mybox_save_to_file("/etc/cf/usr_av_exp","$_usr_av_exp");
+	if($_usr_url_exp!='' && $_IS_AUTH==1) mybox_save_to_file("/etc/cf/usr_url_exp","$_usr_url_exp");
+}
+
+function cf_set_trans($port,$_networks,$_trans_exp) {
+	$_networks=trim($_networks);
+	if($_networks=='') return;
+	$_trans_a=preg_split("/\s+/",$_networks);
+	if(count($_trans_a)==0) return;
+	$txt='';
+	$_skp=array();$_skn=array();
+	foreach($_trans_exp as $ln) {
+		if($ln=='') continue;
+		$_skp[$ln]=1;
+		$txt .="-s $ln -p tcp -m tcp --sport 1:65535 --dport 80 -j RETURN\n";
+	}
+	unset($ln);
+	foreach($_trans_a as $ln) {
+		if($ln=='') continue;
+		if($_skp[$ln]==1) continue;
+		if($_skn[$ln]==1) continue;
+		$_skn[$ln]=1;
+		$txt .="-s $ln -p tcp -m tcp --sport 1:65535 --dport 80 -j REDIRECT --to-port $port\n";
+	}
+	if($txt!='') mybox_save_to_file("/var/sys/http_proxy_trans.set",$txt);
+}
+
+function cf_client_config($_networks,$port) {
+	global $_CLASSIP;
+	$_na=preg_split("/\s+/",$_networks);
+	if(count($_na)==0) return;
+	$inet='';
+	foreach($_na as $ip) {
+		$ip=trim($ip);
+		$ip1='';$ip2='';
+		if($ip=='') continue;
+		if(preg_match("/^(.*?)\/(\d\d)$/",$ip,$mm)) {
+			$ip1=$mm[1];
+			$ip2=$_CLASSIP[$mm[2]];
+			$inet .="isInNet(host,\"$ip1\",\"$ip2\")||";	
+		} else {
+			continue;
+		}
+	}
+	$_config .="function FindProxyForURL(url,host) { \n";
+	$_config .="\tif(isPlainHostName(host)||\n";
+	if($inet!='') $_config .="\t\t$inet\n";
+	$_config .="\t\thost==\"mybox.internal.proxy\") {\n";
+	$_config .="\t\treturn \"DIRECT\";\n";
+	$_config .="\t} else {\n";
+  	$_config .="\t\treturn \"PROXY mybox.internal.proxy:$port; DIRECT\";\n";
+	$_config .="\t}\n";
+	$_config .="}\n";
+	mybox_save_to_file("/service/cf/proxy.pac","$_config");
+}
+
+function cf_config() {
+	global $_QUIET, $_ROOT_DIR, $_PAT_PATH;
+	global $_DB_NAME, $_IS_AUTH, $_trans_exp;
+
+	$_CREATE_CACHE=0;
+
+	/* Auth: from confarray.exl
+		$_HTTP_CF=array();
+		$_HTTP_CF['1']="Standard";
+		$_HTTP_CF['2']="Transparent mode";
+		$_HTTP_CF['3']="Basic User authentication";
+		$_HTTP_CF['4']="Active Directory (SSO)";
+	*/
+	$_cf_http_stat=0;
+	$_cf_http_port=8080;
+	$_cf_http_auth=0;
+	$_cf_http_cache_stat=0;
+	$_cf_http_cache_size=1024;
+	$_cf_http_cache_mem_size=10;
+	$_cf_http_ext_block_stat=0;
+	$_cf_http_filter=0;
+	$_cf_http_filter_c=0;
+	$_cf_http_js=0;
+	$_cf_http_image=0;
+	$_cf_http_object=0;
+	$_cf_http_download="20";
+	$_cf_http_upload="40";
+	$_cf_http_av_stat=0;
+	//$_cf_http_av_min_size=4;
+	//$_cf_http_av_max_size=1024;
+	$_cf_http_redirect=0;
+	$_cf_http_proxy_stat=0;
+	$_cf_http_proxy_port=8080;
+	$_cf_http_proxy_user_stat=0;
+
+	$_cf_http_admin="admin@mybox.net.my";
+	$db_id=mybox_db_connect($_DB_NAME);
+	$result=mybox_db_query("select * from cf",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			if(trim($row['name'])=="cf_http_stat") $_cf_http_stat=trim($row['val']);
+			if(trim($row['name'])=="cf_http_port") $_cf_http_port=trim($row['val']);
+			if(trim($row['name'])=="cf_http_auth") $_cf_http_auth=trim($row['val']);
+			if(trim($row['name'])=="cf_http_cache_stat") $_cf_http_cache_stat=trim($row['val']);
+			if(trim($row['name'])=="cf_http_cache_size") $_cf_http_cache_size=trim($row['val']);
+			if(trim($row['name'])=="cf_http_cache_mem_size") $_cf_http_cache_mem_size=trim($row['val']);
+			if(trim($row['name'])=="cf_http_networks") $_cf_http_networks=trim($row['val']);
+			if(trim($row['name'])=="cf_http_ext_block_stat") $_cf_http_ext_block_stat=trim($row['val']);
+			if(trim($row['name'])=="cf_http_filter") $_cf_http_filter=trim($row['val']);
+			if(trim($row['name'])=="cf_http_filter_port") $_cf_http_filter_port=trim($row['val']);
+			if(trim($row['name'])=="cf_http_js") $_cf_http_js=trim($row['val']);
+			if(trim($row['name'])=="cf_http_image") $_cf_http_image=trim($row['val']);
+			if(trim($row['name'])=="cf_http_object") $_cf_http_object=trim($row['val']);
+ 			if(trim($row['name'])=="cf_http_download") $_cf_http_download=trim($row['val']);
+ 			if(trim($row['name'])=="cf_http_upload") $_cf_http_upload=trim($row['val']);
+			if(trim($row['name'])=="cf_http_av_stat") $_cf_http_av_stat=trim($row['val']);
+			//if(trim($row['name'])=="cf_http_av_min_size") $_cf_http_av_min_size=trim($row['val']);
+			//if(trim($row['name'])=="cf_http_av_max_size") $_cf_http_av_max_size=trim($row['val']);
+			if(trim($row['name'])=="cf_http_redirect") $_cf_http_redirect=trim($row['val']);
+			if(trim($row['name'])=="cf_http_proxy_stat") $_cf_http_proxy_stat=trim($row['val']);
+			if(trim($row['name'])=="cf_http_proxy_host") $_cf_http_proxy_host=trim($row['val']);
+			if(trim($row['name'])=="cf_http_proxy_port") $_cf_http_proxy_port=trim($row['val']);
+			if(trim($row['name'])=="cf_http_proxy_user_stat") $_cf_http_proxy_user_stat=trim($row['val']);
+			if(trim($row['name'])=="cf_http_proxy_user") $_cf_http_proxy_user=trim($row['val']);
+			if(trim($row['name'])=="cf_http_proxy_pass") $_cf_http_proxy_pass=trim($row['val']);
+			if(trim($row['name'])=="cf_sophos_stat") $_cf_sophos_stat=trim($row['val']);
+		}
+	}
+	unset($result);
+
+	$_cf_http_filter_c=mybox_fget_contents("$_PAT_PATH/blacklist/url_block/stat");
+	if($_cf_http_filter_c=='') $_cf_http_filter_c=0;
+
+	if($_cf_http_filter_port=='') $_cf_http_filter_port="6062";
+	if($_cf_sophos_stat=='' || $_cf_sophos_stat==0) {
+		$_cf_http_av_stat=0;
+	}
+
+	// captive? no auth
+	$_captive_portal_stat=0;
+	$_captive_portal_network='';$_captive_portal_networks='';
+	$result=mybox_db_query("select * from misc where name like \"captive_%\"",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			if(trim($row['name'])=="captive_portal_stat") $_captive_portal_stat=trim($row['val']);
+			if(trim($row['name'])=="captive_portal_network") $_captive_portal_network=trim($row['val']);
+		}
+	}
+	if($_captive_portal_stat==1 && $_captive_portal_network!='') {
+		$_captive_portal_networks=cf_networks($db_id,$_captive_portal_network);
+	}
+	if($_cf_http_stat==0) {
+		mybox_init_echo($_QUIET,"INFO","HTTP Proxy service disabled");
+		http_proxy_clear();
+		mybox_db_close($db_id);
+		exit(1);
+	}
+	$_cf_http_admin=mybox_fget_contents("/var/sys/fw_admin");
+	if($_cf_http_admin=='') $_cf_http_admin="admin@mybox";
+	$_networks=cf_networks($db_id,$_cf_http_networks);
+	mybox_save_to_file("/var/sys/http_proxy_networks","$_networks");
+	if($_cf_http_auth==3) {
+		if(cf_write_user_auth($db_id)==0) $_cf_http_auth=1;
+	}
+	if($_cf_http_auth==3 || $_cf_http_auth==4) {
+		$_IS_AUTH=1;
+	}
+	cf_set_exeption($db_id);
+	mybox_save_to_file("/var/sys/http_proxy_port","$_cf_http_port");
+	if($_cf_http_auth==2) {
+		cf_set_trans($_cf_http_port,$_networks,$_trans_exp);
+	}
+	mybox_db_close($db_id);
+
+	if($_cf_http_download=='') {
+		$_cf_http_download=0;
+	} elseif($_cf_http_download!=0) {
+		$_cf_http_download=$_cf_http_download * 1024 * 1024;
+	}
+	if($_cf_http_upload=='') $_cf_http_upload=0;
+
+	if(file_exists("$_ROOT_DIR/scripts/http_proxy/config")) {
+		if(copy("$_ROOT_DIR/scripts/http_proxy/config","/etc/cf/squid.conf")) {
+			return 1;
+		}
+		return 0;
+	} else {
+		$_config='';
+		$_config .="http_port $_cf_http_port\n";
+		$_config .="icp_port 0\n";
+		$_config .="read_timeout 5 minutes\n";
+		$_config .="offline_mode off\n";
+		$_config .="uri_whitespace strip\n";
+		$_config .="nonhierarchical_direct on\n";
+		$_config .="prefer_direct off\n";
+		$_config .="log_fqdn off\n";
+		$_config .="ie_refresh on\n";
+		$_config .="global_internal_static on\n";
+		$_config .="short_icon_urls on\n";
+		//$_config .="connect_timeout 2 minutes\n";
+		$_config .="connect_timeout 30 seconds\n";
+		$_config .="forward_timeout 2 minutes\n";
+		$_config .="client_lifetime 1 day\n";
+		$_config .="visible_hostname mybox.internal.proxy\n";
+		$_config .="log_ip_on_direct off\n";
+		$_config .="ftp_user mybox@\n";
+		$_config .="ftp_passive off\n";
+		$_config .="forwarded_for off\n";
+		$_config .="strip_query_terms off\n";
+		$_config .="half_closed_clients off\n";
+		$_config .="shutdown_lifetime 3 seconds\n";
+		$_config .="httpd_accel_with_proxy on\n";
+		$_config .="httpd_accel_uses_host_header on\n";
+		$_config .="httpd_accel_single_host off\n";
+		$_config .="httpd_accel_host virtual\n";
+		$_config .="max_filedesc 64000\n";
+		$_config .="dns_nameservers 127.0.0.1\n";
+		$_config .="coredump_dir /\n";
+		$_config .="icon_directory /etc/cf/icons\n";
+		$_config .="mime_table /etc/cf/mime.conf\n";
+		$_config .="error_directory /etc/cf/errors\n";
+		$_config .="unlinkd_program /bin/unlinkd\n";
+		$_config .="diskd_program /bin/diskd\n";
+		$_config .="fqdncache_size 2048\n";
+		$_config .="cache_mgr $_cf_http_admin\n";
+		$_config .="debug_options ALL,1 33,2 93,3\n";
+
+
+		if($_cf_http_proxy_stat==1 && $_cf_http_proxy_host!='') {
+			$_passx=mybox_str_decrypt($_cf_http_proxy_pass);
+			$_config .="cache_peer $_cf_http_proxy_host parent $_cf_http_proxy_port 0 default no-query no-digest ";
+			if($_cf_http_proxy_user_stat==1 && ($_cf_http_proxy_user!='' && $_cf_http_proxy_pass!='')) {
+				$_config .="login={$_cf_http_proxy_user}:{$_passx}";
+			}
+			$_config .="\n";
+		}
+
+		if($_cf_http_auth==3) {
+			$_config .="auth_param basic program /bin/ncsa_auth /etc/cf/proxy_auth\n";
+			$_config .="auth_param basic children 5\n";
+			$_config .="auth_param basic realm MyBox Firewall System (Proxy)\n";
+			$_config .="auth_param basic credentialsttl 2 hours\n";
+		} elseif($_cf_http_auth==4) {
+			$_config .="auth_param ntlm program /bin/ntlm_auth --helper-protocol=squid-2.5-ntlmssp\n";
+			$_config .="auth_param ntlm children 5 \n";
+			$_config .="auth_param ntlm max_challenge_reuses 0\n";
+			$_config .="auth_param ntlm max_challenge_lifetime 2 minutes\n";
+			$_config .="auth_param ntlm use_ntlm_negotiate on\n";
+		}
+		$_config .="authenticate_ttl 1 hour\n";
+		$_config .="authenticate_ip_ttl 1 hour\n";
+		if($_cf_http_cache_stat==1) {
+			//$_config .="cache_dir ufs $_ROOT_DIR/cache $_cf_http_cache_size 16 256\n";
+			$_config .="cache_dir diskd $_ROOT_DIR/cache $_cf_http_cache_size 16 256\n";
+			if(!file_exists("$_ROOT_DIR/cache/00") ||
+			!file_exists("$_ROOT_DIR/cache/swap.state") ) $_CREATE_CACHE=1;
+		} else {
+			$_config .="cache_dir null $_ROOT_DIR/cache\n";
+		}
+		if(file_exists("/var/sys/log_setting/httpproxy_access")) {
+			$_config .="cache_access_log /var/log/squid.access\n";
+		} else {
+			$_config .="cache_access_log /dev/null\n";
+		}
+		if(file_exists("/var/sys/log_setting/httpproxy_cache") ||
+			file_exists("/var/sys/log_setting/httpproxy_contentremoval") ||
+			file_exists("/var/sys/log_setting/httpproxy_siteredirection") ) {
+			$_config .="cache_log /var/log/squid.cache\n";
+		} else {
+			$_config .="cache_log /dev/null\n";
+		}
+		$_config .="cache_store_log none\n";
+		$_config .="pid_filename /var/run/squid.pid\n";
+		$_config .="pipeline_prefetch off\n";
+		$_config .="memory_pools off\n";
+		$_config .="maximum_object_size 4096 KB\n";
+		$_config .="minimum_object_size 0 KB\n";
+		//$_config .="maximum_object_size_in_memory 8 KB\n";
+		$_config .="maximum_object_size_in_memory 32 KB\n";
+		$_config .="cache_mem $_cf_http_cache_mem_size MB\n";
+		//$_config .="maximum_object_size 226 MB\n";
+		//$_config .="cache_swap_low 75\n";
+		//$_config .="cache_swap_high 90\n";
+		$_config .="cache_swap_low 80%\n";
+		$_config .="cache_swap_high 100%\n";
+		$_config .="cache_replacement_policy heap GDSF\n";
+		$_config .="memory_replacement_policy heap GDSF\n";
+		//$_config .="cache_replacement_policy heap LRU\n";
+		//$_config .="memory_replacement_policy heap LRU\n";
+		//$_config .="cache_replacement_policy heap LFUDA\n";
+		//$_config .="memory_replacement_policy heap LFUDA\n";
+		//$_config .="refresh_pattern ^ftp:           1440    20%     10080\n";
+		//$_config .="refresh_pattern ^gopher:        1440    0%      1440\n";
+		//$_config .="refresh_pattern .               0       20%     4320\n";
+		$_config .="refresh_pattern . 0 20% 4320\n";
+		$_config .="refresh_pattern -i exe$ 0 50% 999999\n";
+		$_config .="refresh_pattern -i zip$ 0 50% 999999\n";
+		$_config .="refresh_pattern -i tar\.gz$ 0 50% 999999\n";
+		$_config .="refresh_pattern -i tgz$ 0 50% 999999\n";
+		$_config .="refresh_pattern -i gz$ 0 50% 999999\n";
+		$_config .="refresh_pattern -i rar$ 0 50% 999999\n";
+		$_config .="refresh_pattern -i rpm$ 0 50% 999999\n";
+
+		// redirector
+		$url_conf_url_filter=0;
+		if($_cf_http_filter!=0 || $_cf_http_filter_c!=0 || $_cf_http_ext_block_stat!=0 || $_cf_http_redirect!=0 || $_cf_http_av_stat!=0) {
+			if(cf_url_filter($_cf_http_filter,$_cf_http_filter_c,$_cf_http_ext_block_stat,$_cf_http_redirect,$_cf_http_av_stat)==1) {
+				$_config .="redirect_program /bin/urlfilter\n";
+				$_config .="redirect_children 10\n";
+				$_config .="redirect_rewrites_host_header on\n";
+				$_config .="redirector_bypass on\n";
+				$url_conf_url_filter=1;
+			}
+		}
+		$_config .="acl MYBOX_CACHE_MANAGER proto cache_object\n";
+		$_config .="acl all src 0.0.0.0/0.0.0.0\n";
+		$_config .="acl MYBOX_LOCALHOST0 src 127.0.0.1/255.255.255.255\n";
+		$_config .="acl MYBOX_LOCALHOST1 dst 127.0.0.0/255.0.0.0\n";
+		$_config .="acl MYBOX_CONNECT_METHOD method CONNECT\n";
+		$_config .="acl MYBOX_SSL_PORTS port 443\n";
+		$_config .="acl MYBOX_AllOWED_PORTS port 80 443 21 1025-65535\n";
+		$_config .="acl MYBOX_PURGE_METHOD method PURGE\n";
+		$_config .="acl MYBOX_NOCACHE urlpath_regex cache_object:// \?\n";
+		$_config .="acl MYBOX_NOCACHE urlpath_regex cgi-bin \?\n";
+		$_config .="acl MYBOX_INTERNAL0 dstdomain -i mybox.internal.proxy\n";
+		$_config .="acl MYBOX_INTERNAL1 srcdomain -i mybox.internal.proxy\n";
+
+		$_config .="acl MYBOX_AllOWED_NETWORKS src $_networks\n";
+		$_config .="acl MYBOX_LOCAL_NETWORKS dst $_networks\n";
+
+		$_exp_domain_auth=0;
+		$_exp_src_auth=0;
+
+		if(file_exists("/etc/cf/dst_auth_exp") && ($_cf_http_auth==3 || $_cf_http_auth==4)) {
+			$_config .="acl ALLOW_DST_AUTH dstdomain -i \"/etc/cf/dst_auth_exp\"\n";
+			$_exp_domain_auth=1;
+		}
+
+
+		if(file_exists("/etc/cf/src_auth_exp") && ($_cf_http_auth==3 || $_cf_http_auth==4)) {
+			$_config .="acl ALLOW_SRC_AUTH src \"/etc/cf/src_auth_exp\"\n";
+			$_exp_src_auth=1;
+		}
+
+		if($_cf_http_auth==3 || $_cf_http_auth==4) {
+			$_config .="acl MYBOX_PROXY_AUTH proxy_auth REQUIRED\n";
+		}
+
+		if($_cf_http_cache_stat==1) {
+			$_config .="no_cache deny MYBOX_NOCACHE MYBOX_CONNECT_METHOD MYBOX_LOCALHOST0 MYBOX_LOCALHOST1 MYBOX_LOCAL_NETWORKS\n";
+		} else {
+			$_config .="no_cache deny all\n";
+		}
+
+		##### RULES ######
+		$_config .="http_access allow MYBOX_INTERNAL0\n";
+		$_config .="http_access allow MYBOX_INTERNAL1\n";
+		$_config .="http_access deny MYBOX_CACHE_MANAGER\n";
+		$_config .="http_access allow MYBOX_PURGE_METHOD MYBOX_LOCALHOST0\n";
+		$_config .="http_access deny MYBOX_PURGE_METHOD\n";
+		$_config .="http_access deny MYBOX_CONNECT_METHOD !MYBOX_SSL_PORTS !MYBOX_ALLOWED_PORTS\n";
+		$_config .="http_access allow MYBOX_LOCALHOST0\n";
+		$_config .="http_access allow MYBOX_LOCALHOST1\n";
+		$_config .="always_direct allow MYBOX_LOCAL_NETWORKS\n";
+		$_config .="always_direct allow MYBOX_CONNECT_METHOD\n";
+		$_config .="always_direct allow MYBOX_SSL_PORTS\n";
+		$_config .="always_direct allow MYBOX_INTERNAL0\n";
+		$_config .="always_direct allow MYBOX_INTERNAL1\n";
+		$_config .="always_direct allow MYBOX_CONNECT_METHOD\n";
+
+		// auth exlude
+		// auth
+		if($_cf_http_auth==3 || $_cf_http_auth==4) {
+			if($_exp_domain_auth==1) $_config .="http_access allow ALLOW_DST_AUTH\n";
+			if($_exp_src_auth==1) $_config .="http_access allow ALLOW_SRC_AUTH\n";
+			if($_captive_portal_networks!='') {
+				$_config .="acl MYBOX_CAPTIVE_NETWORKS src $_captive_portal_networks\n";
+				$_config .="http_access allow MYBOX_CAPTIVE_NETWORKS\n";
+			}
+			$_config .="http_access deny !MYBOX_PROXY_AUTH\n";
+		}
+
+		// url/ext filter exlude
+		if($url_conf_url_filter==1) {
+			$_config .="redirector_access deny MYBOX_LOCALHOST0\n";
+			$_config .="redirector_access deny MYBOX_LOCALHOST1\n";
+  			$_config .="redirector_access deny MYBOX_SSL_PORTS\n";
+			$_config .="redirector_access deny MYBOX_INTERNAL0\n";
+			$_config .="redirector_access deny MYBOX_INTERNAL1\n";
+		}
+
+		$_config .="http_access allow MYBOX_AllOWED_NETWORKS\n";
+		$_config .="reply_body_max_size $_cf_http_download allow all\n";
+		$_config .="request_body_max_size $_cf_http_upload MB\n";
+		$_config .="http_access deny all\n";
+		if(file_exists("/etc/cf/av_mime_list")) {
+			$_ma='';
+			if(file_exists("/etc/cf/src_av_exp")) {
+				$_config .="acl MYBOX_AV_MIMIE_SRC src \"/etc/cf/src_av_exp\"\n";
+				$_ma .="MYBOX_AV_MIMIE_SRC ";
+			}
+			if(file_exists("/etc/cf/dst_av_exp2")) {
+				$_config .="acl MYBOX_AV_MIMIE_DST dstdomain -i \"/etc/cf/dst_av_exp2\"\n";
+				$_ma .="MYBOX_AV_MIMIE_DST ";
+			}
+			if(file_exists("/etc/cf/usr_av_exp")) {
+				$_config .="acl MYBOX_AV_MIMIE_AUTH acl aclname proxy_auth -i \"/etc/cf/usr_av_exp\"\n";
+				$_ma .="MYBOX_AV_MIMIE_AUTH ";
+			}
+			$_ma=trim($_ma);
+			$_config .="deny_info MYBOX_AV_REDIRECTOR MYBOX_AV_MIMIE_CHECK\n";
+			$_config .="acl MYBOX_AV_MIMIE_CHECK rep_mime_type -i \"/etc/cf/av_mime_list\"\n";
+			$_config .="http_reply_access allow MYBOX_LOCALHOST0 MYBOX_LOCALHOST1 MYBOX_INTERNAL0 MYBOX_INTERNAL1 $_ma\n";
+			$_config .="http_reply_access deny MYBOX_AV_MIMIE_CHECK\n";
+		}
+		if(file_exists("/etc/cf/ext_mime_list")) {
+			$_ma='';
+			if(file_exists("/etc/cf/src_ext_exp")) {
+				$_config .="acl MYBOX_EXT_MIMIE_SRC src \"/etc/cf/src_ext_exp\"\n";
+				$_ma .="MYBOX_EXT_MIMIE_SRC ";
+			}
+			if(file_exists("/etc/cf/dst_ext_exp2")) {
+				$_config .="acl MYBOX_EXT_MIMIE_DST dstdomain -i \"/etc/cf/dst_ext_exp2\"\n";
+				$_ma .="MYBOX_EXT_MIMIE_DST ";
+			}
+			if(file_exists("/etc/cf/usr_ext_exp")) {
+				$_config .="acl MYBOX_EXT_MIMIE_AUTH acl aclname proxy_auth -i \"/etc/cf/usr_ext_exp\"\n";
+				$_ma .="MYBOX_EXT_MIMIE_AUTH ";
+			}
+			$_ma=trim($_ma);
+			$_config .="deny_info MYBOX_URL_REDIRECTOR MYBOX_EXT_MIMIE_CHECK\n";
+			$_config .="acl MYBOX_EXT_MIMIE_CHECK rep_mime_type -i \"/etc/cf/ext_mime_list\"\n";
+			$_config .="http_reply_access allow MYBOX_LOCALHOST0 MYBOX_LOCALHOST1 MYBOX_INTERNAL0 MYBOX_INTERNAL1 $_ma\n";
+			$_config .="http_reply_access deny MYBOX_EXT_MIMIE_CHECK\n";
+		}
+		$_config .="http_reply_access allow all\n";
+		$_config .="icp_access deny all\n";
+
+		# ANONYMITY
+		//$_config .="header_access Via deny all\n";
+		//$_config .="header_access X-Forwarded-For deny all\n";
+
+		if($_cf_http_redirect==1) {
+			if(file_exists("$_PAT_PATH/blacklist/SITE_REDIRECT")) {
+				$buff=mybox_file2array("$_PAT_PATH/blacklist/SITE_REDIRECT");
+				if(count($buff)!=0) {
+					$txt='';
+					foreach($buff as $lnx) {
+						$lnx=trim($lnx);
+						if($lnx=='') continue;
+						if($lnx{0}=="#") continue;
+						list($a,$b)=explode("|",$lnx);
+						$txt .="-http://$a(:80)?(/.*)?\$\thttp://$b\\2\n";
+					}
+					if($txt!='') {
+						mybox_append_to_file("/etc/cf/redirect",$txt);
+						$_config .="mybox_module /lib/cfmod_redirect.so\n";
+					}
+				}
+				unset($buff,$a,$b);
+			}
+		}
+		
+		//if($_cf_http_js==1 || $_cf_http_image==1 || $_cf_http_object==1 || $_cf_http_av_stat==1 || $_cf_http_redirect==1) {
+		if($_cf_http_js==1 || $_cf_http_image==1 || $_cf_http_object==1 || $_cf_http_redirect==1) {
+			$_config .="header_access Accept-Encoding deny all\n";
+		}
+		if($_cf_http_js==1 || $_cf_http_image==1 || $_cf_http_object==1) {
+			$crm='';
+			$_config .="mybox_module /lib/cfmod_htmlfilter.so\n";
+			if($_cf_http_image==1) {
+				$_config .="mybox_module /lib/cfmod_rejecttype.so image/*\n";
+				$crm .="image,";
+			}
+			if($_cf_http_js==1) {
+				$_config .="mybox_module /lib/cfmod_rejecttype.so application/x-javascript text/javascript\n";
+				$crm .="js,";
+			}
+			if($_cf_http_object==1) {
+				$_config .="mybox_module /lib/cfmod_rejecttype.so application/x-shockwave-flash\n";
+				$crm .="object,";
+			}
+			$crm=trim($crm,",");
+			$_config .="mybox_module /lib/cfmod_content.so $crm\n";
+		}
+		/*if($_cf_http_av_stat==1) {
+			if($_cf_http_av_min_size!='' && $_cf_http_av_min_size!=0) {
+				$_cf_http_av_min_size *=1024;
+			}
+			if($_cf_http_av_max_size!='' && $_cf_http_av_max_size!=0) {
+				$_cf_http_av_max_size *=1024;
+			}
+			$_config .="mybox_module /lib/cfmod_clamav.so $_cf_http_av_min_size $_cf_http_av_max_size\n";
+		}*/
+
+		mybox_save_to_file("/etc/cf/squid.conf","$_config");
+		cf_client_config($_networks,$_cf_http_port);
+		if($_CREATE_CACHE==1) {
+			mybox_init_echo($_QUIET,"INFO","Creating cache");
+			mybox_exec_cmd("squid -z");
+		}
+		return 1;
+	}
+	return 0;
+}
+
+function cf_status() {
+	global $_QUIET;
+	$pid=mybox_get_progpid("squid");
+	if($pid!='') {
+		if($_QUIET==0) echo "* squid (pid $pid) is running...\n";
+		return 0;
+	}
+	return 1;
+}
+
+function cf_start() {
+	global $_QUIET, $_ROOT_DIR;
+
+	if(file_exists("$_ROOT_DIR/scripts/http_proxy/start")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/http_proxy/start");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/http_proxy/pre-start")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/http_proxy/pre-start");
+	}
+
+	http_proxy_clear();
+	http_sg_policy_clear();
+	mybox_save_to_file("/var/log/squid.access","");
+	mybox_save_to_file("/var/log/squid.cache","");
+
+	@mybox_mkdirr("$_ROOT_DIR/avscan");
+	@unlink("/var/sys/chk_squid");
+	if(@cf_status()==1 && cf_config()==1) {
+		if(mybox_exec_cmd("squid -DY")==0) {
+			mybox_init_echo($_QUIET,"INFO","Starting HTTP Proxy service");
+			if(!file_exists("/var/sys/init_no_restart")) {
+				mybox_exec_cmd("/service/init/xinet.init reload quiet");
+				do_http_proxy_policy();
+				do_http_sg_policy();
+				mybox_echo_query("xinet-reload-quiet");
+			}
+			@touch("/var/sys/chk_squid");
+		}
+		if(file_exists("$_ROOT_DIR/scripts/http_proxy/post-start")) {
+			mybox_execq_cmd("$_ROOT_DIR/scripts/http_proxy/post-start");
+		}
+		return 0;
+	}
+	mybox_init_echo($_QUIET,"ERROR","Starting HTTP Proxy service failed");
+	return 1;
+}
+
+function cf_shutdown() {
+	mybox_exec_cmd("squid -k shutdown");
+	mybox_killall("squid");
+	return 1;
+}
+
+function cf_stop() {
+	global $_QUIET, $_ROOT_DIR;
+
+	if(!file_exists("/var/sys/init_no_restart")) {
+		http_proxy_clear();
+		http_sg_policy_clear();
+	}
+	do_clean_file();
+	@unlink("/var/sys/chk_squid");
+	mybox_save_to_file("/var/log/squid.access","");
+	mybox_save_to_file("/var/log/squid.cache","");
+
+	if(!file_exists("/var/sys/init_no_restart")) {
+		mybox_echo_query("xinet-reload-quiet");
+	}
+
+	if(file_exists("$_ROOT_DIR/scripts/http_proxy/stop")) {
+		return mybox_execq_cmd("$_ROOT_DIR/scripts/http_proxy/stop");
+	}
+	if(file_exists("$_ROOT_DIR/scripts/http_proxy/pre-stop")) {
+		mybox_execq_cmd("$_ROOT_DIR/scripts/http_proxy/pre-stop");
+	}
+	if(mybox_exec_cmd("squid -k kill")==0) {
+		mybox_killall("squid");
+		mybox_killall("urlfilter");
+		mybox_init_echo($_QUIET,"INFO","Shutting down HTTP Proxy service");
+		if(file_exists("$_ROOT_DIR/scripts/http_proxy/post-stop")) {
+			mybox_execq_cmd("$_ROOT_DIR/scripts/http_proxy/post-stop");
+		}
+		return 0;
+	}
+	@mybox_unlink("$_ROOT_DIR/avscan/*");
+	mybox_init_echo($_QUIET,"ERROR","Shutting down HTTP Proxy service failed");
+	return 1;
+}
+
+$ret=1;
+$_app=basename($_SERVER["argv"][0]);
+if($_SERVER["argv"][2]=='quiet') $_QUIET=1;
+switch($_SERVER["argv"][1]) {
+	case 'start':
+		$ret=cf_start();
+		break;
+	case 'stop':
+		$ret=cf_stop();
+		break;
+	case 'restart':
+		$ret=cf_stop();
+		sleep(2);
+		$ret=cf_start();
+		break;
+	case 'status':
+		$ret=cf_status();
+		break;
+	case 'config':
+		$ret=cf_config();
+		break;
+	default:
+		echo "Usage: $_app [start/stop/restart/status]\n";
+		break;
+}
+exit($ret);
+?>

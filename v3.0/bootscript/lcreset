@@ -1,0 +1,19 @@
+#!/bin/perl
+# $Id: lcreset.pl,v 1.1 2007/08/08 20:50:56 nawawi Exp $
+# Copyright (c) 2007 Tracenetwork Corporation Sdn. Bhd.
+
+my $opt=$ARGV[0];
+
+if($opt eq "p" ) {
+	system("/bin/lcds");
+	exit 0;
+}
+
+unlink("/var/sys/lcd_down");
+unlink("/var/sys/chk_lcdg");
+system("pgrep -f lcd |xargs kill -9 >/dev/null 2>&1");
+system("/bin/lcds");
+system("/bin/lcdp");
+system("/bin/lcde");
+open(TEMP,">/var/sys/chk_lcdg");close(TEMP);
+exit 0;

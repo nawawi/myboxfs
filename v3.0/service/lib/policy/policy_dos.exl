@@ -1,0 +1,234 @@
+<?php 
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+// policy library for DOS/FLOOD
+
+// DOS/FLOOD execute
+function nat_raw_header() {
+	/*
+	ACL1011-01 - DOS FLOOD PROTECTION
+	ACL1011-02 - ICMP FLOOD
+	ACL1011-03 - ICMP FLOOD DROP
+	ACL1011-04 - ICMP FLOOD SRC
+	ACL1011-05 - ICMP FLOOD DST
+	ACL1011-06 - LOCAL TRAFFIC
+	ACL1011-07 - GENERIC ACCEPT
+	ACL1011-09 - SYN FLOOD
+	ACL1011-10 - SYN FLOOD DROP
+	ACL1011-11 - SYN FLOOD DST
+	ACL1011-12 - SYN FLOOD SRC
+	ACL1011-13 - UDP FLOOD
+	ACL1011-14 - UDP FLOOD DROP
+	ACL1011-15 - UDP FLOOD DST
+	ACL1011-16 - UDP FLOOD SRC
+	*/
+	do_iptable("*raw");
+	do_iptable(":PREROUTING ACCEPT [0:0]");
+	do_iptable(":OUTPUT ACCEPT [0:0]");
+	do_iptable(":ACL1011-01 - [0:0]");
+	do_iptable(":ACL1011-02 - [0:0]");
+	do_iptable(":ACL1011-03 - [0:0]");
+	do_iptable(":ACL1011-04 - [0:0]");
+	do_iptable(":ACL1011-05 - [0:0]");
+	do_iptable(":ACL1011-06 - [0:0]");
+	do_iptable(":ACL1011-07 - [0:0]");
+	do_iptable(":ACL1011-09 - [0:0]");
+	do_iptable(":ACL1011-10 - [0:0]");
+	do_iptable(":ACL1011-11 - [0:0]");
+	do_iptable(":ACL1011-12 - [0:0]");
+	do_iptable(":ACL1011-13 - [0:0]");
+	do_iptable(":ACL1011-14 - [0:0]");
+	do_iptable(":ACL1011-15 - [0:0]");
+	do_iptable(":ACL1011-16 - [0:0]");
+}
+
+function do_policy_dos($db_id='') {
+	global $_DB_NAME, $_QUIET;
+
+	if(file_exists("/var/sys/init_no_restart")) return;
+
+	$close_db=0;
+	if($db_id=='') {
+		$db_id=mybox_db_connect($_DB_NAME);
+		$close_db=1;
+	} 
+	$_ips_dos_tcp_stat;$_ips_dos_udp_stat=0;$_ips_dos_icmp_stat=0;
+	$result=mybox_db_query("select * from misc where name like \"ips_dos_%\" ",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			if(trim($row['name'])=="ips_dos_tcp_stat") $_ips_dos_tcp_stat=trim($row['val']);
+			if(trim($row['name'])=="ips_dos_tcp_log") $_ips_dos_tcp_log=trim($row['val']);
+			if(trim($row['name'])=="ips_dos_tcp_mode") $_ips_dos_tcp_mode=trim($row['val']);
+			if(trim($row['name'])=="ips_dos_tcp_src_rate") $_ips_dos_tcp_src_rate=trim($row['val']);
+			if(trim($row['name'])=="ips_dos_tcp_dst_rate") $_ips_dos_tcp_dst_rate=trim($row['val']);
+			if(trim($row['name'])=="ips_dos_udp_stat") $_ips_dos_udp_stat=trim($row['val']);
+			if(trim($row['name'])=="ips_dos_udp_log") $_ips_dos_udp_log=trim($row['val']);
+			if(trim($row['name'])=="ips_dos_udp_mode") $_ips_dos_udp_mode=trim($row['val']);
+			if(trim($row['name'])=="ips_dos_udp_src_rate") $_ips_dos_udp_src_rate=trim($row['val']);
+			if(trim($row['name'])=="ips_dos_udp_dst_rate") $_ips_dos_udp_dst_rate=trim($row['val']);
+			if(trim($row['name'])=="ips_dos_icmp_stat") $_ips_dos_icmp_stat=trim($row['val']);
+			if(trim($row['name'])=="ips_dos_icmp_log") $_ips_dos_icmp_log=trim($row['val']);
+			if(trim($row['name'])=="ips_dos_icmp_mode") $_ips_dos_icmp_mode=trim($row['val']);
+			if(trim($row['name'])=="ips_dos_icmp_src_rate") $_ips_dos_icmp_src_rate=trim($row['val']);
+			if(trim($row['name'])=="ips_dos_icmp_dst_rate") $_ips_dos_icmp_dst_rate=trim($row['val']);
+		}
+	}
+	do_policy_dos_clear();
+	if($_ips_dos_icmp_stat==1 || $_ips_dos_tcp_stat==1 || $_ips_dos_tcp_stat==1) {
+		$_IPSACL=array();
+		$_IPSACL=unserialize(mybox_fget_contents("/var/sys/policy_admin.cache"));
+		iptables_open();
+		nat_raw_header();
+		mybox_init_echo($_QUIET,"INFO","Loading DOS/FLOODING protection rules");
+		do_iptable("-A PREROUTING -s 127.0.0.0/255.0.0.0 -d 127.0.0.0/255.0.0.0 -j ACL1011-06");
+		do_iptable("-A PREROUTING -j ACL1011-01"); 
+		do_iptable("-A PREROUTING -j ACL1011-07"); 
+		do_iptable("-A OUTPUT -s 127.0.0.0/255.0.0.0 -d 127.0.0.0/255.0.0.0 -j ACL1011-06");
+		do_iptable("-A ACL1011-06 -j NOTRACK"); 
+		do_iptable("-A ACL1011-06 -j ACCEPT"); 
+		do_iptable("-A ACL1011-07 -j ACCEPT"); 
+
+		if($_ips_dos_tcp_stat==1) do_iptable("-A ACL1011-01 -p tcp -j ACL1011-09");
+		if($_ips_dos_udp_stat==1) do_iptable("-A ACL1011-01 -p udp -j ACL1011-13");
+		if($_ips_dos_icmp_stat==1) do_iptable("-A ACL1011-01 -p icmp -j ACL1011-02");
+
+		/*	
+			From global.exl:
+			$_IPS_DOS=array();
+			$_IPS_DOS['1']="Source address only";
+			$_IPS_DOS['2']="Destination address only";
+			$_IPS_DOS['3']="Source and destination address";
+
+		*/
+		$_gw_ip=mybox_fget_contents("/var/sys/gw_ip");
+		if($_ips_dos_icmp_stat==1) {
+			if($_gw_ip!='') do_iptable("-A ACL1011-02 -s $_gw_ip -j ACL1011-07");
+			ips_exclude("ACL1011-02","icmpf",$db_id);
+			if($_ips_dos_icmp_mode==3) {
+				do_iptable("-A ACL1011-02 -j ACL1011-04");
+				// recent
+				do_iptable("-A ACL1011-03 -m recent --name dos_icmp --rcheck --seconds 300 -j DROP");
+				do_iptable("-A ACL1011-03 -m recent --name dos_icmp --remove");
+				if($_ips_dos_icmp_log==1) do_iptable("-A ACL1011-03 -m recent --name dos_icmp --set -m limit --limit 5/sec --limit-burst 10 -j NFLOG --nflog-prefix \"ICMP_FLOOD: \" "); 
+				do_iptable("-A ACL1011-03 -m recent --name dos_icmp --set -j DROP"); 
+				do_iptable("-A ACL1011-05 -m hashlimit --hashlimit $_ips_dos_icmp_dst_rate/sec --hashlimit-burst 2 --hashlimit-mode dstip --hashlimit-name ACL1011-05 -j ACL1011-07"); 
+				do_iptable("-A ACL1011-05 -j ACL1011-03");
+				do_iptable("-A ACL1011-04 -m hashlimit --hashlimit $_ips_dos_icmp_src_rate/sec --hashlimit-burst 2 --hashlimit-mode srcip --hashlimit-name ACL1011-04 -j ACL1011-05"); 
+				do_iptable("-A ACL1011-04 -j ACL1011-03");
+			} elseif($_ips_dos_icmp_mode==1) {
+				do_iptable("-A ACL1011-02 -j ACL1011-04"); 
+				// recent
+				do_iptable("-A ACL1011-03 -m recent --name dos_icmp --rcheck --seconds 300 -j DROP");
+				do_iptable("-A ACL1011-03 -m recent --name dos_icmp --remove");
+				if($_ips_dos_icmp_log==1) do_iptable("-A ACL1011-03 -m recent --name dos_icmp --set -m limit --limit 5/sec --limit-burst 10 -j NFLOG --nflog-prefix \"ICMP_FLOOD: \" "); 
+				do_iptable("-A ACL1011-03 -m recent --name dos_icmp --set -j DROP"); 
+				do_iptable("-A ACL1011-04 -m hashlimit --hashlimit $_ips_dos_icmp_src_rate/sec --hashlimit-burst 2 --hashlimit-mode srcip --hashlimit-name ACL1011-04 -j ACL1011-07"); 
+				do_iptable("-A ACL1011-04 -j ACL1011-03");
+			} elseif($_ips_dos_icmp_mode==2) {
+				do_iptable("-A ACL1011-02 -j ACL1011-05");
+				// recent
+				do_iptable("-A ACL1011-03 -m recent --name dos_icmp --rcheck --seconds 300 -j DROP");
+				do_iptable("-A ACL1011-03 -m recent --name dos_icmp --remove");
+				if($_ips_dos_icmp_log==1) do_iptable("-A ACL1011-03 -m recent --name dos_icmp --set -m limit --limit 5/sec --limit-burst 10 -j NFLOG --nflog-prefix \"ICMP_FLOOD: \" ");
+				do_iptable("-A ACL1011-03 -m recent --name dos_icmp --set -j DROP"); 
+				do_iptable("-A ACL1011-05 -m hashlimit --hashlimit $_ips_dos_icmp_dst_rate/sec --hashlimit-burst 2 --hashlimit-mode dstip --hashlimit-name ACL1011-05 -j ACL1011-07"); 
+				do_iptable("-A ACL1011-05 -j ACL1011-03"); 
+			}
+		}
+		if($_ips_dos_tcp_stat==1) {
+			do_iptable("-A ACL1011-09 -p tcp -m tcp ! --tcp-flags SYN,RST,ACK SYN -j ACL1011-07");
+			if($_gw_ip!='') do_iptable("-A ACL1011-02 -s $_gw_ip -j ACL1011-07");
+			ips_exclude("ACL1011-09","tcpf",$db_id);
+			if(count($_IPSACL['FT'])!=0) {
+				foreach($_IPSACL['FT'] as $lx) {
+					if($lx=='') continue;
+					do_iptable("-A ACL1011-09 $lx");
+				}
+				unset($lx);
+			}
+			if($_ips_dos_tcp_mode==3) {
+				do_iptable("-A ACL1011-09 -j ACL1011-12");
+				// recent
+				do_iptable("-A ACL1011-10 -m recent --name dos_tcp --rcheck --seconds 300 -j DROP");
+				do_iptable("-A ACL1011-10 -m recent --name dos_tcp --remove");
+				if($_ips_dos_tcp_log==1) do_iptable("-A ACL1011-10 -m recent --name dos_tcp --set -m limit --limit 5/sec --limit-burst 10 -j NFLOG --nflog-prefix \"SYNC_FLOOD: \" "); 
+				do_iptable("-A ACL1011-10 -m recent --name dos_tcp --set -j DROP"); 
+				do_iptable("-A ACL1011-11 -m hashlimit --hashlimit $_ips_dos_tcp_dst_rate/sec --hashlimit-burst 60 --hashlimit-mode dstip --hashlimit-name ACL1011-11 -j ACL1011-07");
+				do_iptable("-A ACL1011-11 -j ACL1011-10"); 
+				do_iptable("-A ACL1011-12 -m hashlimit --hashlimit $_ips_dos_tcp_src_rate/sec --hashlimit-burst 30 --hashlimit-mode srcip --hashlimit-name ACL1011-12 -j ACL1011-11"); 
+				do_iptable("-A ACL1011-12 -j ACL1011-10");
+			} elseif($_ips_dos_tcp_mode==1) {
+				do_iptable("-A ACL1011-09 -j ACL1011-12"); 
+				// recent
+				do_iptable("-A ACL1011-10 -m recent --name dos_tcp --rcheck --seconds 300 -j DROP");
+				do_iptable("-A ACL1011-10 -m recent --name dos_tcp --remove");
+				if($_ips_dos_tcp_log==1) do_iptable("-A ACL1011-10 -m recent --name dos_tcp --set -m limit -m limit --limit 5/sec --limit-burst 10 -j NFLOG --nflog-prefix \"SYNC_FLOOD: \" "); 
+				do_iptable("-A ACL1011-10 -m recent --name dos_tcp --set -j DROP"); 
+				do_iptable("-A ACL1011-12 -m hashlimit --hashlimit $_ips_dos_tcp_src_rate/sec --hashlimit-burst 30 --hashlimit-mode srcip --hashlimit-name ACL1011-12 -j ACL1011-07");
+				do_iptable("-A ACL1011-12 -j ACL1011-10");
+			} elseif($_ips_dos_tcp_mode==2) {
+				do_iptable("-A ACL1011-09 -j ACL1011-11");
+				// recent
+				do_iptable("-A ACL1011-10 -m recent --name dos_tcp --rcheck --seconds 300 -j DROP");
+				do_iptable("-A ACL1011-10 -m recent --name dos_tcp --remove");
+				if($_ips_dos_tcp_log==1) do_iptable("-A ACL1011-10 -m recent --name dos_tcp -m limit --limit 5/sec --limit-burst 10 -j NFLOG --nflog-prefix \"SYNC_FLOOD: \" "); 
+				do_iptable("-A ACL1011-10 -m recent --name dos_tcp --set -j DROP"); 
+				do_iptable("-A ACL1011-11 -m hashlimit --hashlimit $_ips_dos_tcp_dst_rate/sec --hashlimit-burst 60 --hashlimit-mode dstip --hashlimit-name ACL1011-11 -j ACL1011-07"); 
+				do_iptable("-A ACL1011-11 -j ACL1011-10");
+			}
+		}
+		if($_ips_dos_udp_stat==1) {
+			if($_gw_ip!='') do_iptable("-A ACL1011-02 -s $_gw_ip -j ACL1011-07");
+			ips_exclude("ACL1011-13","udpf",$db_id);
+			if(count($_IPSACL['FU'])!=0) {
+				foreach($_IPSACL['FU'] as $lx) {
+					if($lx=='') continue;
+					do_iptable("-A ACL1011-13 $lx");
+				}
+				unset($lx);
+			}
+			if($_ips_dos_udp_mode==3) {
+				do_iptable("-A ACL1011-13 -j ACL1011-16 ");
+				// recent
+				do_iptable("-A ACL1011-14 -m recent --name dos_udp --rcheck --seconds 300 -j DROP");
+				do_iptable("-A ACL1011-14 -m recent --name dos_udp --remove");
+				if($_ips_dos_udp_log==1) do_iptable("-A ACL1011-14 -m recent --name dos_ucp --set -m limit --limit 5/sec --limit-burst 10 -j NFLOG --nflog-prefix \"UDP_FLOOD: \" "); 
+				do_iptable("-A ACL1011-14 -m recent --name dos_udp --set -j DROP"); 
+				do_iptable("-A ACL1011-15 -m hashlimit --hashlimit $_ips_dos_udp_dst_rate/sec --hashlimit-burst 60 --hashlimit-mode dstip --hashlimit-name ACL1011-15 -j ACL1011-07"); 
+				do_iptable("-A ACL1011-15 -j ACL1011-14"); 
+				do_iptable("-A ACL1011-16 -m hashlimit --hashlimit $_ips_dos_udp_src_rate/sec --hashlimit-burst 60 --hashlimit-mode srcip --hashlimit-name ACL1011-16 -j ACL1011-15"); 
+				do_iptable("-A ACL1011-16 -j ACL1011-14");
+			} elseif($_ips_dos_udp_mode==1) {
+				do_iptable("-A ACL1011-13 -j ACL1011-16");
+				// recent
+				do_iptable("-A ACL1011-14 -m recent --name dos_udp --rcheck --seconds 300 -j DROP");
+				do_iptable("-A ACL1011-14 -m recent --name dos_udp --remove");
+				if($_ips_dos_udp_log==1) do_iptable("-A ACL1011-14 -m recent --name dos_ucp --set -m limit --limit 5/sec --limit-burst 10 -j NFLOG --nflog-prefix \"UDP_FLOOD: \" ");
+				do_iptable("-A ACL1011-14 -m recent --name dos_udp --set -j DROP"); 
+				do_iptable("-A ACL1011-16 -m hashlimit --hashlimit $_ips_dos_udp_src_rate/sec --hashlimit-burst 60 --hashlimit-mode srcip --hashlimit-name ACL1011-16 -j ACL1011-07"); 
+				do_iptable("-A ACL1011-16 -j ACL1011-14");
+			} elseif($_ips_dos_udp_mode==2) {
+				do_iptable("-A ACL1011-13 -j ACL1011-15");
+				// recent
+				do_iptable("-A ACL1011-14 -m recent --name dos_udp --rcheck --seconds 300 -j DROP");
+				do_iptable("-A ACL1011-14 -m recent --name dos_udp --remove");
+				if($_ips_dos_udp_log==1) do_iptable("-A ACL1011-14 -m recent --name dos_ucp --set -m limit --limit 5/sec --limit-burst 10 -j NFLOG --nflog-prefix \"UDP_FLOOD: \" "); 
+				do_iptable("-A ACL1011-14 -m recent --name dos_udp --set -j DROP"); 
+				do_iptable("-A ACL1011-15 -m hashlimit --hashlimit 400/sec --hashlimit-burst 60 --hashlimit-mode dstip --hashlimit-name ACL1011-15 -j ACL1011-07"); 
+				do_iptable("-A ACL1011-15 -j ACL1011-14");
+			}
+		}
+		policy_close();
+	}
+	if($close_db==1) {
+		mybox_db_close($db_id);
+	}
+}
+
+function do_policy_dos_clear() {
+	iptables_open();
+	do_iptable("*raw");
+	policy_close();
+}
+
+?>
+

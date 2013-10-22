@@ -1,0 +1,576 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="diag_logs";
+include_once('page.exl');
+
+mybox_chk_session();
+mybox_send_nocache();
+
+function _print_page1() {
+	global $_LOG_NAME, $_PNG, $_LOG_PATH;
+	clearstatcache();
+	echo "
+		<table style='border-collapse: collapse;border: none; padding: 2px;' width='100%'>
+		<tr class='bgcolor4'>
+		<td class='line_l line_t line_b logb_1 logb_2' style='table-layout: fixed;' width='2%'>&nbsp;</td>
+		<td class='line_t line_b logb_1 logb_2' style='font-weight: bold;'>Log name</td>
+		<td class='line_t line_b logb_1 logb_2' style='font-weight: bold;'>Status</td>
+		<td class='line_t line_b logb_1 logb_2' style='font-weight: bold;'>Activity</td>
+		<td class='line_t line_b logb_1 logb_2' style='font-weight: bold;'>File count</td>
+		<td class='line_t line_b logb_1 logb_2' style='font-weight: bold;'>Size</td>
+		<td class='line_r line_t line_b logb_1 logb_2' style='padding-right: 10px; height: 20px; font-weight: bold; table-layout: fixed; text-align: right;'>Action</td>
+		</tr>
+		<tbody>
+	";
+	foreach($_LOG_NAME as $id => $ls) {
+		list($title,$file)=explode("|",$ls);
+		list($cnt,$size)=preg_split("/\|/",mybox_cntlogfile($file));
+		$status="None";
+		if(glob("$_LOG_PATH/{$file}-*.log")!=NULL) {
+			$status="Today";
+		} elseif(glob("$_LOG_PATH/{$file}-*.log.gz")!=NULL) {
+			$status="Archived";
+		}
+		$f='file';
+		if($cnt > 1) $f='files';
+		$size=mybox_convert_byte($size);
+		$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff;  cursor: pointer;'";
+		$lo="onclick=\"pop_msg('$title log files not available');return false;\"";
+		if($cnt!=0) $lo="onclick=\"self.location.href='/diag_logs.exh?tab=2&id=$id';\" style=' cursor: pointer;'";
+		echo "<tr $lt>";
+		echo "<td class='linedot_l linedot_b logb_2' style='table-layout: fixed;' width='2%' $lo><img src='{$_PNG['df_close']}' border=0 alt='' title=''></td>";
+		echo "<td class='linedot_b logb_2' $lo><b>$title</b></td>";
+		if(file_exists("/var/sys/log_setting/$file")) {
+			echo "<td class='linedot_b logb_2' $lo><font style='color: green;'>Enable</font></td>";
+		} else {
+			echo "<td class='linedot_b logb_2' $lo><font style='color: red;'>Disable</font></td>";
+		}
+		clearstatcache();
+		echo "<td class='linedot_b logb_2' $lo>$status</td>";
+		echo "<td class='linedot_b logb_2' $lo>$cnt $f</td>";
+		echo "<td class='linedot_b logb_2' $lo>$size</td>";
+		echo "<td class='linedot_r linedot_b logb_2' style='text-align: right; table-layout: fixed; white-space: nowrap;'>";
+		if($cnt!=0) {
+			echo "<a href='#' onclick=\"do_save_file('$file',0);return false;\"><img src='{$_PNG['save']}' border=0 alt='' title=''></a>&nbsp;";
+			echo "<a href='#' onclick=\"do_delete_file('$file','$title',0);return false;\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a><input type=checkbox name=del[] value=$file>";
+		} else {
+			echo "<a href='#' onclick=\"pop_msg('$title log files not available');return false;\"><img src='{$_PNG['save']}' border=0 alt='' title=''></a>&nbsp;";
+			echo "<a href='#' onclick=\"pop_msg('$title log files not available');return false;\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a><input type=checkbox name=del[] value=''>";
+		}
+		echo "</td></tr>";
+	}
+	unset($status);
+	echo "
+		<tr>
+		<td class='linedot_l linedot_r linedot_b logb_2' style='text-align: right;' colspan=7><a href='#' onclick=\"do_save_file('all',1);return false;\">Download</a> / <a href='#' onclick=\"do_delete_file('all','Selected',1);return false;\">Delete</a> / <a href='#' onclick='dotoggle();return false;'>Toggle</a> <img src='{$_PNG['arrow_rtr']}' border=0 alt='' title=''></td>
+		</tr>
+		</tbody></tables>
+	";
+}
+if(isset($_GET['d'])&&$_GET['d']==2 && isset($_GET['f'])&&$_GET['f']!='' && isset($_GET['r'])&&$_GET['r']!='') {
+	$name="{$_GET['f']}_log";
+	if(file_exists("$_DOWNLOAD_PATH/$name.tgz")) @unlink("$_DOWNLOAD_PATH/$name.tgz");
+	chdir("$_LOG_PATH");
+	mybox_mkdirr("$name");
+	mybox_exec_cmd("cp $_LOG_PATH/{$_GET['f']}-* $_LOG_PATH/$name/");
+	mybox_exec_cmd("tar -czf $_DOWNLOAD_PATH/$name.tgz ./$name");
+	if(file_exists("$_DOWNLOAD_PATH/$name.tgz")) {
+		@mybox_rmdir("$_LOG_PATH/$name");
+		echo "/d/$name.tgz";
+		exit;
+	}
+	exit;
+}
+if(isset($_GET['d'])&&$_GET['d']==22 && isset($_GET['f'])&&$_GET['f']!='' && isset($_GET['r'])&&$_GET['r']!='') {
+	$name="mybox_logfiles";
+	if(file_exists("$_DOWNLOAD_PATH/$name.tgz")) @unlink("$_DOWNLOAD_PATH/$name.tgz");
+	$del=explode(",",$_GET['f']);
+	if(count($del)!=0) {
+		chdir("$_LOG_PATH");
+		mybox_mkdirr("$name");
+		foreach($del as $l) {
+			mybox_exec_cmd("cp $_LOG_PATH/{$l}-* $_LOG_PATH/$name/");
+		}
+		mybox_exec_cmd("tar -czf $_DOWNLOAD_PATH/$name.tgz ./$name");
+		if(file_exists("$_DOWNLOAD_PATH/$name.tgz")) {
+			@mybox_rmdir("$_LOG_PATH/$name");
+			echo "/d/$name.tgz";
+			exit;
+		}
+	}
+	exit;
+}
+if(isset($_GET['d'])&&$_GET['d']==11 && isset($_GET['f'])&&$_GET['f']!='' && isset($_GET['r'])&&$_GET['r']!='') {
+	if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+		$del=explode(",",$_GET['f']);
+		$_ok=0;
+		if(count($del)!=0) {
+			foreach($del as $l) {
+				mybox_unlink("$_LOG_PATH/{$l}-*");
+				$_ok=1;
+			}
+		} else {
+			mybox_unlink("$_LOG_PATH/{$_GET['f']}-*");
+			$_ok=1;
+		}
+		if($_ok==1) mybox_alert_queue("[WARNING] Log files have been deleted","Log files have been deleted\nby {$_LOGIN['auth_id']} access from {$_LOGIN['auth_addr']}","17");
+		unset($_ok);
+	}
+	_print_page1();
+	exit;
+}
+if(isset($_GET['d'])&&$_GET['d']==1 && isset($_GET['f'])&&$_GET['f']!='' && isset($_GET['r'])&&$_GET['r']!='') {
+	if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+		mybox_unlink("$_LOG_PATH/{$_GET['f']}-*");
+		mybox_alert_queue("[WARNING] Log files have been deleted","Log files have been deleted\nby {$_LOGIN['auth_id']} access from {$_LOGIN['auth_addr']}","17");
+	}
+	_print_page1();
+	exit;
+}
+if(isset($_GET['d'])&&$_GET['d']==0 && isset($_GET['r'])&&$_GET['r']!='') {
+	_print_page1();
+	exit;
+}
+### tab 2
+function _print_page2($id,$ty='',$tm='') {
+	global $_LOG_PATH, $_MONTH, $_PNG, $_LOG_NAME;
+
+	clearstatcache();
+	list($title,$file)=explode("|",$_LOG_NAME[$id]);
+	$list_a=mybox_dir2array("$_LOG_PATH/{$file}-*");
+	$kt=array();
+	$kf=array();
+	if(count($list_a)!=0) {
+		rsort($list_a);
+		reset($list_a);
+		foreach($list_a as $lx) {
+			$lx=basename($lx);
+			if(preg_match("/{$file}\-(\d+)\./",$lx,$mm)) {
+				$dt=strtotime($mm[1]);
+				$y=date('Y',$dt);
+				$m=date('m',$dt);
+				$d=date('d',$dt);
+				$kt[$y][$m][]=$d;
+				$kf[$y][$m][]=$lx;
+			}
+		}
+		$sm=array();$sy='';$sty='';$ok=0;
+		if(count($kt)!=0) {
+			foreach($kt as $ky => $kya) {
+				$kc=0;
+				foreach($kya as $km => $kma) {
+					$kc=count($kma);
+					$fl="file";
+					if($kc > 1) $fl="files";
+					$lk=count($kt[$ky]);
+					$p=@str_repeat('0',strlen($lk)-strlen($kc)).$kc;
+					if($ty=='') $ty=$ky;
+					if($tm=='') $tm=$km;
+					$sp='';
+					if($km==$tm) $sp='selected';
+					$sm[$ky] .="<option value='$km' $sp>($p $fl) - ".strtoupper($_MONTH[$km])."</option>";
+					$sk='';
+					if($ky==$ty) $sk='selected';
+					$st="<option value='$ky' $sk>$ky</option>";
+					if(!isset($sty[$st])) $sty[$st]=1;
+				}
+			}
+			unset($st);
+
+			if(count($sty)!=0) {
+				foreach($sty as $st => $po) {
+					$sy .=$st;
+				}
+			}
+			echo "
+				<table width=100% cellpadding=3 cellspacing=0 class='bc'>
+				<tr>
+				<td class='bc tl' align=left valign=top><img src='/i/menu/corner_tl.gif' class='c'></td>
+				<td class=bc rowspan=2 style='text-align: left; font-size: 12px; font-weight: bold;'>
+				
+				<font style='font-weight: bold; font-size: 11px;'>Year:</font> <select name=year size=1 class=selbox style='width: 80px;' onchange=\"refresh_data('$id');\">
+				$sy
+				</select>&nbsp;
+				<font style='font-weight: bold; font-size: 11px;'>Month:</font> <select name=month size=1 class=selbox style='width: 200px;'>
+				{$sm[$ty]}
+				</select>&nbsp;<a class='btns' href='#' onclick='return refresh_data($id);return false;'>Select</a>
+				</td>
+				<td class='bc tr' align=right valign='top'><img src='/i/menu/corner_tr.gif' class='c'></td></tr>
+				<tr><td class='bc bl' align=left valign='bottom'><img src='/i/menu/corner_bl.gif' class='c'></td>
+				<td class='bc br' align=right valign='bottom'><img src='/i/menu/corner_br.gif' class='c'></td></tr>
+				</table>
+
+			";
+			$_lsa=$kf[$ty][$tm];
+			$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff;  cursor: pointer;'";
+			if(count($_lsa)!=0) {
+				echo "
+					<p class='subtitle' style='margin-top: 5px; width: 100%; font-weight: bold;'><img src='/i/menu/sub_sep.gif'> $title</p>
+					<table style='border-collapse: collapse;border: none;margin-top: 10px; padding: 2px;' width='100%'>
+					<tr class='bgcolor4'>
+					<td class='line_l line_t line_b logb_1 logb_2' style='text-align: center; table-layout: fixed;' width=2%><a href='#' onclick=\"self.location.href='/diag_logs.exh?tab=1&do_tab=1&id=$id'; return false;\" title='Back to main'><img src='{$_PNG['df_open']}' border=0></a></td>
+					<td class='line_t line_b logb_1 logb_2' style='font-weight: bold;'>File name</td>
+					<td class='line_t line_b logb_1 logb_2' style='font-weight: bold;'>Date</td>
+					<td class='line_t line_b logb_1 logb_2' style='font-weight: bold;'>Changed</td>
+					<td class='line_t line_b logb_1 logb_2' style='font-weight: bold;'>Size</td>
+					<td class='line_r line_t line_b logb_1 logb_2' style='font-weight: bold;'>Action</td>
+					</tr>
+					<tbody>
+				";
+				foreach($_lsa as $fx) {
+					$stat=stat("$_LOG_PATH/$fx");
+					$mtime=date('h:i:s A',$stat[9]);
+					$size=sprintf("%u",$stat[7]);
+					clearstatcache();
+					if(preg_match("/$file"."-(\d+)\.log/",$fx,$mm)) {
+						$date=date('d-M-Y',strtotime($mm[1]));
+						$day=date('D',strtotime($mm[1]));
+					}
+					$pic="<img src='{$_PNG['file']}' border=0 alt='' title=''>";
+					if(strpos($fx,"log.gz")!==FALSE) $pic="<img src='{$_PNG['zip']}' border=0 alt='' title=''>";
+					$size=mybox_convert_byte($size);
+	
+					$lo="onclick=\"log_win('$fx'); return false;\"";
+					echo "<tr $lt>";
+					echo "<td class='linedot_l linedot_b logb_2' style='text-align: center; table-layout: fixed;' width=2%><a href='#' $lo>$pic</a></td>";
+					echo "<td class='linedot_b logb_2' $lo><b>$fx</b></td>";
+					echo "<td class='linedot_b logb_2' $lo>
+						<table style='margin: 0px; padding: 0px;'><tr>
+						<td>$day</td><td>$date</td>
+						</tr></table>
+					</td>";
+					echo "<td class='linedot_b logb_2' $lo>$mtime</td>";
+					echo "<td class='linedot_b logb_2' $lo>$size</td>";
+					echo "<td class='linedot_r linedot_b logb_2' width=5% style='text-align: right; table-layout: fixed; white-space: nowrap;'>";
+					echo "<a href='#' onclick=\"self.location.href='/l/$fx';return false;\"><img src='{$_PNG['save']}' border=0 alt='' title=''></a>&nbsp;";
+					echo "<a href='#' onclick=\"do_delete_file('$fx','$fx',0,'$id','$ty','$tm');return false;\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a><input type=checkbox name=del[] value='$fx'>";
+					echo "</td></tr>";
+				}
+				echo "
+					<tr>
+					<td class='linedot_l linedot_r linedot_b' style='text-align: right;' valign=top colspan=6><a href='#' onclick=\"do_save_file('all',1);return false;\">Download</a> / <a href='#' onclick=\"do_delete_file('all','Selected',1,'$id','$ty','$tm');return false;\">Delete</a> / <a href='#' onclick='dotoggle();return false;'>Toggle</a> <img src='{$_PNG['arrow_rtr']}' border=0 alt='' title=''></td>
+					</tr>
+					</tbody>
+				";
+			}
+			echo "
+				</tbody>
+				</table>
+			";
+		}
+	} else {
+		_print_page1();
+	}
+	clearstatcache();
+}
+
+if(isset($_GET['d'])&&$_GET['d']==23 && isset($_GET['f'])&&$_GET['f']!='' && isset($_GET['r'])&&$_GET['r']!='') {
+	$name="mybox_logfiles";
+	if(file_exists("$_DOWNLOAD_PATH/$name.tgz")) @unlink("$_DOWNLOAD_PATH/$name.tgz");
+	$del=explode(",",$_GET['f']);
+	if(count($del)!=0) {
+		chdir("$_LOG_PATH");
+		mybox_mkdirr("$name");
+		foreach($del as $l) {
+			mybox_exec_cmd("cp $_LOG_PATH/{$l} $_LOG_PATH/$name/");
+		}
+		mybox_exec_cmd("tar -czf $_DOWNLOAD_PATH/$name.tgz ./$name");
+		if(file_exists("$_DOWNLOAD_PATH/$name.tgz")) {
+			@mybox_rmdir("$_LOG_PATH/$name");
+			echo "/d/$name.tgz";
+			exit;
+		}
+	}
+	exit;
+}
+
+if(isset($_GET['d'])&&$_GET['d']==12 && isset($_GET['f'])&&$_GET['f']!='' && isset($_GET['r'])&&$_GET['r']!=''
+	&& isset($_GET['id'])&&$_GET['id']!=''
+	&& isset($_GET['ty'])&&$_GET['ty']!=''
+	&& isset($_GET['tm'])&&$_GET['tm']!='') {
+	if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+		$del=explode(",",$_GET['f']);
+		if(count($del)!=0) {
+			$_ok=0;
+			foreach($del as $l) {
+				@unlink("$_LOG_PATH/$l");
+			}
+			if($_ok==1) mybox_alert_queue("[WARNING] Log files have been deleted","Log files have been deleted\nby {$_LOGIN['auth_id']} access from {$_LOGIN['auth_addr']}","17");
+			unset($_ok);
+		}
+	}
+	_print_page2($_GET['id'],$_GET['ty'],$_GET['tm']);
+	exit;
+}
+if(isset($_GET['d'])&&$_GET['d']==13 && isset($_GET['f'])&&$_GET['f']!='' && isset($_GET['r'])&&$_GET['r']!=''
+	&& isset($_GET['id'])&&$_GET['id']!=''
+	&& isset($_GET['ty'])&&$_GET['ty']!=''
+	&& isset($_GET['tm'])&&$_GET['tm']!='') {
+	if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+		@unlink("$_LOG_PATH/{$_GET['f']}");
+		mybox_alert_queue("[WARNING] Log files have been deleted","Log files have been deleted\nby {$_LOGIN['auth_id']} access from {$_LOGIN['auth_addr']}","17");
+	}
+	_print_page2($_GET['id'],$_GET['ty'],$_GET['tm']);
+	exit;
+}
+
+if(isset($_GET['d'])&&$_GET['d']==110 && isset($_GET['r'])&&$_GET['r']!=''
+	&& isset($_GET['id'])&&$_GET['id']!=''
+	&& isset($_GET['ty'])&&$_GET['ty']!=''
+	&& isset($_GET['tm'])&&$_GET['tm']!='') {
+	_print_page2($_GET['id'],$_GET['ty'],$_GET['tm']);
+	exit;
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+
+?>
+<html>
+<head>
+<title>MyAdmin</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<script type='text/javascript' src="/j/mybox_func.js"></script>
+<script type='text/javascript' src="/j/mybox_ajax.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?php echo $_LOGIN['auth_id'];?>";
+</script>
+<script type='text/javascript'>
+	<?php if($tab==2) {?>
+	function set_search_log() {
+		var X='';
+		  for(var i = 0; i < document.f.elements.length; i++) {
+			if(document.f.elements[i].type=='checkbox') {
+			    	if( document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+					if(document.f.elements[i].checked) {
+						X += document.f.elements[i].value;
+						X +=',';
+					}
+    				}	
+			}
+  		}
+		return X;
+	};
+	function do_search_log() {
+		if(chkdel()!=false) {
+			var list=set_search_log();
+			var str=document.f.str.value;
+			if(str=='') return false;
+			LeftPosition = (screen.width) ? (screen.width-620)/2 : 0;
+			TopPosition = (screen.height) ? (screen.height-530)/2 : 0;
+			settings='width=650,height=530,top='+TopPosition+',left='+LeftPosition+',scrollbars=1,status=0,resizable=1,menubar=0';
+			index="diag_logread.exh?fo="+list+"&grep=1&str="+str;
+			win=window.open(index,"logwin<?php echo time();?>",settings);
+			if(!win) {
+				pop_msg("Please allow window popup");
+				return false;
+			}
+			if(parseInt(navigator.appVersion) >= 4){win.window.focus();}
+			return false;	
+		};
+		return false;
+	};
+	function log_win(file) {
+		LeftPosition = (screen.width) ? (screen.width-620)/2 : 0;
+		TopPosition = (screen.height) ? (screen.height-530)/2 : 0;
+		settings='width=650,height=530,top='+TopPosition+',left='+LeftPosition+',scrollbars=1,status=0,resizable=1,menubar=0';
+		index="diag_logread.exh?fo="+file;
+		win=window.open(index,"logwin<?php echo time();?>",settings);
+		if(!win) {
+			pop_msg("Please allow window popup");
+			return false;
+		}
+		if(parseInt(navigator.appVersion) >= 4){win.window.focus();}
+		return false;
+	};
+	<?php } ?>
+	<?php if($tab==1){?>
+	function do_delete_file(file,msg,opt) {
+	<?php if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {?>
+		if(opt==1) {
+			if(chkdel()!=false) {
+				var T='';
+				if(confirm('Are you sure you want to delete the "'+msg+'" log files?')) {
+					for(var i = 0; i < document.f.elements.length; i++) {
+						if(document.f.elements[i].type=='checkbox') {
+			    				if(document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+								if(document.f.elements[i].checked && document.f.elements[i].value!='') {
+									T +=document.f.elements[i].value;
+									T +=',';
+								}
+    							}	
+						}
+  					}
+					if(T!='') {
+						self.location.href='#';
+						error("Removing data. Please wait..");
+						log1_task('<?php echo "/diag_logs.exh?_NOLOGIN=1&r=".time()."";?>&d=11&f='+T);
+					} else {
+						pop_msg("Selected log files not available");
+						clear_toggle();
+					}
+				};
+				return false;
+			}
+		} else {
+			if(confirm('Are you sure you want to delete the "'+msg+'" log files?')) {
+				error("Removing data. Please wait..");
+				log1_task('<?php echo "/diag_logs.exh?_NOLOGIN=1&r=".time()."";?>&d=1&f='+file);
+			}
+			return false;
+		}
+	<?php } else {?>
+		error("Permission denied");return false;
+	<?php }?>
+		return false;
+	};
+
+	function do_save_file(file,opt) {
+		if(opt==1) {
+			if(chkdel()!=false) {
+				var T='';
+				for(var i = 0; i < document.f.elements.length; i++) {
+					if(document.f.elements[i].type=='checkbox') {
+						if(document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+							if(document.f.elements[i].checked && document.f.elements[i].value!='') {
+								T +=document.f.elements[i].value;
+								T +=',';
+							}
+    						}	
+					}
+  				}
+				if(T!='') {
+					self.location.href='#';
+					error("Saving data. Please wait..");
+					log1_task_download('<?php echo "/diag_logs.exh?_NOLOGIN=1&r=".time()."";?>&d=22&f='+T);
+				} else {
+					pop_msg("Selected log files not available");
+					clear_toggle();
+				}
+			} 
+		} else {
+			error("Saving data. Please wait..");
+			log1_task_download('<?php echo "/diag_logs.exh?_NOLOGIN=1&r=".time()."";?>&d=2&f='+file);
+			return false;
+		}
+	}
+	<?php }?>
+	<?php if($tab==2){?>
+	function do_delete_file(file,msg,opt,id,ty,tm) {
+	<?php if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {?>
+		if(opt==1) {
+			if(chkdel()!=false) {
+				var T='';
+				if(confirm('Are you sure you want to delete the "'+msg+'" log files?')) {
+					for(var i = 0; i < document.f.elements.length; i++) {
+						if(document.f.elements[i].type=='checkbox') {
+			    				if(document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+								if(document.f.elements[i].checked && document.f.elements[i].value!='') {
+									T +=document.f.elements[i].value;
+									T +=',';
+								}
+    							}	
+						}
+  					}
+					if(T!='') {
+						self.location.href='#';
+						error("Removing data. Please wait..");
+						log1_task('<?php echo "/diag_logs.exh?_NOLOGIN=1&r=".time()."";?>&d=12&f='+T+'&id='+id+'&ty='+ty+'&tm='+tm);
+					} else {
+						pop_msg("Selected log files not available");
+						clear_toggle();
+					}
+				};
+				return false;
+			}
+		} else {
+			if(confirm('Are you sure you want to delete the "'+msg+'" log files?')) {
+				error("Removing data. Please wait..");
+				log1_task('<?php echo "/diag_logs.exh?_NOLOGIN=1&r=".time()."";?>&d=13&f='+file+'&id='+id+'&ty='+ty+'&tm='+tm);
+			}
+			return false;
+		}
+	<?php } else {?>
+		error("Permission denied");return false;
+	<?php }?>
+		return false;
+	};
+
+	function do_save_file(file,opt) {
+		if(chkdel()!=false) {
+			var T='';
+			for(var i = 0; i < document.f.elements.length; i++) {
+				if(document.f.elements[i].type=='checkbox') {
+					if(document.f.elements[i].name.substr( 0, 3 ) == 'del') {
+						if(document.f.elements[i].checked && document.f.elements[i].value!='') {
+							T +=document.f.elements[i].value;
+							T +=',';
+						}
+    					}	
+				}
+  			}
+			self.location.href='#';
+			error("Saving data. Please wait..");
+			log1_task_download('<?php echo "/diag_logs.exh?_NOLOGIN=1&r=".time()."";?>&d=23&f='+T);
+			return false;
+		}
+	};
+
+	function refresh_data(id) {
+		var ty=document.f.year.value;
+		var tm=document.f.month.value;
+		self.location.href='#';
+		error("Loading data. Please wait..");
+		var dot='<?php echo "/diag_logs.exh?_NOLOGIN=1&r=".time()."";?>&d=110&f=&id='+id+'&ty='+ty+'&tm='+tm;
+		log1_task(dot);
+		return false;
+	}
+	<?php }?>
+</script>
+</head>
+<body onload="load_menu('sub9','t9d2','s9i2');" scroll="auto">
+<form name=f method=post action="/diag_logs.exh">
+
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 0px;'>
+<tr>
+<td>
+<?php mybox_page_section("Logging / View Log Files");?>
+<br><br>
+<?php if($tab==2) { mybox_page_search_log($str); }?>
+<?php mybox_page_msg($msg);?>
+<br>
+
+<?php if($tab==1) { ?>
+<div id='log1' style='margin-top: 0px;'>
+<?php _print_page1();?>
+</div>
+<script type='text/javascript'>
+function update_data() {
+	log1_task('<?php echo "/diag_logs.exh?_NOLOGIN=1&r=".time()."";?>&d=0&f=');
+	return true;
+};
+window.setInterval(update_data, '300000');
+</script>
+<?php  }//tab==1?>
+
+<?php if($tab==2 && $id!='' && $_LOG_NAME[$id]!='') {?>
+<div id='log1' style='margin-top: 0px;'>
+<?php _print_page2($id);?>
+</div>
+
+<?php  } //tab==2?>
+
+</td>
+</tr>
+</table>
+
+<input type=hidden name=do_save value=0>
+<input type=hidden name=id value=<?php echo $id;?>>
+<input type=hidden name=tab value=<?php echo $tab;?>>
+
+</form>
+</body>
+</html>

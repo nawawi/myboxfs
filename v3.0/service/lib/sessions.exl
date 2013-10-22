@@ -1,0 +1,297 @@
+<?php 
+if($_AWIE_CODE!="ef3802a1fce98f3985e6a9a1f7c1a024") exit("\n\n<---[ closed. not parent ]--->\n\n");
+// updated: 2007/10/27 01:51:43
+
+function mybox_ftp_ssh_console_reset_password() {
+	global $_DB_NAME, $_QUIET;
+	$_QUIET=1;
+	mybox_ftp_ssh_console(&$_FTP_STAT,&$_FTP_PORT,&$_FTP_PASS,
+			&$_SSH_STAT,&$_SSH_PORT,&$_SSH_PASS);
+	return;
+}
+// ftp/ssh/console access password set
+function mybox_ftp_ssh_console(&$_FTP_STAT,&$_FTP_PORT,&$_FTP_PASS,
+			&$_SSH_STAT,&$_SSH_PORT,&$_SSH_PASS) {
+	global $_DB_NAME, $_QUIET;
+
+	$_data=array();
+	$_FTP_STAT=0;$_SSH_STAT=0;
+	if(file_exists("/var/sys/ftp_ssh_console.cache")) {
+		$_data=unserialize(mybox_fget_contents("/var/sys/ftp_ssh_console.cache"));
+	} else {
+		$db_id=mybox_db_connect($_DB_NAME);
+		$result=mybox_db_query("select pass from auth_login where name='console'",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			$_data['_CONSOLE_PASS']=mybox_db_fetch_single($result);
+		}
+		unset($result);
+		$result=mybox_db_query("select * from service_ftp",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_data['_FTP_STAT']=$row['stat'];
+				$_data['_FTP_PORT']=trim($row['port']);
+				$_data['_FTP_PASS']=trim($row['pass']);
+			}
+		}
+		unset($result);
+		$result=mybox_db_query("select * from service_ssh",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_data['_SSH_STAT']=$row['stat'];
+				$_data['_SSH_PORT']=trim($row['port']);
+				$_data['_SSH_PASS']=trim($row['pass']);
+			}
+		}
+		mybox_save_to_file("/var/sys/ftp_ssh_console.cache",serialize($_data));
+		mybox_db_close($db_id);
+	}
+	if(count($_data)!=0) {
+		foreach($_data as $n => $v) {
+			$$n=$v;
+		}
+	}
+	if($_CONSOLE_PASS=='') {
+		mybox_init_echo($_QUIET,"ERROR","Failed to set CONSOLE access password");
+		$_CONSOLE_PASS="!";
+	}
+	if($_FTP_PASS=='') {
+		mybox_init_echo($_QUIET,"ERROR","Failed to set FTP access password");
+		$_FTP_PASS="!";
+	}
+
+	if($_SSH_PASS=='') {
+		mybox_init_echo($_QUIET,"ERROR","Failed to set SSH access password");
+		$_SSH_PASS="!";
+	}
+	$_config='';
+	$_config .="mfs:$_SSH_PASS:0:0:mfs:/config:/bin/iosh\n";
+	$_config .="console:$_CONSOLE_PASS:0:0:console:/config:/bin/iosh\n";
+	$_config .="ftp1:$_FTP_PASS:0:0:ftp1:/config:/bin/iosh\n";
+	$_config .="nobody:x:0:0:nobody:/:/bin/false\n";
+	$_config .="pcap:x:0:0:pcap:/:/bin/false\n";
+	mybox_save_to_file("/etc/passwd",$_config);
+	$_config='';
+	$_config .="mfs:x:0:\n";
+	$_config .="console:x:0:\n";
+	$_config .="ftp1:x:0:\n";
+	$_config .="nobody:x:0:\n";
+	$_config .="pcap:x:0:\n";
+	$_config .="tty:x:1:\n";
+	mybox_save_to_file("/etc/group",$_config);
+	return 1;
+}
+
+// clean all session variable and file.
+function mybox_session_logout() {
+	global $_DOWNLOAD_PATH;
+	@session_start();
+	$sess=session_id();
+	$spath=session_save_path();
+	$filesave="tmp.$filesave.$sess";
+	mybox_unlink("$_DOWNLOAD_PATH/tmp.*.$sess");
+	mybox_unlink("$spath/sess_*.f.$sess");
+	mybox_unlink("$spath/sess_$sess");
+	@session_unset();
+	@session_destroy();
+	@session_write_close();
+	mybox_http_session_clean();
+}
+
+function mybox_session_update($session) {
+	if($session!=0) {
+		@session_start();
+		$www_session=time()+60*$session;
+		$_SESSION['login']['page_timeout']=$www_session;
+		$_SESSION['login']['timeout']=$session;
+	}
+}
+
+function mybox_chk_level($auth,$opt) {
+	global $_ERROR;
+	if($opt==1) {
+		if($auth=='admin') return 1;
+	}
+	if($opt==2) {
+		if($auth=='admin' || $auth=='look') return 1;
+	}
+	$_ERROR='Access Restricted!';
+	return 0;
+}
+
+function mybox_chk_ssh_logout($opt,$pid,$ldate,$ip='') {
+	$_ID=unserialize(mybox_fget_contents("/var/sys/ssh.session"));
+	if($opt==1) {
+		$_ID[$pid]="$ip";
+		file_put_contents("/var/sys/ssh.session",serialize($_ID));
+		$console="ssh_{$pid}_{$ip}_".date('d:m:Y_H:i:s',$ldate);
+		@touch("/tmp/console.session/$console");
+	}
+	if($opt==2) {
+		if($_ID[$pid]!='') {
+			$ip=$_ID[$pid];
+			$console="ssh_{$pid}_{$ip}_";
+			mybox_unlink("/tmp/console.session/$console*");
+			unset($_ID[$pid]);
+			file_put_contents("/var/sys/ssh.session",serialize($_ID));
+			return $ip;
+		}
+	}
+	return;
+}
+
+function mybox_chk_ftp_logout($opt,$pid='',$pid2='',$ldate='',$ip='') {
+	$_ID=unserialize(mybox_fget_contents("/var/sys/ftp.session"));
+	if($opt==1) {
+		$_ID[$pid]="$ip|$pid2";
+		file_put_contents("/var/sys/ftp.session",serialize($_ID));
+		$console="ftp_{$pid}_{$ip}_".date('d:m:Y_H:i:s',$ldate);
+		@touch("/tmp/console.session/$console");
+	}
+	if($opt==2) {
+		if(is_array($_ID) && count($_ID)!=0) {
+			foreach($_ID as $pid => $lx) {
+				if(@mybox_get_pid($pid)=='') {
+					list($ip,$pid2)=preg_split("/\|/",$lx);
+					unset($_ID[$pid]);
+					$console="ftp_{$pid}_{$ip}";
+					mybox_unlink("/tmp/console.session/$console*");
+					mybox_session_kmsg("ftp","ftp1",$ip);
+				}
+			}
+		}
+	}
+	if($opt==3) {
+		if($_ID[$pid]!='') {
+			$lx=$_ID[$pid];
+			list($ip,$pid2)=preg_split("/\|/",$lx);
+			$console="ftp_{$pid}_{$ip}_";
+			mybox_unlink("/tmp/console.session/$console*");
+			unset($_ID[$pid]);
+		}
+	}
+	file_put_contents("/var/sys/ftp.session",serialize($_ID));
+}
+
+function mybox_session_print($opt=0) {
+	if(!is_dir("/tmp/console.session")) return 1;
+	$dir=mybox_dir2array("/tmp/console.session/*");
+	mybox_http_session_clean();
+	if(count($dir)!=0) {
+		if($opt==0) {
+			printf("%-6s %-9s %-15s %-10s %-8s\n","SID","TYPE","FROM","DATE","TIME");
+			printf("%-6s %-9s %-15s %-10s %-8s\n","------","---------","---------------","----------","--------");
+		}
+		foreach($dir as $ln) {
+			$lx=basename($ln);
+			if(preg_match("/(\S+)\_(\S+)\_(\S+)\_(\S+)\_(\S+)/",$lx,$mm)) {
+				$date=preg_replace("/:/","/",$mm[4]);
+				if($mm[1]=="console") {
+					if($mm[2]==1) {
+						$pid=mybox_get_progpid("iosh console");
+						if($pid!='') {
+							if($opt==0) printf("%-6s %-9s %-15s %s %s\n",$pid,$mm[1],$mm[3],$date,$mm[5]);
+							$console=str_replace("console_{$mm[2]}_","console_{$pid}_",$ln);
+							rename($ln,$console);
+						}
+					} else {
+						if(mybox_get_pid($mm[2])!='') {
+							if($opt==0) printf("%-6s %-9s %-15s %s %s\n",$mm[2],$mm[1],$mm[3],$date,$mm[5]);
+						} else {
+							@unlink($ln);
+						}
+					}
+				} elseif($mm[1]=="ssh") {
+					if(mybox_get_pid($mm[2])!='') {
+						if($opt==0) printf("%-6s %-9s %-15s %s %s\n",$mm[2],$mm[1],$mm[3],$date,$mm[5]);
+					} else {
+						@unlink($ln);
+					}
+				} elseif($mm[1]=="https") {
+					if($opt==0) printf("%-6s %-9s %-15s %s %s\n",$mm[2],$mm[1],$mm[3],$date,$mm[5]);
+				} elseif($mm[1]=="ftp") {
+					if(mybox_get_pid($mm[2])!='') {
+						if($opt==0) printf("%-6s %-9s %-15s %s %s\n",$mm[2],$mm[1],$mm[3],$date,$mm[5]);
+					} else {
+						@unlink($ln);
+					}
+				}
+			}
+		}
+	}
+}
+
+function mybox_session_kmsg($type,$auth,$auth_addr,$status="Session logout") {
+	$ldate=time();
+	mybox_write_log($ldate,"auth","AUTH","TYPE=$type USER=$auth IP=$auth_addr MSG=$status");
+}
+
+function mybox_session_kill($xpid) {
+	if(!is_dir("/tmp/console.session")) return 1;
+	$dir=mybox_dir2array("/tmp/console.session/*_{$xpid}_*");
+	if(count($dir)!=0) {
+		foreach($dir as $ln) {
+			$lx=basename($ln);
+			if(preg_match("/(\S+)\_($xpid)\_(\S+)\_(\S+)\_(\S+)/",$lx,$mm)) {
+				if($mm[1]=="https") {
+					$sess=mybox_fget_contents($ln);
+					@unlink("/tmp/sessions/sess_{$sess}");
+					@mybox_session_kmsg("https","admin",$mm[3]);
+				}
+				if($mm[1]=="ssh") {
+					@mybox_kill($xpid,9);
+					mybox_chk_ssh_logout('2',$xpid,time());
+					@mybox_session_kmsg("ssh","mfs",$mm[3]);
+				}
+				if($mm[1]=="ftp") {
+					$_ID=unserialize(mybox_fget_contents("/var/sys/ftp.session"));
+					if(!is_array($_ID)) $_ID=array();
+					$lx=$_ID[$xpid];
+					list($ip,$pid2)=preg_split("/\|/",$lx);
+					@mybox_kill("$xpid $pid2",9);
+					mybox_chk_ftp_logout('3',$xpid,time());
+					@mybox_session_kmsg("ftp","ftp1",$mm[3]);
+				}
+				@unlink($ln);
+			}
+		}
+	}
+	mybox_session_print();
+	return 1;
+}
+
+function mybox_chk_pptp_user($_opt,$_dev,$_remote_ip,$_real_ip,$_username) {
+	$ldate=time();
+	$_DATA=array();
+	if(file_exists("/var/sys/pptpvpnusers")) $_DATA=unserialize(mybox_fget_contents("/var/sys/pptpvpnusers"));
+	if($_opt==1) {
+		$_pid=mybox_get_progpid($_real_ip);
+		$_DATA[$_dev]="$_remote_ip|$_real_ip|$_username|$ldate|$_pid";
+		mybox_save_to_file("/var/sys/pptpvpnusers",serialize($_DATA));
+		$msg="TYPE=pptp USER=$_username IP=$_real_ip MSG=Connection started ($_remote_ip)";
+		mybox_write_log($ldate,"auth","AUTH",$msg);
+	} else {
+		unset($_DATA[$_dev]);
+		mybox_save_to_file("/var/sys/pptpvpnusers",serialize($_DATA));
+		$msg="TYPE=pptp USER=$_username IP=$_real_ip MSG=Connection closed ($_remote_ip)";
+		mybox_write_log($ldate,"auth","AUTH",$msg);
+	}
+}
+
+function mybox_kill_pptp_user() {
+	if(file_exists("/var/sys/pptpvpnusers")) {
+		$_DATA=unserialize(mybox_fget_contents("/var/sys/pptpvpnusers"));
+		if(count($_DATA)!=0) {
+			foreach($_DATA as $dv => $list) {
+				$list=trim($list);
+				if($list=='') continue;
+				list($_remote_ip,$_real_ip,$_username,$_time,$_pid)=preg_split("/\|/",$list);
+				if(mybox_get_pid($_pid)!='') continue;
+				unset($_DATA[$dv]); 
+			}
+		}
+		mybox_save_to_file("/var/sys/pptpvpnusers",serialize($_DATA));
+	}
+}
+
+
+?>

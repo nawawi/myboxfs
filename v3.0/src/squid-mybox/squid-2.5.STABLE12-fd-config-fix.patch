@@ -1,0 +1,13 @@
+--- squid-2.5.STABLE12/src/comm_select.c.old	2005-12-19 10:16:26.000000000 +0100
++++ squid-2.5.STABLE12/src/comm_select.c	2005-12-19 10:31:36.000000000 +0100
+@@ -750,6 +750,10 @@
+ 	    comm_select_http_incoming();
+ 	callicp = calldns = callhttp = 0;
+ 	maxfd = Biggest_FD + 1;
++        xmemcpy(&readfds, &global_readfds,
++            howmany(maxfd, FD_MASK_BITS) * FD_MASK_BYTES);
++        xmemcpy(&writefds, &global_writefds,
++            howmany(maxfd, FD_MASK_BITS) * FD_MASK_BYTES);
+ 	/* remove stalled FDs, and deal with pending descriptors */
+ 	pending = 0;
+ 	FD_ZERO(&pendingfds);

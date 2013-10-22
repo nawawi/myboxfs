@@ -1,0 +1,1124 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="system_definitions_s";
+include_once('page.exl');
+mybox_chk_session();
+mybox_send_nocache();
+$db_id=mybox_db_connect($_DB_NAME);
+
+function clean_file_cache() {
+	@unlink("/var/sys/defservice.cache");
+	@unlink("/var/sys/defservice4nat.cache");
+	@unlink("/var/sys/defname.cache");
+}
+
+function del_name($id,$table,$db_id) {
+	$name='';
+	$result=mybox_db_query("select name from $table where id='$id'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		$name=mybox_db_fetch_single($result);
+	}
+	mybox_db_query("delete from $table where id='$id'",$db_id);
+	if($name!='') {
+		update_def($name,"","2",$db_id);
+	}
+}
+
+function update_def($name,$nameold,$opt,$db_id) {
+	if($opt==1) {
+		$table="defservices_grp";
+		$result=mybox_db_query("select id,members from $table",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_id=$row['id'];
+				$_members=trim($row['members']);
+				if(strpos($_members,",")!==FALSE) {
+					if(preg_match("/$nameold/",$_members)) {
+						$_members=preg_replace("/$nameold/",$name,$_members);
+						mybox_db_query("update $table set members='$_members' where id='$_id'",$db_id);
+					}
+				} else {
+					if($_members=="$nameold") {
+						mybox_db_query("update $table set members='$_members' where id='$_id'",$db_id);
+					}
+				}
+			}
+		}
+		unset($result,$_id,$_service,$table,$_members);
+
+		foreach(array("pf_inbound","pf_outbound") as $table) {
+			$result=mybox_db_query("select id,service from $table",$db_id);
+			if(mybox_db_num_rows($result)!=0) {
+				while($row=mybox_db_fetch_assoc($result)) {
+					$_id=$row['id'];
+					$_service=trim($row['service']);
+					if(strpos($_service,",")!==FALSE) {
+						if(preg_match("/$nameold/",$_service)) {
+							$_service=preg_replace("/$nameold/",$name,$_service);
+							mybox_db_query("update $table set service='$_service' where id='$_id'",$db_id);
+						}
+					} else {
+						if($_service=="$nameold") {
+							mybox_db_query("update $table set service='$name' where id='$_id'",$db_id);
+						}
+					}
+				}
+			}
+			unset($result,$_id,$_service);
+		}
+		unset($table);
+
+		// dnat,snat
+		foreach(array("pf_dnat","pf_snat") as $table) {
+			$result=mybox_db_query("select id,service,fwdp from $table",$db_id);
+			if(mybox_db_num_rows($result)!=0) {
+				while($row=mybox_db_fetch_assoc($result)) {
+					$_id=$row['id'];
+					$_service=trim($row['service']);
+					$_fwdp=trim($row['fwdp']);
+					if(strpos($_service,",")!==FALSE) {
+						if(preg_match("/$nameold/",$_service)) {
+							$_service=preg_replace("/$nameold/",$name,$_service);
+							mybox_db_query("update $table set service='$_service' where id='$_id'",$db_id);
+						}
+					} else {
+						if($_service=="$nameold") {
+							mybox_db_query("update $table set service='$name' where id='$_id'",$db_id);
+						}
+					}
+					if(strpos($_fwdp,",")!==FALSE) {
+						if(preg_match("/$nameold/",$_fwdp)) {
+							$_fwdp=preg_replace("/$nameold/",$name,$_fwdp);
+							mybox_db_query("update $table set fwdp='$_fwdp' where id='$_id'",$db_id);
+						}
+					} else {
+						if($_fwdp=="$nameold") {
+							mybox_db_query("update $table set fwdp='$name' where id='$_id'",$db_id);
+						}
+					}
+				}
+			}
+			unset($result,$_id,$_service,$_fwdp);
+		} // foreach
+		unset($table);
+		// server load balancing
+		$result=mybox_db_query("select id,service from server_balancing",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_id=$row['id'];
+				$_service=trim($row['service']);
+				if($_service=="$nameold") {
+					mybox_db_query("update server_balancing set service='$name' where id='$_id'",$db_id);
+				}
+			}
+		}
+		unset($result);
+		// QOS
+		$result=mybox_db_query("select id,service from htb_client",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_id=$row['id'];
+				$_service=trim($row['service']);
+				if($_service=="$nameold") {
+					mybox_db_query("update htb_client set service='$name' where id='$_id'",$db_id);
+				}
+			}
+		}
+	}
+	if($opt==2) {
+		$table="defservices_grp";
+		$result=mybox_db_query("select id,members from $table",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_id=$row['id'];
+				$_members=trim($row['members']);
+				if(strpos($_members,",")!==FALSE) {
+					$_grp=preg_split("/,/",$_members);
+					if(count($_grp)!=0) {
+						$_members='';
+						foreach($_grp as $gp) {
+							if($gp=="$name") continue;
+							$_members .="$gp,";
+						}
+						$_members=trim($_members,",");
+						if($_members!='') {
+							mybox_db_query("update $table set members='$_members' where id='$_id'",$db_id);
+						} else {
+							mybox_db_query("delete from $table where id='$_id'",$db_id);
+						}
+					}
+				} else {
+					if($_members=="$name") {
+						mybox_db_query("delete from $table where id='$_id'",$db_id);
+					}
+				}
+			}
+		}
+		unset($result,$_id,$table,$_members,$_grp,$gp);
+
+		foreach(array("pf_inbound","pf_outbound") as $table) {
+			$result=mybox_db_query("select id,service from $table",$db_id);
+			if(mybox_db_num_rows($result)!=0) {
+				while($row=mybox_db_fetch_assoc($result)) {
+					$_id=$row['id'];
+					$_service=trim($row['service']);
+					if(strpos($_service,",")!==FALSE) {
+						$_grp=preg_split("/,/",$_service);
+						if(count($_grp)!=0) {
+							$_service='';
+							foreach($_grp as $gp) {
+								if($gp=="$name") continue;
+								$_service .="$gp,";
+							}
+							$_service=trim($_service,",");
+							if($_service!='') {
+								mybox_db_query("update $table set service='$_service' where id='$_id'",$db_id);
+							} else {
+								mybox_db_query("delete from $table where id='$_id'",$db_id);
+							}
+						}
+					} else {
+						if($_service=="$name") {
+							mybox_db_query("delete from $table where id='$_id'",$db_id);
+						}
+					}
+				}
+			}
+			unset($result,$_id,$_service,$_grp,$gp);
+		}
+		unset($table);
+
+
+		// dnat,snat
+		foreach(array("pf_dnat","pf_snat") as $table) {
+			$result=mybox_db_query("select id,service,fwdp from $table",$db_id);
+			if(mybox_db_num_rows($result)!=0) {
+				while($row=mybox_db_fetch_assoc($result)) {
+					$_id=$row['id'];
+					$_service=trim($row['service']);
+					$_fwdp=trim($row['fwdp']);
+					if(strpos($_service,",")!==FALSE) {
+						$_grp=preg_split("/,/",$_service);
+						if(count($_grp)!=0) {
+							$_service='';
+							foreach($_grp as $gp) {
+								if($gp=="$name") continue;
+								$_service .="$gp,";
+							}
+							$_service=trim($_service,",");
+							if($_service!='') {
+								mybox_db_query("update $table set service='$_service' where id='$_id'",$db_id);
+							} else {
+								mybox_db_query("delete from $table where id='$_id'",$db_id);
+							}
+						}
+					} else {
+						if($_service=="$name") {
+							mybox_db_query("delete from $table where id='$_id'",$db_id);
+						}
+					}
+					unset($_grp,$gp);
+					if(strpos($_fwdp,",")!==FALSE) {
+						$_grp=preg_split("/,/",$_fwdp);
+						if(count($_grp)!=0) {
+							$_fwdp='';
+							foreach($_grp as $gp) {
+								if($gp=="$name") continue;
+								$_fwdp .="$gp,";
+							}
+							$_fwdp=trim($_fwdp,",");
+							if($_fwdp!='') {
+								mybox_db_query("update $table set fwdp='$_fwdp' where id='$_id'",$db_id);
+							} else {
+								mybox_db_query("delete from $table where id='$_id'",$db_id);
+							}
+						}
+					} else {
+						if($_fwdp=="$name") {
+							mybox_db_query("delete from $table where id='$_id'",$db_id);
+						}
+					}
+				}
+			}
+			unset($result,$_id,$_service,$_grp,$gp,$_fwdp);
+		}
+		unset($table);
+		// server load balancing
+		$result=mybox_db_query("select id,service from server_balancing",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_id=$row['id'];
+				$_service=trim($row['service']);
+				if($_service=="$name") {
+					mybox_db_query("delete from server_balancing where id='$_id'",$db_id);
+				}
+			}
+		}
+		unset($result);
+		// QOS
+		$result=mybox_db_query("select id,service from htb_client",$db_id);
+		if(mybox_db_num_rows($result)!=0) {
+			while($row=mybox_db_fetch_assoc($result)) {
+				$_id=$row['id'];
+				$_service=trim($row['service']);
+				if($_service=="$name") {
+					mybox_db_query("delete from htb_client where id='$_id'",$db_id);
+				}
+			}
+		}
+	}
+}
+
+if(mybox_chk_level($_LOGIN['auth_id'],1)==1) {
+	if($tab==1) {
+		if($col==1) {
+			if(isset($do_save)&&$do_save==2) {
+				if(is_array($del) && count($del)!=0) {
+					foreach($del as $x) {
+						if($x!='') del_name($x,"defservices",$db_id);
+					}
+				} else {
+					if($del!='') del_name($del,"defservices",$db_id);
+				}
+				clean_file_cache();
+			}
+		}
+		if($col==2) {
+			if(isset($do_save)&&$do_save==1) {
+				if($do_id!='edit') {
+					if($proto==4) $etc="$icmp";
+					$name=trim($name);
+					$note=mybox_escape_str($note);
+					$result=mybox_db_query("select name from defservices where name='$name'",$db_id);
+					if(mybox_db_num_rows($result)==0) {
+						mybox_db_query("insert into defservices (name,protocol,dport,sport,etc,note) values ('$name','$proto','$dport','$sport','$etc','$note')",$db_id);
+						$msg='Definition saved';
+						clean_file_cache();
+					} else {
+						$msg="Definition name '$name' already exist";
+					}
+				}
+				if($do_id=='edit') {
+					if($proto==4) $etc="$icmp";
+					$name=trim($name);
+					$nameold=trim($nameold);
+					$note=mybox_escape_str($note);
+					if($name!=$nameold) {
+						$result=mybox_db_query("select name from defservices where name='$name'",$db_id);
+						if(mybox_db_num_rows($result)!=0) {
+							$msg="Definition name '$name' already exist";
+						} else {
+							mybox_db_query("update defservices set name='$name',protocol='$proto',dport='$dport',sport='$sport',etc='$etc',note='$note' where id='$id'",$db_id);
+							$msg='Definition updated';$col=1;$do_id='';
+							clean_file_cache();update_def($name,$nameold,"1",$db_id);
+						}
+					} else {
+						mybox_db_query("update defservices set name='$name',protocol='$proto',dport='$dport',sport='$sport',etc='$etc',note='$note' where id='$id'",$db_id);
+						$msg='Definition updated';$col=1;$do_id='';
+						clean_file_cache();
+					}
+				}
+			}
+		}
+	}
+	if($tab==2) {
+		if($col==1) {
+			if(isset($do_save)&&$do_save==2) {
+				if(is_array($del) && count($del)!=0) {
+					foreach($del as $x) {
+						if($x!='') del_name($x,"defservices_grp",$db_id);
+					}
+				} else {
+					if($del!='') del_name($del,"defservices_grp",$db_id);
+				}
+				clean_file_cache();
+			}
+		}
+		if($col==2) {
+			if(isset($do_save)&&$do_save==1) {
+				if($do_id!='edit') {
+					$name=trim($name);
+					$note=mybox_escape_str($note);
+					$members=trim($members,",");
+					$result=mybox_db_query("select name from defservices where name='$name'",$db_id);
+					if(mybox_db_num_rows($result)==0) {
+						$resultx=mybox_db_query("select name from defservices_grp where name='$name'",$db_id);
+						if(mybox_db_num_rows($resultx)==0) {
+							mybox_db_query("insert into defservices_grp (name,members,note) values ('$name','$members','$note')",$db_id);
+							$msg='Group Definition saved';
+							clean_file_cache();
+						} else {
+							$msg="Group name '$name' already exist";
+						}
+					} else {
+						$msg="Group name '$name' already used in service name";
+					}
+				}
+				if($do_id=='edit') {
+					$name=trim($name);
+					$nameold=trim($nameold);
+					$members=trim($members,",");
+					$note=mybox_escape_str($note);
+					$result=mybox_db_query("select name from defservices where name='$name'",$db_id);
+					if(mybox_db_num_rows($result)==0) {
+						if($name!=$nameold) {
+							$resultx=mybox_db_query("select name from defservices_grp where name='$name'",$db_id);
+							if(mybox_db_num_rows($resultx)!=0) {
+								$msg="Group name '$name' already exist";
+							} else {
+								mybox_db_query("update defservices_grp set name='$name',members='$members',note='$note' where id='$id'",$db_id);
+								$msg='Group Definition updated';$col=1;$do_id='';
+								clean_file_cache();
+							}
+						} else {
+							mybox_db_query("update defservices_grp set name='$name',members='$members',note='$note' where id='$id'",$db_id);
+							$msg='Group Definition updated';$col=1;$do_id='';
+							clean_file_cache();
+						}
+					} else {
+						$msg="Group name '$name' already used in service name";
+					}
+					
+				}
+			}
+		}
+	}
+} else {
+	if((isset($do_save)&&$do_save!='') || (isset($do_id)&&$do_id!='')) {
+		$msg="Permission denied";
+	}
+}
+
+if(!isset($tab)||$tab=='') $tab=1;
+if(!isset($col)||$col=='') $col=1;
+
+?>
+<html>
+<head>
+<title>MyAdmin</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<script type='text/javascript' src="/j/mybox_func.js"></script>
+<script type='text/javascript' src="/j/mybox_overlib.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?php echo $_LOGIN['auth_id'];?>";
+	page_load();
+</script>
+</head>
+<body onload="load_menu('sub2','t2d2','s2i2');" scroll="auto">
+<form name=f method=post action="/system_definitions_s.exh">
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 0px;'>
+<tr>
+<td>
+<?php mybox_page_section("Definitions / Service");?>
+<br><br>
+<?php if($col==1) { mybox_page_search($str); }?>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="/system_definitions_s.exh?tab=1" <?php if($tab==1){?>class="tabact"<?php }?>>Service</a></li>
+<li><a href="/system_definitions_s.exh?tab=2" <?php if($tab==2){?>class="tabact"<?php }?>>Service Group</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td>
+<?php mybox_page_msg($msg);?>
+<br>
+
+<!-- tab container -->
+<table width="100%" border="0" cellpadding="0" cellspacing="0">
+<tr><td>
+<ul id="tabnav">
+<li class="<?php if($col==1) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=1) { echo "<a href=\"/system_definitions_s.exh?tab=$tab&col=1\">"; }?>Definitions<?php if($col!=1) { echo "</a>"; }?></li>
+<li class="<?php if($col==2) { echo "tabact"; } else { echo "tabinact"; }?>"><?php if($col!=2) { echo "<a href=\"/system_definitions_s.exh?tab=$tab&col=2\">"; }?><?php if($do_id=='edit') { echo "Edit"; } else { echo "Add new"; }?><?php if($col!=2) { echo "</a>"; }?></li>
+</ul>
+</td></tr>
+<tr> 
+<td class="tabcont">
+<?php if(isset($tab)&&$tab=='1') {?>
+<?php if($col==1) {?>
+<table width="100%" class=data>
+<thead class="blue">
+      <tr>
+        <td style='font-weight: bold; width: 2%;border-right: 0px;'>#</td> 
+        <td style='font-weight: bold; border-left: 0px;border-right: 0px;'>Name</td>
+        <td style='font-weight: bold; border-left: 0px;border-right: 0px;'>Protocol</td>
+	<td style='font-weight: bold; border-left: 0px; border-right: 0px;'></td>
+        <td style='width: 5%; border-left: 0px; border-right: 0px;'>&nbsp;</td>
+      </tr>
+</thead>
+<tbody>
+<?php 
+// counting
+$currentPage = $HTTP_SERVER_VARS["PHP_SELF"];
+$maxRows_Recordset=50;
+if(!isset($pageNum_Recordset)) $pageNum_Recordset=0;
+$startRow_Recordset=@($pageNum_Recordset * $maxRows_Recordset);
+if(isset($str)&&$str!='') {
+	$strn=mybox_escape_str($str);
+	$query_Recordset="select * from defservices where name like \"%$strn%\" order by id ASC";
+} else {
+	$query_Recordset="select * from defservices order by id ASC";
+}
+$query_limit_Recordset=sprintf("%s LIMIT %d, %d", $query_Recordset, $startRow_Recordset, $maxRows_Recordset);
+
+$Recordset=mybox_db_query($query_limit_Recordset, $db_id);
+if(isset($totalRows_Recordset)) {
+	$totalRows_Recordset=$totalRows_Recordset;
+} else {
+	$all_Recordset=mybox_db_query($query_Recordset,$db_id);
+	$totalRows_Recordset=mybox_db_num_rows($all_Recordset);
+}
+$totalPages_Recordset=@ceil($totalRows_Recordset/$maxRows_Recordset)-1;
+$queryString_Recordset=null;
+if(!empty($_SERVER['QUERY_STRING'])) {
+	$params=explode("&", $_SERVER['QUERY_STRING']);
+  	$newParams=array();
+  	foreach ($params as $param) {
+		if(stristr($param, "pageNum_Recordset")==true) continue;
+		if(stristr($param, "totalRows_Recordset")==true) continue;
+		if(stristr($param, "maxRows_Recordset")==true) continue;
+		if(stristr($param, "tab")==true) continue;
+		if(stristr($param, "col")==true) continue;
+		if(stristr($param, "do_id")==true) continue;
+		if(stristr($param, "str")==true) continue;
+		if(stristr($param, "do_list")==true) continue;
+		array_push($newParams, $param);
+  	}
+  	if(count($newParams) != 0) {
+    		$queryString_Recordset="&" . implode("&", $newParams);
+  	}
+}
+$queryString_Recordset=sprintf("&totalRows_Recordset=%d%s&tab=$tab&col=$col&str=$str&do_id=$do_id&do_list=$do_list",$totalRows_Recordset,$queryString_Recordset);
+if($pageNum_Recordset > 0) { 
+	$pagefirst=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, 0, $queryString_Recordset);
+	$pageprev=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, max(0, $pageNum_Recordset - 1), $queryString_Recordset);
+	$button1="<a href='$pagefirst'><img src='{$_PNG['first']}' border=0 alt='' title=''></a>\n";
+	$button2="<a href='$pageprev'><img src='{$_PNG['prev']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button1="<img src='{$_PNG['first']}' border=0 alt='' title=''>\n";
+	$button2="<img src='{$_PNG['prev']}' border=0 alt='' title=''>\n";
+}
+if($pageNum_Recordset < $totalPages_Recordset) {
+	$pagenext=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, min($totalPages_Recordset, $pageNum_Recordset + 1), $queryString_Recordset);
+	$pagelast=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, $totalPages_Recordset, $queryString_Recordset);
+	$button3="<a href='$pagenext'><img src='{$_PNG['next']}' border=0 alt='' title=''></a>\n";
+	$button4="<a href='$pagelast'><img src='{$_PNG['last']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button3="<img src='{$_PNG['next']}' border=0 alt='' title=''>\n";
+	$button4="<img src='{$_PNG['last']}' border=0 alt='' title=''>\n";
+}
+unset($pagefirst,$pageprev,$pagenext,$pagelast);
+$x=1;
+$_cnum=1;
+if(!isset($pageNum_Recordset)||$pageNum_Recordset==''||$pageNum_Recordset==0) {
+	$_cnum=1;
+} else {
+	$_cnum=($pageNum_Recordset * $maxRows_Recordset);
+	if($_cnum <= 0) {
+		$_cnum=1;
+	} else {
+		$_cnum +=1;
+	}
+}
+$_PROTO['any']='any';
+$_nok=0;
+do {
+	$_id=$row['id'];
+	if($_id=='') continue;
+	$_name=$row['name'];
+	$_protocol=$row['protocol'];
+	$_dport=trim($row['dport']);
+	$_sport=trim($row['sport']);
+	$_etc=trim($row['etc']);
+	$_port='';
+	if($_protocol==4) {
+		$_port="ICMP type: $_etc";
+	} elseif($_protocol==5) {
+		$_port="IP Protocol: $_etc";
+	} elseif($_protocol==6 || $_protocol==7) {
+		$_port="SIP: $_etc";
+	} else {
+		$_port='';
+		if($_sport!='') $_port .="$_sport <img src='{$_PNG['arrow_right_s']}' border=0 alt='' title=''> ";
+		if($_dport!='') $_port .="$_dport";
+		$_port="$_port";
+	}
+	$_note=mybox_unescape_str($row['note']);
+	if($_note!='') $_note=mybox_print_note($_note);
+	$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff;cursor: pointer; '";
+	$lo='';
+	if($_id!=0) {
+		$lo="onclick=\"self.location.href='/system_definitions_s.exh?tab=$tab&col=2&id=$_id&do_id=edit';\" ";
+		echo "
+			<tr $lt>
+        		<td $lo style='vertical-align: top;'>$_cnum</td>
+        		<td $lo style='vertical-align: top; color: green;'><b>$_name</b></td>
+        		<td $lo style='vertical-align: top;'><b>{$_PROTO[$_protocol]}</b></td>
+			<td $lo style='vertical-align: top;border-right: 0px;'>
+			<b>$_port</b>
+			$_note
+			</td>
+			<td style='border-left: 0px;text-align: right; vertical-align: bottom; table-layout: fixed; white-space: nowrap;' align=right>
+			<a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='/system_definitions_s.exh?tab=$tab&do_list=$do_list&str=$str&col=$col&do_save=2&del=$_id&pageNum_Recordset=$pageNum_Recordset&totalPages_Recordset=$totalPages_Recordset';\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a>
+			<input type=checkbox name=del[] value=$_id>
+			</td>
+			</tr>
+		";
+		$_nok++;
+	} else {
+		echo "
+			<tr $lt>
+        		<td $lo style='vertical-align: top;'>$_cnum</td>
+        		<td $lo style='vertical-align: top; color: green'><b>$_name</b></td>
+			<td $lo style='vertical-align: top;' colspan=3>
+			<b>$_port</b>
+			$_note
+			</td>
+			</tr>
+		";
+		$_nok++;
+	}
+	$_cnum++;
+	$x++;
+} while($row=mybox_db_fetch_assoc($Recordset));
+
+if($x > 1 && $_id!=0) {
+?>
+<tr>
+<td style='text-align: right; background: #ffffff;' align=right valign=top colspan=5>
+<a href='#' onclick='do_delete(2);return false;'>Delete</a> / <a href='#' onclick='dotoggle();return false;'>Toggle</a> <img src='<?php echo $_PNG['arrow_rtr'];?>' border=0 alt='' title=''></td>
+</tr>
+<?php  } else if($_nok==0) {?>
+<tr>
+<td style='text-align: left; border-right: 0px; background: #ffffff;' valign=top colspan=5>
+No record available.
+</td></tr>
+<?php }
+echo mybox_print_nextpage($pageNum_Recordset,$totalPages_Recordset,$totalRows_Recordset,$maxRows_Recordset,$queryString_Recordset,$currentPage,'5',$button1,$button2,$button3,$button4);
+?>
+
+</tbody>
+</table>
+
+<?php }//col=1?>
+<?php if($col==2){
+$_sport="1:65535";
+if($do_id=='edit') {
+	$result=mybox_db_query("select * from defservices where id='$id'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			$_protocol=$row['protocol'];
+			$_dport=$row['dport'];
+			$_sport=$row['sport'];
+			$_etc=$row['etc'];
+			$_note=mybox_unescape_str($row['note']);
+		}
+	}
+}
+
+?>
+<script type="text/javascript">
+	function do_submit() {
+		var name=Trim(document.f.name.value);
+		if(name=='') {
+			pop_msg("Definition name empty");
+			document.f.name.focus();
+			return false;
+		}
+		if(name.match(/,/)!=null || name.match(/\$/)!=null || name.match(/;/)!=null || name.match(/'/)!=null) {
+			pop_msg("Invalid Definition name '"+name+"'");
+			document.f.name.focus();
+			return false;
+		}
+		var proto=document.f.proto.value;
+		if(proto!=4) {
+			if(proto==5) {
+				var etc=Trim(document.f.etc.value);
+				if(etc.match(/^\d+$/)==null) {
+					pop_msg("Invalid Protocol number");
+					return false;
+				}
+			} else if(proto==6 || proto==7) {
+				var etc=Trim(document.f.etc.value);
+				if(!pmn(etc)) {
+					pop_msg("Invalid SIP number");
+					return false;
+				}
+			} else {
+				var dport=Trim(document.f.dport.value);
+				var sport=Trim(document.f.sport.value);
+				if(!pmn(dport)) {
+					pop_msg("Invalid Destination Port");
+					return false;
+				}
+				if(!pmn(sport)) {
+					pop_msg("Invalid Source Port");
+					return false;
+				}
+			}
+		}
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	}
+	function chk_proto(val) {
+		if(val=='4') {
+			do_show('p3');
+			do_hide('p4');
+			do_hide('p1');
+			do_hide('p2');
+		} else if(val=='5' || val=='6' || val=='7') {
+			do_show('p4');
+			do_hide('p3');
+			do_hide('p1');
+			do_hide('p2');
+			if(val=='5') {
+				document.getElementById("p4m").innerHTML='Protocol number';
+			} else {
+				document.getElementById("p4m").innerHTML='SIP';
+			}
+		} else {
+			do_hide('p4');
+			do_hide('p3');
+			do_show('p1');
+			do_show('p2');
+		}
+	}
+</script>
+<table width="100%" class="data">
+<tr> 
+<td valign="middle" class="tdname">Name</td>
+<td valign="middle" class="tdvalue">
+<input name="name" type="text" class="valbox2" value="<?php echo $_name;?>">
+<?php if($do_id=='edit'){?>
+<input name="nameold" type="hidden" value="<?php echo $_name;?>">
+<?php }?>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Protocol</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array();
+foreach($_PROTO as $a => $b) {
+	$data_a[$b]=$a;
+}
+if(!isset($_protocol)||$_protocol=='') $_protocol=1;
+$set_a=array("act"=>"chk_proto('b');");
+echo mybox_select_box('sds1',$data_a,"$_protocol",'proto',$set_a);
+?>
+</td>
+</tr>
+<tr id='p3' style='display: none;'> 
+<td valign="middle" class="tdname">ICMP Type</td>
+<td valign="middle" class="tdvalue">
+<?php 
+$data_a=array();
+foreach($_ICMP as $a => $b) {
+	$data_a[$b]=$a;
+}
+if(!isset($_etc)||$_etc=='') $_etc='any';
+$set_a=array("height"=>"150px;");
+echo mybox_select_box('sds2',$data_a,"$_etc",'icmp',$set_a);
+?>
+</td>
+</tr>
+<tr id='p1'> 
+<td valign="middle" class="tdname">Destination Port</td>
+<td valign="middle" class="tdvalue"><input name="dport" type="text" class="valbox2" value="<?php echo $_dport;?>"></td>
+</tr>
+<tr id='p2'> 
+<td valign="middle" class="tdname">Source Port</td>
+<td valign="middle" class="tdvalue"><input name="sport" type="text" class="valbox2" value="<?php echo $_sport;?>"></td>
+</tr>
+<tr id='p4' style='display: none;'> 
+<td valign="middle" class="tdname" id='p4m'>
+<?php if($_protocol==5){?>
+Protocol number
+<?php } else{?>
+SPI
+<?php }?>
+</td>
+<td valign="middle" class="tdvalue"><input name="etc" type="text" class="valbox2" value="<?php echo $_etc;?>"></td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Comment</td>
+<td valign="middle" class="tdvalue"><input name="note" type="text" class="valbox2" value="<?php echo $_note;?>"></td>
+</tr>
+</table>
+<?php if($do_id=='edit'){?>
+<script type='text/javascript'>
+	chk_proto('<?php echo $_protocol;?>');
+</script>
+<?php }?>
+<?php }//col=2?>
+<?php  }//tab=1?>
+
+
+<?php if(isset($tab)&&$tab=='2') {?>
+<?php if($col==1) {?>
+<table width="100%" class=data>
+<thead class="blue">
+      <tr>
+        <td style='font-weight: bold; width: 2%; border-right: 0px;'>#</td> 
+        <td style='font-weight: bold; border-right: 0px;border-left: 0px;'>Name</td>
+        <td style='font-weight: bold; border-left: 0px; border-right: 0px;'>Members</td>
+        <td style='width: 5%; border-left: 0px; border-right: 0px;'>&nbsp;</td>
+      </tr>
+</thead>
+<tbody>
+<?php 
+// counting
+$currentPage = $HTTP_SERVER_VARS["PHP_SELF"];
+$maxRows_Recordset=50;
+if(!isset($pageNum_Recordset)) $pageNum_Recordset=0;
+$startRow_Recordset=@($pageNum_Recordset * $maxRows_Recordset);
+if(isset($str)&&$str!='') {
+	$strn=mybox_escape_str($str);
+	$query_Recordset="select * from defservices_grp where name like \"%$strn%\" order by id ASC";
+} else {
+	$query_Recordset="select * from defservices_grp order by id ASC";
+}
+$query_limit_Recordset=sprintf("%s LIMIT %d, %d", $query_Recordset, $startRow_Recordset, $maxRows_Recordset);
+
+$Recordset=mybox_db_query($query_limit_Recordset, $db_id);
+if(isset($totalRows_Recordset)) {
+	$totalRows_Recordset=$totalRows_Recordset;
+} else {
+	$all_Recordset=mybox_db_query($query_Recordset,$db_id);
+	$totalRows_Recordset=mybox_db_num_rows($all_Recordset);
+}
+$totalPages_Recordset=@ceil($totalRows_Recordset/$maxRows_Recordset)-1;
+$queryString_Recordset=null;
+if(!empty($_SERVER['QUERY_STRING'])) {
+	$params=explode("&", $_SERVER['QUERY_STRING']);
+  	$newParams=array();
+  	foreach ($params as $param) {
+		if(stristr($param, "pageNum_Recordset")==true) continue;
+		if(stristr($param, "totalRows_Recordset")==true) continue;
+		if(stristr($param, "maxRows_Recordset")==true) continue;
+		if(stristr($param, "tab")==true) continue;
+		if(stristr($param, "col")==true) continue;
+		if(stristr($param, "do_id")==true) continue;
+		if(stristr($param, "str")==true) continue;
+		if(stristr($param, "do_list")==true) continue;
+		array_push($newParams, $param);
+  	}
+  	if(count($newParams) != 0) {
+    		$queryString_Recordset="&" . implode("&", $newParams);
+  	}
+}
+$queryString_Recordset=sprintf("&totalRows_Recordset=%d%s&tab=$tab&col=$col&str=$str&do_id=$do_id&do_list=$do_list",$totalRows_Recordset,$queryString_Recordset);
+if($pageNum_Recordset > 0) { 
+	$pagefirst=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, 0, $queryString_Recordset);
+	$pageprev=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, max(0, $pageNum_Recordset - 1), $queryString_Recordset);
+	$button1="<a href='$pagefirst'><img src='{$_PNG['first']}' border=0 alt='' title=''></a>\n";
+	$button2="<a href='$pageprev'><img src='{$_PNG['prev']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button1="<img src='{$_PNG['first']}' border=0 alt='' title=''>\n";
+	$button2="<img src='{$_PNG['prev']}' border=0 alt='' title=''>\n";
+}
+if($pageNum_Recordset < $totalPages_Recordset) {
+	$pagenext=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, min($totalPages_Recordset, $pageNum_Recordset + 1), $queryString_Recordset);
+	$pagelast=sprintf("%s?pageNum_Recordset=%d%s", $currentPage, $totalPages_Recordset, $queryString_Recordset);
+	$button3="<a href='$pagenext'><img src='{$_PNG['next']}' border=0 alt='' title=''></a>\n";
+	$button4="<a href='$pagelast'><img src='{$_PNG['last']}' border=0 alt='' title=''></a>\n";
+} else {
+	$button3="<img src='{$_PNG['next']}' border=0 alt='' title=''>\n";
+	$button4="<img src='{$_PNG['last']}' border=0 alt='' title=''>\n";
+}
+unset($pagefirst,$pageprev,$pagenext,$pagelast);
+$x=1;
+$_cnum=1;
+if(!isset($pageNum_Recordset)||$pageNum_Recordset==''||$pageNum_Recordset==0) {
+	$_cnum=1;
+} else {
+	$_cnum=($pageNum_Recordset * $maxRows_Recordset);
+	if($_cnum <= 0) {
+		$_cnum=1;
+	} else {
+		$_cnum +=1;
+	}
+}
+do {
+	$_id=$row['id'];
+	if($_id=='') continue;
+	$_name=$row['name'];
+	$_members=$row['members'];
+	$_note=mybox_unescape_str($row['note']);
+	if($_note!='') $_note=mybox_print_note($_note);
+	$lt="onMouseOver=\"this.style.backgroundColor='#CCFFCC';\" onMouseOut=\"this.style.backgroundColor='#ffffff';\" style='background: #ffffff;  cursor: pointer;'";
+	$lo='';
+	$lo="onclick=\"self.location.href='/system_definitions_s.exh?tab=$tab&col=2&id=$_id&do_id=edit';\" ";
+	echo "
+		<tr $lt>
+        	<td $lo style='vertical-align: top;'>$_cnum</td>
+        	<td $lo style='vertical-align: top; table-layout: fixed; white-space: nowrap; color: green;'><b>$_name</b></td>
+		<td $lo style='vertical-align: top; font-weight: bold; border-right: 0px;'>
+	";
+	$mln=preg_split("/,/",$_members);
+	if(count($mln)!=0) {
+		$i='';
+		foreach($mln as $a) {
+			if($a=='') continue;
+			$a=mybox_get_defname($a,2,'def1',$db_id);
+			$i .="$a / ";
+		}
+		$i=trim($i);
+		$i=trim($i,"/");
+		echo "$i";
+	} else {
+		$_members=mybox_get_defname($_members,2,'def1',$db_id);
+		echo "<b>$_members</b>";
+	}
+	echo "
+		$_note
+		</td>
+		<td style='border-left: 0px;text-align: right; vertical-align: bottom; table-layout: fixed; white-space: nowrap;' align=right>
+		<a href='#' onclick=\"if(confirm('Are you sure you want to proceed?')) self.location.href='/system_definitions_s.exh?tab=$tab&do_list=$do_list&str=$str&col=$col&do_save=2&del=$_id&pageNum_Recordset=$pageNum_Recordset&totalPages_Recordset=$totalPages_Recordset';\"><img src='{$_PNG['delete']}' border=0 alt='' title=''></a>
+		<input type=checkbox name=del[] value=$_id>
+		</td>
+		</tr>
+	";
+	$_cnum++;
+	$x++;
+} while($row=mybox_db_fetch_assoc($Recordset));
+
+if($x > 1 && $_id!=0) {
+?>
+<tr>
+<td style='text-align: right; background: #ffffff;' align=right valign=top colspan=4>
+<a href='#' onclick='do_delete(2);return false;'>Delete</a> / <a href='#' onclick='dotoggle();return false;'>Toggle</a> <img src='<?php echo $_PNG['arrow_rtr'];?>' border=0 alt='' title=''></td>
+</tr>
+<?php  } else {?>
+<tr>
+<td style='text-align: left; border-right: 0px; background: #ffffff;' valign=top colspan=4>
+No record available.
+</td></tr>
+<?php }
+echo mybox_print_nextpage($pageNum_Recordset,$totalPages_Recordset,$totalRows_Recordset,$maxRows_Recordset,$queryString_Recordset,$currentPage,'4',$button1,$button2,$button3,$button4);
+?>
+</tbody>
+</table>
+
+<?php }//col=1?>
+<?php if($col==2){
+$_tl=array();
+$result=mybox_db_query("select name from defservices where id!='0'",$db_id);
+if(mybox_db_num_rows($result)!=0) {
+	while($row=mybox_db_fetch_assoc($result)) {
+		$_xname=$row['name'];
+		$_tl[$_xname]="$_xname";
+	}
+	unset($_xname);
+}
+
+if($do_id=='edit') {
+	unset($result);
+	$result=mybox_db_query("select * from defservices_grp where id='$id'",$db_id);
+	if(mybox_db_num_rows($result)!=0) {
+		while($row=mybox_db_fetch_assoc($result)) {
+			$_name=$row['name'];
+			$_members=$row['members'];
+			$_note=mybox_unescape_str($row['note']);
+		}
+	}
+	$_nml=preg_split("/,/",$_members);
+	if(count($_nml)!=0) {
+		foreach($_nml as $a) {
+			if($a=='') continue;
+			if($_tl[$a]==$a) unset($_tl[$a]);
+		}
+	} else {
+		$_nml[]="$_members";
+	}
+	unset($a);
+}
+
+?>
+<script type="text/javascript">
+	function do_submit() {
+		var name=Trim(document.f.name.value);
+		if(name=='') {
+			pop_msg("Definition name empty");
+			document.f.name.focus();
+			return false;
+		}
+		if(name.match(/,/)!=null || name.match(/\$/)!=null || name.match(/;/)!=null || name.match(/'/)!=null) {
+			pop_msg("Invalid Definition name '"+name+"'");
+			document.f.name.focus();
+			return false;
+		}
+		var list=document.f.mr;
+		var lr='';
+		var ti=0;
+		for(var i=0;i<list.length;i++) {
+			if(list.options[i]!=null && list.options[i].value!='') {
+				ti++;
+				lr +=list.options[i].value;
+				lr +=',';
+			}
+		}
+		if(lr=='') {
+			pop_msg("No member defined");
+			return false;
+		}
+		if(ti==1) {
+			pop_msg("Member must more than one");
+			return false;
+		}
+		document.f.members.value=lr;
+		if(document.f.btsave) document.f.btsave.disabled=true;
+		document.f.do_save.value='1';
+		document.f.submit();
+		return true;
+	}
+	function inmoveto(a) {
+		if(a=="right") {
+			var p=document.f.mr.length;
+			var lstlenght=document.f.ml.length;
+			var list=document.f.ml;
+			for(var i=0;i<lstlenght;i++) {
+				if(list[i]!=null && list[i].value!='') {
+					if(list.options[i].selected==true) {
+						document.f.mr[p]=new Option(list.options[i].text,list.options[i].value);
+						list[i]=null;
+						p++;
+					}
+				}
+			}
+		}
+
+		if(a=="left") {
+			var p=document.f.ml.length;
+			var lstlenght=document.f.mr.length;
+			var list=document.f.mr;
+			for(var i='0';i<lstlenght;i++) {
+				if(list[i]!=null && list[i].value!='') {
+					if(list.options[i].selected==true) {
+						document.f.ml[p]=new Option(list.options[i].text,list.options[i].value);
+						list[i]=null;
+						p++;
+					}
+				}
+			}
+		}
+	}
+</script>
+<table width="100%" class="data">
+<tr> 
+<td valign="middle" class="tdname">Name</td>
+<td valign="middle" class="tdvalue">
+<input name="name" type="text" class="valbox2" value="<?php echo $_name;?>">
+<?php if($do_id=='edit'){?>
+<input name="nameold" type="hidden" value="<?php echo $_name;?>">
+<?php }?>
+</td>
+</tr>
+<tr> 
+<td valign="top" class="tdname">Members</td>
+<td valign="top" class="tdvalue">
+<table style='border: 0px; padding: 0px; margin: 0px;'>
+<tr>
+<td valign=top style='border: 0px; font-style: italic; font-weight: bold;' colspan=2>
+Available service
+</td>
+<td valign=top style='border: 0px; font-style: italic; font-weight: bold;'>
+Selected service
+</td>
+</tr>
+<tr>
+<td valign=top style='border: 0px; text-align: center;'>
+<select name=ml size=7 multiple class=selbox style='height: 105px; width: 150px;'>
+<?php 
+foreach($_tl as $n => $m) {
+	$px=mybox_get_defname($n,1,'def1',$db_id);
+	echo "<option value='$n' $px>$n</option>";
+	unset($px);
+}
+unset($n,$m);
+?>
+</select>
+</td>
+<td valign=absmiddle style='border: 0px; text-align: center;'>
+
+<table class="data" style='border: 0px; padding: 0px; margin: 0px;'>
+<tr>
+<td valign=top style='border: 0px;'>
+<a name="sini"><a class="btns" href="#sini" onclick="return inmoveto('right');return false;"> >> </a>
+</td>
+</tr>
+<tr>
+<td valign=top style='border: 0px;'>
+<a name="sini"><a class="btns" href="#sini" onclick="return inmoveto('left');return false;"> << </a>
+</td>
+</tr>
+</table>
+
+</td>
+<td valign=top style='border: 0px; text-align: center;'>
+<select name=mr size=7 multiple class=selbox style='height: 105px; width: 150px;'>
+<?php 
+foreach($_nml as $a) {
+	$px=mybox_get_defname($a,1,'def1',$db_id);
+	echo "<option value='$a' $px>$a</option>";
+	unset($px);
+}
+unset($a);
+?>
+</select>
+</td>
+</tr>
+</table>
+<span id='def1' class='def' style='display: none; position: absolute;'></span>
+</td>
+</tr>
+<tr> 
+<td valign="middle" class="tdname">Comment</td>
+<td valign="middle" class="tdvalue"><input name="note" type="text" class="valbox2" value="<?php echo $_note;?>"></td>
+</tr>
+</table>
+<input type=hidden name=members value=''>
+<?php }//col=2?>
+<?php  }//tab=2?>
+
+<?php if($col==2){?>
+<table align=right>
+<tbody>
+<tr>
+<td>
+<a name="sini"><a class="btn" href="#sini" onclick="return do_submit();return false;"><?php if($do_id=='edit') { echo "Update"; } else { echo "Save";}?></a>
+</td></tr> 
+</tbody>
+</table>
+<?php }//col=2?>
+<!-- end tab container -->
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?php echo $tab;?>>
+<input type=hidden name=col value=<?php echo $col;?>>
+<input type=hidden name=id value='<?php echo $id;?>'>
+<input type=hidden name=do_id value='<?php echo $do_id;?>'>
+</form><br><br>
+<script type='text/javascript'>page_kill();</script>
+</body>
+</html>
+<?php mybox_db_close($db_id);?>

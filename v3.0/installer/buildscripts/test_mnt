@@ -1,0 +1,3 @@
+mkdir -p p
+mount -oloop,rw -t iso9660 mybox2.1.iso p
+

@@ -1,0 +1,6 @@
+rm -rfv ./build
+mkdir -p ./build/patterns
+php -f create_rules.php
+cp -av sig/* ./build/patterns
+cp -v ips.config-middle ./build/patterns
+

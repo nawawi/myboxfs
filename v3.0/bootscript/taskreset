@@ -1,0 +1,11 @@
+#!/bin/perl
+# $Id: taskreset.pl,v 1.1 2007/08/08 20:50:56 nawawi Exp $
+# Copyright (c) 2007 Tracenetwork Corporation Sdn. Bhd.
+
+if ( -e "/var/sys/taskq_down" ) {
+	unlink("/var/sys/taskq_down");
+	system("pkill -9 -f taskq >/dev/null 2>&1");
+	system("/bin/taskq");
+	exit 1;
+}
+exit 0;

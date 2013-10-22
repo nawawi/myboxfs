@@ -1,0 +1,125 @@
+#!/bin/sh
+
+VERSION="0.22"
+
+CURLLIBS="`curl-config --libs || exit -1` -lcurl"
+INCLUDE=" -I/usr/local/include "
+CFLAGS="$CFLAGS $CURLLIBS $INCLUDE"
+OUTFILE="src/Makefile"
+BINARY=squidclam
+TMPFILE=`mktemp -t squidclamXXXXXX` || echo "could not create a tempfile"
+
+# no options allowed
+if test $# -ne 0
+then
+	echo ""
+	echo "This is just a very small script. No Options available."
+	echo "If you like to provide me with a better one please do :)"
+	echo ""
+	exit -1
+fi
+
+# check which OS we have here. (not needed for now)
+uname | grep -i linux > /dev/null
+if test "$?" -eq "0"
+then
+	OS="Linux"
+cat > $OUTFILE << EOF
+ifndef \$(DESTDIR)
+        DESTDIR="/usr/local/bin"
+endif
+EOF
+fi
+
+uname | grep -i bsd > /dev/null
+if test "$?" -eq "0"
+then
+	OS="BSD"
+cat > $OUTFILE << EOF
+.ifndef DESTDIR
+        DESTDIR="/usr/local/bin"
+.endif
+EOF
+
+fi
+echo "Found a *$OS* System hope thats right."
+
+echo "#define SQUIDCLAMVERSION \"squidclam-$VERSION\"" > src/version.h
+
+# only use libs once
+CFLAGS="`echo $CFLAGS | tr ' ' '\n' | sort -u | tr '\n' ' '`"
+
+# compiler test
+if test x"$CC" = "x"
+then
+    CC="gcc -Wall "
+fi
+
+# can we generate an executable
+cat > $TMPFILE.c << EOF
+int main (void) {
+	return 0;
+}
+EOF
+
+$CC -o $TMPFILE.exe $TMPFILE.c
+
+if test $? -ne 0
+then
+	echo "compiler not able to generate an executable"
+	exit -1
+else
+	rm -f $TMPFILE*
+fi
+
+# write makefile
+cat >> $OUTFILE << EOF
+CFLAGS=$CFLAGS
+
+all:    $BINARY.c config.c clamdscan.c
+	$CC $CFLAGS -s -o $BINARY $BINARY.c config.c clamdscan.c
+
+gdb:    $BINARY.c config.c clamdscan.c
+	$CC $CFLAGS -g -o $BINARY $BINARY.c config.c clamdscan.c
+
+debug:    $BINARY.c config.c clamdscan.c
+	$CC -DDEBUG $CFLAGS -g -O2 -o $BINARY $BINARY.c config.c clamdscan.c
+
+clean: 
+	rm -f $BINARY $OUTFILE
+
+install: $BINARY
+	cp $BINARY \$(DESTDIR)/.
+
+tar: clean 
+	tar --owner=nobody --group=nobody -cvzC ../.. -f ../../release/$BINARY-$VERSION.tar.gz $BINARY-$VERSION 
+	md5sum ../../release/$BINARY-$VERSION.tar.gz | tee ../../release/$BINARY-$VERSION.md5
+EOF
+
+mount | egrep "(tmpfs|/dev/rd|/dev/md)" > /dev/null 2>&1
+if test "$?" -ne "0"
+then
+	echo "Warning: you really should use and mount tmpfs!"
+fi
+
+echo "If anything goes wrong beyond this point don't worry probably everythings fine for you."
+
+
+# additional things to do ;)
+# set version in contributed spec file
+if test -f contrib/squidclam.spec.in
+then
+	sed "s/^Version:.*/Version:\t$VERSION/" contrib/squidclam.spec.in > contrib/squidclam.spec
+fi
+
+# generate a proper ebuild (At least I hope so ;)
+if test -f contrib/squidclam.ebuild.in
+then
+	cp contrib/squidclam.ebuild.in contrib/squidclam-$VERSION.ebuild
+fi
+
+which egrep > /dev/null 2>&1
+if test "$?" -ne "0"
+then
+    exit 0
+fi

@@ -1,0 +1,135 @@
+<?php 
+if(!isset($_ENV['MYBOX_AUTH_KEY'])||$_ENV['MYBOX_AUTH_KEY']=='') exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="report_network";
+include_once('page.exl');
+mybox_chk_session();
+mybox_send_nocache();
+
+
+
+if(!isset($tab)||$tab=='') $tab=1;
+
+?>
+<html>
+<head>
+<title>MyAdmin</title>
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-store, no-cache, must-revalidate">
+<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+<meta http-equiv=refresh content='300'; url='<?php echo "/report_ips.exh?tab=$tab";?>'>
+<LINK REL=StyleSheet HREF="/c/mybox_style.css" TYPE="text/css">
+<script type='text/javascript' src="/j/mybox_func.js"></script>
+<script type='text/javascript'>
+	defaultStatus="MyBox Firewall - Logged on as <?php echo $_LOGIN['auth_id'];?>";
+	page_load();
+</script>
+</head>
+<body onload="load_menu('sub8','t8d3','s8i3');" scroll="auto">
+<form name=f method=post action="/report_ips.exh">
+<table border=0 cellpadding=0 cellspacing=0 width=95% align=center style='margin-top: 0px;'>
+<tr>
+<td>
+<?php mybox_page_section("Reporting / Intrusion Protection");?>
+<br><br>
+<!-- start tab -->
+<ul class="tabs">
+<li><a href="/report_ips.exh?tab=1" <?php if($tab==1){?>class="tabact"<?php }?>>Daily</a></li>
+<li><a href="/report_ips.exh?tab=2" <?php if($tab==2){?>class="tabact"<?php }?>>Weekly</a></li>
+<li><a href="/report_ips.exh?tab=3" <?php if($tab==3){?>class="tabact"<?php }?>>Monthly</a></li>
+<li><a href="/report_ips.exh?tab=4" <?php if($tab==4){?>class="tabact"<?php }?>>Yearly</a></li>
+</ul> 
+<!-- end tab -->
+<!-- start block --> 
+<div class="container">
+<table class="container" align=center>
+<tbody>
+<tr>
+<td> 
+<br>
+<!-- tab container -->
+<table border=0 cellspacing=2 cellpadding=2 width="100%" class=tabcont>
+
+<?php if($tab==1) {
+	$dir=mybox_dir2array("$_HTDOCS_PATH/g/ips*_daily.png");
+	$cnt=count($dir);
+	if($cnt!=0) {
+		$x=0;
+		foreach($dir as $g) {
+			if(file_exists($g)) {
+				$x++;
+				$graph=basename($g);
+				echo "<tr><td width=98% valign=top>";
+				echo "<img src='/png.exh?p=$graph' border=0></td></tr>";
+				if($x!=$cnt) echo "<tr><td><hr size=1 width='100%' style='border-color: #000000';></td></tr>";
+			}
+		}
+	}
+} // tab==1 ?>
+
+<?php if($tab==2) {
+	$dir=mybox_dir2array("$_HTDOCS_PATH/g/ips*_weekly.png");
+	$cnt=count($dir);
+	if($cnt!=0) {
+		$x=0;
+		foreach($dir as $g) {
+			if(file_exists($g)) {
+				$x++;
+				$graph=basename($g);
+				echo "<tr><td width=98% valign=top>";
+				echo "<img src='/png.exh?p=$graph' border=0></td></tr>";
+				if($x!=$cnt) echo "<tr><td><hr size=1 width='100%' style='border-color: #000000';></td></tr>";
+			}
+		}
+	}
+} // tab==2 ?>
+<?php if($tab==3) {
+	$dir=mybox_dir2array("$_HTDOCS_PATH/g/ips*_monthly.png");
+	$cnt=count($dir);
+	if($cnt!=0) {
+		$x=0;
+		foreach($dir as $g) {
+			if(file_exists($g)) {
+				$x++;
+				$graph=basename($g);
+				echo "<tr><td width=98% valign=top>";
+				echo "<img src='/png.exh?p=$graph' border=0></td></tr>";
+				if($x!=$cnt) echo "<tr><td><hr size=1 width='100%' style='border-color: #000000';></td></tr>";
+			}
+		}
+	}
+} // tab==3 ?>
+<?php if($tab==4) {
+	$dir=mybox_dir2array("$_HTDOCS_PATH/g/ips*_yearly.png");
+	$cnt=count($dir);
+	if($cnt!=0) {
+		$x=0;
+		foreach($dir as $g) {
+			if(file_exists($g)) {
+				$x++;
+				$graph=basename($g);
+				echo "<tr><td width=98% valign=top>";
+				echo "<img src='/png.exh?p=$graph' border=0></td></tr>";
+				if($x!=$cnt) echo "<tr><td><hr size=1 width='100%' style='border-color: #000000';></td></tr>";
+			}
+		}
+	}
+} // tab==4 ?>
+</table>
+</td>
+</tr> 
+</tbody>
+</table>
+
+</div>
+<!-- end block -->
+
+</td>
+</tr>
+</table>
+<input type=hidden name=do_save value=0>
+<input type=hidden name=tab value=<?php echo $tab;?>>
+</form>
+<script type='text/javascript'>page_kill();</script>
+</body>
+</html>

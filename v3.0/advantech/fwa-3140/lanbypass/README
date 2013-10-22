@@ -1,0 +1,73 @@
+3700 / 3140 / 4180 / 6280A / 6280B Lan Bypass Installation Guide
+-----------------------------------------------------------
+- Untar lanbypass-0.0.4.tgz to suitable directory.
+    tar xzvf lanbypass-0.0.3.tgz -C /tmp
+
+- Build program
+    # cd /tmp/lanbypass; make;
+
+- Product 3700
+    - Enter 3700 directory
+      # cd 3700
+
+    - Show LAN BYPASS state
+      # ./lanbypass -s 
+    - LAN 1/2 BYPASS
+      # ./lanbypass -p 1 -e 0 -s  
+    - LAN 3/4 BYPASS
+      # ./lanbypass -p 1 -e 1 -s  
+
+    - LAN 1/2 no BYPASS
+      # ./lanbypass -p 0 -d 0 -s  
+    - LAN 3/4 no BYPASS
+      # ./lanbypass -p 0 -d 1 -s  
+
+- Product 3140
+    - Enter 3140 directory
+      # cd 3140
+    - Show LAN BYPASS state
+      # ./lanbypass
+    - LAN BYPASS
+      # ./lanbypass on  
+    - LAN NOT BYPASS
+      # ./lanbypass off  
+
+- Product 4180
+    - Enter 4180 directory
+      # cd 4180
+    - Show LAN BYPASS state
+      # ./lanbypass
+    - LAN BYPASS
+      # ./lanbypass on  
+    - LAN NOT BYPASS
+      # ./lanbypass off  
+
+- Product 6280A 
+    - Enter 6280A directory
+      # cd 6280A
+    - Show LAN BYPASS state
+      # ./lanbypass -s
+    - LAN BYPASS 
+      Enable Group 0(LAN1 LAN2) 
+      # ./lanbypass -e 0  
+    - LAN NOT BYPASS
+      Disable Group 0(LAN1 LAN2) 
+      # ./lanbypass -d 0  
+
+- Product 6280B
+    - Enter 6280B directory
+      # cd 6280B
+    - Show LAN BYPASS state
+      # ./lanbypass -s
+    - LAN BYPASS 
+      Enable Group 0(LAN1 LAN2) 
+      # ./lanbypass -e 0  
+    - LAN NOT BYPASS
+      Disable Group 0(LAN1 LAN2) 
+      # ./lanbypass -d 0  
+    - Note
+      If Watchdog is connected to I/O board, after watchdog is being trigerred,
+      the program can no longer control the lan bypass state.
+      To regain software control of the lan bypass, reset the server.
+
+cplus.shen@advantech.com.tw

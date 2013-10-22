@@ -1,0 +1,74 @@
+#!/bin/bash
+ROOT_DIR=$(pwd)
+SRC_DIR=$ROOT_DIR/service
+TMP_DIR=$ROOT_DIR/service_tmp
+DST_DIR=$ROOT_DIR/service_enc
+
+cd $ROOT_DIR
+rm -rf $DST_DIR
+rm -rf $TMP_DIR
+if [ ! -d "$DST_DIR" ]; then
+	mkdir -p $DST_DIR
+fi
+
+find $SRC_DIR/* -name '*.ex*' |xargs dos2unix
+find $SRC_DIR/* -name '*.init' |xargs dos2unix
+find $SRC_DIR/* -name '*.js' |xargs dos2unix
+find $SRC_DIR/* -name '*.css' |xargs dos2unix
+
+cp -a $SRC_DIR $TMP_DIR
+find $TMP_DIR/* -name '*.ex*' > /tmp/f.list
+find $TMP_DIR/* -name '*.init' >> /tmp/f.list
+
+for f in $(cat /tmp/f.list);do
+	read h < $f
+	S=
+	S=$(echo "$h" |grep ^#)
+	if [ ! -z "$S" -a "$S" != "" ]; then
+		echo "$h" > $f.tmp
+	fi
+	php -w $f | php -f html_strip > $f.tmp1
+	cat $f.tmp1 >> $f.tmp
+	rm -f $f.tmp1
+	cat $f.tmp > $f
+	rm -f $f.tmp && chmod 700 $f
+done
+for f in $(find $SRC_DIR/* -name "*.css");do perl -pi -e 's/\n//' $f && perl -pi -e 's/\}/\}\n/g' $f && perl -pi -e 's/\*\//\*\/\n/g' $f;done
+
+rm -f /tmp/f.list
+
+# --encoded-only \
+#mv -v $TMP_DIR/lib/graph.exl $TMP_DIR/lib/graph.exlh
+/usr/local/Zend/bin/zendenc \
+--quiet  \
+--optimizations 1023 \
+--ignore-errors \
+--recursive \
+--short-tags on \
+--asp-tags off \
+--no-default-extensions \
+--include-ext exh \
+--include-ext exl \
+--include-ext inc \
+--include-ext php \
+--include-ext exc \
+--include-ext jse \
+--include-ext lang \
+--include-ext init \
+--no-header \
+--ignore "CVS" \
+--ignore ".cvsignore"  \
+--ignore ".backup"  \
+--ignore "Thumbs.db"  \
+$TMP_DIR \
+$DST_DIR
+cd $ROOT_DIR
+rm -rf $TMP_DIR
+_SCNT="$(find $SRC_DIR/* |wc -l)";
+_DCNT="$(find $DST_DIR/* |wc -l)";
+echo "SOURCE FILE -> $_SCNT";
+echo "ENCODE FILE -> $_DCNT";
+if [ "$_SCNT" != "$_DCNT" ]; then
+	echo "Encode ERROR";
+	exit 1;
+fi

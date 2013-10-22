@@ -1,0 +1,127 @@
+#!/bin/sh
+# $Id: salin.sh,v 1.1 2007/11/01 17:55:37 nawawi Exp $
+trap "do_clean" 1 2 3 15
+
+do_chk_rsync() {
+	if [ ! -x "/bin/rsync" ]; then
+		echo "No rsync program found";
+		exit 1;
+	fi
+}
+do_clean() {
+	rm -f /etc/rsyncd.conf /etc/rsyncd.secrets 2>/dev/null
+	do_stop_server;
+}
+
+do_server() {
+	local _USER="";
+	local _PASS="";
+	while /bin/true; do
+		echo -n "Enter username for connection: "
+		read _USER
+		if [ -z "$_USER" -o "$_USER" = "" ]; then
+			echo "No user defined";
+		else
+			break;
+		fi
+	done
+	while /bin/true; do
+		echo -n "Enter password for connection: "
+		read _PASS
+		if [ -z "$_PASS" -o "$_PASS" = "" ]; then
+			echo "No password defined";
+		else
+			echo "$_USER:$_PASS" > /etc/rsyncd.secrets
+			chmod 400 /etc/rsyncd.secrets
+			break;
+		fi
+	done
+	echo "[boot]" > /etc/rsyncd.conf
+	echo "path            = /boot" >> /etc/rsyncd.conf
+	echo "comment         = mybox boot" >> /etc/rsyncd.conf
+	echo "gid             = 0" >> /etc/rsyncd.conf
+	echo "uid             = 0" >> /etc/rsyncd.conf
+	echo "list            = yes" >> /etc/rsyncd.conf
+	echo "auth users      = $_USER" >> /etc/rsyncd.conf
+	echo "secrets file    = /etc/rsyncd.secrets" >> /etc/rsyncd.conf
+	echo "[strg]" >> /etc/rsyncd.conf
+	echo "path            = /strg" >> /etc/rsyncd.conf
+	echo "comment         = mybox storage" >> /etc/rsyncd.conf
+	echo "gid             = 0" >> /etc/rsyncd.conf
+	echo "uid             = 0" >> /etc/rsyncd.conf
+	echo "list            = yes" >> /etc/rsyncd.conf
+	echo "auth users      = $_USER" >> /etc/rsyncd.conf
+	echo "secrets file    = /etc/rsyncd.secrets" >> /etc/rsyncd.conf
+
+	chmod 640 /etc/rsyncd.conf
+	rsync --daemon
+	if [ $? = 0 ]; then
+		echo "Running rsync service sucessful";
+		exit 0;
+	fi
+	echo "Running rsync service failed";
+	exit 1;
+}
+
+do_client() {
+	local _HOST="";
+	local _USER="";
+	local _PASS="";
+	while /bin/true; do
+		echo -n "Enter host/ip for connection: "
+		read _HOST
+		if [ -z "$_HOST" -o "$_HOST" = "" ]; then
+			echo "No host defined";
+		else
+			break;
+		fi
+	done
+	while /bin/true; do
+		echo -n "Enter username for connection: "
+		read _USER
+		if [ -z "$_USER" -o "$_USER" = "" ]; then
+			echo "No user defined";
+		else
+			break;
+		fi
+	done
+	while /bin/true; do
+		echo -n "Enter password for connection: "
+		read _PASS
+		if [ -z "$_PASS" -o "$_PASS" = "" ]; then
+			echo "No password defined";
+		else
+			break;
+		fi
+	done
+	echo "This action will replace all mybox core file.";
+	echo "Are you sure, you want to continue? [Y/N] "
+	read ans;
+	case "$ans" in
+		y*|Y*)
+			export RSYNC_PASSWORD=$_PASS
+			rsync --delete-before -aruvl $_USER@$_HOST::boot /boot
+			rsync --delete-before -aruvl $_USER@$_HOST::strg /strg
+		;;
+	esac 
+}
+do_stop_server() {
+	pkill -f rsync >/dev/null 2>&1
+}
+
+do_chk_rsync;
+case "$1" in
+	--server)
+	do_server;
+	;;
+	--stop-server)
+	echo "Stopping rsync service";
+	do_clean;
+	;;
+	--client)
+	do_client;
+	;;
+	*)
+	echo "Usage: $(basename $0) --server/--client/--stop-server";
+	;;
+esac

@@ -1,0 +1,255 @@
+--- php-5.2.0.ori/main/main.c	2006-09-25 22:48:33.000000000 +0800
++++ php-5.2.0/main/main.c	2006-11-09 00:02:24.000000000 +0800
+@@ -301,6 +301,8 @@
+ 	STD_PHP_INI_ENTRY("upload_max_filesize",	"2M",		PHP_INI_SYSTEM|PHP_INI_PERDIR,		OnUpdateLong,			upload_max_filesize,	php_core_globals,	core_globals)
+ 	STD_PHP_INI_ENTRY("post_max_size",			"8M",		PHP_INI_SYSTEM|PHP_INI_PERDIR,		OnUpdateLong,			post_max_size,			sapi_globals_struct,sapi_globals)
+ 	STD_PHP_INI_ENTRY("upload_tmp_dir",			NULL,		PHP_INI_SYSTEM,		OnUpdateStringUnempty,	upload_tmp_dir,			php_core_globals,	core_globals)
++ 	STD_PHP_INI_ENTRY("upload_metter",			"0",		PHP_INI_ALL,		OnUpdateBool,			upload_metter,			php_core_globals,	core_globals)
++ 	STD_PHP_INI_ENTRY("upload_metter_dir",			NULL,		PHP_INI_ALL,		OnUpdateStringUnempty,		upload_metter_dir,		php_core_globals,	core_globals)
+ 
+ 	STD_PHP_INI_ENTRY("user_dir",				NULL,		PHP_INI_SYSTEM,		OnUpdateString,			user_dir,				php_core_globals,	core_globals)
+ 	STD_PHP_INI_ENTRY("variables_order",		"EGPCS",	PHP_INI_SYSTEM|PHP_INI_PERDIR,		OnUpdateStringUnempty,	variables_order,		php_core_globals,	core_globals)
+--- php-5.2.0.ori/main/php_globals.h	2006-07-19 20:25:46.000000000 +0800
++++ php-5.2.0/main/php_globals.h	2006-11-09 00:05:48.000000000 +0800
+@@ -142,6 +142,9 @@
+ 	zend_bool always_populate_raw_post_data;
+ 	zend_bool report_zend_debug;
+ 
++	zend_bool upload_metter;
++	char * upload_metter_dir;
++
+ 	int last_error_type;
+ 	char *last_error_message;
+ 	char *last_error_file;
+--- php-5.2.0.ori/main/rfc1867.c	2006-09-29 18:05:34.000000000 +0800
++++ php-5.2.0/main/rfc1867.c	2006-11-09 00:24:47.000000000 +0800
+@@ -774,6 +774,87 @@
+ 	return out;
+ }
+ 
++typedef struct _Xdata {
++   int time_start;
++   int time_last;
++   int speed_average;
++   int speed_last;
++   int bytes_uploaded;
++   int bytes_total;
++   int files_uploaded;
++   char progress[1024];
++   char host[128];
++   char user[32];
++   char pass[32];
++   char db[32];
++   char id[1024];
++} Xdata;
++
++static void update_progress_metter_file(Xdata *X)
++{
++   int eta,s;
++
++   FILE *F;
++
++   s   = X->speed_average; if (s < 1) s=1;
++   eta = (X->bytes_total - X->bytes_uploaded) / s;
++   
++   if ( strlen(X->progress) > 0 ) {
++     F = VCWD_FOPEN(X->progress, "wb");
++     if (F) {
++       fprintf(F, "time_start=%d\ntime_last=%d\nspeed_average=%d\nspeed_last=%d\nbytes_uploaded=%d\nbytes_total=%d\nfiles_uploaded=%d\neta=%d\n", X->time_start, X->time_last, X->speed_average, X->speed_last, X->bytes_uploaded, X->bytes_total, X->files_uploaded, eta  );
++       fclose(F);
++     }
++   }
++   sapi_module.sapi_error(E_NOTICE, "metter: read %d of %d", SG(read_post_bytes), SG(request_info).content_length );
++}
++
++static void update_progress_metter(Xdata *X, int read, int total) 
++{
++   int d,dt,dtx;
++   int bu;
++   int sp;
++
++
++   if (!X->time_start) {
++      X->time_start     = X->time_last = time(NULL);
++
++      X->bytes_total    = total;
++      X->bytes_uploaded = read;
++
++      X->speed_average  = X->speed_last = X->bytes_uploaded;
++
++      update_progress_metter_file(X);
++      return;
++   }
++
++   dt = time(NULL) - X->time_last;
++   d = read - X->bytes_uploaded;
++
++   if (dt < 1) {
++      if (read < total)
++         return;                             // avoid divide by zero
++      if (d < 1) 
++	 return;
++      dt = 1;
++   }
++
++
++
++   sp = d/dt;
++
++
++   X->bytes_uploaded = read;
++   X->time_last      = time(NULL);
++
++   dtx               = X->time_last - X->time_start; if (dtx < 1) dtx = 1;
++   X->speed_average  = X->bytes_uploaded / dtx;
++
++   X->speed_last     = sp;
++
++   update_progress_metter_file(X);
++}
++
+ 
+ /*
+  * The combined READER/HANDLER
+@@ -796,6 +877,8 @@
+ 	zval *array_ptr = (zval *) arg;
+ 	int fd=-1;
+ 	zend_llist header;
++	Xdata X;
++	int progress_metter=0;
+ 	void *event_extra_data = NULL;
+ 
+ 	if (SG(request_info).content_length > SG(post_max_size)) {
+@@ -803,6 +886,7 @@
+ 		return;
+ 	}
+ 
++	bzero(&X,sizeof(X));
+ 	/* Get the boundary */
+ 	boundary = strstr(content_type_dup, "boundary");
+ 	if (!boundary || !(boundary=strchr(boundary, '='))) {
+@@ -874,6 +958,7 @@
+ 		zend_llist_clean(&header);
+ 
+ 		if (!multipart_buffer_headers(mbuff, &header TSRMLS_CC)) {
++			if (progress_metter) update_progress_metter( &X, SG(read_post_bytes), SG(request_info).content_length );
+ 			goto fileupload_done;
+ 		}
+ 
+@@ -967,6 +1052,54 @@
+ 					max_file_size = atol(value);
+ 				}
+ 
++
++
++				if (!strcmp(param, "UPLOAD_METTER_ID") && PG(upload_metter) && PG(upload_metter_dir)) {
++				   char *c,*v = estrdup(value);   					
++				   for (c=v;*c;c++) {
++				      if ( (*c >= '0' && *c <= '9') ||
++     				           (*c >= 'a' && *c <= 'z') ||
++			     		   (*c >= 'A' && *c <= 'Z') ||
++	     				    *c == '.' || *c == '_'  || 
++	     				    *c == ',' || *c == '@'  || 
++					    *c == '-' || *c == '%') {
++				      }else{
++					 *c=0;
++					 break;
++				      }
++				   }
++
++				   if (v && *v) {
++				      if (strlen(v) > 64) v[64]=0;
++				      progress_metter=1;
++				      snprintf(X.progress,1000, "%s/%s", PG(upload_metter_dir), v);
++				   }
++				   efree(v);
++				}
++                                if ( !strcmp(param, "UPLOAD_METTER_ID") && PG(upload_metter)) {
++                                   char *c,*v = estrdup(value);
++                                   for (c=v;*c;c++) {
++                                      if ( (*c >= '0' && *c <= '9') ||
++                                           (*c >= 'a' && *c <= 'z') ||
++                                           (*c >= 'A' && *c <= 'Z') ||
++                                            *c == '.' || *c == '_'  ||
++                                            *c == ',' || *c == '@'  ||
++                                            *c == '-' || *c == '%') {
++                                      }else{
++                                         *c=0;
++                                         break;
++                                      }
++                                   }
++
++                                   if (v && *v) {
++                                      if (strlen(v) > 64) v[64]=0;
++                                      progress_metter=1;
++                                      snprintf(X.id,1000, "%s", v);
++                                   }
++                                   efree(v);
++                                }
++				
++				
+ 				efree(param);
+ 				efree(value);
+ 				continue;
+@@ -1016,6 +1149,11 @@
+ 
+ 			total_bytes = cancel_upload = 0;
+ 
++ 
++ 
++ 			if (progress_metter) update_progress_metter( &X, SG(read_post_bytes), SG(request_info).content_length );
++ 			X.files_uploaded++;
++ 
+ 			if (!skip_upload) {
+ 				/* Handle file */
+ 				fd = php_open_temporary_fd(PG(upload_tmp_dir), "php", &temp_filename TSRMLS_CC);
+@@ -1100,6 +1238,7 @@
+ 						cancel_upload = UPLOAD_ERROR_F;
+ 					} else {
+ 						total_bytes += wlen;
++						if (progress_metter) update_progress_metter( &X, SG(read_post_bytes), SG(request_info).content_length );
+ 					}
+ 					
+ 					offset += wlen;
+@@ -1345,7 +1484,7 @@
+ 		event_end.post_bytes_processed = SG(read_post_bytes);
+ 		php_rfc1867_callback(MULTIPART_EVENT_END, &event_end, &event_extra_data TSRMLS_CC);
+ 	}
+-	
++	if (progress_metter) update_progress_metter( &X, SG(read_post_bytes), SG(request_info).content_length );
+ 	SAFE_RETURN;
+ }
+ 
+--- php-5.2.0.ori/sapi/apache2filter/sapi_apache2.c	2006-07-25 21:40:05.000000000 +0800
++++ php-5.2.0/sapi/apache2filter/sapi_apache2.c	2006-11-09 00:02:24.000000000 +0800
+@@ -386,6 +386,15 @@
+ 	SG(request_info).request_uri = safe_strdup(f->r->uri);
+ 	SG(request_info).path_translated = safe_strdup(f->r->filename);
+ 	f->r->no_local_copy = 1;
++
++	// add this --- cut here ---
++	{
++	   char *content_length = (char *) apr_table_get(r->headers_in, "Content-Length");
++	   SG(request_info).content_length = (content_length ? atoi(content_length) : 0);
++	} // --cut here --
++
++
++	
+ 	content_type = sapi_get_default_content_type(TSRMLS_C);
+ 	f->r->content_type = apr_pstrdup(f->r->pool, content_type);
+ 	SG(request_info).post_data = ctx->post_data;
+--- php-5.2.0.ori/sapi/apache2handler/sapi_apache2.c	2006-08-10 21:43:18.000000000 +0800
++++ php-5.2.0/sapi/apache2handler/sapi_apache2.c	2006-11-09 00:14:47.000000000 +0800
+@@ -428,6 +428,12 @@
+ 	SG(request_info).path_translated = apr_pstrdup(r->pool, r->filename);
+ 	r->no_local_copy = 1;
+ 
++       // add this --- cut here ---
++       {
++          char *content_length = (char *) apr_table_get(r->headers_in, "Content-Length");
++          SG(request_info).content_length = (content_length ? atoi(content_length) : 0);
++       } // --cut here --
++
+ 	content_length = (char *) apr_table_get(r->headers_in, "Content-Length");
+ 	SG(request_info).content_length = (content_length ? atoi(content_length) : 0);
+ 

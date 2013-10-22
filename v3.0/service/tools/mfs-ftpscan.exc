@@ -1,0 +1,69 @@
+#!/bin/php -f
+<?php 
+if(isset($_ENV['GATEWAY_INTERFACE'])||isset($_ENV['SERVER_PROTOCOL'])) exit;
+$_AWIE_CODE="ef3802a1fce98f3985e6a9a1f7c1a024";
+$_SYSID="mfs-ftpscan";
+include_once("clib.exl");
+include_once('av.exl');
+
+putenv("PATH=/bin:/service/tools:/service/init");
+
+function do_log($msg) {
+	global $_srcip,$_username,$_path,$_filename,$_servername;
+	$ldate=time();
+	$sc=mybox_url_get_country($_servername);
+	$txt="HOST=$ip LOGIN=$_username PATH=$_path SC=$sc SERVER=$_servername FILE=$_filename MSG=$msg";
+	mybox_write_log($ldate,"ftpproxy_av","FTP-PROXY-AV",$txt);
+}
+
+if(!file_exists("/var/sys/ftp_proxy.set")) exit(1);
+$_config=unserialize(mybox_fget_contents("/var/sys/ftp_proxy.set"));
+$_cf_ftp_stat=$_config['cf_ftp_stat'];
+$_cf_ftp_av_stat=$_config['cf_ftp_av_stat'];
+$_cf_ftp_ext_stat=$_config['cf_ftp_ext_stat'];
+
+if($_cf_ftp_stat==0) exit(1);
+
+$_app=basename($_SERVER["argv"][0]);
+$_file=trim($_SERVER["argv"][1]);
+$_srcip=trim($_SERVER["argv"][2]);
+$_username=trim($_SERVER["argv"][3]);
+$_filename=trim($_SERVER["argv"][4]);
+$_servername=trim($_SERVER["argv"][5]);
+$_path=trim($_SERVER["argv"][6]);
+
+if($_file=='') exit(1);
+if(!file_exists($_file)) exit(1);
+
+
+$ret=1;
+if($_cf_ftp_av_stat==1) {
+	$tet=0;
+	$tet=mybox_av_scan($_file,&$virus);
+	if($tet==1) {
+		do_log("Virus found '$virus'");
+		$ret=0;
+	} else {
+		do_log("No virus found");
+		$ret=1;
+	}
+}
+if($_cf_ftp_ext_stat==1 && $_filename!='') {
+	if(file_exists("$_PAT_PATH/blacklist/FTP_EXT_BLOCK")) {
+		$_ext=file("$_PAT_PATH/blacklist/FTP_EXT_BLOCK");
+		if(count($_ext)!=0) {
+			foreach($_ext as $ln) {
+				$ln=trim($ln);
+				if($ln=='') continue;
+				$ln=ltrim($ln,".");
+				if(preg_match("/\.{$ln}$/",$_filename)) {
+					do_log("Bad file extension '{$ln}'");
+					$ret=0;break;
+				}
+				
+			}
+		}
+	}
+}
+exit($ret);
+?>
