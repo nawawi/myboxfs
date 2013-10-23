@@ -1,0 +1,9 @@
+config-kernel-default:
+	configuration that use for mybox1.x
+
+config-kernel-ref2:
+	* no scsi
+	* no usb
+
+
+

@@ -1,0 +1,25 @@
+# mybox signatures
+include rules/ddos.sig
+include rules/backdoor.sig
+include rules/dos.sig
+include rules/smtp.sig
+include rules/telnet.sig
+include rules/web-attacks.sig
+include rules/icmp.sig
+include rules/sql.sig
+include rules/web-iis.sig
+include rules/web-misc.sig
+include rules/snmp.sig
+include rules/dns.sig
+include rules/exploit.sig
+include rules/scan.sig
+include rules/nntp.sig
+include rules/pop3.sig
+include rules/pop2.sig
+include rules/rpc.sig
+include rules/virus.sig
+include rules/p2p.sig
+include rules/chat.sig
+include rules/finger.sig
+include rules/x11.sig
+include rules/multimedia.sig

@@ -1,0 +1,5 @@
+./mini_httpd -S -u root -i mini.pid -l mini.log -c **.html
+
+openssl req -new > cert.csr
+openssl rsa -in privkey.pem -out key.pem
+openssl x509 -in cert.csr -out cert.pem -req -signkey key.pem -days 365

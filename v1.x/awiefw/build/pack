@@ -1,0 +1,9 @@
+#!/bin/sh
+rm -fv rel/*.zip
+rm -fv rel/*.tgz
+rm -fv rel/*.gz
+
+tar -zcvf rel/boot.tgz boot.img message boot.lss vmtrace syslinux.cfg *.psf
+tar -zcvf rel/pkg.tgz idsconf configs packages
+tar -zcvf rel/pkg2.tgz idsconf packages configs/modules.lst configs/md5sum.lst configs/crontab.cnf configs/version
+

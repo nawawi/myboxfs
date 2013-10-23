@@ -1,0 +1,9 @@
+#!/bin/sh
+HOME_DIR=/usr/miniserv
+PATH=/usr/local/openssl/bin:$PATH
+export PATH
+openssl req -batch -new -x509 -days 365 -nodes -out $HOME_DIR/cert/key.pem -keyout $HOME_DIR/cert/key.pem
+openssl x509 -subject -dates -fingerprint -out $HOME_DIR/cert/cert.pem -in $HOME_DIR/cert/key.pem
+chmod 600 $HOME_DIR/cert/key.pem
+chmod 600 $HOME_DIR/cert/cert.pem
+

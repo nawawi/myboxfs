@@ -1,0 +1,433 @@
+#!/bin/php
+<?
+//
+// Mybox Firewall - A Firewall Appliance
+// http://www.mybox.net.my/
+//
+// (C) Copyright 2002,2003,2004 Mohd Nawawi Mohamad Jamili, TraceNetwork Corporation Sdn. Bhd.
+//
+// This program is not free software; you cannot redistribute it and/or
+// modify without permission copyright owner.
+//
+// This code is protected by copyright law and international treaties. 
+// Unauthorized reproduction or distribution of this program, or any portion of it, 
+// may result in severe civil and criminal penalties, and will be prosecuted to the 
+// maximum extent possible under the law.
+//
+// $Id: admin4.so,v 1.00 2003/10/19 1:33 AM nawawi Exp $
+//
+	include_once('scripts/functions.inc');
+	include_once('scripts/auth.inc');
+	$_ACCESS=chk_session();
+	if($_ACCESS=='') {
+		write_userlog('Accessing Admin -> Remote Backup page','Access denied');
+		go_exit();
+	}
+	if(isset($do)&& $do=='2') {
+		if(file_exists('/hd/configs/rbackup.lst')) {
+			write_userlog('Executing Admin -> Remote Backup -> Clear log file','Access granted');
+			unlink('/hd/configs/rbackup.lst');
+		}
+		unset($do,$action);
+	}
+	if((isset($do)&& $do=='1') && (isset($action)&& $action=='save')) {
+		write_ini('REMOTEBACKUP','SERVER',$rserver);
+		write_ini('REMOTEBACKUP','PATH',$rpath);
+		write_ini('REMOTEBACKUP','LOGIN',$rlogin);
+		write_ini('REMOTEBACKUP','PASSWORD',$rpass);
+		write_ini('REMOTEBACKUP','FILE',"$list");
+		unset($do,$action,$rserver,$rpath,$rlogin,$rpass,$list);
+		write_userlog('Executing Admin -> Remote Backup -> updatelist','Access granted');
+		header("Location: admin_msg.so?ref=admin4.so&msg=Please wait.. saving data..");
+	}
+	$rserver=get_ini('REMOTEBACKUP','SERVER');
+	if($rserver=='NULL') $rserver='127.0.0.1';
+	$rpath=get_ini('REMOTEBACKUP','PATH');
+	if($rpath=='NULL') $rpath='/tmp/BACKUP';
+	$rlogin=get_ini('REMOTEBACKUP','LOGIN');
+	if($rlogin=='NULL') $rlogin='ftp';
+	$rpass=get_ini('REMOTEBACKUP','PASSWORD');
+	if($rpass=='NULL') $rpass='ftp@anon.org';
+	$rfile=get_ini('REMOTEBACKUP','FILE');
+	if($rfile!='NULL' || $rfile!='') {
+		list($p1,$p2,$p3,$p4,$p5,$p6,$p7,$p8)=preg_split("/,/",$rfile);
+	} else {
+		$p1='0';$p2='0';$p3='0';$p4='0';$p5='0';$p6='0';$p7='0';$p8='0';
+	}
+	$p1c='checked';$p2c='checked';$p3c='checked';$p4c='checked';$p5c='checked';$p6c='checked';$pp1='checked';$pp11='checked';
+	$p11c='';$p22c='';$p33c='';$p44c='';$p55c='';$p66c='';$pp2='';$pp22='';
+	if($p1=='0' || $p1=='') {
+		$p1c='';$p11c='checked';
+	}
+	if($p2=='0' || $p2=='') {
+		$p2c='';$p22c='checked';
+	}
+	if($p3=='0' || $p3=='') {
+		$p3c='';$p33c='checked';
+	}
+	if($p4=='0' || $p4=='') {
+		$p4c='';$p44c='checked';
+	}
+	if($p5=='0' || $p5=='') {
+		$p5c='';$p55c='checked';
+	}
+	if($p6=='0' || $p6=='') {
+		$p6c='';$p66c='checked';
+	}
+	if($p7=='0' || $p7=='') {
+		$pp1='checked';$pp2='';
+	}
+	if($p8=='0' || $p8=='') {
+		$pp11='';$pp22='checked';
+	}
+	// start
+	$currentPage = $HTTP_SERVER_VARS["PHP_SELF"];
+	$pageNum_Recordset='0';
+	$maxRows_Recordset=15;
+	if(isset($HTTP_GET_VARS['pageNum_Recordset'])) {
+  		$pageNum_Recordset = $HTTP_GET_VARS['pageNum_Recordset'];
+	}
+	$startRow_Recordset = $pageNum_Recordset * $maxRows_Recordset;
+	$row_Recordset=array();
+	if(file_exists("/hd/configs/rbackup.lst")) {
+		$line=file("/hd/configs/rbackup.lst");
+		$i='1';
+		for($x=count($line);$x >= $startRow_Recordset;$x--) {
+			$buff=$line[$x];
+			$buff=trim($buff);
+			if($buff!='' && $i!=$maxRows_Recordset) {
+				array_push($row_Recordset,$buff);
+				$i++;
+			}
+		}
+	}
+	if(isset($HTTP_GET_VARS['totalRows_Recordset'])) {
+  		$totalRows_Recordset = $HTTP_GET_VARS['totalRows_Recordset'];
+	} else {
+  		$totalRows_Recordset=count($line);
+	}
+
+	$totalPages_Recordset=ceil($totalRows_Recordset/$maxRows_Recordset)-1;
+	$queryString_Recordset = "";
+	if(!empty($HTTP_SERVER_VARS['QUERY_STRING'])) {
+  		$params = explode("&", $HTTP_SERVER_VARS['QUERY_STRING']);
+  		$newParams = array();
+  		foreach ($params as $param) {
+    			if (stristr($param, "pageNum_Recordset") == false && 
+        			stristr($param, "totalRows_Recordset") == false) {
+      				array_push($newParams, $param);
+    			}
+  		}
+  		if (count($newParams) != 0) {
+    			$queryString_Recordset = "&" . implode("&", $newParams);
+  		}
+	}
+	$queryString_Recordset = sprintf("&totalRows_Recordset=%d%s", $totalRows_Recordset, $queryString_Recordset);
+
+	write_userlog('Accessing Admin -> Remote Backup page','Access granted');
+	write_nocache();
+?>
+<?include_once('scripts/header.inc');?>
+<html>
+<head>
+<title>MyBox Firewall</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<?include_once('scripts/style.css');?>
+<?include_once('scripts/global.js');?>
+<script language="javascript"><!--
+	defaultStatus="Remote Backup";
+	function dosubmit() {
+		if(document.f.rserver.value=='NULL' | document.f.rserver.value=='') {
+			document.f.rserver.focus();
+			return false;
+		}
+		if(document.f.rpath.value=='NULL' | document.f.rpath.value=='') {
+			document.f.rpath.focus();
+			return false;
+		}
+		if(document.f.rlogin.value=='NULL' | document.f.rlogin.value=='') {
+			document.f.rlogin.focus();
+			return false;
+		}
+		if(document.f.rpass.value=='NULL' | document.f.rpass.value=='') {
+			document.f.rpass.focus();
+			return false;
+		}
+		var l1='1';
+		var l2='1';
+		var l3='1';
+		var l4='1';
+		var l5='1';
+		var l6='1';
+		var p1='1';
+		var p11='1';
+		if(document.f.c2.checked==true) l1='0';
+		if(document.f.d2.checked==true) l2='0';
+		if(document.f.e2.checked==true) l3='0';
+		if(document.f.f2.checked==true) l4='0';
+		if(document.f.g2.checked==true) l5='0';
+		if(document.f.h2.checked==true) l6='0';
+		if(document.f.p2.checked==true) p1='0';
+		if(document.f.p22.checked==true) p11='0';
+		document.f.list.value=l1+','+l2+','+l3+','+l4+','+l5+','+l6+','+p1+','+p11;
+		document.f.action.value='save';
+		document.f.submit();
+	}
+
+	function doexec() {
+		LeftPosition = (screen.width) ? (screen.width-400)/2 : 0;
+		TopPosition = (screen.height) ? (screen.height-360)/2 : 0;
+		settings='width=400,height=360,top='+TopPosition+',left='+LeftPosition+',scrollbars=0,status=0,resizable=0';
+		window.open("show.so","show",settings);
+		return true;
+	}
+//--></script>
+</head>
+<body bgcolor="#888888" leftmargin="0" topmargin="0" marginwidth="0" marginheight="0" onload="initjsDOMenu();">
+<!-- start console win -->
+<center>
+<table bgcolor="#eeeeee" height="100%" width="100%" border="0" cellpadding="0" cellspacing="0" class="block0">
+<tr valign="top">
+<td align="center">	
+<table bgcolor="#005a8f" width="100%" border="0" cellpadding="2" cellspacing="0">
+<tr valign="center">
+<td height="18" align="left" class="td_label" width=10><img src="png.so?path=image&image=online.gif" border=0 alt="<?get_online();?>"></td>
+<td height="18" align="left" class="td_label">&nbsp;Administration - Remote Backup</td>
+<td height="18" align="right"><a href="blank.so"><img src="png.so?path=image&image=close.png" border="0"></a></td>
+</tr>
+</table>
+<table bgcolor="#d4d0c8" width="100%" height="18" border="0" cellpadding="0" cellspacing="0">
+<tr valign="center">
+<td>
+<form>
+<nobr>
+<?if(!is_admin($_ACCESS)){?><input type=button value="WebAdmin Setup" class=input_button onclick="load('admin0.so');"><?}?><input type=button value="Backup/Restore" class=input_button onclick="load('admin1.so');"><input type=button value="Remote Backup" class=input_button onclick="load('admin4.so');"><?if(!is_admin($_ACCESS)){?><input type=button value="Password Setup" class=input_button onclick="load('admin2.so');"><input type=button value="Alarm Setup" class=input_button onclick="load('admin3.so');"><?}?>
+</nobr>
+
+</td>
+</tr>
+<tr><td></form></td></tr>
+</table>
+
+<table bgcolor="#eeeeee" width="100%" height="100%" border="0" cellpadding="1" cellspacing="1" class="block">
+<tr valign="top">
+<td align=center><br><br>
+
+<form name=f action=admin4.so?do=1 method=post>
+    <table cellpadding="5" border="0" cellspacing="0" align="center">
+    <tr>
+        <!-- Options -->
+        <td valign="top" align=center>
+            <fieldset>
+                <legend>Setting Conditions</legend>
+                <table border="0" cellspacing="1" cellpadding="0">
+                    <tr>
+                        <td>
+   <table width="550" cellpadding="5" border="0" cellspacing="0" align="center">
+    <tr>
+        <td valign="top" width="300" align=center>
+          <fieldset>
+                <legend>Access</legend>
+                <table border="0" cellspacing="1" cellpadding="0">
+                    <tr>
+                        <td>
+                            FTP Server&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td class=td_tab bgcolor="#E7E9F2">
+			<input type="text" name="rserver" size="25" value="<?echo $rserver;?>" class="input_text">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            Remote Path&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td class=td_tab bgcolor="#E7E9F2">
+                            <input type="text" name="rpath" size="25" value="<?echo $rpath;?>" class="input_text">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            Login&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td class=td_tab bgcolor="#E7E9F2">
+			<input type="text" name="rlogin" size="25" value="<?echo $rlogin;?>" class="input_text">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td class=td_tab bgcolor="#E7E9F2">
+                            <input type="password" name="rpass" size="25" value="<?echo $rpass;?>" class="input_text">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            Passive mode?&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td class=td_tab bgcolor="#E7E9F2">
+			<input type="checkbox" name=p1 onclick="if(document.f.p1.checked==true)document.f.p2.checked=false;document.f.p1.checked=true;" <?echo $pp1;?>> Yes <input type="checkbox" name=p2 onclick="if(document.f.p2.checked==true)document.f.p1.checked=false;document.f.p2.checked=true;" <?echo $pp2;?>> No
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            Auto backup?&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td class=td_tab bgcolor="#E7E9F2">
+			<input type="checkbox" name=p11 onclick="if(document.f.p11.checked==true)document.f.p22.checked=false;document.f.p11.checked=true;" <?echo $pp11;?>> Yes <input type="checkbox" name=p22 onclick="if(document.f.p22.checked==true)document.f.p11.checked=false;document.f.p22.checked=true;" <?echo $pp22;?>> No
+                        </td>
+                    </tr>
+                   </table></fieldset>
+        </td>
+        <td valign="top" width="250" align=center>
+            <fieldset>
+                <legend>File</legend>
+                <table border="0" cellspacing="1" cellpadding="0">
+                       <tr>
+                        <td>
+                            Configuration&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td class=td_tab bgcolor="#E7E9F2">
+			<input type="checkbox" name=c1 onclick="if(document.f.c1.checked==true)document.f.c2.checked=false;document.f.c1.checked=true;" <?echo $p1c;?>> Yes <input type="checkbox" name=c2 onclick="if(document.f.c2.checked==true)document.f.c1.checked=false;document.f.c2.checked=true;" <?echo $p11c;?>> No
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            Portscan Logs&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td class=td_tab bgcolor="#E7E9F2">
+			<input type="checkbox" name=d1 onclick="if(document.f.d1.checked==true)document.f.d2.checked=false;document.f.d1.checked=true;" <?echo $p2c;?>> Yes <input type="checkbox" name=d2 onclick="if(document.f.d2.checked==true)document.f.d1.checked=false;document.f.d2.checked=true;" <?echo $p22c;?>> No
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            IDS Logs&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td class=td_tab bgcolor="#E7E9F2">
+			<input type="checkbox" name=e1 onclick="if(document.f.e1.checked==true)document.f.e2.checked=false;document.f.e1.checked=true;" <?echo $p3c;?>> Yes <input type="checkbox" name=e2 onclick="if(document.f.e2.checked==true)document.f.e1.checked=false;document.f.e2.checked=true;" <?echo $p33c;?>> No
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            Policy Logs&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td class=td_tab bgcolor="#E7E9F2">
+			<input type="checkbox" name=f1 onclick="if(document.f.f1.checked==true)document.f.f2.checked=false;document.f.f1.checked=true;" <?echo $p4c;?>> Yes <input type="checkbox" name=f2 onclick="if(document.f.f2.checked==true)document.f.f1.checked=false;document.f.f2.checked=true;" <?echo $p44c;?>> No
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            User Logs&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td class=td_tab bgcolor="#E7E9F2">
+			<input type="checkbox" name=g1 onclick="if(document.f.g1.checked==true)document.f.g2.checked=false;document.f.g1.checked=true;" <?echo $p5c;?>> Yes <input type="checkbox" name=g2 onclick="if(document.f.g2.checked==true)document.f.g1.checked=false;document.f.g2.checked=true;" <?echo $p55c;?>> No
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            Statistic Graph&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td class=td_tab bgcolor="#E7E9F2">
+			<input type="checkbox" name=h1 onclick="if(document.f.h1.checked==true)document.f.h2.checked=false;document.f.h1.checked=true;" <?echo $p6c;?>> Yes <input type="checkbox" name=h2 onclick="if(document.f.h2.checked==true)document.f.h1.checked=false;document.f.h2.checked=true;" <?echo $p66c;?>> No
+                        </td>
+                    </tr>
+                   </table>
+            </fieldset>
+         </td>
+    </tr>
+    </table>
+                        </td>
+                     </tr>
+<tr>
+	            <td colspan="2" align=center> 
+            <input type="button" value="Execute" class="input_button" onclick="doexec();"><input type="button" value="Save This Setting" class="input_button" onclick="return dosubmit();">
+        </td>
+    </tr>
+<tr><td></td></tr>
+                    <tr>
+                        <td align=center>
+                               <table width="540" border="0" cellpadding="1" cellspacing="1" class=block>
+      <tr bgcolor="#c1c1c1"> 
+        <td colspan="5"> 
+          <div align="left">Remote Backup Activity</div>
+        </td>
+      </tr>
+      <tr bgcolor="#6696bc"> 
+        <td class=td_pad>Day</td>
+	<td class=td_pad>Date</td>
+	<td class=td_pad>Time</td>
+        <td class=td_pad>Status</td>
+      </tr>
+	<?
+	if(count($row_Recordset)>0) {
+		foreach($row_Recordset as $line) {
+			$line=trim($line);
+			if($line!='') {
+				list($day,$date,$time,$action)=preg_split('/\|/',$line);
+				echo "
+					<tr bgcolor=#E7E9F2>
+				        <td class=td_pad>$day</td>
+					<td class=td_pad>$date</td>
+					<td class=td_pad>$time</td>
+        				<td class=td_pad>$action</td>
+					</tr>
+				";
+			}
+		}
+	}
+	?>
+</table>
+	<? if(file_exists('/hd/configs/rbackup.lst')) { ?>
+
+  <table bgcolor="#c0c0c0" width="540" border="0" cellpadding="1" cellspacing="1" class="block">
+        <tr> 
+    <td colspan=8 align="center">     
+
+	<? if($pageNum_Recordset > 0) { ?>
+      	<a href="<?printf("%s?pageNum_Recordset=%d%s", $currentPage, 0, $queryString_Recordset); ?>"><img src="png.so?path=image&image=first.png" border=0></a>
+      <? }   ?>  
+	<? if ($pageNum_Recordset > 0) {  ?>
+      <a href="<? printf("%s?pageNum_Recordset=%d%s", $currentPage, max(0, $pageNum_Recordset - 1), $queryString_Recordset); ?>"><img src="png.so?path=image&image=prev.png" border=0></a>
+      <? }   ?>     
+	<? if ($pageNum_Recordset < $totalPages_Recordset) {  ?>
+      <a href="<? printf("%s?pageNum_Recordset=%d%s", $currentPage, min($totalPages_Recordset, $pageNum_Recordset + 1), $queryString_Recordset); ?>"><img src="png.so?path=image&image=next.png" border=0></a>
+      <? }  ?>
+    
+	<? if ($pageNum_Recordset < $totalPages_Recordset) {  ?>
+      <a href="<? printf("%s?pageNum_Recordset=%d%s", $currentPage, $totalPages_Recordset, $queryString_Recordset); ?>"><img src="png.so?path=image&image=last.png" border=0></a> 
+      <? }  ?>
+</td>
+
+
+	</tr>
+   </table>
+<br>
+<center>
+	<input type="button" value="Cancel" class="input_button" onclick="load('admin.so');"><input type=button name="saving" value="  Clear log file  " class="input_button" onclick="load('admin4.so?do=2');">
+</center>
+<? } ?>
+<br>
+                        </td>
+                    </tr>
+                   </table>
+            </fieldset>
+         </td>
+    </tr>
+    </table>
+<input type=hidden name=action>
+<input type=hidden name=list>
+</form>
+</td>
+</tr>
+</table>
+
+</td>
+</tr>
+</table>
+
+</center>
+<!-- end console win -->
+</body>
+</html>
+
+<? flush(); ?>

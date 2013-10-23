@@ -1,0 +1,168 @@
+#!/bin/php
+<?
+//
+// Mybox Firewall - A Firewall Appliance
+// http://www.mybox.net.my/
+//
+// (C) Copyright 2002,2003,2004 Mohd Nawawi Mohamad Jamili, TraceNetwork Corporation Sdn. Bhd.
+//
+// This program is not free software; you cannot redistribute it and/or
+// modify without permission copyright owner.
+//
+// This code is protected by copyright law and international treaties. 
+// Unauthorized reproduction or distribution of this program, or any portion of it, 
+// may result in severe civil and criminal penalties, and will be prosecuted to the 
+// maximum extent possible under the law.
+//
+// $Id: stats_view.so,v 1.00 2003/07/28 1:07 AM nawawi Exp $
+//
+	include_once('scripts/functions.inc');
+	include_once('scripts/auth.inc');
+	$_ACCESS=chk_session();
+	if($_ACCESS=='') {
+		write_userlog('Accessing Log & Stat -> Statistic graph -> graph view','Access denied');
+		go_exit();
+	}
+	
+	if(isset($page)&&$page!='') {
+		$alt[1]='Daily Graph';
+		$alt[2]='Weekly Graph';
+		$alt[3]='Monthly Graph';
+		$alt[4]='Yearly Graph';
+		$refer="/stats_view.so?page=$page";
+		switch($page) {
+			case '1':
+				$image[1]='png.so?nocache=1&path=graph&image=eth01.png';
+				$image[2]='png.so?nocache=1&path=graph&image=eth02.png';
+				$image[3]='png.so?nocache=1&path=graph&image=eth03.png';
+				$image[4]='png.so?nocache=1&path=graph&image=eth04.png';
+				$title='External Network';
+			break;
+			case '2':
+				$image[1]='png.so?nocache=1&path=graph&image=eth11.png';
+				$image[2]='png.so?nocache=1&path=graph&image=eth12.png';
+				$image[3]='png.so?nocache=1&path=graph&image=eth13.png';
+				$image[4]='png.so?nocache=1&path=graph&image=eth14.png';
+				$title='Primary DMZ Network';
+			break;
+			case '3':
+				$image[1]='png.so?nocache=1&path=graph&image=eth21.png';
+				$image[2]='png.so?nocache=1&path=graph&image=eth22.png';
+				$image[3]='png.so?nocache=1&path=graph&image=eth23.png';
+				$image[4]='png.so?nocache=1&path=graph&image=eth24.png';
+				$title='Secondary DMZ Network';
+			break;
+			case '4':
+				$image[1]='png.so?nocache=1&path=graph&image=eth31.png';
+				$image[2]='png.so?nocache=1&path=graph&image=eth32.png';
+				$image[3]='png.so?nocache=1&path=graph&image=eth33.png';
+				$image[4]='png.so?nocache=1&path=graph&image=eth34.png';
+				$title='Internal Network';
+			break;
+			case '5':
+				$image[1]='png.so?nocache=1&path=graph&image=loadavg1.png';
+				$image[2]='png.so?nocache=1&path=graph&image=loadavg2.png';
+				$image[3]='png.so?nocache=1&path=graph&image=loadavg3.png';
+				$image[4]='png.so?nocache=1&path=graph&image=loadavg4.png';
+			break;
+			case '6':
+				$image[1]='png.so?nocache=1&path=graph&image=wanping1.png';
+				$image[2]='png.so?nocache=1&path=graph&image=wanping2.png';
+				$image[3]='png.so?nocache=1&path=graph&image=wanping3.png';
+				$image[4]='png.so?nocache=1&path=graph&image=wanping4.png';
+			break;
+			case '7':
+				$image[1]='png.so?nocache=1&path=graph&image=idshits1.png';
+				$image[2]='png.so?nocache=1&path=graph&image=idshits2.png';
+				$image[3]='png.so?nocache=1&path=graph&image=idshits3.png';
+				$image[4]='png.so?nocache=1&path=graph&image=idshits4.png';
+			break;
+			case '8':
+				$image[1]='png.so?nocache=1&path=graph&image=freemem1.png';
+				$image[2]='png.so?nocache=1&path=graph&image=freemem2.png';
+				$image[3]='png.so?nocache=1&path=graph&image=freemem3.png';
+				$image[4]='png.so?nocache=1&path=graph&image=freemem4.png';
+			break;
+
+		}
+		unset($page);
+	}
+	write_userlog('Accessing Log & Stat -> Statistic graph -> graph view','Access granted');
+	write_nocache();
+?>
+<?include_once('scripts/header.inc');?>
+<html>
+<head>
+<title>MyBox Firewall</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="refresh" content="300; url=<?echo $refer;?>">
+<?include_once('scripts/style.css');?>
+<?include_once('scripts/global.js');?>
+<script language="javascript"><!--
+	defaultStatus="Statistic Graph";
+//--></script>
+</head>
+<body bgcolor="#888888" leftmargin="0" topmargin="0" marginwidth="0" marginheight="0" onload="initjsDOMenu();">
+<!-- start console win -->
+<center>
+<table bgcolor="#eeeeee" height="100%" width="100%" border="0" cellpadding="0" cellspacing="0" class="block0">
+<tr valign="top">
+<td align="center">	
+<table bgcolor="#005a8f" width="100%" border="0" cellpadding="2" cellspacing="0">
+<tr valign="center">
+<td height="18" align="left" class="td_label" width=10><img src="png.so?nocache=0&path=image&image=online.gif" border=0 alt="<?get_online();?>"></td>
+<td height="18" align="left" class="td_label">&nbsp;Logs & Stat - Statistic Graph</td>
+<td height="18" align="right"><a href="blank.so"><img src="png.so?nocache=0&path=image&image=close.png" border="0"></a></td>
+</tr>
+</table>
+<table bgcolor="#d4d0c8" width="100%" height="18" border="0" cellpadding="0" cellspacing="0">
+<tr valign="center">
+<td>
+<form name=e>
+<nobr>
+<input type=button value="Network Statistic Graph" class=input_button onclick="load('stats0.so');"><input type=button value="Statistic Graph" class=input_button onclick="load('stats1.so');"><input type=button value="IDS Logs" class=input_button onclick="load('stats2.so');"><input type=button value="Portscan Logs" class=input_button onclick="load('stats3.so');"><input type=button value="Policy Logs" class=input_button onclick="load('stats4.so');"><input type=button value="User Logs" class=input_button onclick="load('stats5.so');">
+</nobr>
+</td>
+</tr>
+<tr><td></form></td></tr>
+</table>
+
+
+<table bgcolor="#eeeeee" width="100%" height="100%" border="0" cellpadding="1" cellspacing="1" class="block">
+<tr valign="top">
+<td align=center><br><br>
+    <table cellpadding="5" border="0" cellspacing="0" align="center">
+    <tr>
+
+        <td nowrap="nowrap" align=center valign="top" width="680">
+          <fieldset><br>
+                <table border="0" cellspacing="1" cellpadding="0">
+                    <tr>
+                        <td align=center>
+			<?
+				for($x='1';$x<5;$x++) {
+					echo "<img src=\"$image[$x]\" alt=\"$alt[$x]\" nosave><br><br>\n";
+				}
+			?>
+                        </td>
+                    </tr>
+
+                   </table><br>
+            </fieldset>
+        </td>
+    </tr>
+    </table>
+</td>
+</tr>
+
+</table>
+</td>
+</tr>
+</table>
+</center>
+<!-- end console win -->
+</body>
+</html>
+
+<? unset($refer); flush();?>

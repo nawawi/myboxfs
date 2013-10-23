@@ -1,0 +1,259 @@
+#!/bin/php
+<?
+//
+// Mybox Firewall - A Firewall Appliance
+// http://www.mybox.net.my/
+//
+// (C) Copyright 2002,2003,2004 Mohd Nawawi Mohamad Jamili, TraceNetwork Corporation Sdn. Bhd.
+//
+// This program is not free software; you cannot redistribute it and/or
+// modify without permission copyright owner.
+//
+// This code is protected by copyright law and international treaties. 
+// Unauthorized reproduction or distribution of this program, or any portion of it, 
+// may result in severe civil and criminal penalties, and will be prosecuted to the 
+// maximum extent possible under the law.
+//
+// $Id: admin0.so,v 1.00 2003/07/28 1:07 AM nawawi Exp $
+//
+
+	include_once('scripts/functions.inc');
+	include_once('scripts/auth.inc');
+	$_ACCESS=chk_session();
+	if($_ACCESS=='' || is_admin($_ACCESS)) {
+		write_userlog('Accessing Admin -> WebAdmin Setup page','Access denied');
+		go_exit();
+	}
+	if(is_admin($_ACCESS)) {
+		write_userlog('Accessing Admin -> WebAdmin Setup page','Access denied -> Not Admin');
+		echo "you're on candid camera..";
+		exit;
+	}
+	// Save
+	if(isset($do)&& $do=='1') {
+		$ipallow=trim(rtrim(($list),','));
+		if(!isset($wan)) $wan='0';
+		if(!isset($dmz1)) $dmz1='0';
+		if(!isset($dmz2)) $dmz2='0';
+		if(!isset($lan)) $lan='0';
+		$con="$wan,$dmz1,$dmz2,$lan";
+		$change_port=get_ini('MINISERV','PORT');
+		write_ini('MINISERV','IPALLOW',$ipallow);
+		write_ini('MINISERV','SESSTIMEOUT',$session);
+		write_ini('MINISERV','CONNECTION',"$con");
+		unset($do,$ipallow,$session,$wan,$dmz1,$dmz2,$lan);
+		if($change_port==$port) {
+			header("Location: admin_msg.so?ref=admin0.so&msg=Please wait.. saving data..");
+			exit;
+		} else {
+			write_ini('MINISERV','PORT',$port);
+			header("Location: admin_msg0.so?ref=admin0.so");
+			exit;
+		}
+	}
+	unset($change_port,$port);
+
+	$PORT=get_ini('MINISERV','PORT');
+	$SESSTIMEOUT=get_ini('MINISERV','SESSTIMEOUT');
+	$CONNECTION=get_ini('MINISERV','CONNECTION');
+	$IPALLOW=get_ini('MINISERV','IPALLOW');
+	
+	list($wan,$dmz1,$dmz2,$lan)=preg_split("/,/",$CONNECTION);
+	if($wan=='1') $CON0='checked';
+	if($dmz1=='1') $CON1='checked';
+	if($dmz2=='1') $CON2='checked';
+	if($lan=='1') $CON3='checked';
+
+	write_userlog('Accessing Admin -> WebAdmin Setup page','Access granted');
+	write_nocache();
+?>
+<?include_once('scripts/header.inc');?>
+<html>
+<head>
+<title>MyBox Firewall</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<?include_once('scripts/style.css');?>
+<?include_once('scripts/network.js');?>
+<?include_once('scripts/global.js');?>
+<script language="javascript1.2"><!--
+	defaultStatus="WebAdmin Setup";
+	function addthisip() {
+		var ipc=document.f.ipc.value;
+		if(ipc=='') {
+			document.f.ipc.focus();
+			return false;
+		}
+		if(!checkIp(ipc)) {
+			document.f.ipc.value='';
+			document.f.ipc.focus();
+			return false;
+		}
+		var lstlenght=document.f.al.length;
+		var list=document.f.al;
+		for(i='0';i<lstlenght;i++) {
+			if(list.options[i].text==ipc) {
+				alert('Ip already exists');
+				return false;
+			}
+		}
+		document.f.al[lstlenght]=new Option(ipc,ipc);
+		return true;
+	}
+	function deleteip() {
+		var lstlenght=document.f.al.length;
+		var list=document.f.al;
+		for(var i='0';i<lstlenght;i++) {
+			if(list[i]!=null) {
+
+				if(list.options[i].selected==true) {
+					list[i]=null;
+				}
+			}
+		}
+		return true;
+	}
+	function dosubmit() {
+		var lstlenght=document.f.al.length;
+		var list=document.f.al;
+		var port=document.f.port.value;
+		var sess=document.f.session.value;
+		var wan='0';
+		var dmz1='0';
+		var dmz2='0';
+		var lan='0';
+		if(document.f.wan.checked==true) wan='1';
+		if(document.f.dmz1.checked==true) dmz1='1';
+		if(document.f.dmz2.checked==true) dmz2='1';
+		if(document.f.lan.checked==true) lan='1';
+		if(!isInteger(port)|!isInteger(sess)|port==''|sess=='') {
+			alert('Invalid Input');
+			document.f.port.value='';
+			document.f.port.focus();
+			return false;
+		}
+		var X='';
+		for(i='0';i<lstlenght;i++) {
+			X +=list.options[i].text;
+			X +=',';
+		}
+		document.f.list.value=X;
+		document.f.submit();
+		return true;
+	}
+//--></script>
+</head>
+<body bgcolor="#888888" leftmargin="0" topmargin="0" marginwidth="0" marginheight="0" onload="document.f.port.focus();initjsDOMenu();">
+<!-- start console win -->
+<center>
+<table bgcolor="#eeeeee" height="100%" width="100%" border="0" cellpadding="0" cellspacing="0" class="block0">
+<tr valign="top">
+<td align="center">	
+<table bgcolor="#005a8f" width="100%" border="0" cellpadding="2" cellspacing="0">
+<tr valign="center">
+<td height="18" align="left" class="td_label" width=10><img src="png.so?path=image&image=online.gif" border=0 alt="<?get_online();?>"></td>
+<td height="18" align="left" class="td_label">&nbsp;Administration - WebAdmin Setup</td>
+<td height="18" align="right"><a href="blank.so"><img src="png.so?path=image&image=close.png" border="0"></a></td>
+</tr>
+</table>
+<table bgcolor="#d4d0c8" width="100%" height="18" border="0" cellpadding="0" cellspacing="0">
+<tr valign="center">
+<td>
+<form name=e>
+<nobr>
+<?if(!is_admin($_ACCESS)){?><input type=button value="WebAdmin Setup" class=input_button onclick="load('admin0.so');"><?}?><input type=button value="Backup/Restore" class=input_button onclick="load('admin1.so');"><input type=button value="Remote Backup" class=input_button onclick="load('admin4.so');"><?if(!is_admin($_ACCESS)){?><input type=button value="Password Setup" class=input_button onclick="load('admin2.so');"><input type=button value="Alarm Setup" class=input_button onclick="load('admin3.so');"><?}?>
+</nobr>
+</td>
+</tr>
+<tr><td></form></td></tr>
+</table>
+<table bgcolor="#eeeeee" width="100%" height="100%" border="0" cellpadding="1" cellspacing="1" class="block">
+<tr valign="top">
+<td align=center><br><br>
+
+<form name=f action=admin0.so?do=1 method=post>
+<table border="0" cellspacing="0" align="center">
+<tr>
+<td nowrap="nowrap" align=center valign="top">
+<fieldset>
+<legend>IP's Allowed</legend>
+<table border="0" cellspacing="1" cellpadding="0" bgcolor="#E7E9F2">
+<tr>
+<td valign="top">
+<select name=al class=input_text size=6 multiple>
+<?
+	$list=preg_split("/,/",$IPALLOW);
+	for($x='0';$x<count($list);$x++) {
+		echo "<option value=\"$list[$x]\">$list[$x]</option>\n";
+	}
+?>
+</select>
+</td>
+</tr>
+</table>
+</fieldset>
+</td>
+<td valign=top align=center>
+<fieldset>
+<legend>WebAdmin Setup</legend>
+<table border="0" cellspacing="1" cellpadding="0" bgcolor="#E7E9F2">
+<tr>
+<td>
+WebAdmin Port&nbsp;&nbsp;&nbsp;&nbsp;
+</td>
+<td class=td_tab bgcolor="#E7E9F2">
+<input type="text" name="port" size="15" value="<?echo $PORT;?>" class="input_text" tabindex=1>
+</td>
+</tr>
+<tr>
+<td>
+Session Timeout&nbsp;&nbsp;&nbsp;&nbsp;
+</td>
+<td class=td_tab bgcolor="#E7E9F2">
+<input type="text" name="session" size="1" value="<?echo $SESSTIMEOUT;?>" class="input_text" tabindex=2> Hour(s)
+</td>
+</tr>
+<tr>
+<td>
+WebAdmin Connection&nbsp;&nbsp;&nbsp;&nbsp;
+</td>
+<td class=td_tab bgcolor="#E7E9F2">
+<input type=checkbox name=wan tabindex=3 value=1 <?echo "$CON0";?>> Wan <input type=checkbox name=dmz1 tabindex=4 value=1 <?echo $CON1;?>> DMZ1 <input type=checkbox name=dmz2 tabindex=5 value=1 <?echo $CON2;?>> DMZ2 <input type=checkbox name=lan tabindex=6 value=1 <?echo $CON3;?>> Lan
+</td>
+</tr>
+<tr>
+<td>
+Allow IP to Connect&nbsp;&nbsp;&nbsp;&nbsp;
+</td>
+<td class=td_tab bgcolor="#E7E9F2">
+<input type="text" name="ipc" size="15" value="" class="input_text" tabindex=7> <input type=button value="Add This Ip" class="input_button" onclick="javascript:addthisip();" tabindex=8>
+</td>
+</tr>
+</table>
+</fieldset>
+</td>
+</tr>
+<tr>
+<td colspan=3" align="center">
+<input type=button value="Delete Selected" class=input_button onclick="javascript:deleteip();" tabindex=11>&nbsp;&nbsp;<input type="button" value="Cancel" class="input_button" onclick="load('admin.so');" tabindex=10><input type="button" value="Save This Setting" class="input_button" onclick="return dosubmit();" tabindex=9>
+</td>
+</tr>
+
+</table>
+<input type=hidden name=list>
+</form>
+
+</td>
+</tr>
+</table>
+
+</td>
+</tr>
+</table>
+</center>
+<!-- end console win -->
+</body>
+</html>
+
+<? flush(); ?>
+
+

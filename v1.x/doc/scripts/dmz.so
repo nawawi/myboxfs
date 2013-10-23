@@ -1,0 +1,18 @@
+#!/bin/php -q
+<?
+	if(!file_exists('/sbin/ipvsadm')) {
+		syslog(LOG_ERR,'/sbin/ipvsadm not such file');
+		return;
+	}
+	if(file_exists('dmz.inc')) {
+		include_once('dmz.inc');
+	} elseif(file_exists('scripts/dmz.inc')) {
+		include_once('scripts/dmz.inc');
+	} else {
+		include_once('/usr/miniserv/scripts/dmz.inc');
+	}
+	do_extip();
+	do_hosts();
+	do_flush();
+	do_dmz();
+?>

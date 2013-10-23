@@ -1,0 +1,127 @@
+#!/bin/php -q
+<?
+//
+// Mybox Firewall - A Firewall Appliance
+// http://www.mybox.net.my/
+//
+// (C) Copyright 2002,2003,2004 Mohd Nawawi Mohamad Jamili, TraceNetwork Corporation Sdn. Bhd.
+//
+// This program is not free software; you cannot redistribute it and/or
+// modify without permission copyright owner.
+//
+// This code is protected by copyright law and international treaties. 
+// Unauthorized reproduction or distribution of this program, or any portion of it, 
+// may result in severe civil and criminal penalties, and will be prosecuted to the 
+// maximum extent possible under the law.
+//
+// $Id: send_alert.so,v 1.00 2003/07/28 1:07 AM nawawi Exp $
+//
+
+	set_time_limit(0);
+	include_once('/usr/miniserv/scripts/functions.inc');
+	include_once('/usr/miniserv/scripts/smtp.inc');
+
+	function get_mailmx($host) {
+		$handle=popen("dig $host mx",'r');
+		while($buff=fgets($handle,4096)) {
+			$buff=trim($buff);
+			if($buff!='' && preg_match("/^(.*)\s+(\d+)\s+IN\s+MX\s+(\d+)\s+(.*)$/",$buff,$ret)) {
+				$mailserv=rtrim($ret[4],'.');
+			}
+		}
+		pclose($handle);
+		flush();
+		return $mailserv;
+	}
+	function send_email($name,$email,$subject,$body) {
+		list($user,$mail)=preg_split("/@/",$email);
+		$mail=trim($mail);
+		$params['host'] = get_mailmx($mail);
+		$params['port'] = 25;
+		$params['helo'] = exec('hostname');
+		$params['auth'] = FALSE;
+		$servip=exec('hostname');
+		if($servip=='') $servip='mybox.firewall.net';
+		$from="From: \"keeper\" <keeper@$servip>";
+		$to="To: \"$name\" <$email>";
+		$subject="Subject: MyBox - $subject";
+		$send_params['recipients']=array("$email");
+		$send_params['headers']=array($from,$to,$subject);
+		$send_params['from']="keeper@$servip";
+		$send_params['body']="$body";
+		if(is_object($smtp = smtp::connect($params)) && $smtp->send($send_params)){
+			return 1;
+		}else{
+			return 0;
+		}
+	}
+
+	function ids_alert($message) {
+		if(file_exists('/hd/configs/alarm.lst')) {
+			$file=fopen('/hd/configs/alarm.lst','r');
+			while(!feof($file)) {
+				$buff=fgets($file,500);
+				$buff=trim($buff);
+				if($buff!='') {
+					list($name,$email,$ids,$backup,$system,$active)=preg_split("/\|/",$buff);
+					if(($email!='') && ($ids==1) && ($active==1)) {
+						send_email("$name","$email","IDS Alert","$message");
+					}
+				}
+			}
+			fclose($file);
+		}
+	}
+
+	function system_alert($msg) {
+		if(file_exists('/hd/configs/alarm.lst')) {
+			$file=fopen('/hd/configs/alarm.lst','r');
+			while(!feof($file)) {
+				$buff=fgets($file,500);
+				$buff=trim($buff);
+				if($buff!='') {
+					list($name,$email,$ids,$backup,$system,$active)=preg_split("/\|/",$buff);
+					if(($email!='') && ($system==1) && ($active==1)) {
+						send_email("$name","$email","System Alert","$msg");
+					}
+				}
+			}
+			fclose($file);
+		}
+	}
+	$idsdir=get_ini('IDS','REPORT');
+	$policydir=get_ini('IPSYSCTL','REPORT');
+	$idslog="$idsdir/alert.log";
+	$policylog="$policydir/alert.log";
+	$data='';
+
+	if(file_exists($idslog)) {
+		$line=file($idslog);
+		for($x=count($line);$x >= 0;$x--) {
+			$buff=$line[$x];
+			if($buff!='') {
+				$data .= "$buff";
+			}
+		}
+		unlink($idslog);
+	}
+
+	if(file_exists($policylog)) {
+		$line=file($policylog);
+		$data='';
+		for($x=count($line);$x >= 0;$x--) {
+			$buff=$line[$x];
+			if($buff!='') $data .= "$buff";
+		}
+		unlink($policylog);
+	}
+	if($data!='') {
+		ids_alert("$data");
+	}
+
+	if(file_exists('/tmp/no_log')) {
+		system_alert("WARNING! Mybox logfiles is out of space. Please export and clean Mybox logfiles.");
+	}
+
+?>
+

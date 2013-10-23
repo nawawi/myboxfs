@@ -1,0 +1,31 @@
+RANDFILE = server.rnd
+
+[ req ]
+default_bits = 1024
+encrypt_key = yes
+distinguished_name = req_dn
+x509_extensions = cert_type
+
+[ req_dn ]
+countryName = Country Name (2 letter code)
+countryName_default             = MY
+countryName_min                 = 2
+countryName_max                 = 2
+
+stateOrProvinceName             = State or Province Name (full name)
+stateOrProvinceName_default     = Selangor Darul Ehsan
+
+localityName                    = Locality Name (eg, city)
+localityName_default            = Petaling Jaya
+
+0.organizationName              = Organization Name (eg, company)
+0.organizationName_default      = Tracenetwork Corporation Sdn. Bhd
+
+organizationalUnitName          = Organizational Unit Name (eg, section)
+organizationalUnitName_default  = Mybox Firewall
+
+0.commonName                    = Common Name (FQDN of your server)
+0.commonName_default            = Mybox Firewall
+
+[ cert_type ]
+nsCertType = server

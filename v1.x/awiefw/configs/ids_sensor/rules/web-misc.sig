@@ -1,0 +1,5 @@
+alert tcp any any -> $HOME_NET $HTTP_PORTS (msg:"1\:1 WEB-MISC bad HTTP/1.1 request, Potentially worm attack"; flow:to_server,established; content:"GET / HTTP/1.1|0d 0a 0d 0a|";  offset:0; depth:18;)
+alert tcp any any -> $HOME_NET $HTTP_PORTS (msg:"1\:1 WEB-MISC apache chunked encoding memory corruption exploit attempt"; flow:established,to_server; content:"|C0 50 52 89 E1 50 51 52 50 B8 3B 00 00 00 CD 80|";)
+alert tcp any any -> $HOME_NET $HTTP_PORTS (msg:"1\:1 WEB-MISC Apache Chunked-Encoding worm attempt"; flow:to_server,established; content:"CCCCCCC\: AAAAAAAAAAAAAAAAAAA"; nocase;)
+alert tcp any any -> $HOME_NET $HTTP_PORTS (msg:"1\:1 WEB-MISC whisker space splice attack"; content:"|20|"; flow:to_server,established; dsize:1;)
+alert tcp any any -> $HOME_NET $HTTP_PORTS (msg:"1\:1 WEB-MISC whisker tab splice attack"; dsize: <5; flow:to_server,established; content: "|09|";)

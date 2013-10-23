@@ -1,0 +1,659 @@
+#!/bin/php
+<?
+//
+// Mybox Firewall - A Firewall Appliance
+// http://www.mybox.net.my/
+//
+// (C) Copyright 2002,2003,2004 Mohd Nawawi Mohamad Jamili, TraceNetwork Corporation Sdn. Bhd.
+//
+// This program is not free software; you cannot redistribute it and/or
+// modify without permission copyright owner.
+//
+// This code is protected by copyright law and international treaties. 
+// Unauthorized reproduction or distribution of this program, or any portion of it, 
+// may result in severe civil and criminal penalties, and will be prosecuted to the 
+// maximum extent possible under the law.
+//
+// $Id: network1.so,v 1.00 2003/07/28 1:07 AM nawawi Exp $
+//
+	include_once('scripts/functions.inc');
+	include_once('scripts/auth.inc');
+	$_ACCESS=chk_session();
+	if($_ACCESS=='' || is_admin($_ACCESS)) {
+		write_userlog('Accessing Network -> Interfaces page','Access denied');
+		go_exit();
+	}
+	if(is_admin($_ACCESS)) {
+		write_userlog('Accessing Network -> Interfaces page','Access denied -> Not Admin');
+		echo "you're on candid camera..";
+		exit;
+	}
+	// Save
+	if(isset($do)&& $do=='1') {
+		if($outup==1) $outboot='1';
+		if($outdown==1) $outboot='0';
+		write_ini('NETWORK','OUTSIDE_IP',$outip);
+		write_ini('NETWORK','OUTSIDE_NETWORK',$outnetwork);
+		write_ini('NETWORK','OUTSIDE_NETMASK',$outnetmask);
+		write_ini('NETWORK','OUTSIDE_BROADCAST',$outbroadcast);
+		write_ini('NETWORK','OUTSIDE_BOOT',$outboot);
+		write_ini('NETWORK','OUTSIDE_DEV',$outdev);
+		unset($do,$outip,$outnetwork,$outnetmask,$outbroadcast,$outboot,$outdev);
+
+		if($inup==1) $inboot='1';
+		if($indown==1) $inboot='0';
+		write_ini('NETWORK','INSIDE_IP',$inip);
+		write_ini('NETWORK','INSIDE_NETWORK',$innetwork);
+		write_ini('NETWORK','INSIDE_NETMASK',$innetmask);
+		write_ini('NETWORK','INSIDE_BROADCAST',$inbroadcast);
+		write_ini('NETWORK','INSIDE_BOOT',$inboot);
+		write_ini('NETWORK','INSIDE_DEV',$indev);
+		unset($do,$inip,$innetwork,$innetmask,$inbroadcast,$inboot,$indev);
+
+		if($dmzup==1) $dmzboot='1';
+		if($dmzdown==1) $dmzboot='0';
+		write_ini('NETWORK','DMZ1_IP',$dmzip);
+		write_ini('NETWORK','DMZ1_NETWORK',$dmznetwork);
+		write_ini('NETWORK','DMZ1_NETMASK',$dmznetmask);
+		write_ini('NETWORK','DMZ1_BROADCAST',$dmzbroadcast);
+		write_ini('NETWORK','DMZ1_BOOT',$dmzboot);
+		write_ini('NETWORK','DMZ1_DEV',$dmzdev);
+		unset($do,$dmzip,$dmznetwork,$dmznetmask,$dmzbroadcast,$dmzboot,$dmzdev);
+
+		if($dmzup2==1) $dmzboot2='1';
+		if($dmzdown2==1) $dmzboot2='0';
+		write_ini('NETWORK','DMZ2_IP',$dmzip2);
+		write_ini('NETWORK','DMZ2_NETWORK',$dmznetwork2);
+		write_ini('NETWORK','DMZ2_NETMASK',$dmznetmask2);
+		write_ini('NETWORK','DMZ2_BROADCAST',$dmzbroadcast2);
+		write_ini('NETWORK','DMZ2_BOOT',$dmzboot2);
+		write_ini('NETWORK','DMZ2_DEV',$dmzdev2);
+		unset($do,$dmzip2,$dmznetwork2,$dmznetmask2,$dmzbroadcast2,$dmzboot2,$dmzdev2);
+		write_userlog('Executing Network -> Interfaces -> Save config','Action granted');
+		header("Location: network0_msg.so?ref=network1.so");
+	}
+
+	$outip=get_ini('NETWORK','OUTSIDE_IP');
+	$outnetwork=get_ini('NETWORK','OUTSIDE_NETWORK');
+	$outnetmask=get_ini('NETWORK','OUTSIDE_NETMASK');
+	$outbroadcast=get_ini('NETWORK','OUTSIDE_BROADCAST');
+	$outboot=get_ini('NETWORK','OUTSIDE_BOOT');
+	$outdev=get_ini('NETWORK','OUTSIDE_DEV');
+
+	$outboot1='';
+	$outboot0='';
+	if($outboot==1) {
+		$outboot0='checked';
+	} else {
+		$outboot1='checked';
+	}
+
+	$inip=get_ini('NETWORK','INSIDE_IP');
+	$innetwork=get_ini('NETWORK','INSIDE_NETWORK');
+	$innetmask=get_ini('NETWORK','INSIDE_NETMASK');
+	$inbroadcast=get_ini('NETWORK','INSIDE_BROADCAST');
+	$inboot=get_ini('NETWORK','INSIDE_BOOT');
+	$indev=get_ini('NETWORK','INSIDE_DEV');
+
+	$inboot1='';
+	$inboot0='';
+	if($inboot==1) {
+		$inboot0='checked';
+	} else {
+		$inboot1='checked';
+	}
+
+	$dmzip=get_ini('NETWORK','DMZ1_IP');
+	$dmznetwork=get_ini('NETWORK','DMZ1_NETWORK');
+	$dmznetmask=get_ini('NETWORK','DMZ1_NETMASK');
+	$dmzbroadcast=get_ini('NETWORK','DMZ1_BROADCAST');
+	$dmzboot=get_ini('NETWORK','DMZ1_BOOT');
+	$dmzdev=get_ini('NETWORK','DMZ1_DEV');
+
+	$dmzboot1='';
+	$dmzboot0='';
+	if($dmzboot==1) {
+		$dmzboot0='checked';
+	} else {
+		$dmzboot1='checked';
+	}
+
+	$dmzip2=get_ini('NETWORK','DMZ2_IP');
+	$dmznetwork2=get_ini('NETWORK','DMZ2_NETWORK');
+	$dmznetmask2=get_ini('NETWORK','DMZ2_NETMASK');
+	$dmzbroadcast2=get_ini('NETWORK','DMZ2_BROADCAST');
+	$dmzboot2=get_ini('NETWORK','DMZ2_BOOT');
+	$dmzdev2=get_ini('NETWORK','DMZ2_DEV');
+
+	$dmzboot21='';
+	$dmzboot20='';
+	if($dmzboot2==1) {
+		$dmzboot20='checked';
+	} else {
+		$dmzboot21='checked';
+	}
+
+	write_userlog('Accessing Network -> Interfaces page','Access granted');
+	write_nocache();
+?>
+<?include_once('scripts/header.inc');?>
+<html>
+<head>
+<title>MyBox Firewall</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<?include_once('scripts/style.css');?>
+<?include_once('scripts/network.js');?>
+<?include_once('scripts/global.js');?>
+<script language="javascript1.2"><!--
+	defaultStatus="Interfaces Setup";
+	function dosubmit() {
+		var outip=document.f.outip.value;
+		var outnetwork=document.f.outnetwork.value;
+		var outnetmask=document.f.outnetmask.value;
+		var outbroadcast=document.f.outbroadcast.value;
+		var inip=document.f.outip.value;
+		var innetwork=document.f.innetwork.value;
+		var innetmask=document.f.innetmask.value;
+		var inbroadcast=document.f.inbroadcast.value;
+		var dmzip=document.f.dmzip.value;
+		var dmznetwork=document.f.dmznetwork.value;
+		var dmznetmask=document.f.dmznetmask.value;
+		var dmzbroadcast=document.f.dmzbroadcast.value;
+		var dmzip2=document.f.dmzip2.value;
+		var dmznetwork2=document.f.dmznetwork2.value;
+		var dmznetmask2=document.f.dmznetmask2.value;
+		var dmzbroadcast2=document.f.dmzbroadcast2.value;
+		var outup='0';
+		var inup='0';
+		var dmzup='0';
+		var dmzup2='0';
+		if(document.f.outup.checked==true) var outup='1';
+		if(document.f.inup.checked==true) var inup='1';
+		if(document.f.dmzup.checked==true) var dmzup='1';
+		if(document.f.dmzup2.checked==true) var dmzup2='1';
+		if(!checkIp(outip)) return false;
+		if(!checkIp(outnetwork)) return false;
+		if(!checkIp(outnetmask)) return false;
+		if(!checkIp(outbroadcast)) return false;
+		if(!checkIp(inip)) return false;
+		if(!checkIp(innetwork)) return false;
+		if(!checkIp(innetmask)) return false;
+		if(!checkIp(inbroadcast)) return false;
+		if(!checkIp(dmzip)) return false;
+		if(!checkIp(dmznetwork)) return false;
+		if(!checkIp(dmznetmask)) return false;
+		if(!checkIp(dmzbroadcast)) return false;
+		if(!checkIp(dmzip2)) return false;
+		if(!checkIp(dmznetwork2)) return false;
+		if(!checkIp(dmznetmask2)) return false;
+		if(!checkIp(dmzbroadcast2)) return false;
+		document.f.submit();
+		return true;
+	}
+	function fload() {
+		<?
+			if(!$outboot) {
+				echo "document.f.outip.disabled=true;\n";
+				echo "document.f.outnetwork.disabled=true;\n";
+				echo "document.f.outnetmask.disabled=true;\n";
+				echo "document.f.outbroadcast.disabled=true;\n";
+				echo "document.f.outdev.disabled=true;\n";
+			}
+			if(!$inboot) {
+				echo "document.f.inip.disabled=true;\n";
+				echo "document.f.innetwork.disabled=true;\n";
+				echo "document.f.innetmask.disabled=true;\n";
+				echo "document.f.inbroadcast.disabled=true;\n";
+				echo "document.f.indev.disabled=true;\n";
+			}
+			if(!$dmzboot) {
+				echo "document.f.dmzip.disabled=true;\n";
+				echo "document.f.dmznetwork.disabled=true;\n";
+				echo "document.f.dmznetmask.disabled=true;\n";
+				echo "document.f.dmzbroadcast.disabled=true;\n";
+				echo "document.f.dmzdev.disabled=true;\n";
+			}
+			if(!$dmzboot2) {
+				echo "document.f.dmzip2.disabled=true;\n";
+				echo "document.f.dmznetwork2.disabled=true;\n";
+				echo "document.f.dmznetmask2.disabled=true;\n";
+				echo "document.f.dmzbroadcast2.disabled=true;\n";
+				echo "document.f.dmzdev2.disabled=true;\n";
+			}
+		?>
+		return true;
+	}
+
+	function outbootchk() {
+		document.f.outip.disabled = !(document.f.outip.disabled);
+		document.f.outnetwork.disabled = !(document.f.outnetwork.disabled);
+		document.f.outnetmask.disabled = !(document.f.outnetmask.disabled);
+		document.f.outbroadcast.disabled = !(document.f.outbroadcast.disabled);
+	}
+	function inbootchk() {
+		document.f.inip.disabled = !(document.f.inip.disabled);
+		document.f.innetwork.disabled = !(document.f.innetwork.disabled);
+		document.f.innetmask.disabled = !(document.f.innetmask.disabled);
+		document.f.inbroadcast.disabled = !(document.f.inbroadcast.disabled);
+	}
+	function dmzbootchk() {
+		document.f.dmzip.disabled = !(document.f.dmzip.disabled);
+		document.f.dmznetwork.disabled = !(document.f.dmznetwork.disabled);
+		document.f.dmznetmask.disabled = !(document.f.dmznetmask.disabled);
+		document.f.dmzbroadcast.disabled = !(document.f.dmzbroadcast.disabled);
+	}
+	function dmz2bootchk() {
+		document.f.dmzip2.disabled = !(document.f.dmzip2.disabled);
+		document.f.dmznetwork2.disabled = !(document.f.dmznetwork2.disabled);
+		document.f.dmznetmask2.disabled = !(document.f.dmznetmask2.disabled);
+		document.f.dmzbroadcast2.disabled = !(document.f.dmzbroadcast2.disabled);
+	}
+
+	function donet(type) {
+		if(type==1) {
+			var ip=document.f.outip.value;
+			if(ip=='') return;
+			if(document.f.outnetwork.value=='') {
+				ip=netfromIp(ip);
+				document.f.outnetwork.value=ip;
+			}
+			if(document.f.outnetmask.value=='') {
+				document.f.outnetmask.value='255.255.255.0';
+			}
+			if(document.f.outbroadcast.value=='') {
+				var bcast=bcastfromIp(ip);
+				document.f.outbroadcast.value=bcast;
+			}
+		}
+		if(type==2) {
+			var ip=document.f.inip.value;
+			if(ip=='') return;
+			if(document.f.innetwork.value=='') {
+				ip=netfromIp(ip);
+				document.f.innetwork.value=ip;
+			}
+			if(document.f.innetmask.value=='') {
+				document.f.innetmask.value='255.255.255.0';
+			}
+			if(document.f.inbroadcast.value=='') {
+				var bcast=bcastfromIp(ip);
+				document.f.inbroadcast.value=bcast;
+			}
+		}
+		if(type==3) {
+			var ip=document.f.dmzip.value;
+			if(ip=='') return;
+			if(document.f.dmznetwork.value=='') {
+				ip=netfromIp(ip);
+				document.f.dmznetwork.value=ip;
+			}
+			if(document.f.dmznetmask.value=='') {
+				document.f.dmznetmask.value='255.255.255.0';
+			}
+			if(document.f.dmzbroadcast.value=='') {
+				var bcast=bcastfromIp(ip);
+				document.f.dmzbroadcast.value=bcast;
+			}
+		}
+		if(type==4) {
+			var ip=document.f.dmzip2.value;
+			if(ip=='') return;
+			if(document.f.dmznetwork2.value=='') {
+				ip=netfromIp(ip);
+				document.f.dmznetwork2.value=ip;
+			}
+			if(document.f.dmznetmask2.value=='') {
+				document.f.dmznetmask2.value='255.255.255.0';
+			}
+			if(document.f.dmzbroadcast2.value=='') {
+				var bcast=bcastfromIp(ip);
+				document.f.dmzbroadcast2.value=bcast;
+			}
+		}
+	}
+//--></script>
+</head>
+<body bgcolor="#888888" leftmargin="0" topmargin="0" marginwidth="0" marginheight="0" onload="initjsDOMenu();;document.f.outip.focus();fload();">
+<!-- start console win -->
+<center>
+<table bgcolor="#eeeeee" height="100%" width="100%" border="0" cellpadding="0" cellspacing="0" class="block0">
+<tr valign="top">
+<td align="center">	
+<table bgcolor="#005a8f" width="100%" border="0" cellpadding="2" cellspacing="0">
+<tr valign="center">
+<td height="18" align="left" class="td_label" width=10><img src="png.so?path=image&image=online.gif" border=0 alt="<?get_online();?>"></td>
+<td height="18" align="left" class="td_label">&nbsp;Network Configuration - Interfaces Setup</td>
+<td height="18" align="right"><a href="blank.so"><img src="png.so?path=image&image=close.png" border="0"></a></td>
+</tr>
+</table>
+<table bgcolor="#d4d0c8" width="100%" height="18" border="0" cellpadding="0" cellspacing="0">
+<tr valign="center">
+<td>
+<form name=e>
+<nobr>
+<input type=button value="DNS/Gateway" class=input_button onclick="load('network0.so');"><input type=button value="Interfaces Setup" class=input_button onclick="load('network1.so');"><input type=button value="Routing Setup" class=input_button onclick="load('network5.so');"><input type=button value="Host Addresses" class=input_button onclick="load('network2.so');"><input type=button value="ARP Cache" class=input_button onclick="load('network3.so');"><input type=button value="Bandwidth Shaping" class=input_button onclick="load('network4.so');"><input type=button value="Link Failover" class=input_button onclick="load('network6.so');">
+</nobr>
+</td>
+</tr>
+<tr><td></form></td></tr>
+</table>
+
+
+<table bgcolor="#eeeeee" width="100%" height="100%" border="0" cellpadding="1" cellspacing="1" class="block">
+<tr valign="top">
+<td align=center><br><br>
+
+<form name=f action=network1.so?do=1 method=post>
+    <table cellpadding="5" border="0" cellspacing="0" align="center">
+    <tr>
+       <td valign="top" width="250">
+            <fieldset>
+                <legend>External Network</legend>
+                <table border="0" cellspacing="1" cellpadding="0">
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            IP Address &nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td bgcolor="#E7E9F2">
+
+			<input type="text" name="outip" size="15" value="<?echo $outip;?>" class="input_text" onclick="donet(1);">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            Network Address&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td bgcolor="#E7E9F2">
+                            <input type="text" name="outnetwork" size="15" value="<?echo $outnetwork;?>" class="input_text" onclick="donet(1);">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            Netmask Address&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td bgcolor="#E7E9F2">
+                            <input type="text" name="outnetmask" size="15" value="<?echo $outnetmask;?>" class="input_text" onclick="donet(1);">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            Broadcast Address&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td bgcolor="#E7E9F2">
+                            <input type="text" name="outbroadcast" size="15" value="<?echo $outbroadcast;?>" class="input_text" onclick="donet(1);">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            Interface Device&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td bgcolor="#E7E9F2">
+                            <select name="outdev" size=1>
+			 <? for($x=0;$x<4;$x++) { 
+				$xx="eth$x";
+				if($outdev==$xx) {
+			   		echo "<option value=\"$xx\" selected>$xx</option>";
+				} else {
+					echo "<option value=\"$xx\">$xx</option>";
+				}
+			    }
+			?>
+			    </select>
+                        </td>
+                    </tr>
+                   </table>
+            </fieldset>
+         </td>
+
+        <td valign="top" width="250">
+            <fieldset>
+                <legend>Secure Network</legend>
+                 <table border="0" cellspacing="1" cellpadding="0">
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            IP Address &nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td bgcolor="#E7E9F2">
+			<input type="text" name="inip" size="15" value="<?echo $inip;?>"  class="input_text" onclick="donet(2);">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            Network Address&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td bgcolor="#E7E9F2">
+                            <input type="text" name="innetwork" size="15" value="<?echo $innetwork;?>" class="input_text" onclick="donet(2);">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            Netmask Address&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td bgcolor="#E7E9F2">
+                            <input type="text" name="innetmask" size="15" value="<?echo $innetmask;?>" class="input_text" onclick="donet(2);">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            Broadcast Address&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td bgcolor="#E7E9F2">
+                            <input type="text" name="inbroadcast" size="15" value="<?echo $inbroadcast;?>" class="input_text" onclick="donet(2);">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            Interface Device&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td bgcolor="#E7E9F2">
+                            <select name="indev" size=1>
+			 <? for($x=0;$x<4;$x++) { 
+				$xx="eth$x";
+				if($indev==$xx) {
+			   		echo "<option value=\"$xx\" selected>$xx</option>";
+				} else {
+					echo "<option value=\"$xx\">$xx</option>";
+				}
+			  }
+			?>
+			    </select>
+                        </td>
+                    </tr>
+                   </table>
+            </fieldset>
+         </td>
+    </tr>
+    <tr>
+        <td valign="top" width="250">
+            <fieldset>
+                <legend>Primary DMZ</legend>
+                 <table border="0" cellspacing="1" cellpadding="0">
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            IP Address &nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td bgcolor="#E7E9F2">
+			<input type="text" name="dmzip" size="15" value="<?echo $dmzip;?>" class="input_text" onclick="donet(3);">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            Network Address&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td bgcolor="#E7E9F2">
+                            <input type="text" name="dmznetwork" size="15" value="<?echo $dmznetwork;?>" class="input_text" onclick="donet(3);">
+                        </td>
+                    </tr>
+                    <tr>
+
+                        <td bgcolor="#E7E9F2">
+                            Netmask Address&nbsp;&nbsp;&nbsp;&nbsp;
+
+                        </td>
+                        <td bgcolor="#E7E9F2">
+                            <input type="text" name="dmznetmask" size="15" value="<?echo $dmznetmask;?>" class="input_text" onclick="donet(3);">
+
+                        </td>
+
+                    </tr>
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            Broadcast Address&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td bgcolor="#E7E9F2">
+                            <input type="text" name="dmzbroadcast" size="15" value="<?echo $dmzbroadcast;?>" class="input_text" onclick="donet(3);">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            Interface Device&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td bgcolor="#E7E9F2">
+                            <select name="dmzdev" size=1>
+			 <? for($x=0;$x<4;$x++) { 
+				$xx="eth$x";
+				if($dmzdev==$xx) {
+			   		echo "<option value=\"$xx\" selected>$xx</option>";
+				} else {
+					echo "<option value=\"$xx\">$xx</option>";
+				}
+			    }
+			?>
+			    </select>
+                        </td>
+                    </tr>
+                   </table>
+            </fieldset>
+         </td>
+       <td valign="top" width="250">
+            <fieldset>
+                <legend>Secondary DMZ</legend>
+                 <table border="0" cellspacing="1" cellpadding="0">
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            IP Address &nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td bgcolor="#E7E9F2">
+			<input type="text" name="dmzip2" size="15" value="<?echo $dmzip2;?>" class="input_text" onclick="donet(4);">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            Network Address&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td bgcolor="#E7E9F2">
+                            <input type="text" name="dmznetwork2" size="15" value="<?echo $dmznetwork2;?>" class="input_text" onclick="donet(4);">
+                        </td>
+                    </tr>
+                    <tr>
+
+                        <td bgcolor="#E7E9F2">
+                            Netmask Address&nbsp;&nbsp;&nbsp;&nbsp;
+
+                        </td>
+                        <td bgcolor="#E7E9F2">
+                            <input type="text" name="dmznetmask2" size="15" value="<?echo $dmznetmask2;?>" class="input_text" onclick="donet(4);">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            Broadcast Address&nbsp;&nbsp;&nbsp;&nbsp;
+
+                        </td>
+                        <td bgcolor="#E7E9F2">
+                            <input type="text" name="dmzbroadcast2" size="15" value="<?echo $dmzbroadcast2;?>" class="input_text" onclick="donet(4);">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            Interface Device&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td bgcolor="#E7E9F2">
+                            <select name="dmzdev2" size=1>
+			 <? for($x=0;$x<4;$x++) { 
+				$xx="eth$x";
+				if($dmzdev2==$xx) {
+			   		echo "<option value=\"$xx\" selected>$xx</option>";
+				} else {
+					echo "<option value=\"$xx\">$xx</option>";
+				}
+			    }
+			?>
+			    </select>
+                        </td>
+                    </tr>
+                   </table>
+            </fieldset>
+         </td>
+    </tr>
+<!------------------->
+    <tr>
+       <td colspan=2 align=center valign="top" width="520">
+            <fieldset>
+
+                <legend>Active</legend>
+                 <table border="0" cellspacing="1" cellpadding="0" bgcolor="#E7E9F2">
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            External Network&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td>
+			<input type=checkbox name=outup value=1 onclick="if(document.f.outup.checked==true)document.f.outdown.checked=false;document.f.outup.checked=true;outbootchk();" <?echo $outboot0;?>> Yes <input type=checkbox name=outdown value=1 onclick="if(document.f.outdown.checked==true)document.f.outup.checked=false;document.f.outdown.checked=true;outbootchk();" <?echo $outboot1;?>> No
+
+                        </td>
+                    </tr>
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            Secure Network&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td>
+			<input type=checkbox name=inup value=1 onclick="if(document.f.inup.checked==true)document.f.indown.checked=false;document.f.inup.checked=true;inbootchk();" <?echo $inboot0;?>> Yes <input type=checkbox name=indown value=1 onclick="if(document.f.indown.checked==true)document.f.inup.checked=false;document.f.indown.checked=true;inbootchk();" <?echo $inboot1;?>> No
+                        </td>
+                    </tr>
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            Primary DMZ&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td>
+			<input type=checkbox name=dmzup value=1 onclick="if(document.f.dmzup.checked==true)document.f.dmzdown.checked=false;document.f.dmzup.checked=true;dmzbootchk();" <?echo $dmzboot0;?>> Yes <input type=checkbox name=dmzdown value=1 onclick="if(document.f.dmzdown.checked==true)document.f.dmzup.checked=false;document.f.dmzdown.checked=true;dmzbootchk();" <?echo $dmzboot1;?>> No
+                        </td>
+                    </tr>
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            Secondary DMZ&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td>
+			<input type=checkbox name=dmzup2 value=1 onclick="if(document.f.dmzup2.checked==true)document.f.dmzdown2.checked=false;document.f.dmzup2.checked=true;dmz2bootchk();" <?echo $dmzboot20;?>> Yes <input type=checkbox name=dmzdown2 value=1 onclick="if(document.f.dmzdown2.checked==true)document.f.dmzup2.checked=false;document.f.dmzdown2.checked=true;dmz2bootchk();" <?echo $dmzboot21;?>> No
+                        </td>
+                    </tr>
+                   </table>
+
+            </fieldset>
+         </td>
+
+    </tr>
+
+    <tr>
+        <td colspan="2" align="center">
+            <input type="button" value="Cancel" class="input_button" onclick="load('network.so');"><input type="button" value="Save This Setting" class="input_button" onclick="return dosubmit();">
+        </td>
+    </tr>
+
+    </table>
+
+</form>
+
+</td>
+</tr>
+</table>
+
+
+</td>
+</tr>
+</table>
+</center>
+<!-- end console win -->
+</body>
+</html>
+
+<? flush(); ?>

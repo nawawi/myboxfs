@@ -1,0 +1,12 @@
+var HTTP_PORTS 80 443 8080 
+var SHELLCODE_PORTS !80
+var AIM_SERVERS [64.12.24.0/24,64.12.25.0/24,64.12.26.14/24,64.12.28.0/24,64.12.29.0/24,64.12.161.0/24,64.12.163.0/24,205.188.5.0/24,205.188.9.0/24]
+preprocessor http_decode: 80 unicode iis_alt_unicode double_encode iis_flip_slash full_whitespace
+preprocessor rpc_decode: 111 32771
+preprocessor bo: -nobrute
+preprocessor telnet_decode
+preprocessor portscan: $HOME_NET 4 3 /var/log/portscan.log
+preprocessor portscan-ignorehosts: $HOME_NET
+preprocessor conversation: allowed_ip_protocols all, timeout 60, max_conversations 3000
+output alert_syslog: LOG_AUTH LOG_ALERT
+include mybox.sig

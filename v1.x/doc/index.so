@@ -1,0 +1,106 @@
+#!/bin/php
+<?
+//
+// Mybox Firewall - A Firewall Appliance
+// http://www.mybox.net.my/
+//
+// (C) Copyright 2002,2003,2004 Mohd Nawawi Mohamad Jamili, TraceNetwork Corporation Sdn. Bhd.
+//
+// This program is not free software; you cannot redistribute it and/or
+// modify without permission copyright owner.
+//
+// This code is protected by copyright law and international treaties. 
+// Unauthorized reproduction or distribution of this program, or any portion of it, 
+// may result in severe civil and criminal penalties, and will be prosecuted to the 
+// maximum extent possible under the law.
+//
+// $Id: index.so,v 1.00 2003/07/28 1:07 AM nawawi Exp $
+//
+	include_once('scripts/functions.inc');
+	include_once('scripts/auth.inc');
+	$_ACCESS=chk_session();
+	if($_ACCESS!='') {
+		go_in();
+	}
+	delete_cookie();
+	$rand=crypt(mt_rand(0, rand())/rand());
+	$rand=md5(crypt($rand));
+	setcookie("session_login",$rand);
+	write_nocache();
+?>
+<?include_once('scripts/header.inc');?>
+<html>
+<head>
+<title>MyBox Firewall - Authorization Required</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<?include_once('scripts/style.css');?>
+<script language="javascript"><!--
+	if (top.frames.length!=0) // out from main frame
+		top.location=self.document.location;
+	function chk_this() {
+		if(document.login_form.passwd.value=='') {
+			document.login_form.passwd.focus();
+			return false;
+		}
+		return true;
+	}
+//--></script>
+</head>
+<body bgcolor="#005a8f" oncontextmenu="return false" scroll="no" onload='document.login_form.passwd.focus();'>
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+<center>
+<table border=0 cellspacing=0 cellpadding=0 width=98% valign=middle>
+<tr>
+<td align=center valign=middle>
+<form method=post action="login.so" autocomplete=off name=login_form>
+<table bgcolor=#ffffff border="0" cellpadding="2" cellspacing="0" width="40%" class=block>
+<tr><td>
+<table bgcolor="#eeeeee" border="0" cellpadding="2" cellspacing="0" width="100%" class=block> 
+<tr><td bgcolor="#E7E9F2" align="center">
+<table border="0" cellspacing="6" cellpadding="6" bgcolor="ffffff" width="100%">
+<tr bgcolor="#ffffff">
+<td align="center">
+<img src="png.so?image=login_logo.png&path=image" nosave border=0>
+<table border="0" cellpadding="4" cellspacing="0" bgcolor="#E7E9F2" class=block>
+<tr ><td class=td_pad align="right" bgcolor="#E7E9F2" nowrap>Password:</td>
+<td class=td_pad bgcolor="#E7E9F2"><input name="passwd" type="password" size="30" maxlength="30" class=input_text></td>
+<td><input type="submit" value="&nbsp;Enter" class=input_button onclick="return chk_this();"></td>
+</tr>
+</tr>
+</table><br>
+<font class=td_pad>
+<? 
+	if(file_exists('/etc/mybox-release')) {
+		$handle=fopen('/etc/mybox-release','r');
+		$version=fgets($handle,150);
+		$version=trim($version);
+		echo "$version";
+		fclose($handle);
+	}
+?>
+</font>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</td></tr></table>
+</td></tr></table>
+<input type=hidden name=session_login value="<?echo $rand;?>">
+<br><font style='font-size:8pt;'>
+Copyright &copy; <a style='font-size:8pt;color:black' href="http://www.tracenetwork.com.my" target=_blank">Tracenetwork Corporation Sdn Bhd</a>. All Rights Reserved
+</font>
+</form>
+</td>
+</tr>
+</table>
+</center>
+</body>
+</html>
+
+<? flush(); ?>
+

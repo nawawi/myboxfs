@@ -1,0 +1,4 @@
+#!/bin/php
+<?
+	header("Location: /index.so");
+?>

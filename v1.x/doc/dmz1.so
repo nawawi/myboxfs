@@ -1,0 +1,263 @@
+#!/bin/php
+<?
+//
+// Mybox Firewall - A Firewall Appliance
+// http://www.mybox.net.my/
+//
+// (C) Copyright 2002,2003,2004 Mohd Nawawi Mohamad Jamili, TraceNetwork Corporation Sdn. Bhd.
+//
+// This program is not free software; you cannot redistribute it and/or
+// modify without permission copyright owner.
+//
+// This code is protected by copyright law and international treaties. 
+// Unauthorized reproduction or distribution of this program, or any portion of it, 
+// may result in severe civil and criminal penalties, and will be prosecuted to the 
+// maximum extent possible under the law.
+//
+// $Id: dmz1.so,v 1.00 2003/07/28 1:07 AM nawawi Exp $
+//
+	include_once('scripts/functions.inc');
+	include_once('scripts/auth.inc');
+	include_once('scripts/dmz.inc');
+	$_ACCESS=chk_session();
+	if($_ACCESS=='' || is_admin($_ACCESS)) {
+		write_userlog('Accessing DMZ -> External IP setup page','Access denied');
+		go_exit();
+	}
+	if(is_admin($_ACCESS)) {
+		write_userlog('Accessing DMZ -> External IP setup page','Access denied -> Not Admin');
+		echo "you're on candid camera..";
+		exit;
+	}
+	if(isset($do)&& $do=='1') {
+		$list=trim(rtrim(($list),','));
+		write_dmzextiplist($list);
+		do_extip();
+		unset($do,$list);
+		write_userlog('Executing DMZ -> External IP setup -> Saving data','Action granted');
+		header("Location: dmz_msg.so?msg=Please wait.. saving data..&ref=dmz1.so");
+	}
+	write_userlog('Accessing DMZ -> External IP setup page','Access granted');
+	write_nocache();
+?>
+<?include_once('scripts/header.inc');?>
+<html>
+<head>
+<title>MyBox Firewall</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<?include_once('scripts/style.css');?>
+<?include_once('scripts/network.js');?>
+<?include_once('scripts/global.js');?>
+<script language="javascript1.2"><!--
+	defaultStatus="DMZ External IP Setup";
+	function doselect() {
+		var lst=document.f.lst.value;
+		var parray=lst.split("|");
+		var ip=parray[0];
+		var subnet=parray[1];
+		if(ip=='') return;
+		document.f.ip.value=ip;
+		document.f.subnet.value=subnet;
+		return true;
+	}
+	function dodelete() {
+		var lstlenght=document.f.lst.length;
+		var list=document.f.lst;
+		for(var i='0';i<lstlenght;i++) {
+			if(list[i]!=null) {
+				if(list.options[i].selected==true) {
+
+					list[i]=null;
+				}
+			}
+		}
+		return true;
+	}
+	function doadd() {
+		var ip=document.f.ip.value;
+		var subnet=document.f.subnet.value;
+		if(ip=='' | subnet=='') {
+			alert('Invalid input');
+			return false;
+		}
+		if(!checkIp(ip)) {
+			document.f.ip.value='';
+			document.f.ip.focus();
+			return false;
+		}
+		if(!checkIp(subnet)) {
+			document.f.subnet.value='';
+			document.f.subnet.focus();
+			return false;
+		}
+		var lstlenght=document.f.lst.length;
+		var list=document.f.lst;
+		for(i='0';i<lstlenght;i++) {
+			if(list.options[i].text==ip) {
+				alert('External IP already exists');
+				return false;
+			}
+		}
+		var val=ip+'|'+subnet;
+		document.f.lst[lstlenght]=new Option(ip,val);
+		return true;
+	}
+	function doupdate() {
+		var ip=document.f.ip.value;
+		var subnet=document.f.subnet.value;
+		if(ip=='' | subnet=='') {
+			alert('Invalid input');
+			return false;
+		}
+		if(!checkIp(ip)) {
+			document.f.ip.value='';
+			document.f.ip.focus();
+			return false;
+		}
+		if(!checkIp(subnet)) {
+			document.f.subnet.value='';
+			document.f.subnet.focus();
+			return false;
+		}
+		var lstlenght=document.f.lst.length;
+		var list=document.f.lst;
+		var val=ip+'|'+subnet;
+		var ok='0';
+		for(i='0';i<lstlenght;i++) {
+			if(list.options[i].text==ip) {
+				list.options[i].value=val;
+				ok='1';
+			}
+		}
+		if(!ok) {
+			alert('no such External IP Address for update');
+			return false;
+		}
+		return true;
+	}
+	function dosubmit() {
+		var lstlenght=document.f.lst.length;
+		var list=document.f.lst;
+		var X='';
+		for(i='0';i<lstlenght;i++) {
+			X +=list.options[i].value;
+			X +=',';
+		}
+		document.f.list.value=X;
+		return true;
+	}
+	
+	function donet() {
+		if(document.f.subnet.value=='') {
+			document.f.subnet.value='255.255.255.0';
+		} 
+	}
+//--></script>
+</head>
+<body bgcolor="#888888" leftmargin="0" topmargin="0" marginwidth="0" marginheight="0" onload="initjsDOMenu();">
+<!-- start console win -->
+<center>
+<table bgcolor="#eeeeee" height="100%" width="100%" border="0" cellpadding="0" cellspacing="0" class="block0">
+<tr valign="top">
+<td align="center">	
+<table bgcolor="#005a8f" width="100%" border="0" cellpadding="2" cellspacing="0">
+<tr valign="center">
+<td height="18" align="left" class="td_label" width=10><img src="png.so?path=image&image=online.gif" border=0 alt="<?get_online();?>"></td>
+<td height="18" align="left" class="td_label">&nbsp;DMZ Configuration - External IP Setup</td>
+<td height="18" align="right"><a href="blank.so"><img src="png.so?path=image&image=close.png" border="0"></a></td>
+</tr>
+</table>
+<table bgcolor="#d4d0c8" width="100%" height="18" border="0" cellpadding="0" cellspacing="0">
+<tr valign="center">
+<td>
+<form name=e>
+<nobr>
+<input type=button value="DMZ Services Setup" class=input_button onclick="load('dmz0.so');"><input type=button value="DMZ External IP Setup" class=input_button onclick="load('dmz1.so');"><input type=button value="DMZ Hostname Setup" class=input_button onclick="load('dmz2.so');"></nobr>
+</td>
+</tr>
+<tr><td></form></td></tr>
+</table>
+
+<table bgcolor="#eeeeee" width="100%" height="100%" border="0" cellpadding="1" cellspacing="1" class="block">
+<tr valign="top">
+<td align=center><br><br>
+
+<form name=f action=dmz1.so?do=1 method=post>
+<table border="0" cellspacing="0" align="center">
+<tr>
+<td nowrap="nowrap" align=center valign="top">
+<fieldset>
+<legend>IP Listed</legend>
+<table border="0" cellspacing="1" cellpadding="0" bgcolor="#E7E9F2">
+<tr>
+<td valign="top">
+<select name=lst class=input_text size=7 multiple onchange="doselect();">
+<?
+	if(file_exists('/hd/configs/dmz_e.lst')) {
+		$file=fopen('/hd/configs/dmz_e.lst','r');
+		while(!feof($file)) {
+			$buff=fgets($file,500);
+			$buff=trim($buff);
+			list($value,$text,$temp)=explode('|',$buff);
+			if($buff!='') {
+				echo "<option value=\"$buff\">$value</option>\n";
+			}
+		}
+		fclose($file);
+	}
+?>
+</td>
+</tr>
+</table>
+</fieldset>
+</td>
+<td valign=top align=center>
+
+<fieldset>
+<legend>IP Setup</legend>
+<table border="0" cellspacing="1" cellpadding="0" bgcolor="#E7E9F2">
+<tr>
+<td bgcolor="#E7E9F2">
+IP Address&nbsp;&nbsp;&nbsp;&nbsp;
+</td>
+<td bgcolor="#E7E9F2">
+<input type="text" name="ip" size="15" value="" class="input_text" onclick="donet();">
+</td>
+</tr>
+<tr>
+<td bgcolor="#E7E9F2">
+Subnet Mask&nbsp;&nbsp;&nbsp;&nbsp;
+</td>
+<td bgcolor="#E7E9F2">
+<input type="text" name="subnet" size="15" value="" class="input_text" onclick="donet();">
+</td>
+</tr>
+</table>
+</fieldset>
+</td>
+</tr>
+
+<tr>
+<td colspan="5" align="center">
+<input type=button value="Delete Selected" class=input_button onclick="dodelete();"><input type=button value="Add to list" class=input_button onclick="return doadd();"><input type=button value="Update" class=input_button onclick="return doupdate();">&nbsp;<input type="button" value="Cancel" class="input_button" onclick="load('dmz.so');"><input type="submit" value="Save This Setting" class="input_button" onclick="return dosubmit();">
+</td>
+</tr>
+
+</table>
+<input type=hidden name=list>
+</form>
+
+
+</td>
+</tr>
+</table>
+</td>
+</tr>
+</table>
+</center>
+
+
+<!-- end console win -->
+</body>
+</html>
+<? flush(); ?>

@@ -1,0 +1,81 @@
+#!/bin/php -q
+<?
+//
+// Mybox Firewall - A Firewall Appliance
+// http://www.mybox.net.my/
+//
+// (C) Copyright 2002,2003,2004 Mohd Nawawi Mohamad Jamili, TraceNetwork Corporation Sdn. Bhd.
+//
+// This program is not free software; you cannot redistribute it and/or
+// modify without permission copyright owner.
+//
+// This code is protected by copyright law and international treaties. 
+// Unauthorized reproduction or distribution of this program, or any portion of it, 
+// may result in severe civil and criminal penalties, and will be prosecuted to the 
+// maximum extent possible under the law.
+//
+// $Id: arpscan.so,v 1.00 2003/07/28 1:07 AM nawawi Exp $
+//
+
+
+	set_time_limit(0);
+	if(!file_exists('/proc/net/arp')) exit;
+	if(file_exists('functions.inc')) {
+		include_once('functions.inc');
+	} elseif(file_exists('scripts/functions.inc')) {
+		include_once('scripts/functions.inc');
+	} else {
+		include_once('/usr/miniserv/scripts/functions.inc');
+	}
+	function get_nbt($ip) {
+		if(!check_mynetwork($ip)) return;
+		@touch('/tmp/no_kill_nbtscan');
+		$handle=popen("nbtscan -r -q -s '|' $ip",'r');
+		$buff=fread($handle, 2096);
+		$buff=trim($buff);
+		$buff=preg_replace("/<|>/",'',$buff);
+		pclose($handle);
+		@shell_exec("sh /etc/init.d/console.sh nbtscan");
+		@unlink('/tmp/no_kill_nbtscan');
+		return "$buff";
+	}
+	function write_arpalog($value) {
+		$handle=fopen('/hd/configs/arpa.lst','a');
+		fputs($handle,"$value\n");
+		fflush($handle);
+		fclose($handle);
+	}
+	$clear=fopen('/hd/configs/arpa.lst','w');
+	fputs($clear,"\n");
+	fflush($clear);
+	fclose($clear);
+	$handle=popen('dnet arp show','r');
+	while($buff=fgets($handle,4096)) {
+		$buff=trim($buff);
+		if($buff!='') {
+			list($ip,$rest,$hw)=preg_split("/\s+/",$buff);
+			$hw=strtoupper($hw);
+			if($ip!='') {
+				$nbuff=get_nbt($ip);
+				list($ipx,$nbtname,$server,$cname)=preg_split("/\|/",$nbuff);
+				$nbtname=trim($nbtname);
+				$cname=trim($cname);
+				if($nbtname=='') $nbtname='none';
+				if($cname=='') $cname='none';
+				$hbuff=trim(gethostbyaddr($ip));
+				if($hbuff==$ip) {
+					$hbuff='none';
+				}
+				$nbtname=strtolower($nbtname);
+				$cname=strtolower($cname);
+				$hw=strtoupper($hw);
+				write_arpalog("$hbuff|$ip|$nbtname|$cname|$hw");
+				shell_exec("dnet arp delete $ip");
+			}
+		}
+		unset($buff,$ip,$rest,$hw,$ipx,$nbtname,$server,$cname,$nbuff,$hbuff);
+	}
+	pclose($handle);
+	flush();
+?>
+

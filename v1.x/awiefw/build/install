@@ -1,0 +1,30 @@
+#!/bin/sh
+cd /hd
+
+dosconvert() { 
+	[ -f "$1" ] && tr -d '\r' < $1 > d2u.tmp && mv d2u.tmp $1 && rm -f d2u.tmp && chmod 700 $1
+}
+
+[ -f "pkg.tgz" ] && mv pkg.tgz pkg0.tgz
+wget https://192.168.0.250/rel/pkg.tgz
+
+umount -r /hd/reports > /dev/null 2>&1
+for f in *; do
+	if [ "$f" != "ldlinux.sys" ] && [ "$f" != "pkg.tgz" ] && [ "$f" != "pkg0.tgz" ]; then
+		echo "uninstall $f"
+		rm -rf $f
+	fi
+done
+
+echo "Installing..."
+[ -f "pkg.tgz" ] && tar -zxvf pkg.tgz
+
+echo "cleanup..."
+for f in configs/*; do
+	echo "$f"
+	dosconvert $f
+done
+
+echo "Done."
+
+	

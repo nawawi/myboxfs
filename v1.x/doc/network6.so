@@ -1,0 +1,261 @@
+#!/bin/php
+<?
+//
+// Mybox Firewall - A Firewall Appliance
+// http://www.mybox.net.my/
+//
+// (C) Copyright 2002,2003,2004 Mohd Nawawi Mohamad Jamili, TraceNetwork Corporation Sdn. Bhd.
+//
+// This program is not free software; you cannot redistribute it and/or
+// modify without permission copyright owner.
+//
+// This code is protected by copyright law and international treaties. 
+// Unauthorized reproduction or distribution of this program, or any portion of it, 
+// may result in severe civil and criminal penalties, and will be prosecuted to the 
+// maximum extent possible under the law.
+//
+// $Id: network6.so,v 1.00 2003/11/23 3:00 AM nawawi Exp $
+//
+	include_once('scripts/functions.inc');
+	include_once('scripts/auth.inc');
+	$_ACCESS=chk_session();
+	if($_ACCESS=='' || is_admin($_ACCESS)) {
+		write_userlog('Accessing Network -> Link Failover page','Access denied');
+		go_exit();
+	}
+	if(is_admin($_ACCESS)) {
+		write_userlog('Accessing Network -> Link Failover page','Access denied -> Not Admin');
+		echo "you're on candid camera..";
+		exit;
+	}
+
+	function write_falinklist($value) {
+		del_route();
+		$list=explode(',',$value);
+		$handle=fopen("/hd/configs/falink.lst", "w");
+		for($x='0';$x<count($list);$x++) {
+			$pp=rtrim($list[$x],',');
+			fputs($handle,"$pp\n");
+		}
+		fclose($handle);
+	}
+
+	if(isset($do)&& $do=='1') {
+		$list=trim(rtrim(($list),','));
+		write_falinklist($list);
+		write_ini('FAILOVER','GATEWAY_BACKUP',$gwlink);
+		write_ini('FAILOVER','LOOP_CHECK',$idle);
+		write_ini('FAILOVER','TIMEOUT_CONNECT',$timeout);
+		write_ini('FAILOVER','TIME_SWITCH',$switch);
+		write_ini('FAILOVER','LINK','/hd/configs/falink.lst');
+		unset($do,$list);
+		shell_exec('/etc/init.d/failover.sh restart');
+		write_userlog('Executing Network -> Link Failover -> Saving data','Action granted');
+		header("Location: network_msg.so?msg=Please wait.. saving data..&ref=network6.so");
+	}
+	write_userlog('Accessing Network -> Link Failover page','Access granted');
+	write_nocache();
+?>
+<?include_once('scripts/header.inc');?>
+<html>
+<head>
+<title>MyBox Firewall</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<?include_once('scripts/style.css');?>
+<?include_once('scripts/network.js');?>
+<?include_once('scripts/global.js');?>
+<script language="javascript"><!--
+	defaultStatus="Link Failover Setup";
+	function addthisval() {
+		var ip=document.f.ip.value;
+		var port=document.f.port.value;
+		if(ip=='') {
+			document.f.ip.focus();
+			return false;
+		}
+		if(port=='') {
+			document.f.port.focus();
+			return false;
+		}
+		var e=ip+':'+port;
+		for(i='0'; i<document.f.alm.length; i++){
+			var m=document.f.alm.options[i].text;
+			if(m==e) {
+				alert('Conditions already exist');
+				return false;
+			}
+		}
+		if(!checkIp(ip)) return false;
+		var p=document.f.alm.length;
+		var v=ip+':'+port;
+		document.f.alm[p]=new Option(e,v);
+		return true;
+	}
+
+	function deleteval() {
+		var lstlenght=document.f.alm.length;
+		var list=document.f.alm;
+		for(var i='0';i<lstlenght;i++) {
+			if(list[i]!=null) {
+				if(list.options[i].selected==true) {
+					list[i]=null;
+				}
+			}
+		}
+		return true;
+	}
+	function dosubmit() {
+		var lstlenght=document.f.alm.length;
+		var list=document.f.alm;
+		var X='';
+		for(i='0';i<lstlenght;i++) {
+			X +=list.options[i].value;
+			X +=',';
+		}
+		document.f.list.value=X;
+		return true;
+	}
+//--></script>
+</head>
+<body bgcolor="#888888" leftmargin="0" topmargin="0" marginwidth="0" marginheight="0" onload="initjsDOMenu();">
+<!-- start console win -->
+<center>
+<table bgcolor="#eeeeee" height="100%" width="100%" border="0" cellpadding="0" cellspacing="0" class="block0">
+<tr valign="top">
+<td align="center">	
+<table bgcolor="#005a8f" width="100%" border="0" cellpadding="2" cellspacing="0">
+<tr valign="center">
+<td height="18" align="left" class="td_label" width=10><img src="png.so?path=image&image=online.gif" border=0 alt="<?get_online();?>"></td>
+<td height="18" align="left" class="td_label">&nbsp;Network Configuration - Link Failover</td>
+<td height="18" align="right"><a href="blank.so"><img src="png.so?path=image&image=close.png" border="0"></a></td>
+</tr>
+</table>
+<table bgcolor="#d4d0c8" width="100%" height="18" border="0" cellpadding="0" cellspacing="0">
+<tr valign="center">
+<td>
+<form name=e>
+<nobr>
+<input type=button value="DNS/Gateway" class=input_button onclick="load('network0.so');"><input type=button value="Interfaces Setup" class=input_button onclick="load('network1.so');"><input type=button value="Routing Setup" class=input_button onclick="load('network5.so');"><input type=button value="Host Addresses" class=input_button onclick="load('network2.so');"><input type=button value="ARP Cache" class=input_button onclick="load('network3.so');"><input type=button value="Bandwidth Shaping" class=input_button onclick="load('network4.so');"><input type=button value="Link Failover" class=input_button onclick="load('network6.so');">
+</nobr>
+</td>
+</tr>
+<tr><td></form></td></tr>
+</table>
+
+
+<table bgcolor="#eeeeee" width="100%" height="100%" border="0" cellpadding="1" cellspacing="1" class="block">
+<tr valign="top">
+<td align=center><br><br>
+<?if(isset($MSG)) echo $MSG;?>
+
+<form name=f action=network6.so?do=1 method=post>
+<table border="0" cellspacing="0" align="center">
+<tr>
+<td nowrap="nowrap" align=center valign="top">
+<fieldset>
+<legend>Link Listed</legend>
+<table border="0" cellspacing="1" cellpadding="0" bgcolor="#E7E9F2">
+<tr>
+<td valign="top">
+<select name=alm class=input_text size=8 multiple>
+<?
+	if(file_exists('/hd/configs/falink.lst')) {
+		$file=fopen('/hd/configs/falink.lst','r');
+		while(!feof($file)) {
+			$buff=fgets($file,500);
+			$buff=trim($buff);
+			list($ip,$port,$temp)=explode(':',$buff);
+			if(empty($text)) $text='isp';
+			if($buff!='') {
+				echo "<option value=\"$buff\">$ip:$port</option>\n";
+			}
+		}
+		fclose($file);
+	}
+?>
+</select>
+</td>
+</tr>
+</table>
+</fieldset>
+</td>
+<td valign=top align=center>
+<fieldset>
+<legend>Link Conditions</legend>
+<table border="0" cellspacing="1" cellpadding="0" bgcolor="#E7E9F2">
+<tr>
+<td>
+Link Gateway&nbsp;&nbsp;&nbsp;&nbsp;
+</td>
+<td>
+<input type="text" name="gwlink" size="15" value="<?echo trim(get_ini('FAILOVER','GATEWAY_BACKUP'));?>" class="input_text">
+</td>
+</tr>
+<tr>
+<td>
+Link Timeout&nbsp;&nbsp;&nbsp;&nbsp;
+</td>
+<td>
+<input type="text" name="timeout" size="5" value="<?echo trim(get_ini('FAILOVER','TIMEOUT_CONNECT'));?>" class="input_text">
+</td>
+</tr>
+<tr>
+<td>
+Link Idle check&nbsp;&nbsp;&nbsp;&nbsp;
+</td>
+<td>
+<input type="text" name="idle" size="5" value="<?echo trim(get_ini('FAILOVER','LOOP_CHECK'));?>" class="input_text">
+</td>
+</tr>
+<tr>
+<td>
+Link switch check&nbsp;&nbsp;&nbsp;&nbsp;
+</td>
+<td>
+<input type="text" name="switch" size="5" value="<?echo trim(get_ini('FAILOVER','TIME_SWITCH'));?>" class="input_text">
+</td>
+</tr>
+<tr>
+<td>
+IP to check&nbsp;&nbsp;&nbsp;&nbsp;
+</td>
+<td>
+<input type="text" name="ip" size="15" value="" class="input_text">
+</td>
+</tr>
+<tr>
+<td>
+Port IP&nbsp;&nbsp;&nbsp;&nbsp;
+</td>
+<td>
+<input type="text" name="port" size="5" value="" class="input_text"><input type="button" value="Add" class="input_button" onclick="return addthisval();">
+</td>
+</tr>
+
+</table>
+</fieldset>
+</td>
+</tr>
+<tr>
+<td colspan="3" align="center">
+<input type="button" value="Delete Selected" class="input_button" onclick="return deleteval();">&nbsp;<input type="button" value="Cancel" class="input_button" onclick="load('network.so');"><input type="submit" value="Save This Setting" class="input_button" onclick="return dosubmit();">
+</td>
+</tr>
+
+</table>
+<input type=hidden name=list>
+</form>
+
+</td>
+</tr>
+</table>
+
+</td>
+</tr>
+</table>
+</center>
+<!-- end console win -->
+</body>
+</html>
+
+<? flush(); ?>

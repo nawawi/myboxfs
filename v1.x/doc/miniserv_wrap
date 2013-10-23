@@ -1,0 +1,25 @@
+#!/bin/sh
+CONFIG=/hd/configs/mybox.cnf
+
+if [ ! -f $CONFIG ]; then
+    exit 0
+fi
+
+USER=`config -r MINISERV USER $CONFIG`
+LOG=`config -r MINISERV LOG $CONFIG`
+PID=`config -r MINISERV PID $CONFIG`
+PORT=`config -r MINISERV PORT $CONFIG`
+ROOT=`config -r MINISERV HOME $CONFIG`
+
+#cd $ROOT
+
+while true ; do
+	if [ -f "/tmp/miniserv_reset" ]; then
+		kill -9 `cat $PID`
+		rm -f $PID /tmp/miniserv_reset
+		php -q /usr/miniserv/scripts/filter_rule.php
+	fi
+	./miniserv -D -S -u root -l /dev/null -i $PID -p $PORT -c "**.so|**.inc" 
+    	sleep 10
+done
+

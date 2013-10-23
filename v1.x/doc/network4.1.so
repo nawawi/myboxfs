@@ -1,0 +1,287 @@
+#!/bin/php
+<?
+//
+// Mybox Firewall - A Firewall Appliance
+// http://www.mybox.net.my/
+//
+// (C) Copyright 2002,2003,2004 Mohd Nawawi Mohamad Jamili, TraceNetwork Corporation Sdn. Bhd.
+//
+// This program is not free software; you cannot redistribute it and/or
+// modify without permission copyright owner.
+//
+// This code is protected by copyright law and international treaties. 
+// Unauthorized reproduction or distribution of this program, or any portion of it, 
+// may result in severe civil and criminal penalties, and will be prosecuted to the 
+// maximum extent possible under the law.
+//
+// $Id: network4.1.so,v 1.00 2003/07/28 1:07 AM nawawi Exp $
+//
+	include_once('scripts/functions.inc');
+	include_once('scripts/auth.inc');
+	$_ACCESS=chk_session();
+	if($_ACCESS=='' || is_admin($_ACCESS)) {
+		write_userlog('Accessing Network -> Bandwidth Setting page','Access denied');
+		go_exit();
+	}
+	if(is_admin($_ACCESS)) {
+		write_userlog('Accessing Network -> Bandwidth Setting page','Access denied -> Not Admin');
+		echo "you're on candid camera..";
+		exit;
+	}
+	if(isset($do)&& $do=='1') {
+		if(isset($action) && $action!='') {
+			list($src,$trans,$que,$descr)=preg_split("/\|/",$action);
+			if(check_src_shaper($src)) {
+				unset($do,$action);
+				header("Location: network_msg.so?msg=Source $src already exist..&ref=network4.1.so");
+				exit;
+			}
+			write_bandwidthlist($action);
+			unset($do,$action);
+			write_userlog('Executing Network -> Bandwidth Setting -> Saving data','Action granted');
+			header("Location: network_msg.so?msg=Please wait.. saving data..&ref=network4.1.so");
+			exit;
+		}
+		unset($do,$action);
+	}
+	write_userlog('Accessing Network -> Bandwidth Setting page','Access granted');
+	write_nocache();
+?>
+<?include_once('scripts/header.inc');?>
+<html>
+<head>
+<title>MyBox Firewall</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<?include_once('scripts/style.css');?>
+<?include_once('scripts/global.js');?>
+<?include_once('scripts/network.js');?>
+<script language="javascript1.2"><!--
+	defaultStatus="Bandwidth Shaping";
+	var size=1024;
+	function dosubmit() {
+		var src0=document.f.src0.value;
+		var src1=document.f.src1.value;
+		if(src0!='NULL') {
+			var src=src0;
+		} else {
+			var src=src1;
+		}
+		var trans0=document.f.trans0.value;
+		var trans1=document.f.trans1.value;
+		if(trans0!='NULL') {
+			var trans=trans0;
+		} else {
+			var trans=trans1;
+		}
+		//var que=document.f.que.value;
+		var que='5';
+		var descr=document.f.descr.value;
+		descr=descr.replace(/\,/,'');
+		if(src==''|trans==''|que=='') {
+			document.f.src1.focus();
+			return false;
+		}
+		if(checkIp(src)==false) {
+			document.f.src1.value=''
+			document.f.src1.focus();
+			return false;
+		}
+		if(!isInteger(trans)) {
+			document.f.trans1.value='';
+			document.f.trans1.focus();
+			return false;
+		}
+		var tran=trans * size;
+		var ret=src+'|'+tran+'|'+que+'|'+descr+'|1';
+		document.f.action.value=ret;
+		document.f.submit();
+		return true;
+	}
+	function calculate() {
+		var val=document.f.size.value;
+		size=val;
+	}
+//--></script>
+</head>
+<body bgcolor="#888888" leftmargin="0" topmargin="0" marginwidth="0" marginheight="0">
+<!-- start console win -->
+<center>
+<table bgcolor="#eeeeee" height="100%" width="100%" border="0" cellpadding="0" cellspacing="0" class="block0">
+<tr valign="top">
+<td align="center">	
+<table bgcolor="#005a8f" width="100%" border="0" cellpadding="2" cellspacing="0">
+<tr valign="center">
+<td height="18" align="left" class="td_label" width=10><img src="png.so?path=image&image=online.gif" border=0 alt="<?get_online();?>"></td>
+<td height="18" align="left" class="td_label">&nbsp;Network Configuration - Bandwidth Shaping</td>
+<td height="18" align="right"><a href="blank.so"><img src="png.so?path=image&image=close.png" border="0"></a></td>
+</tr>
+</table>
+<table bgcolor="#d4d0c8" width="100%" height="18" border="0" cellpadding="0" cellspacing="0">
+<tr valign="center">
+<td>
+<form name=e>
+<nobr>
+<input type=button value="DNS/Gateway" class=input_button onclick="load('network0.so');"><input type=button value="Interfaces Setup" class=input_button onclick="load('network1.so');"><input type=button value="Routing Setup" class=input_button onclick="load('network5.so');"><input type=button value="Host Addresses" class=input_button onclick="load('network2.so');"><input type=button value="ARP Cache" class=input_button onclick="load('network3.so');"><input type=button value="Bandwidth Shaping" class=input_button onclick="load('network4.so');"><input type=button value="Link Failover" class=input_button onclick="load('network6.so');"><input type=button value="Link Failover" class=input_button onclick="load('network6.so');">
+</nobr>
+</td>
+</tr>
+<tr><td></form></td></tr>
+</table>
+
+
+<table bgcolor="#eeeeee" width="100%" height="100%" border="0" cellpadding="1" cellspacing="1" class="block">
+<tr valign="top">
+<td align=center><br><br>
+<form name=f action=network4.1.so?do=1 method=post>
+<!------>
+<table bgcolor="#eeeeee" width="800" border="0" cellpadding="1" cellspacing="1">
+<tr valign="top">
+<td valign="top">
+    <table cellpadding="5" border="0" cellspacing="0" align="center">
+    <tr>
+        <td align=center valign="top" width="400">
+            <fieldset>
+                <legend>Bandwidth Setting</legend>
+                <table border="0" cellspacing="1" cellpadding="0">
+                    <tr>
+                        <td class=td_tab>
+                            Source&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td class=td_tab bgcolor="#E7E9F2">
+
+			<select name=src0 class=input_text onchange="document.f.src1.value='';">
+			<option value="NULL" selected>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</option>
+			<?
+				$eth0ip=get_ini('NETWORK','OUTSIDE_IP');
+				$eth0net=get_ini('NETWORK','OUTSIDE_NETWORK');
+				$eth2ip=get_ini('NETWORK','INSIDE_IP');
+				$eth2net=get_ini('NETWORK','INSIDE_NETWORK');
+				$eth1ip=get_ini('NETWORK','DMZ1_IP');
+				$eth1net=get_ini('NETWORK','DMZ1_NETWORK');
+				$eth3ip=get_ini('NETWORK','DMZ2_IP');
+				$eth3net=get_ini('NETWORK','DMZ2_NETWORK');
+				if($eth0ip!=NULL) {
+					echo "<option value=\"$eth0ip\">$eth0ip</option>\n";
+				}
+				if($eth2ip!=NULL) {
+					echo "<option value=\"$eth2ip\">$eth2ip</option>\n";
+				}
+				if($eth1ip!=NULL) {
+					echo "<option value=\"$eth1ip\">$eth1ip</option>\n";
+				}
+				if($eth3ip!=NULL) {
+					echo "<option value=\"$eth3ip\">$eth3ip</option>\n";
+				}
+				if($eth0net!=NULL) {
+					echo "<option value=\"$eth0net/24\">$eth0net/24</option>\n";
+				}
+				if($eth2net!=NULL) {
+					echo "<option value=\"$eth2net/24\">$eth2net/24</option>\n";
+				}
+				if($eth1net!=NULL) {
+					echo "<option value=\"$eth1net/24\">$eth1net/24</option>\n";
+				}
+				if($eth3net!=NULL) {
+					echo "<option value=\"$eth3net/24\">$eth3net/24</option>\n";
+				}
+				if(file_exists('/hd/configs/hosts.lst')) {
+					$file=fopen('/hd/configs/hosts.lst','r');
+					while(!feof($file)) {
+						$buff=fgets($file,500);
+						$buff=trim($buff);
+						if($buff!='') {
+							list($ip,$tmp)=explode('|',$buff);
+							if($ip!='') {
+								echo "<option value=\"$ip\">$ip</option>\n";
+							}
+
+						}
+					}
+					fclose($file);
+
+				}
+				if(file_exists('/hd/configs/dmz_h.lst')) {
+					$file=fopen('/hd/configs/dmz_h.lst','r');
+					while(!feof($file)) {
+						$buff=fgets($file,500);
+						$buff=trim($buff);
+						if($buff!='') {
+							list($ip,$tmp)=explode('|',$buff);
+							if($ip!='') {
+								echo "<option value=\"$ip\">$ip</option>\n";
+							}
+						}
+					}
+					fclose($file);
+				}
+			?>
+			</select>
+                            <input type="text" name="src1" size="15" value="" class="input_text" onclick="document.f.src1.value='';document.f.src0.options[0].selected=true">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class=td_tab>
+                            Transmission&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td class=td_tab bgcolor="#E7E9F2">
+			   <select name=trans0 class=input_text onchange="document.f.trans1.value='';">
+			    <option value="NULL">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</option>
+			    <? 
+				if(file_exists('/hd/configs/trans.lst')) {
+					$buff=file('/hd/configs/trans.lst');
+					foreach($buff as $line) {
+						$line=trim($line);
+						if($line!='') {
+							echo "<option value='$line'>$line</option>";
+						}
+					}
+					unset($buff,$line);
+				}
+			    ?>
+			    </select>
+                            <input type="text" name="trans1" size="7" value="" class="input_text" onclick="document.f.trans1.value='';document.f.trans0.options[0].selected=true"">
+			    <select name=size class=input_text onchange="calculate();">
+			    <option value="1024">Kb</option>
+			    <option value="1048576">Mb</option>
+			    <option value="1073741824">Gb</option>
+			    </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class=td_tab>
+                            Description&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                       <td class=td_tab bgcolor="#E7E9F2">
+                            <input type="text" name="descr" size="15" value="" class="input_text" onclick="document.f.descr.value=''">
+                        </td>
+                    </tr>
+                   </table>
+            </fieldset>
+         </td>
+    </tr>
+    </table>
+<input type=hidden name=action>
+</form>
+
+</td>
+</tr>
+    <tr>
+        <td colspan="2" align="center">
+           <input type="button" value="Cancel" class="input_button" onclick="load('network4.so');"> <input type="button" value="Save This Setting" class="input_button" onclick="return dosubmit();">
+        </td>
+    </tr>
+</table>
+<!------>
+
+</td>
+</tr>
+</table>
+</td>
+</tr>
+</table>
+</center>
+<!-- end console win -->
+</body>
+</html>
+
+<? flush(); ?>

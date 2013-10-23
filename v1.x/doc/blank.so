@@ -1,0 +1,49 @@
+#!/bin/php
+<?
+//
+// Mybox Firewall - A Firewall Appliance
+// http://www.mybox.net.my/
+//
+// (C) Copyright 2002,2003,2004 Mohd Nawawi Mohamad Jamili, TraceNetwork Corporation Sdn. Bhd.
+//
+// This program is not free software; you cannot redistribute it and/or
+// modify without permission copyright owner.
+//
+// This code is protected by copyright law and international treaties. 
+// Unauthorized reproduction or distribution of this program, or any portion of it, 
+// may result in severe civil and criminal penalties, and will be prosecuted to the 
+// maximum extent possible under the law.
+//
+// $Id: blank.so,v 1.00 2003/07/28 1:07 AM nawawi Exp $
+//
+	include_once('scripts/functions.inc');
+	include_once('scripts/auth.inc');
+	$_ACCESS=chk_session();
+	if($_ACCESS=='') {
+		go_exit();
+	}
+	write_nocache();
+?>
+<?include_once('scripts/header.inc');?>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>MyBox Firewall</title>
+<?include_once('scripts/global.js');?>
+<?include_once('scripts/style.css');?>
+</head>
+<body bgcolor="#888888" leftMargin=0 rightMargin=0 leftMargin=0 rightMargin=0 topMargin=0 bottomMargin=0 marginheight="0" marginwidth="0" bgproperties="fixed" scroll=no onload="initjsDOMenu();">
+	<table height="110%" border="0" cellpadding="0" cellspacing="0">
+		<tr valign="top">
+			<td>	
+				&nbsp;
+			</td>
+		</tr>
+		<tr>
+			<td></td>
+		</tr>
+	</table>
+</body>
+</html>
+
+<? flush(); ?>

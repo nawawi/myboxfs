@@ -1,0 +1,646 @@
+#!/bin/php
+<?
+//
+// Mybox Firewall - A Firewall Appliance
+// http://www.mybox.net.my/
+//
+// (C) Copyright 2002,2003,2004 Mohd Nawawi Mohamad Jamili, TraceNetwork Corporation Sdn. Bhd.
+//
+// This program is not free software; you cannot redistribute it and/or
+// modify without permission copyright owner.
+//
+// This code is protected by copyright law and international treaties. 
+// Unauthorized reproduction or distribution of this program, or any portion of it, 
+// may result in severe civil and criminal penalties, and will be prosecuted to the 
+// maximum extent possible under the law.
+//
+// $Id: policy2.1.so,v 1.00 2003/07/28 1:07 AM nawawi Exp $
+//
+	include_once('scripts/functions.inc');
+	include_once('scripts/auth.inc');
+	$_ACCESS=chk_session();
+	if($_ACCESS=='' || is_admin($_ACCESS)) {
+		write_userlog('Accessing NAT -> New rule page','Access denied');
+		go_exit();
+	}
+	if(is_admin($_ACCESS)) {
+		write_userlog('Accessing NAT -> New rule page','Access denied -> Not Admin');
+		echo "you're on candid camera..";
+		exit;
+	}
+	if(isset($do)&& $do=='1') {
+		list($list,$rule)=explode(',',$list);
+		write_natlist($list,$rule);
+		unset($do,$list,$rule);
+		write_userlog('Executing NAT -> New rule page -> Saving data','Action granted');
+		header("Location: policy_msg.so?ref=policy2.1.so&msg=Please wait.. saving data..");
+	}
+
+	write_userlog('Accessing NAT -> New rule page','Access granted');
+	write_nocache();
+?>
+<?include_once('scripts/header.inc');?>
+<html>
+<head>
+<title>MyBox Firewall</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<?include_once('scripts/style.css');?>
+<?include_once('scripts/global.js');?>
+<?include_once('scripts/network.js');?>
+<script language="javascript1.2"><!--
+	defaultStatus="DNAT Policy";
+	function dosubmit() {
+		var protocol=document.f.protocol.value;
+		if(document.f.log0.checked==true) {
+			var log='1';
+		} else {
+			var log='0';
+		}
+
+		// rule
+		if(document.f.rule0.checked==true) {
+			var rule='1';
+		} else {
+			var rule='0';
+		}
+		if(document.f.desc.value=='') {
+			var desc='none';
+		} else {
+			var desc=document.f.desc.value;
+			desc=desc.replace(/\,/,'');
+		}
+		
+		// src
+		if(document.f.src_ip0.value=='NULL') {
+			if(document.f.src_ip1.value=='') {
+				return false;
+			} else {
+				var src_ip=document.f.src_ip1.value;
+			}
+		} else {
+			var src_ip=document.f.src_ip0.value;
+		}
+		if(checkIp(src_ip)==false) {
+			document.f.src_ip1.focus();
+			document.f.src_ip1.value='';
+			return false;
+		}
+		if(src_ip=='0.0.0.0') src_ip='any';
+
+		// src port
+		if(document.f.src_po0.value=='NULL') {
+			if(document.f.src_po1.value=='') {
+				return false;
+			} else {
+				var src_po=document.f.src_po1.value;
+			}
+		} else {
+			var src_po=document.f.src_po0.value;
+		}
+		if(src_po!='any') {
+			if(!isInteger(src_po)) {
+				document.f.src_po1.focus();
+				document.f.src_po1.value='';
+				alert('Invalid port');
+			}
+		}
+		
+		// destination ip
+		if(document.f.des_ip0.value=='NULL') {
+			if(document.f.des_ip1.value=='') {
+				return false;
+			} else {
+				var des_ip=document.f.des_ip1.value;
+			}
+		} else {
+			var des_ip=document.f.des_ip0.value;
+		}
+		if(checkIp(des_ip)==false) {
+			document.f.des_ip1.focus();
+			document.f.des_ip1.value='';
+			return false;
+		}
+		if(des_ip=='0.0.0.0') des_ip='any';
+
+		// src port
+		if(document.f.des_po0.value=='NULL') {
+			if(document.f.des_po1.value=='') {
+				return false;
+			} else {
+				var des_po=document.f.des_po1.value;
+			}
+		} else {
+			var des_po=document.f.des_po0.value;
+		}
+		if(des_po!='any') {
+			if(!isInteger(des_po)) {
+				document.f.des_po1.focus();
+				document.f.des_po1.value='';
+				alert('Invalid port');
+			}
+		}
+
+		//fwd
+		if(document.f.fw_ip0.value=='NULL') {
+			if(document.f.fw_ip1.value=='') {
+				return false;
+			} else {
+				var fw_ip=document.f.fw_ip1.value;
+			}
+		} else {
+			var fw_ip=document.f.fw_ip0.value;
+		}
+		if(checkIp(fw_ip)==false) {
+			document.f.fw_ip1.focus();
+			document.f.fw_ip1.value='';
+			return false;
+		}
+		if(fw_ip=='0.0.0.0') fw_ip='any';
+
+		// src port
+		if(document.f.fw_po0.value=='NULL') {
+			if(document.f.fw_po1.value=='') {
+				return false;
+			} else {
+				var fw_po=document.f.fw_po1.value;
+			}
+		} else {
+			var fw_po=document.f.fw_po0.value;
+		}
+		if(fw_po!='any') {
+			if(!isInteger(fw_po)) {
+				document.f.fw_po1.focus();
+				document.f.fw_po1.value='';
+				alert('Invalid port');
+			}
+		}
+
+		//Source Source Port Destination Destination Port Protocol Traffic Action Description Log Active 
+		var val=src_ip+'|'+src_po+'|'+des_ip+'|'+des_po+'|'+fw_ip+'|'+fw_po+'|'+protocol+'|'+desc+'|'+log+'|'+'1'+'|';
+		
+		document.f.list.value=val+','+rule;
+		document.f.submit();
+	}
+
+	function chk_proto() {
+		var prot=document.f.protocol.value;
+		if((prot!='tcp')|(prot!='udp')|(prot!='icmp')) {
+			document.f.src_po0.disabled=true;
+			document.f.src_po1.value='';
+
+			document.f.src_po0.options[1].selected=true;
+			document.f.src_po1.disabled=true;
+			document.f.des_po0.disabled=true;
+			document.f.des_po1.value='';
+			document.f.des_po0.options[1].selected=true;
+			document.f.des_po1.disabled=true;
+			document.f.fw_po0.disabled=true;
+			document.f.fw_po1.value='';
+			document.f.fw_po0.options[1].selected=true;
+			document.f.fw_po1.disabled=true;
+		}
+		if((prot=='tcp')|(prot=='udp')|(prot=='icmp')) {
+			document.f.src_po0.disabled=false;
+			document.f.src_po1.value='';
+			document.f.src_po0.options[0].selected=true;
+			document.f.src_po1.disabled=false;
+			document.f.des_po0.disabled=false;
+			document.f.des_po1.value='';
+			document.f.des_po0.options[0].selected=true;
+			document.f.des_po1.disabled=false;
+			document.f.fw_po0.disabled=false;
+			document.f.fw_po1.value='';
+			document.f.fw_po0.options[0].selected=true;
+			document.f.fw_po1.disabled=false;
+		}
+	}
+//--></script>
+</head>
+<body bgcolor="#888888" leftmargin="0" topmargin="0" marginwidth="0" marginheight="0" onload="initjsDOMenu();chk_proto();">
+<!-- start console win -->
+<center>
+<table bgcolor="#eeeeee" height="100%" width="100%" border="0" cellpadding="0" cellspacing="0" class="block0">
+<tr valign="top">
+<td align="center">	
+
+<table bgcolor="#005a8f" width="100%" border="0" cellpadding="2" cellspacing="0">
+<tr valign="center">
+<td height="18" align="left" class="td_label" width=10><img src="png.so?path=image&image=online.gif" border=0 alt="<?get_online();?>"></td>
+<td height="18" align="left" class="td_label">&nbsp;Policy Configuration - DNAT Policy</td>
+<td height="18" align="right"><a href="blank.so"><img src="png.so?path=image&image=close.png" border="0"></a></td>
+
+</tr>
+</table>
+<table bgcolor="#d4d0c8" width="100%" height="18" border="0" cellpadding="0" cellspacing="0">
+<tr valign="center">
+<td>
+<form name=e>
+<nobr>
+<input type=button value="Filter Policy" class=input_button onclick="load('policy0.so');"><input type=button value="Custom Policy" class=input_button onclick="load('policy1.so');"><input type=button value="Interfaces Policy" class=input_button onclick="load('policy5.so');"><input type=button value="DNAT Policy" class=input_button onclick="load('policy2.so');"><input type=button value="SNAT Policy" class=input_button onclick="load('policy6.so');"><input type=button value="String Policy" class=input_button onclick="load('policy3.so');"><input type=button value="IP Sysctl Setup" class=input_button onclick="load('policy4.so');"></nobr>
+</td>
+</tr>
+<tr><td></form></td></tr>
+</table>
+
+
+<table bgcolor="#eeeeee" width="100%" height="100%" border="0" cellpadding="1" cellspacing="1" class="block">
+<tr valign="top">
+<td align=center><br><br>
+
+<form name=f action=policy2.1.so?do=1 method=post>
+    <table cellpadding="5" border="0" cellspacing="0" align="center">
+    <tr>
+        <td nowrap="nowrap" valign="top" width="250">
+          <fieldset>
+                <legend>Rule Options</legend>
+                <table border="0" cellspacing="1" cellpadding="0" bgcolor="#E7E9F2">
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            Protocol&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td align=right bgcolor="#E7E9F2">
+			<select name=protocol class=input_text onchange="chk_proto();">
+			<option value="all">all&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</option>
+			<option value="tcp">tcp</option>
+			<option value="udp">udp</option>
+			<option value="gre">gre</option>
+			</select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            Logging&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td bgcolor="#E7E9F2">
+			<input type=checkbox name=log0 value="yes" onclick="if(document.f.log0.checked==true) document.f.log1.checked=false;document.f.log0.checked=true"> Yes <input type=checkbox name=log1 value="no" onclick="if(document.f.log1.checked==true) document.f.log0.checked=false;document.f.log1.checked=true" checked> No
+                        </td>
+                    </tr>
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            Rule position&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td bgcolor="#E7E9F2">
+			<input type=checkbox name=rule0 value="top" onclick="if(document.f.rule0.checked==true) document.f.rule1.checked=false;document.f.rule0.checked=true"> Top <input type=checkbox name=rule1 value="bottom" onclick="if(document.f.rule1.checked==true) document.f.rule0.checked=false;document.f.rule1.checked=true" checked> Bottom
+                        </td>
+                    </tr>
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            Description&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td bgcolor="#E7E9F2">
+			<input type="text" name="desc" size="15" value="" class="input_text">
+                        </td>
+                    </tr>
+		</table>
+            </fieldset>
+        </td>
+        <!-- Options -->
+        <td valign="top" width="350">
+            <fieldset>
+                <legend>Rule Conditions</legend>
+                <table border="0" cellspacing="1" cellpadding="0" bgcolor="#E7E9F2">
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            Source IP&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td align=right bgcolor="#E7E9F2">
+
+			<select name=src_ip0 class=input_text onchange="document.f.src_ip1.value='';">
+			<option value="NULL" selected>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</option>
+			<option value="0.0.0.0">any</option>
+			<option value="127.0.0.1">127.0.0.1</option>
+			<?
+				$eth0ip=get_ini('NETWORK','OUTSIDE_IP');
+				$eth0net=get_ini('NETWORK','OUTSIDE_NETWORK');
+				$eth2ip=get_ini('NETWORK','INSIDE_IP');
+				$eth2net=get_ini('NETWORK','INSIDE_NETWORK');
+				$eth1ip=get_ini('NETWORK','DMZ1_IP');
+				$eth1net=get_ini('NETWORK','DMZ1_NETWORK');
+				$eth3ip=get_ini('NETWORK','DMZ2_IP');
+				$eth3net=get_ini('NETWORK','DMZ2_NETWORK');
+				if($eth0ip!=NULL) {
+					echo "<option value=\"$eth0ip\">$eth0ip</option>\n";
+				}
+				if($eth2ip!=NULL) {
+					echo "<option value=\"$eth2ip\">$eth2ip</option>\n";
+				}
+				if($eth1ip!=NULL) {
+					echo "<option value=\"$eth1ip\">$eth1ip</option>\n";
+				}
+				if($eth3ip!=NULL) {
+					echo "<option value=\"$eth3ip\">$eth3ip</option>\n";
+				}
+				if($eth0net!=NULL) {
+					echo "<option value=\"$eth0net/24\">$eth0net/24</option>\n";
+				}
+				if($eth2net!=NULL) {
+					echo "<option value=\"$eth2net/24\">$eth2net/24</option>\n";
+				}
+				if($eth1net!=NULL) {
+					echo "<option value=\"$eth1net/24\">$eth1net/24</option>\n";
+				}
+				if($eth3net!=NULL) {
+					echo "<option value=\"$eth3net/24\">$eth3net/24</option>\n";
+				}
+				if(file_exists('/hd/configs/hosts.lst')) {
+					$file=fopen('/hd/configs/hosts.lst','r');
+					while(!feof($file)) {
+						$buff=fgets($file,500);
+						$buff=trim($buff);
+						if($buff!='') {
+							list($ip,$tmp)=explode('|',$buff);
+							if($ip!='') {
+								echo "<option value=\"$ip\">$ip</option>\n";
+							}
+						}
+					}
+					fclose($file);
+				}
+				if(file_exists('/hd/configs/dmz_h.lst')) {
+					$file=fopen('/hd/configs/dmz_h.lst','r');
+					while(!feof($file)) {
+						$buff=fgets($file,500);
+
+						$buff=trim($buff);
+						if($buff!='') {
+							list($ip,$tmp)=explode('|',$buff);
+							if($ip!='') {
+								echo "<option value=\"$ip\">$ip</option>\n";
+							}
+						}
+					}
+					fclose($file);
+				}
+			?>
+			</select>
+                        </td>
+                        <td bgcolor="#E7E9F2">
+                            <input type="text" name="src_ip1" size="15" value="" class="input_text" onclick="document.f.src_ip0.options[0].selected=true;">
+                        </td>
+                    </tr>
+                    <tr>
+
+                        <td bgcolor="#E7E9F2">
+                            Source Port&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td align=right bgcolor="#E7E9F2">
+			<select name=src_po0 class=input_text onchange="document.f.src_po1.value='';">
+			<option value="NULL" selected>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</option>
+			<option value="any">any</option>
+			<option value="80">http</option>
+			<option value="443">https</option>
+			<option value="25">smtp</option>
+			<option value="23">telnet</option>
+			<option value="21">ftp</option>
+			<option value="20">ftp-data</option>
+			<option value="22">ssh</option>
+			<option value="69">tftp</option>
+			<option value="115">sftp</option>
+			<option value="143">imap</option>
+			<option value="161">snmp</option>
+			<option value="162">snmptrap</option>
+			<option value="110">pop3</option>
+			<option value="8080">proxy</option>
+			<option value="33434">traceroute</option>
+			<option value="465">smtps</option>
+			<option value="3128">squid</option>
+			<option value="540">uucp</option>
+			</select>
+                        </td>
+                        <td bgcolor="#E7E9F2">
+                            <input type="text" name="src_po1" size="15" value="" class="input_text" onclick="document.f.src_po0.options[0].selected=true;">
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            Destination IP&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td align=right bgcolor="#E7E9F2">
+			<select name=des_ip0 class=input_text onchange="document.f.des_ip1.value='';">
+
+			<option value="NULL" selected>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</option>
+			<option value="0.0.0.0">any</option>
+			<option value="127.0.0.1">127.0.0.1</option>
+			<?
+				if($eth0ip!=NULL) {
+					echo "<option value=\"$eth0ip\">$eth0ip</option>\n";
+				}
+				if($eth2ip!=NULL) {
+					echo "<option value=\"$eth2ip\">$eth2ip</option>\n";
+				}
+				if($eth1ip!=NULL) {
+					echo "<option value=\"$eth1ip\">$eth1ip</option>\n";
+				}
+				if($eth3ip!=NULL) {
+					echo "<option value=\"$eth3ip\">$eth3ip</option>\n";
+				}
+				if($eth0net!=NULL) {
+					echo "<option value=\"$eth0net/24\">$eth0net/24</option>\n";
+				}
+				if($eth2net!=NULL) {
+					echo "<option value=\"$eth2net/24\">$eth2net/24</option>\n";
+				}
+				if($eth1net!=NULL) {
+					echo "<option value=\"$eth1net/24\">$eth1net/24</option>\n";
+				}
+				if($eth3net!=NULL) {
+					echo "<option value=\"$eth3net/24\">$eth3net/24</option>\n";
+				}
+				if(file_exists('/hd/configs/hosts.lst')) {
+					$file=fopen('/hd/configs/hosts.lst','r');
+					while(!feof($file)) {
+						$buff=fgets($file,500);
+						$buff=trim($buff);
+						if($buff!='') {
+							list($ip,$tmp)=explode('|',$buff);
+							if($ip!='') {
+								echo "<option value=\"$ip\">$ip</option>\n";
+							}
+						}
+					}
+					fclose($file);
+				}
+				if(file_exists('/hd/configs/dmz_h.lst')) {
+					$file=fopen('/hd/configs/dmz_h.lst','r');
+					while(!feof($file)) {
+						$buff=fgets($file,500);
+
+						$buff=trim($buff);
+						if($buff!='') {
+							list($ip,$tmp)=explode('|',$buff);
+							if($ip!='') {
+
+								echo "<option value=\"$ip\">$ip</option>\n";
+							}
+						}
+					}
+					fclose($file);
+				}
+			?>
+
+			</select>
+                        </td>
+                        <td bgcolor="#E7E9F2">
+                            <input type="text" name="des_ip1" size="15" value="" class="input_text" onclick="document.f.des_ip0.options[0].selected=true;">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td bgcolor="#E7E9F2">
+                            Destination Port&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td align=right bgcolor="#E7E9F2">
+			<select name=des_po0 class=input_text onchange="document.f.des_po1.value='';">
+			<option value="NULL" selected>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</option>
+			<option value="any">any</option>
+			<option value="80">http</option>
+			<option value="443">https</option>
+			<option value="25">smtp</option>
+			<option value="23">telnet</option>
+			<option value="21">ftp</option>
+			<option value="20">ftp-data</option>
+			<option value="22">ssh</option>
+			<option value="69">tftp</option>
+			<option value="115">sftp</option>
+			<option value="143">imap</option>
+			<option value="161">snmp</option>
+			<option value="162">snmptrap</option>
+			<option value="110">pop3</option>
+			<option value="8080">proxy</option>
+			<option value="33434">traceroute</option>
+			<option value="465">smtps</option>
+			<option value="3128">squid</option>
+			<option value="540">uucp</option>
+			</select>
+                        </td>
+                       <td bgcolor="#E7E9F2">
+                            <input type="text" name="des_po1" size="15" value="" class="input_text" onclick="document.f.des_po0.options[0].selected=true;">
+                        </td>
+                    </tr>
+
+                   <tr>
+                        <td bgcolor="#E7E9F2">
+                            Translate to IP&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td align=right bgcolor="#E7E9F2">
+			<select name=fw_ip0 class=input_text onchange="document.f.fw_ip1.value='';">
+			<option value="NULL" selected>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</option>
+			<option value="0.0.0.0">any</option>
+			<option value="127.0.0.1">127.0.0.1</option>
+			<?
+				if($eth0ip!=NULL) {
+					echo "<option value=\"$eth0ip\">$eth0ip</option>\n";
+				}
+				if($eth2ip!=NULL) {
+					echo "<option value=\"$eth2ip\">$eth2ip</option>\n";
+				}
+				if($eth1ip!=NULL) {
+					echo "<option value=\"$eth1ip\">$eth1ip</option>\n";
+				}
+				if($eth0net!=NULL) {
+					echo "<option value=\"$eth0net/24\">$eth0net/24</option>\n";
+				}
+				if($eth2net!=NULL) {
+					echo "<option value=\"$eth2net/24\">$eth2net/24</option>\n";
+				}
+
+				if($eth1net!=NULL) {
+					echo "<option value=\"$eth1net/24\">$eth1net/24</option>\n";
+				}
+				if(file_exists('/hd/configs/hosts.lst')) {
+					$file=fopen('/hd/configs/hosts.lst','r');
+					while(!feof($file)) {
+						$buff=fgets($file,500);
+						$buff=trim($buff);
+						if($buff!='') {
+							list($ip,$tmp)=explode('|',$buff);
+							if($ip!='') {
+								echo "<option value=\"$ip\">$ip</option>\n";
+							}
+						}
+					}
+					fclose($file);
+				}
+				if(file_exists('/hd/configs/dmz_h.lst')) {
+					$file=fopen('/hd/configs/dmz_h.lst','r');
+					while(!feof($file)) {
+						$buff=fgets($file,500);
+
+						$buff=trim($buff);
+						if($buff!='') {
+							list($ip,$tmp)=explode('|',$buff);
+							if($ip!='') {
+								echo "<option value=\"$ip\">$ip</option>\n";
+							}
+						}
+					}
+					fclose($file);
+				}
+			?>
+			</select>
+                        </td>
+                        <td bgcolor="#E7E9F2">
+                            <input type="text" name="fw_ip1" size="15" value="" class="input_text" onclick="document.f.fw_ip0.options[0].selected=true;">
+                        </td>
+                    </tr>
+
+                     <tr>
+                        <td bgcolor="#E7E9F2">
+                            Translate to Port&nbsp;&nbsp;&nbsp;&nbsp;
+                        </td>
+                        <td align=right bgcolor="#E7E9F2">
+			<select name=fw_po0 class=input_text onchange="document.f.fw_po1.value='';">
+			<option value="NULL" selected>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</option>
+			<option value="any">any</option>
+			<option value="80">http</option>
+			<option value="443">https</option>
+			<option value="25">smtp</option>
+			<option value="23">telnet</option>
+			<option value="21">ftp</option>
+			<option value="20">ftp-data</option>
+			<option value="22">ssh</option>
+			<option value="69">tftp</option>
+			<option value="115">sftp</option>
+			<option value="143">imap</option>
+			<option value="161">snmp</option>
+			<option value="162">snmptrap</option>
+			<option value="110">pop3</option>
+			<option value="8080">proxy</option>
+			<option value="33434">traceroute</option>
+			<option value="465">smtps</option>
+			<option value="3128">squid</option>
+			<option value="540">uucp</option>
+			</select>
+                        </td>
+                       <td bgcolor="#E7E9F2">
+                            <input type="text" name="fw_po1" size="15" value="" class="input_text" onclick="document.f.fw_po0.options[0].selected=true;">
+                        </td>
+                    </tr>
+
+                   </table>
+            </fieldset>
+         </td>
+    </tr>
+
+    <tr>
+        <td colspan="2" align="center">
+           <input type="button" value="Cancel" class="input_button" onclick="load('policy.so');"> <input type="button" value="Save This Rule" class="input_button" onclick="return dosubmit();">
+        </td>
+    </tr>
+    </table>
+<input type=hidden name=list>
+</form>
+
+</td>
+</tr>
+</table>
+
+</td>
+</tr>
+</table>
+</center>
+<!-- end console win -->
+</body>
+</html>
+
+<? flush(); ?>
