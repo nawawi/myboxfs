@@ -1,4 +1,0 @@
-#
-# name	getty				type	status		comments
-#
-console	"/bin/sh /etc/rc.initial"	cons25	on secure
